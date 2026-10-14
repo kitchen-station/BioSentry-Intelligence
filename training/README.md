@@ -18,6 +18,7 @@ Status: **spike (M3b)**, retrospective and on public data only.
 | `export_numpy.py` | Turns the FP32 and INT8 ONNX files into `weights.npz` and `golden.npz` for the backend's numpy forward pass (needs `rhythm_head.py` beside it, so no `-I`) |
 | `golden_windows.py` | The seeded synthetic windows behind `golden.npz` (numpy only; a test regenerates them from the seed) |
 | `rr_baseline.py` | Classical RR-irregularity AF baseline for the M3 exit gate: `check-detector` (MIT-BIH DS1 only), `select` (feature and threshold from CinC validation only), `score` (AFDB, head and baseline on the same windows, paired record-level bootstrap). Numpy only at import; its pure functions are tested in `backend/tests/unit/test_rr_baseline.py` |
+| `pvc.py` | Premature-ventricular-beat metric code and the RR-ratio comparator: beat context, the two rules, one-to-one beat scoring (V is the only positive), pooled rates, record-level bootstrap, window-placement misses. Development on MIT-BIH DS1 only (`develop`); it names no test-split record. Numpy only at import; tested in `backend/tests/unit/test_pvc.py` |
 | `rr_baseline_selection.json` | The pinned choice `select` wrote before AFDB was scored, with the detector's constants |
 | `bench_ort.py` | CPU latency (p50, p95 per window and per patient-minute) and peak RSS of the FP32 or INT8 network under ONNX Runtime, batch 1, one thread |
 | `pyproject.toml` | Own project, exact pins, Python 3.11 |
@@ -41,6 +42,9 @@ python3.11 -m venv .venv && .venv/bin/pip install -c constraints.txt -e .
 .venv/bin/python -I rr_baseline.py select --out out
 .venv/bin/python -I rr_baseline.py score  --data data --out out
 .venv/bin/python -I bench_ort.py --onnx out/tiny_fp32.onnx
+
+# PVC comparator development (DS1 only)
+.venv/bin/python -I pvc.py develop --data data --out out
 ```
 
 Run with `-I` and keep downloaded data in its own directory: treat it as untrusted input.
@@ -52,7 +56,7 @@ Run with `-I` and keep downloaded data in its own directory: treat it as untrust
 | PhysioNet/CinC Challenge 2017 training set (doi 10.13026/d3hm-sf11) | train / validation / test, split by record | 99 MB zip |
 | MIT-BIH Noise Stress Test DB, bw/em/ma noise records (10.13026/C2HS3T) | noise augmentation (first half), robustness test (second half) | 6 MB |
 | MIT-BIH Atrial Fibrillation DB (10.13026/C2MW2D) | external test only, never trained on | 635 MB |
-| MIT-BIH Arrhythmia DB (10.13026/C2F305) | R-peak detector check of the RR baseline on DS1 only (paced records and 202 out); DS2 untouched, reserved for the PVC metric | 109 MB |
+| MIT-BIH Arrhythmia DB (10.13026/C2F305) | R-peak detector check of the RR baseline and PVC comparator development, on DS1 only (paced records and 202 out); the test split is untouched, reserved for the PVC metric | 109 MB |
 
 ## Spike results (retrospective, public data; see Limits)
 

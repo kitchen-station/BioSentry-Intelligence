@@ -94,16 +94,18 @@ def _local_maxima(values: np.ndarray) -> np.ndarray:
     return np.flatnonzero((values[1:-1] > values[:-2]) & (values[1:-1] >= values[2:])) + 1
 
 
-def _gate(energy: np.ndarray, candidates: np.ndarray, radius: int) -> np.ndarray:
-    """Candidates that survive refractory suppression and reach THRESHOLD_FRACTION of the typical
-    peak (the median of the five largest). Empty when there is no candidate."""
+def _gate(
+    energy: np.ndarray, candidates: np.ndarray, radius: int, fraction: float = THRESHOLD_FRACTION
+) -> np.ndarray:
+    """Candidates that survive refractory suppression and reach `fraction` of the typical peak
+    (the median of the five largest). Empty when there is no candidate."""
     if candidates.size == 0:
         return np.zeros(0, dtype=np.int64)
     best_first = candidates[np.argsort(-energy[candidates], kind="stable")]
     kept = np.array(_suppress(best_first, energy.size, radius), dtype=np.int64)
     heights = np.sort(energy[kept])[::-1]
     reference = float(np.median(heights[:TYPICAL_PEAKS]))
-    return kept[energy[kept] >= THRESHOLD_FRACTION * reference]
+    return kept[energy[kept] >= fraction * reference]
 
 
 def _merge(y: np.ndarray, peaks: np.ndarray, radius: int) -> np.ndarray:
@@ -120,7 +122,9 @@ def _refine(y: np.ndarray, peaks: np.ndarray, reach: int) -> np.ndarray:
     )
 
 
-def detect_r_peaks(x: Sequence[float] | np.ndarray, fs: float = FS) -> np.ndarray:
+def detect_r_peaks(
+    x: Sequence[float] | np.ndarray, fs: float = FS, threshold_fraction: float = THRESHOLD_FRACTION
+) -> np.ndarray:
     """R-peak sample indices of one window. Plain Pan-Tompkins-style energy detector.
 
     Raises ValueError on a non-finite sample: the caller refuses the window (I1), nothing is
@@ -140,7 +144,7 @@ def detect_r_peaks(x: Sequence[float] | np.ndarray, fs: float = FS) -> np.ndarra
     width = max(int(round(INTEGRATION_S * fs)), 1)
     energy = np.convolve(np.pad(slope * slope, width // 2, mode="edge"), np.ones(width) / width, "valid")[:n]
     radius = int(round(REFRACTORY_S * fs))
-    kept = _gate(energy, _local_maxima(energy), radius)
+    kept = _gate(energy, _local_maxima(energy), radius, threshold_fraction)
     return _merge(y, _refine(y, kept, int(round(REFINE_REACH_S * fs))), radius)
 
 
