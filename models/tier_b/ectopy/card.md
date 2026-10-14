@@ -7,9 +7,9 @@
 | version | 0.1.0-spike |
 | status | **research**: trained for study; not for ranking, not wired, not for product use |
 | artifact | `weights.npz` (boosted trees as arrays, band-pass coefficients, parity vectors); sha256 pinned in `models/registry.yaml` |
-| pin | `pin.json` freezes the method, thresholds, records, code hashes and minimums before the test split is scored |
+| pin | `pin.json` (status: pending) would freeze the method, thresholds, records, code hashes and minimums before the test split is scored; **DS2 is reserved and not scored** |
 | use | evaluation and development only |
-| claims | retrospective, public data. For the test split: "inter-patient test split of MIT-BIH Arrhythmia (DS2), same database as the development split", never "external" or "validated" (P10) |
+| claims | **none for PVC detection.** The development numbers below are out-of-fold estimates on the development records, retrospective, public data; they are not a test result and not "external" or "validated" (P10). Research-only |
 
 ## What it does
 
@@ -56,7 +56,7 @@ exists, may only calibrate and validate.
 included) were read once on 2026-10-14 to establish that a PVC metric was feasible. No DS2 signal,
 detector output or method result has been computed on DS2 at the time of this card.
 
-## Development results (DS1; record-grouped five-fold cross-validation; not a test result)
+## Development results (DS1; record-grouped five-fold cross-validation; out-of-fold development estimates, not a test result)
 
 Beat level, 150 ms one-to-one matching, annotated `V` the only positive; every other beat symbol,
 `F` (fusion) and `E` (escape) included, is a negative and stays in the denominators. A detection
@@ -68,6 +68,11 @@ holds 3,677 `V` beats in 22 records.
 | Learned head, out-of-fold, threshold 0.40 | 0.701 | 0.708 | 0.982 | 0.704 |
 | Primary comparator: RR-ratio rule (interval before / window median < 0.89) | 0.610 | 0.573 | 0.966 | 0.591 |
 | Secondary comparator: ratio < 0.95 and interval after > 1.10 x median | 0.478 | 0.720 | 0.986 | 0.575 |
+
+**Verdict: minimum NOT met on development data; DS2 reserved, not scored; no PVC claim.** The
+Evaluator's minimums are pooled sensitivity >= 0.80 and PPV >= 0.80; the head's out-of-fold
+0.701 and 0.708 are below both. The RR-ratio rule (0.610 / 0.573 / 0.966) is the PVC baseline
+against which any later head would be read.
 
 The head's row is out-of-fold: each record was scored by a model that never saw it. The two rules
 have two parameters each, chosen on DS1 by pooled F1 (their rows are resubstitution on DS1, which
@@ -92,20 +97,31 @@ and dealt out by `V` count: {115, 122, 124, 205, 208}, {106, 112, 114, 207, 220}
   development patients the beat-relative features generalised across records and the CNN did not.
   Neither CNN is shipped.
 
-## The test, to be run once
+## The test split: reserved, not scored
 
-Frozen in `pin.json` before the test split is touched: the method and its thresholds, the code
-files by sha256, the record lists, the definitions above, and the minimums set by the Evaluator
-before the counts were known: **pooled sensitivity >= 0.80 and PPV >= 0.80 as point estimates**,
-with record-level 95% intervals (1,000 resamples, seed 20261014) quoted and not gating. Pass or
-fail does not depend on beating the comparator; the paired difference with its interval is
-reported, and this card will say plainly if the learned head adds nothing. Records with zero PVCs
-are listed and stay in the pooled denominators; beats lost to where the windows fell are counted
-next to sensitivity. From the pin on, the test split is consumed: no decision may be informed by
-it, it is scored once, and a rerun is only a reproduction check with identical output.
+**DS2 is reserved and not scored.** The learned head misses the Evaluator's minimums on the
+development data (out-of-fold sensitivity 0.701 and PPV 0.708 against 0.80 and 0.80), the test
+split can be scored only once, and spending it on this head would leave nothing to evaluate a
+better one on. The Orchestrator held the scoring and the Evaluator agreed (2026-10-14). The minimums
+do not move. This card makes no PVC claim; the head is research-only, at status `research` and
+wired nowhere.
 
-No test-split number exists in this card yet. The development numbers above are a reason to
-expect that 0.80 / 0.80 may not be met.
+`pin.json` (status: pending; valid only for a head that is frozen and scored once, a different head
+needs a new pin) is ready for the day the test split is scored. It freezes, on the
+development records only, the method and its thresholds, the code files by sha256, the record
+lists, the definitions above and the minimums set by the Evaluator before the counts were known:
+**pooled sensitivity >= 0.80 and PPV >= 0.80 as point estimates**, with record-level 95% intervals
+(1,000 resamples, seed 20261014) quoted and not gating. Pass or fail does not depend on beating the
+comparator; the paired difference with its interval would be reported, and this card would say
+plainly if the learned head adds nothing. Records with zero PVCs would be listed and stay in the
+pooled denominators; beats lost to where the windows fell would be counted next to sensitivity. If
+it is ever scored, the test split is consumed from the pin on: scored once, a rerun only a
+reproduction check with identical output, no decision informed by it. The only way to a stronger
+claim is a better head developed on other data and scored once: the card does not promise one.
+
+No test-split number exists. The test split would be called, if scored, the "inter-patient test
+split of MIT-BIH Arrhythmia (DS2), same database as the development split", never external or
+validated.
 
 ## Limitations (read before quoting any number)
 
@@ -119,8 +135,9 @@ expect that 0.80 / 0.80 may not be met.
   where it fails; fusion (`F`) and escape (`E`) beats count as negatives.
 - Windows are independent 10 s: the first beat of a window has no interval before it, the last
   none after it, and a beat within 0.24 s of an edge is not callable.
-- **The M3 exit gate is not met by this card.** Outstanding at least: the test-split run and its
-  verdict, MindSpore Lite parity; the Evaluator's gate decides, and nothing here claims it.
+- **The M3 exit gate is not met by this card.** Outstanding at least: a PVC head that meets the
+  minimums on development data and a single test-split run, and MindSpore Lite parity; the
+  Evaluator's gate decides, and nothing here claims it.
 
 ## Reproduce
 

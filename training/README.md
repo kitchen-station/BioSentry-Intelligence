@@ -58,7 +58,7 @@ Run with `-I` and keep downloaded data in its own directory: treat it as untrust
 | PhysioNet/CinC Challenge 2017 training set (doi 10.13026/d3hm-sf11) | train / validation / test, split by record | 99 MB zip |
 | MIT-BIH Noise Stress Test DB, bw/em/ma noise records (10.13026/C2HS3T) | noise augmentation (first half), robustness test (second half) | 6 MB |
 | MIT-BIH Atrial Fibrillation DB (10.13026/C2MW2D) | external test only, never trained on | 635 MB |
-| MIT-BIH Arrhythmia DB (10.13026/C2F305) | R-peak detector check of the RR baseline; PVC comparator and learned head development, on DS1 only (paced records and 202 out). The test split is untouched until the pin, then scored once | 109 MB |
+| MIT-BIH Arrhythmia DB (10.13026/C2F305) | R-peak detector check of the RR baseline; PVC comparator and learned head development, on DS1 only (paced records and 202 out). The test split is reserved, untouched and not scored (pin pending) | 109 MB |
 
 ## Spike results (retrospective, public data; see Limits)
 

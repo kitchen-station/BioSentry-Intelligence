@@ -1,7 +1,9 @@
 {
  "pin_version": 1,
+ "status": "pending",
+ "status_note": "DS2 reserved, not scored: DS2 is unconsumed. The pin is pending: it is valid only for a head that is frozen and scored once, and a different head needs a new pin. Until then the test split stays untouched and unscored (held by the Orchestrator and agreed by the Evaluator, 2026-10-14, because this head misses the minimums on development data and DS2 can be scored once).",
  "frozen_on": "2026-10-14",
- "purpose": "Freezes the PVC method, its thresholds and model, the records, the definitions, the code and the minimums, chosen on the development records only, BEFORE the test split is touched (M3 exit gate part 2, item 1). From this commit on the test split is consumed: it is scored once, in its own PR, with this file as input; no decision about the method may be informed by it.",
+ "purpose": "DS2 reserved, not scored. If the test split is ever scored, this file freezes the PVC method, its thresholds and model, the records, the definitions, the code and the minimums, chosen on the development records only, BEFORE the test split is touched (M3 exit gate part 2, item 1). From the scoring on, the test split is consumed: it is scored once, in its own PR, with this file as input; no decision about the method may be informed by it.",
  "records": {
   "development": [
    "101",
@@ -232,7 +234,7 @@
  },
  "disclosure": "The annotation counts of the 22 DS2 records (3,220 V in 16 of 22 records, 202 included) were read once on 2026-10-14 to establish that a PVC metric was feasible, and were reported to the Orchestrator and the Evaluator in the Researcher's plan. No DS2 signal, detector output or method result had been computed on DS2 when this pin was written.",
  "claims": {
-  "allowed": "retrospective, public data; inter-patient test split of MIT-BIH Arrhythmia (DS2), same database as the development split; 21 records",
+  "allowed": "None for PVC detection while DS2 is not scored. If the test split is scored: retrospective, public data; inter-patient test split of MIT-BIH Arrhythmia (DS2), same database as the development split; 21 records",
   "never": [
    "external",
    "validated",
@@ -251,5 +253,5 @@
   "training/pvc_head.py": "0e71e962c76a032ef1df77bd4cddba9f31ddfbb72e0245d8f37a936ebeb55f45",
   "training/rr_baseline_selection.json": "62068713f0fd5444a8b88f13ba6635352ebf936adfa2cc10dfeccea1c85967b6"
  },
- "consumption": "scored once, by one scripted command, output committed with its sha256; a rerun is only a reproduction check with identical output; nothing is tuned after the first test-split number, and a mismatch is reported, not fixed."
+ "consumption": "Applies only if the test split is scored: scored once, by one scripted command, output committed with its sha256; a rerun is only a reproduction check with identical output; nothing is tuned after the first test-split number, and a mismatch is reported, not fixed. Not applicable while DS2 is reserved and not scored."
 }

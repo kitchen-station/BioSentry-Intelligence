@@ -169,6 +169,19 @@ def test_the_minimums_and_the_statistics_are_the_rulings() -> None:
     assert "head minus primary comparator" in pin["statistics"]["paired"]
 
 
+def test_the_pin_is_pending_and_says_that_the_test_split_is_reserved_not_scored() -> None:
+    pin = _pin()
+    assert pin["status"] == "pending"
+    assert pin["purpose"].startswith("DS2 reserved, not scored.")
+    note = pin["status_note"]
+    assert "DS2 reserved, not scored" in note
+    assert "DS2 is unconsumed" in note
+    assert "valid only for a head that is frozen and scored once" in note
+    assert "a different head needs a new pin" in note
+    assert "Applies only if the test split is scored" in pin["consumption"]
+    assert pin["claims"]["allowed"].startswith("None for PVC detection while DS2 is not scored.")
+
+
 def test_the_disclosure_the_consumption_rule_and_the_claim_words_are_in_the_pin() -> None:
     pin = _pin()
     assert "3,220 V in 16 of 22 records, 202 included" in pin["disclosure"]
