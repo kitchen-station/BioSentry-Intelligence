@@ -1,0 +1,255 @@
+{
+ "pin_version": 1,
+ "frozen_on": "2026-10-14",
+ "purpose": "Freezes the PVC method, its thresholds and model, the records, the definitions, the code and the minimums, chosen on the development records only, BEFORE the test split is touched (M3 exit gate part 2, item 1). From this commit on the test split is consumed: it is scored once, in its own PR, with this file as input; no decision about the method may be informed by it.",
+ "records": {
+  "development": [
+   "101",
+   "106",
+   "108",
+   "109",
+   "112",
+   "114",
+   "115",
+   "116",
+   "118",
+   "119",
+   "122",
+   "124",
+   "201",
+   "203",
+   "205",
+   "207",
+   "208",
+   "209",
+   "215",
+   "220",
+   "223",
+   "230"
+  ],
+  "development_folds": [
+   [
+    "115",
+    "122",
+    "124",
+    "205",
+    "208"
+   ],
+   [
+    "106",
+    "112",
+    "114",
+    "207",
+    "220"
+   ],
+   [
+    "101",
+    "109",
+    "116",
+    "223"
+   ],
+   [
+    "108",
+    "119",
+    "215",
+    "230"
+   ],
+   [
+    "118",
+    "201",
+    "203",
+    "209"
+   ]
+  ],
+  "development_v_counts": {
+   "101": 0,
+   "106": 518,
+   "108": 17,
+   "109": 37,
+   "112": 0,
+   "114": 43,
+   "115": 0,
+   "116": 109,
+   "118": 16,
+   "119": 444,
+   "122": 0,
+   "124": 47,
+   "201": 198,
+   "203": 444,
+   "205": 71,
+   "207": 105,
+   "208": 989,
+   "209": 1,
+   "215": 164,
+   "220": 0,
+   "223": 473,
+   "230": 1
+  },
+  "test_split": {
+   "name": "inter-patient test split of MIT-BIH Arrhythmia (DS2), same database as the development split",
+   "records": [
+    "100",
+    "103",
+    "105",
+    "111",
+    "113",
+    "117",
+    "121",
+    "123",
+    "200",
+    "210",
+    "212",
+    "213",
+    "214",
+    "219",
+    "221",
+    "222",
+    "228",
+    "231",
+    "232",
+    "233",
+    "234"
+   ]
+  },
+  "excluded": {
+   "202": "same subject and tape as 201, which is a development record",
+   "102": "paced beats annotated",
+   "104": "paced beats annotated",
+   "107": "paced beats annotated",
+   "217": "paced beats annotated"
+  }
+ },
+ "signal": {
+  "database": "MIT-BIH Arrhythmia Database 1.0.0, ODC-By 1.0, doi 10.13026/C2F305",
+  "lead": "MLII, by name",
+  "resampling": "scipy.signal.resample_poly 25/36 from 360 Hz to 250 Hz",
+  "windows": "consecutive non-overlapping 10 s (2,500 samples) from sample 0; a trailing partial window is not scored; windows are independent",
+  "beats_in_scope": "annotated beats inside whole windows, symbols N L R B A a J S V r F e j n E / f Q ?"
+ },
+ "detector": {
+  "code": "training/rr_baseline.py detect_r_peaks via training/pvc.py detect_grid",
+  "fs": 250,
+  "window": 2500,
+  "min_beats": 6,
+  "median_rr_s": [
+   0.3,
+   2.0
+  ],
+  "refractory_s": 0.25,
+  "threshold_fraction": 0.15,
+  "typical_peaks": 5,
+  "integration_s": 0.15,
+  "refine_reach_s": 0.1,
+  "band_hz": [
+   5.0,
+   15.0
+  ],
+  "kernel_span_s": 0.5,
+  "chosen_on": "development records only: most V beats found with beat-level PPV >= 0.99"
+ },
+ "definitions": {
+  "positive": "annotated V only",
+  "negatives": "every other beat symbol, F (fusion) and E (escape) included, and they stay in the denominators; false positives are reported by reference symbol",
+  "match": "one-to-one, within 150 ms, detections and annotated beats both sorted, two-pointer",
+  "sensitivity": "true positives / annotated V beats in scope; a V beat the detector missed, or detected but not callable, or detected and not called, is a false negative",
+  "ppv": "true positives / every detection called PVC, matched to an annotated beat or not",
+  "specificity": "1 - (annotated non-V beats matched to a detection called PVC) / (annotated non-V beats); a beat the detector missed is not called PVC",
+  "pooling": "pooled (micro) counts over records; records with no PVCs are listed and stay in the denominators",
+  "callable": "a beat is callable when 60 samples either side of its R peak lie inside its own 10 s window; a beat that is not callable is never called",
+  "window_placement": "V beats with no detection on the evaluated grid but one on the same detector run on a grid shifted by half a window (5 s), reported as a separate count next to sensitivity; they remain false negatives"
+ },
+ "comparators": {
+  "primary": {
+   "name": "RR-ratio rule",
+   "rule": "interval before the beat / the window's median interval < theta",
+   "theta": 0.89,
+   "median_needs": "at least 4 detections in the window",
+   "chosen_on": "development records only, pooled beat-level F1 over theta 0.50 to 0.95"
+  },
+  "secondary": {
+   "name": "RR-ratio rule with a compensatory pause",
+   "rule": "interval before / median < theta and interval after / median > phi",
+   "theta": 0.95,
+   "phi": 1.1,
+   "chosen_on": "development records only, pooled beat-level F1 over theta 0.50 to 0.95 and phi 1.00 to 1.40",
+   "reported": "with its own paired difference and interval; the better of the two is never picked after scoring"
+  }
+ },
+ "head": {
+  "id": "tier_b/ectopy",
+  "version": "0.1.0-spike",
+  "artifact": "models/tier_b/ectopy/weights.npz",
+  "weights_sha256": "cc05ff5faf755a7b34441b03573044d64c693eb686919a114a4eb7be66fff83e",
+  "kind": "60 boosted trees (depth 3) over 12 beat-relative features, numpy forward pass",
+  "threshold": 0.4,
+  "threshold_rule": "first maximum of pooled out-of-fold beat-level F1 over 0.05 to 0.95 step 0.05",
+  "selection": "record-grouped five-fold cross-validation on the development records: no beat-level random split, no record in two folds, early stopping off, hyperparameters fixed before any fold was fitted",
+  "development_out_of_fold": {
+   "sensitivity": 0.7005711177590427,
+   "ppv": 0.7076923076923077,
+   "specificity": 0.9816883199457431,
+   "f1": 0.7041137078037447
+  },
+  "features": [
+   "has_prev",
+   "ratio_prev",
+   "has_next",
+   "ratio_next",
+   "has_template",
+   "template_corr",
+   "log2_amplitude_ratio",
+   "log2_width_ratio",
+   "polarity_agreement",
+   "width_25",
+   "peak_to_peak",
+   "max_abs"
+  ],
+  "gbm": {
+   "max_depth": 3,
+   "max_iter": 60,
+   "learning_rate": 0.1,
+   "min_samples_leaf": 50,
+   "l2_regularization": 1.0,
+   "early_stopping": false,
+   "random_state": 0
+  },
+  "threshold_note": "stored as float32 in weights.npz"
+ },
+ "minimums": {
+  "sensitivity": 0.8,
+  "ppv": 0.8,
+  "basis": "pooled (micro) point estimates on the test split; set by the Evaluator before the annotation counts were known (they did not know them); the user may overrule",
+  "intervals": "record-level percentile 95%, reported and quoted in the claim, not gating",
+  "comparator": "pass or fail does not depend on beating the comparator; the card says plainly if the learned head adds nothing"
+ },
+ "statistics": {
+  "bootstrap": {
+   "unit": "record",
+   "resamples": 1000,
+   "seed": 20261014
+  },
+  "paired": "head minus primary comparator, and head minus secondary comparator, each with its own interval, on the same beats"
+ },
+ "disclosure": "The annotation counts of the 22 DS2 records (3,220 V in 16 of 22 records, 202 included) were read once on 2026-10-14 to establish that a PVC metric was feasible, and were reported to the Orchestrator and the Evaluator in the Researcher's plan. No DS2 signal, detector output or method result had been computed on DS2 when this pin was written.",
+ "claims": {
+  "allowed": "retrospective, public data; inter-patient test split of MIT-BIH Arrhythmia (DS2), same database as the development split; 21 records",
+  "never": [
+   "external",
+   "validated",
+   "beats NEWS2",
+   "hours earlier"
+  ],
+  "limitations_to_state": [
+   "PVC across devices and sites untested",
+   "single lead",
+   "22 development patients"
+  ]
+ },
+ "code_sha256": {
+  "training/rr_baseline.py": "7fcc02ab68d4e360bf6118e022cb176c06ec48d500c6e44e8394043d2174f31f",
+  "training/pvc.py": "1591e2e29251a11850a391f42126940b32f71b5abd13ee357767b3fdceb18706",
+  "training/pvc_head.py": "0e71e962c76a032ef1df77bd4cddba9f31ddfbb72e0245d8f37a936ebeb55f45",
+  "training/rr_baseline_selection.json": "62068713f0fd5444a8b88f13ba6635352ebf936adfa2cc10dfeccea1c85967b6"
+ },
+ "consumption": "scored once, by one scripted command, output committed with its sha256; a rerun is only a reproduction check with identical output; nothing is tuned after the first test-split number, and a mismatch is reported, not fixed."
+}
