@@ -88,3 +88,35 @@ def f1_within(truth: tuple[float, ...], found: tuple[float, ...], tol_s: float =
         return 0.0
     precision, recall = tp / len(found), tp / len(truth)
     return 2 * precision * recall / (precision + recall)
+
+
+def ecg_with_premature_beats(
+    pvc_after: tuple[int, ...],
+    n_beats: int = 130,
+    rr: float = 0.85,
+    seed: int = 1,
+    fs: float = 250.0,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Sinus rhythm with PVCs that arrive 0.6 RR after the previous beat and take the place of the
+    next sinus beat (the full compensatory pause): returns the signal (mV), the beat positions
+    in samples and the symbols ("N" or "V").
+
+    Unlike `synth_ecg`, whose ectopic beat comes late, these are truly premature: the interval
+    before is 0.6 RR and the one after 1.4 RR, so a prematurity rule has something to find."""
+    sinus = 0.6 + rr * np.arange(n_beats)
+    times, symbols = [], []
+    for k, t in enumerate(sinus):
+        if k in pvc_after:
+            times.append(sinus[k - 1] + 0.6 * rr)
+            symbols.append("V")
+        else:
+            times.append(t)
+            symbols.append("N")
+    duration = float(sinus[-1] + 1.0)
+    axis = np.arange(round(duration * fs)) / fs
+    rng = np.random.default_rng(seed)
+    x = rng.normal(0.0, 0.02, axis.size) + 0.1 * np.sin(2 * np.pi * 0.3 * axis)
+    for tb, symbol in zip(times, symbols, strict=True):
+        for off, sigma, amp in _PVC if symbol == "V" else _NORMAL:
+            x += amp * np.exp(-0.5 * ((axis - (tb + off)) / sigma) ** 2)
+    return x, np.array(times) * fs, np.array(symbols)

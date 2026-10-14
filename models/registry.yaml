@@ -35,6 +35,22 @@ models:
     valid_until: null
     card: models/tier_b/arrhythmia/card.md
 
+  - id: tier_b/ectopy
+    tier: B
+    kind: ml
+    version: 0.1.0-spike
+    status: research          # trained for study; not wired; the test split is scored once, in its own PR, after pin.json
+    sha256: cc05ff5faf755a7b34441b03573044d64c693eb686919a114a4eb7be66fff83e   # models/tier_b/ectopy/weights.npz
+    corpus:
+      - "MIT-BIH Arrhythmia Database, ODC-By 1.0, doi 10.13026/C2F305 (development records DS1: training and record-grouped cross-validation; test split DS2 less 202 untouched until the pin)"
+    licence: https://physionet.org/content/mitdb/view-license/1.0.0/
+    metrics:
+      ds1_oof_sensitivity: 0.701
+      ds1_oof_ppv: 0.708
+      ds1_oof_specificity: 0.982
+    valid_until: null
+    card: models/tier_b/ectopy/card.md
+
   - id: tier_b/signal_layer
     tier: B
     kind: classical

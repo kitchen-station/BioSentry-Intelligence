@@ -15,7 +15,7 @@ from types import ModuleType
 
 import numpy as np
 import pytest
-from synth_ecg import synth_ecg
+from synth_ecg import ecg_with_premature_beats, synth_ecg
 
 ROOT = Path(__file__).resolve().parents[3]
 TRAINING = ROOT / "training"
@@ -425,38 +425,10 @@ def test_symbol_counts_are_summed_across_records() -> None:
 
 # --- end to end on synthetic ECG --------------------------------------------------------------
 
-_NORMAL = ((-0.16, 0.025, 0.12), (-0.025, 0.010, -0.12), (0.0, 0.012, 1.0), (0.028, 0.012, -0.2),
-           (0.26, 0.055, 0.30))  # fmt: skip
-_PVC = ((0.0, 0.028, 1.3), (0.30, 0.07, -0.35))  # wide, tall, no P wave, inverted T
-
-
-def _ecg_with_premature_beats(
-    pvc_after: tuple[int, ...], n_beats: int = 130, rr: float = 0.85, seed: int = 1
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Sinus rhythm with PVCs that arrive 0.6 RR after the previous beat and take the place of the
-    next sinus beat (the full compensatory pause): returns signal, beat positions, symbols."""
-    sinus = 0.6 + rr * np.arange(n_beats)
-    times, symbols = [], []
-    for k, t in enumerate(sinus):
-        if k in pvc_after:
-            times.append(sinus[k - 1] + 0.6 * rr)
-            symbols.append("V")
-        else:
-            times.append(t)
-            symbols.append("N")
-    duration = float(sinus[-1] + 1.0)
-    axis = np.arange(round(duration * FS)) / FS
-    rng = np.random.default_rng(seed)
-    x = rng.normal(0.0, 0.02, axis.size) + 0.1 * np.sin(2 * np.pi * 0.3 * axis)
-    for tb, symbol in zip(times, symbols, strict=True):
-        for off, sigma, amp in _PVC if symbol == "V" else _NORMAL:
-            x += amp * np.exp(-0.5 * ((axis - (tb + off)) / sigma) ** 2)
-    return x, np.array(times) * FS, np.array(symbols)
-
 
 def test_the_rule_calls_every_premature_synthetic_beat_and_no_normal_one() -> None:
     # the premature beats arrive at 13.0, 34.3, 55.5 and 81.0 s: clear of the window edges
-    x, pos, sym = _ecg_with_premature_beats((15, 40, 65, 95))
+    x, pos, sym = ecg_with_premature_beats((15, 40, 65, 95))
     det = pvc.detect_grid(x, fraction=0.15)
     table = pvc.build_table(pos, sym, det)
     called = pvc.rr_ratio_rule(det.rr_prev, det.median_rr, 0.8)
@@ -469,7 +441,7 @@ def test_the_rule_calls_every_premature_synthetic_beat_and_no_normal_one() -> No
 
 
 def test_the_pause_variant_calls_the_same_beats_and_a_pause_alone_calls_nothing() -> None:
-    x, pos, sym = _ecg_with_premature_beats((15, 40, 65, 95))
+    x, pos, sym = ecg_with_premature_beats((15, 40, 65, 95))
     det = pvc.detect_grid(x, fraction=0.15)
     table = pvc.build_table(pos, sym, det)
     called = pvc.rr_pause_rule(det.rr_prev, det.rr_next, det.median_rr, 0.8, 1.2)
@@ -481,7 +453,7 @@ def test_the_pause_variant_calls_the_same_beats_and_a_pause_alone_calls_nothing(
 
 def test_a_premature_beat_at_the_start_of_a_window_cannot_be_called() -> None:
     # sinus beats sit 0.85 s apart from 0.6 s: beat 12 is the first one at or after 10.0 s
-    x, pos, sym = _ecg_with_premature_beats((12,))
+    x, pos, sym = ecg_with_premature_beats((12,))
     det = pvc.detect_grid(x, fraction=0.15)
     table = pvc.build_table(pos, sym, det)
     k = int(np.argmin(np.abs(det.pos - pos[12])))
@@ -518,7 +490,7 @@ def test_the_development_code_can_reach_ds1_and_nothing_else() -> None:
         *("212", "213", "214", "219", "221", "222", "228", "231", "232", "233", "234"),
     ]
     paced = ("102", "104", "107", "217")
-    for name in ("rr_baseline.py", "pvc.py"):
-        text = (TRAINING / name).read_text(encoding="utf-8")
-        assert not [r for r in ds2 + list(paced) if f'"{r}"' in text], name
+    for path in sorted(TRAINING.glob("*.py")):
+        text = path.read_text(encoding="utf-8")
+        assert not [r for r in ds2 + list(paced) if f'"{r}"' in text], path.name
     assert not set(ds2) & set(rb.DS1)
