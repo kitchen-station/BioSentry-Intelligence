@@ -1,0 +1,801 @@
+/* ============================================================
+   Patient detail -- two-column layout with vitals, findings, notes
+   ============================================================ */
+
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- Status strip ---- */
+
+.statusStrip {
+  background: var(--ink);
+  color: var(--button-ink);
+  padding: 0 var(--sp-4);
+}
+
+.stripInner {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 36px;
+}
+
+.back {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--button-ink);
+  text-decoration: none;
+  opacity: 0.8;
+}
+
+.back:hover {
+  opacity: 1;
+  text-decoration: none;
+}
+
+.stripRight {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  font-family: var(--font-sans);
+  font-size: 12px;
+}
+
+.liveDot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: #4ade80;
+  border-radius: 50%;
+  margin-right: 4px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.stripSignal { display: flex; align-items: center; }
+.stripUpdate { opacity: 0.6; }
+.stripId { opacity: 0.4; }
+
+/* ---- Summary bar ---- */
+
+.summaryBar {
+  border-bottom: 1px solid var(--border);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface);
+}
+
+.summaryRow {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.summaryInner {
+  display: flex;
+  gap: 1px;
+  background: var(--border);
+  width: fit-content;
+}
+
+.summaryBlock {
+  background: var(--surface);
+  padding: var(--sp-2) var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 100px;
+}
+
+.summaryLabel {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+
+.summaryBig {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 20px;
+  line-height: 1;
+}
+
+/* ---- Escalation reasons ---- */
+
+.reasonBlock {
+  background: var(--surface);
+  padding: var(--sp-2) var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 200px;
+}
+
+.reasonList {
+  display: flex;
+  gap: var(--sp-1);
+  flex-wrap: wrap;
+}
+
+.reasonTag {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--ground);
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+}
+
+.reasonPathway {
+  font-weight: 400;
+  color: var(--label);
+}
+
+.reasonNone {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--label);
+}
+
+/* ---- Drawer toggle buttons ---- */
+
+.drawerButtons {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.drawerBtn {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--label);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: var(--sp-1) var(--sp-3);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.drawerBtn:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+.drawerBtnActive {
+  color: var(--button-ink);
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+/* ---- Overlay panel ---- */
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 80px;
+}
+
+.overlayBackdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.overlayPanel {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  width: 640px;
+  max-width: 90vw;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: var(--sp-4) var(--sp-5);
+}
+
+.overlayHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--sp-3);
+}
+
+.overlayTitle {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+
+.overlayClose {
+  font-family: var(--font-sans);
+  font-size: 18px;
+  color: var(--label);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.overlayClose:hover {
+  color: var(--ink);
+}
+
+/* ---- Layout ---- */
+
+.layout {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  width: 100%;
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- Panels (always open — no collapsing) ---- */
+
+.panel {
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: 1px solid var(--border);
+}
+
+.panelEyebrow {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--label);
+  margin-bottom: var(--sp-3);
+}
+
+.patientName {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.patientSub {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--label);
+  margin-top: var(--sp-1);
+}
+
+.admitting {
+  font-size: 15px;
+  margin-top: var(--sp-2);
+  line-height: 1.4;
+}
+
+/* ---- Score ---- */
+
+.scoreBlock {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+
+.scoreValue {
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.scoreLabel {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--label);
+}
+
+/* ---- Tier B findings list ---- */
+
+.findingsGroup {
+  margin-bottom: var(--sp-2);
+}
+
+.findingsGroup:last-child {
+  margin-bottom: 0;
+}
+
+.findingsGroupLabel {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--label);
+  padding: var(--sp-2) 0 var(--sp-1);
+  border-bottom: 1px solid var(--border);
+}
+
+.findingRow {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  align-items: baseline;
+  gap: var(--sp-3);
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.findingRow:last-child {
+  border-bottom: none;
+}
+
+.findingSignificant .findingValue {
+  font-weight: 600;
+}
+
+.findingLabel {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--label);
+}
+
+.findingValue {
+  font-size: 14px;
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+
+.findingDirection {
+  font-size: 12px;
+  color: var(--label);
+}
+
+.findingSource {
+  font-family: var(--font-sans);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--label);
+  border: 1px solid var(--border);
+  padding: 0 3px;
+  margin-left: auto;
+}
+
+.findingDetail {
+  grid-column: 1 / -1;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--label);
+  margin-top: -2px;
+}
+
+.pending {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--label);
+}
+
+/* ---- Tier C outcome model ---- */
+
+.tierC {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.riskHeadline {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+}
+
+.riskValue {
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.riskCaption {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--label);
+}
+
+.modelFreshness {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--label);
+  margin-top: calc(-1 * var(--sp-2));
+}
+
+.attrList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  border-top: 1px solid var(--border);
+  padding-top: var(--sp-3);
+}
+
+.attrRow {
+  display: grid;
+  grid-template-columns: 150px 1fr 48px;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.attrLabel {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--label);
+}
+
+/* Diverging bar: fills grow from a center zero-line -- risk-increasing to the
+   right in ink, protective to the left in muted grey. */
+.attrBar {
+  position: relative;
+  height: 6px;
+  background: var(--border);
+}
+
+.attrZero {
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  bottom: -2px;
+  width: 1px;
+  background: var(--ink);
+}
+
+.attrBarPos,
+.attrBarNeg {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  transition: width 0.5s;
+}
+
+.attrBarPos {
+  left: 50%;
+  background: var(--ink);
+}
+
+.attrBarNeg {
+  right: 50%;
+  background: var(--label);
+  opacity: 0.5;
+}
+
+.attrVal {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: right;
+}
+
+.attrValNeg {
+  color: var(--label);
+  font-weight: 400;
+}
+
+.tierCFooter {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--label);
+  border-top: 1px solid var(--border);
+  padding-top: var(--sp-2);
+}
+
+/* ---- Charts (stacked vertically to avoid overflow) ---- */
+
+.chartGrid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+
+.chartGrid > div {
+  width: 100%;
+}
+
+.chartGrid > div svg {
+  width: 100%;
+  height: auto;
+}
+
+/* ---- Vitals grid ---- */
+
+.vitalsGrid {
+  display: flex;
+  flex-direction: column;
+}
+
+.vitalRow {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  align-items: baseline;
+  gap: var(--sp-3);
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 15px;
+}
+
+.vitalRow:last-child {
+  border-bottom: none;
+}
+
+.vitalLabel {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--label);
+}
+
+.vitalValue {
+  font-size: 15px;
+}
+
+/* ---- Clinical notes ---- */
+
+.noteInput {
+  display: flex;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+
+.noteTextarea {
+  flex: 1;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: var(--sp-2);
+  border: 1px solid var(--border);
+  background: var(--ground);
+  color: var(--ink);
+  resize: vertical;
+  min-height: 60px;
+  border-radius: 0;
+}
+
+.noteTextarea:focus {
+  outline: none;
+  border-color: var(--ink);
+}
+
+.noteTextarea::placeholder {
+  color: var(--label);
+}
+
+.noteSubmit {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--ink);
+  color: var(--button-ink);
+  border: none;
+  padding: var(--sp-2) var(--sp-3);
+  cursor: pointer;
+  align-self: flex-end;
+  white-space: nowrap;
+}
+
+.noteSubmit:hover {
+  opacity: 0.85;
+}
+
+.noteSubmit:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.notesList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.noteItem {
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.noteItem:last-child {
+  border-bottom: none;
+}
+
+.noteMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: 4px;
+}
+
+.noteAuthor {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.noteRole {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--label);
+  border: 1px solid var(--border);
+  padding: 0 4px;
+}
+
+.noteTime {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--label);
+  margin-left: auto;
+}
+
+.noteDelete {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--label);
+  background: none;
+  border: 1px solid var(--border);
+  padding: 0 6px;
+  cursor: pointer;
+  margin-left: var(--sp-2);
+}
+
+.noteDelete:hover {
+  color: #c0392b;
+  border-color: #c0392b;
+}
+
+.noteContent {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+  margin: 0;
+}
+
+/* ---- Responsive: tablet ---- */
+
+@media (max-width: 768px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .overlayPanel {
+    width: 100%;
+    max-width: 100vw;
+  }
+
+  .summaryRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-2);
+  }
+
+  .summaryInner {
+    flex-wrap: wrap;
+  }
+
+  .drawerButtons {
+    flex-wrap: wrap;
+  }
+
+  .findingRow {
+    grid-template-columns: 100px 1fr;
+  }
+
+  .attrRow {
+    grid-template-columns: 110px 1fr 44px;
+  }
+}
+
+/* ---- Responsive: phone ---- */
+
+@media (max-width: 480px) {
+  .summaryBar {
+    padding: var(--sp-2) var(--sp-3);
+  }
+
+  .panel {
+    padding: var(--sp-3);
+  }
+
+  .patientName {
+    font-size: 20px;
+  }
+
+  .scoreValue {
+    font-size: 28px;
+  }
+
+  .findingRow {
+    grid-template-columns: 1fr;
+    gap: var(--sp-1);
+  }
+
+  .attrRow {
+    grid-template-columns: 1fr 44px;
+    gap: var(--sp-2);
+  }
+
+  .attrBar {
+    grid-column: 1 / -1;
+  }
+
+  .vitalRow {
+    grid-template-columns: 100px 1fr;
+    gap: var(--sp-2);
+  }
+
+  .noteInput {
+    flex-direction: column;
+  }
+
+  .noteSubmit {
+    align-self: stretch;
+    text-align: center;
+  }
+
+  .noteMeta {
+    flex-wrap: wrap;
+    gap: var(--sp-1);
+  }
+
+  .noteTime {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .stripInner {
+    padding: 0 var(--sp-2);
+  }
+
+  .overlayPanel {
+    padding: var(--sp-3);
+  }
+
+  .overlay {
+    padding-top: 40px;
+  }
+}
