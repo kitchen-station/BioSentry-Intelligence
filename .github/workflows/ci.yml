@@ -17,9 +17,7 @@ concurrency:
 # binds to them: do not rename. No `paths:` filters, so required checks never
 # end up skipped.
 #
-# Not covered (nothing to run yet):
-#   - backend/ and models/: only .gitkeep (prompts 04/05 pending). Add a Python
-#     job (3.11, pip cache) when backend/ gains code.
+# Not covered:
 #   - npm audit: reported by the `audit` job but never gating (known highs in
 #     react-router 7.6.3, source-map-js). Do not add it to required checks.
 

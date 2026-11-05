@@ -20,7 +20,7 @@ web-lint:
 web-test:
 	cd $(FRONTEND) && npm test
 
-check: web-typecheck
+check: web-typecheck web-lint web-test be-check
 
 # --- Contract: Pydantic schemas -> contracts/openapi.json -> frontend/src/types/generated.ts ---
 # Locally: make contract PYTHON=backend/.venv/bin/python
