@@ -35,8 +35,10 @@ If a port is busy, `make dev` stops and says so. Pick other ports and open the w
 make dev PYTHON=backend/.venv/bin/python WEB_PORT=5200 API_PORT=8100
 ```
 
-Other commands, configuration, the project layout and the design notes are in
-[DEVELOPMENT.md](DEVELOPMENT.md).
+`make check` runs lint, types and tests for both halves; `make contract` regenerates
+`contracts/openapi.json` and `frontend/src/types/generated.ts` from the Pydantic schemas (never
+edit those by hand); `make data` regenerates the synthetic dataset. Every target is in the
+[Makefile](Makefile).
 
 ## What you will see
 
@@ -73,6 +75,23 @@ applied to made-up patients.
 - **I6** The synthetic flag propagates: every fixture record says `synthetic: true`.
 - **I7** Privacy (RA 10173): one screen per clinician, their patients only, audit on every view.
 - **I8** Transport: BLE to a gateway, then Wi-Fi or 4G to the cloud. NB-IoT is excluded.
+
+## Design rules
+
+- **Fuse inputs, never outputs.** Tier C may read raw and derived features; it never reads
+  another tier's verdict.
+- **Escalation arbiter**, the only component that changes displayed priority:
+  1. Tier A threshold met: escalate unconditionally.
+  2. Tier C may raise, never below Tier A's position.
+  3. Tier B significant finding: raise and attach the pathway.
+  4. Notes-layer concern: raise and attach the trigger phrase (v2).
+  5. Missing required input: NOT RANKED, naming what is missing.
+
+  v1 implements rules 1 and 5; the others are inert hooks.
+- **Ward view** is filtered server-side to the signed-in clinician's patients, on every call.
+- **Look:** clinical instrument. Near-white ground, near-black ink, Source Serif 4 for clinical
+  values, Inter for chrome, no radius, shadows or gradients, no colour in the ranked list. Tokens
+  are in `frontend/src/index.css`.
 
 ## Before you expose it anywhere
 

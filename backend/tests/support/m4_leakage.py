@@ -26,7 +26,7 @@ FORBIDDEN_NAME_PARTS = (
 )  # fmt: skip
 PERTURBATIONS = ("nan", "garbage", "reversed")
 
-# The declared feature schema (training/M4_SPEC.md section 3). A name outside it fails; the
+# The declared Tier C feature schema (spec section 3). A name outside it fails; the
 # deny-list above is a second layer, not the gate.
 VITALS = (
     "heart_rate", "respiratory_rate", "spo2", "temperature",

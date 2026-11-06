@@ -55,7 +55,7 @@ class TierCData(Contract):
 
 
 class TierCInput(Contract):
-    """Everything Tier C may read. Features in, never verdicts (OVERVIEW: fuse inputs)."""
+    """Everything Tier C may read. Features in, never verdicts (README: fuse inputs)."""
 
     patient_id: str
     as_of: AwareDatetime

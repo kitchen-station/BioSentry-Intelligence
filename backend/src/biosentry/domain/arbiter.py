@@ -1,6 +1,6 @@
 """The escalation arbiter: the only component allowed to change displayed priority.
 
-v1 implements two rules; the others are typed, inert hooks (OVERVIEW, "Escalation arbiter"):
+v1 implements two rules; the others are typed, inert hooks (README, "Design rules"):
 
   1. Tier A threshold met -> escalate unconditionally.            LIVE
   2. Tier C may raise, never below Tier A.                        inert (no Tier C yet)

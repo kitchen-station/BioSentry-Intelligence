@@ -1,4 +1,4 @@
-// Invariants from README (I1-I7) and OVERVIEW.md checked against the fixture
+// Invariants from README (I1-I7 and "Design rules") checked against the fixture
 // provider, so the CP3 generator and the CP6 HTTP provider inherit them.
 //
 // `it.fails` marks a KNOWN violation: the test passes while the invariant is
@@ -262,7 +262,7 @@ describe("clinician scope (fixture stand-in for server-side filtering)", () => {
   }
 
   // Fail closed: a clinician id with no assignment entry sees nobody, through the
-  // ward, the list and the detail endpoint alike (OVERVIEW.md "Ward view"; the
+  // ward, the list and the detail endpoint alike (README "Design rules"; the
   // server-side provider carries the same test).
   it("an unknown clinician id sees no patients (fail closed)", async () => {
     setActiveClinician("rn-manalo");

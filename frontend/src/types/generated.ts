@@ -538,7 +538,7 @@ export interface components {
         };
         /**
          * TierCInput
-         * @description Everything Tier C may read. Features in, never verdicts (OVERVIEW: fuse inputs).
+         * @description Everything Tier C may read. Features in, never verdicts (README: fuse inputs).
          */
         readonly TierCInput: {
             readonly admitting_context: string;

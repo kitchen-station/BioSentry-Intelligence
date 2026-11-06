@@ -1,9 +1,6 @@
 node_modules/
 dist/
 .DS_Store
-prompts/
-
-docs/
 # Python (backend/)
 .venv/
 __pycache__/
@@ -13,7 +10,8 @@ __pycache__/
 .ruff_cache/
 .hypothesis/
 
-# Local working documents (the plan and the project log): never committed
+# Local working documents (plan, project log, writeups/): never committed
 /PLAN.md
 /PROJECT.md
+/writeups/
 

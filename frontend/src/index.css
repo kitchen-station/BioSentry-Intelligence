@@ -1,7 +1,7 @@
 /* ============================================================
    BioSentry global tokens and resets
    Design language: no border-radius, Inter + Source Serif,
-   near-white ground. See docs/design.md.
+   near-white ground. See README, "Design rules".
    ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600&family=Inter:wght@400;500&display=swap');

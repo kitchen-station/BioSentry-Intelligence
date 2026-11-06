@@ -1,7 +1,7 @@
 """Tier C: outcome model. Feature contract and predictor protocol only (scaffold, CP5).
 
 The input is `TierCInput`, built from features, never from Tier A or Tier B verdicts
-(OVERVIEW: fuse inputs, never outputs). No model exists yet: the scaffold predictor returns
+(README: fuse inputs, never outputs). No model exists yet: the scaffold predictor returns
 `NotComputed`, and the arbiter ignores Tier C until it is registered, calibrated and current.
 """
 
