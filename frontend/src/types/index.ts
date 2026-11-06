@@ -1,7 +1,7 @@
 /**
  * Contract types for the BioSentry dashboard.
  *
- * Source of truth: backend/src/biosentry/schemas (Pydantic) -> contracts/openapi.json
+ * Source of truth: backend/src/biosentry/schemas (Pydantic) -> frontend/contracts/openapi.json
  * -> ./generated.ts. Never hand-edit generated.ts; regenerate with `make contract`.
  * CI (`contract-drift`) fails when the committed file differs from a fresh generation.
  *

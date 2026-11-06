@@ -22,11 +22,11 @@ web-test:
 
 check: web-typecheck web-lint web-test be-check
 
-# --- Contract: Pydantic schemas -> contracts/openapi.json -> frontend/src/types/generated.ts ---
+# --- Contract: Pydantic schemas -> frontend/contracts/openapi.json -> frontend/src/types/generated.ts ---
 # Locally: make contract PYTHON=backend/.venv/bin/python
 
 PYTHON ?= python3
-CONTRACTS := contracts
+CONTRACTS := frontend/contracts
 GENERATED := $(CONTRACTS)/openapi.json frontend/src/types/generated.ts
 
 .PHONY: contract-install contract-export contract-ts contract contract-test contract-check

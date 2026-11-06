@@ -36,7 +36,7 @@ make dev PYTHON=backend/.venv/bin/python WEB_PORT=5200 API_PORT=8100
 ```
 
 `make check` runs lint, types and tests for both halves; `make contract` regenerates
-`contracts/openapi.json` and `frontend/src/types/generated.ts` from the Pydantic schemas (never
+`frontend/contracts/openapi.json` and `frontend/src/types/generated.ts` from the Pydantic schemas (never
 edit those by hand); `make data` regenerates the synthetic dataset. Every target is in the
 [Makefile](Makefile).
 

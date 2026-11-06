@@ -1,6 +1,6 @@
 """Build the OpenAPI 3.1 document for the contract schemas.
 
-    python -m biosentry.schemas.openapi --out contracts/openapi.json
+    python -m biosentry.schemas.openapi --out frontend/contracts/openapi.json
 
 Output is deterministic (sorted keys, stable ordering); CI regenerates it and fails on diff.
 Paths stay empty until the API lands (CP6): this document is the schema contract.

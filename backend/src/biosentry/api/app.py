@@ -7,7 +7,7 @@ to the caller's patients on the server, on every call, and a patient who does no
 one who is not yours get the same 404. A write whose body fails validation leaves a
 `rejected` audit row (ids only, no values). Responses are `Cache-Control: no-store`. The
 service serves nothing unauthenticated except /healthz: no docs or schema routes (the
-contract is contracts/openapi.json).
+contract is frontend/contracts/openapi.json).
 """
 
 import logging

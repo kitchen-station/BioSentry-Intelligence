@@ -8,7 +8,7 @@ from typing import Any
 from biosentry.schemas.openapi import build_openapi, dumps
 
 REPO = Path(__file__).resolve().parents[3]
-COMMITTED = REPO / "contracts" / "openapi.json"
+COMMITTED = REPO / "frontend" / "contracts" / "openapi.json"
 FRONTEND_TYPES = REPO / "frontend" / "src" / "types" / "index.ts"
 
 # Every name the hand-written frontend/src/types/index.ts exported before CP1.
@@ -60,7 +60,7 @@ def test_output_is_deterministic() -> None:
 
 def test_committed_openapi_matches_the_schemas() -> None:
     assert COMMITTED.read_text(encoding="utf-8") == dumps(build_openapi()), (
-        "contracts/openapi.json is stale: run `make contract` and commit the result"
+        "frontend/contracts/openapi.json is stale: run `make contract` and commit the result"
     )
 
 

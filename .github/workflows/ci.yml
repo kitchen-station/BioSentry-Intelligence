@@ -106,7 +106,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: contracts/package-lock.json
+          cache-dependency-path: frontend/contracts/package-lock.json
       - run: make contract-install
       # pytest exits 5 when nothing is collected, so an empty suite fails this step.
       - run: make contract-check
