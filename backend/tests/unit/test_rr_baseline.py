@@ -954,7 +954,7 @@ def test_the_card_says_what_it_must_about_afdb_and_the_exit_gate() -> None:
 
 def test_the_card_and_the_training_readme_never_call_afdb_held_out() -> None:
     # The Evaluator's ruling: AFDB is an external set for the gate, not "held-out"; the word stays
-    # out of the card, the README and any PR or demo text. (training/M4_SPEC.md uses it for the M4
+    # out of the card, the README and any PR or demo text. (the archived M4 spec uses it for the M4
     # design, which is not about AFDB, and is not checked here.)
     assert "held-out" not in _card().lower()
     readme = (TRAINING / "README.md").read_text(encoding="utf-8")
