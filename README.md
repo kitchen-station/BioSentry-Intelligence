@@ -7,6 +7,12 @@ vital signs, adds what the hospital already knows (diagnosis, labs, and two valu
 types in: blood pressure and level of consciousness) and puts every patient on one ranked
 list, one screen per clinician.
 
+**Why.** Ward nurse-to-patient ratios run 1:20 or worse (DOH standard 1:12), and automated
+alerts alone have not cut mortality: the gap is unreliable alerts and too few people to act.
+BioSentry's contribution is the process, not the hardware: an offline-first ward system (patch,
+gateway and edge server, cloud sync when the network allows) that cuts false alarms and tells
+one nurse who to see next.
+
 The list is sorted by **NEWS2**, a published bedside early-warning score (Tier A). A patient
 who meets a NEWS2 trigger sits above one who does not. Tiers B and C (mechanism findings and an
 outcome model) are not part of the scoring: what the screens show for them is demo content.
@@ -59,8 +65,15 @@ edit those by hand); `make data` regenerates the synthetic dataset. Every target
 - Tested building blocks for Tier B signals (heartbeat detection, heart-rate variability,
   respiratory rate, perfusion index), not yet connected to the scoring or to a device.
 
-**Pending:** Tier B and C in the scoring, trained models, anything measured on real patients,
-a sensor pipeline, a database, real authentication, document extraction.
+**Pending:** Tier B in the scoring, a signal-quality model, conformal abstention, distilled
+edge models, anything measured on real patients, a sensor pipeline (IoT Device Access), a
+database, real authentication, document extraction, and a plain-language explanation of each
+ranked alert for the nurse. Tier C (outcome model) is under review.
+
+**Next:** deploy offline-first on Huawei Cloud (IoT Device Access, ModelArts, MindSpore Lite,
+Object Storage Service), then compare against a threshold-alarm baseline on false alarms per
+patient per shift. Not doing: federated learning, digital twins, reinforcement-learning
+assignment, ECG foundation models.
 
 This repository makes no claim about clinical performance. The scores are a published rule
 applied to made-up patients.
