@@ -10,7 +10,7 @@
 import { fileURLToPath } from "node:url";
 import { build } from "vite";
 import { afterEach, describe, expect, it } from "vitest";
-import synthetic from "../../../data/synthetic/synthetic.json";
+import synthetic from "../data/synthetic.json";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 

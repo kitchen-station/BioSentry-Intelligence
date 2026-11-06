@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import type { ClinicalNote, PatientDetail as PatientDetailType, TierBFinding, TierCData } from "../types";
+import type { ClinicalNote, PatientDetail as PatientDetailType, TierBFinding } from "../types";
 import { getPatient, getNotes, addNote, deleteNote } from "../api";
 import { CurrentVitals, VitalRow } from "../components/CurrentVitals";
 import { TrendChart } from "../components/TrendChart";
@@ -41,70 +41,6 @@ function FindingRow({ finding }: { finding: TierBFinding }) {
 const DEVICE_AXES = new Set(["af", "rr", "pi"]);
 const LAB_SUBSTRATE = new Set(["trop", "k-mg", "kdigo", "lactate"]);
 const SECONDARY_AXES = new Set(["hrv"]);
-
-function fmtSignedContribution(value: number): string {
-  const sign = value > 0 ? "+" : value < 0 ? "\u2212" : "";
-  return `${sign}${Math.abs(value).toFixed(2)}`;
-}
-
-// Reads the outcome model's own inference clock, not the vitals feed's.
-function fmtScoredAgo(seconds: number): string {
-  if (seconds < 90) return "just now";
-  if (seconds < 3600) return `${Math.round(seconds / 60)} min ago`;
-  const hours = Math.round(seconds / 3600);
-  return `${hours} hour${hours === 1 ? "" : "s"} ago`;
-}
-
-// Tier C: calibrated outcome-model probability, its own freshness, and the
-// signed feature attributions that make the score inspectable.
-function TierCSection({ data }: { data: TierCData }) {
-  const pct = Math.round(data.risk_probability * 100);
-  const ranked = [...data.attributions]
-    .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution))
-    .slice(0, 6);
-  const maxAbs = Math.max(...ranked.map((a) => Math.abs(a.contribution)), 1e-9);
-
-  return (
-    <div className={styles.tierC}>
-      <div className={styles.riskHeadline}>
-        <span className={styles.riskValue}>{pct}%</span>
-        <span className={styles.riskCaption}>
-          Deterioration risk &middot; {data.forecast_window}
-        </span>
-      </div>
-
-      <p className={styles.modelFreshness}>
-        Model last scored {fmtScoredAgo(data.scored_seconds_ago)}
-      </p>
-
-      <div className={styles.attrList}>
-        {ranked.map((a) => {
-          const half = (Math.abs(a.contribution) / maxAbs) * 50;
-          const positive = a.contribution > 0;
-          return (
-            <div key={a.feature} className={styles.attrRow}>
-              <span className={styles.attrLabel}>{a.feature}</span>
-              <div className={styles.attrBar}>
-                <span className={styles.attrZero} />
-                <span
-                  className={positive ? styles.attrBarPos : styles.attrBarNeg}
-                  style={{ width: `${half}%` }}
-                />
-              </div>
-              <span
-                className={`${styles.attrVal} ${positive ? "" : styles.attrValNeg}`}
-              >
-                {fmtSignedContribution(a.contribution)}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-
-      <p className={styles.tierCFooter}>Ranking signal only &mdash; not a diagnosis</p>
-    </div>
-  );
-}
 
 type Drawer = "notes" | "charts" | null;
 
@@ -388,14 +324,6 @@ export function PatientDetail() {
             )}
           </div>
 
-          <div className={styles.panel}>
-            <p className={styles.panelEyebrow}>Tier C &mdash; Outcome model</p>
-            {patient.tier_c ? (
-              <TierCSection data={patient.tier_c} />
-            ) : (
-              <p className={styles.pending}>not yet implemented</p>
-            )}
-          </div>
         </div>
 
         {/* Right: vitals + labs (always visible) */}

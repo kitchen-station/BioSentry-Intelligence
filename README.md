@@ -14,37 +14,29 @@ gateway and edge server, cloud sync when the network allows) that cuts false ala
 one nurse who to see next.
 
 The list is sorted by **NEWS2**, a published bedside early-warning score (Tier A). A patient
-who meets a NEWS2 trigger sits above one who does not. Tiers B and C (mechanism findings and an
-outcome model) are not part of the scoring: what the screens show for them is demo content.
+who meets a NEWS2 trigger sits above one who does not. Tier B (mechanism findings) is demo
+content, not part of the scoring.
+
+**This repository is frontend-only for now.** The backend, the ML models and the training code
+were removed ahead of the Huawei overhaul; the dashboard runs on a committed synthetic ward
+(`frontend/src/data/synthetic.json`). The earlier backend is in git history.
 
 **This is not a diagnosis system.** It ranks and displays. A human decides.
 
 ## Run it
 
-You need Python 3.11, Node.js `^20.19` or `>=22.12`, and git, make and curl.
-From the repository root:
+You need Node.js `^20.19` or `>=22.12`, and make. From the repository root:
 
 ```bash
-python3.11 -m venv backend/.venv
-make be-install PYTHON=backend/.venv/bin/python
 make web-install
-make dev PYTHON=backend/.venv/bin/python
+make web-dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173), choose a department and a clinician, and
-sign in with any passphrase. Ctrl-C stops both servers. Whatever you enter is kept in memory
-and is gone when the API restarts.
+Open the URL Vite prints, choose a department and a clinician, and sign in with any
+passphrase. Whatever you enter is kept in memory and is gone on reload.
 
-If a port is busy, `make dev` stops and says so. Pick other ports and open the web one:
-
-```bash
-make dev PYTHON=backend/.venv/bin/python WEB_PORT=5200 API_PORT=8100
-```
-
-`make check` runs lint, types and tests for both halves; `make contract` regenerates
-`frontend/contracts/openapi.json` and `frontend/src/types/generated.ts` from the Pydantic schemas (never
-edit those by hand); `make data` regenerates the synthetic dataset. Every target is in the
-[Makefile](Makefile).
+`make check` runs lint, types and tests. `frontend/src/types/generated.ts` is the API
+contract, frozen until the new backend exists. Every target is in the [Makefile](Makefile).
 
 ## What you will see
 
@@ -60,15 +52,13 @@ edit those by hand); `make data` regenerates the synthetic dataset. Every target
 
 **Built**, on synthetic data:
 
-- The dashboard and an API, with NEWS2 and the escalation rules computed on the server.
-- Each clinician sees only their own patients, and every view is audited.
-- Tested building blocks for Tier B signals (heartbeat detection, heart-rate variability,
-  respiratory rate, perfusion index), not yet connected to the scoring or to a device.
+- The dashboard: ward list, patient detail and station views, on a fixture provider.
+- An HTTP provider that talks to an API with the same contract (no API in the repo yet).
 
-**Pending:** Tier B in the scoring, a signal-quality model, conformal abstention, distilled
+**Pending:** a backend (scoring, clinician scope and audit), Tier B in the scoring, a signal-quality model, conformal abstention, distilled
 edge models, anything measured on real patients, a sensor pipeline (IoT Device Access), a
 database, real authentication, document extraction, and a plain-language explanation of each
-ranked alert for the nurse. Tier C (outcome model) is under review.
+ranked alert for the nurse.
 
 **Next:** deploy offline-first on Huawei Cloud (IoT Device Access, ModelArts, MindSpore Lite,
 Object Storage Service), then compare against a threshold-alarm baseline on false alarms per
@@ -82,7 +72,7 @@ applied to made-up patients.
 
 - **I1** Missing is missing: nothing is imputed or defaulted to zero.
 - **I2** Every value carries where it came from: source, tier, time, quality.
-- **I3** Tiers stay separate: Tier A sorts; Tier C never sorts and never alerts.
+- **I3** Tiers stay separate: Tier A sorts.
 - **I4** Abstention is an output: NOT RANKED is a row with a reason and an instruction.
 - **I5** No training on BioSentry patients: local data calibrates and validates only.
 - **I6** The synthetic flag propagates: every fixture record says `synthetic: true`.
@@ -91,17 +81,17 @@ applied to made-up patients.
 
 ## Design rules
 
-- **Fuse inputs, never outputs.** Tier C may read raw and derived features; it never reads
+- **Fuse inputs, never outputs.** A model may read raw and derived features; it never reads
   another tier's verdict.
 - **Escalation arbiter**, the only component that changes displayed priority:
   1. Tier A threshold met: escalate unconditionally.
-  2. Tier C may raise, never below Tier A's position.
-  3. Tier B significant finding: raise and attach the pathway.
-  4. Notes-layer concern: raise and attach the trigger phrase (v2).
-  5. Missing required input: NOT RANKED, naming what is missing.
+  2. Tier B significant finding: raise and attach the pathway.
+  3. Notes-layer concern: raise and attach the trigger phrase (v2).
+  4. Missing required input: NOT RANKED, naming what is missing.
 
-  v1 implements rules 1 and 5; the others are inert hooks.
-- **Ward view** is filtered server-side to the signed-in clinician's patients, on every call.
+  The fixture data follows rules 1 and 4.
+- **Ward view** must be filtered server-side to the signed-in clinician's patients, on every
+  call. The fixture provider stands in for that filter.
 - **Look:** clinical instrument. Near-white ground, near-black ink, Source Serif 4 for clinical
   values, Inter for chrome, no radius, shadows or gradients, no colour in the ranked list. Tokens
   are in `frontend/src/index.css`.
@@ -109,10 +99,7 @@ applied to made-up patients.
 ## Before you expose it anywhere
 
 - **Synthetic data only.** No real patient data exists in this repository.
-- **Identity is a stub.** The sign-in token *is* the clinician id, so anyone who can reach the
-  API can act as any clinician. The API listens on `127.0.0.1` only and refuses another address
-  unless started with `--allow-remote`. Do not put it on a network.
-- **One process.** State lives in memory, so the API refuses to start with more than one worker.
+- **Identity is a stub.** Sign-in accepts any passphrase. There is no real authentication.
 
 ## Licence
 

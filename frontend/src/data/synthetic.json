@@ -168,37 +168,7 @@
             }
           ]
         },
-        "tier_c": {
-          "attributions": [
-            {
-              "contribution": 0.31,
-              "feature": "Respiratory rate vs baseline"
-            },
-            {
-              "contribution": 0.18,
-              "feature": "BNP (last lab)"
-            },
-            {
-              "contribution": 0.14,
-              "feature": "Pulse pressure narrowing"
-            },
-            {
-              "contribution": 0.09,
-              "feature": "SpO₂ trend slope (3h)"
-            },
-            {
-              "contribution": 0.05,
-              "feature": "Heart rate trend slope (3h)"
-            },
-            {
-              "contribution": -0.06,
-              "feature": "Diuretic response (6h)"
-            }
-          ],
-          "forecast_window": "next 1–4h",
-          "risk_probability": 0.23,
-          "scored_seconds_ago": 420.0
-        }
+        "tier_c": null
       },
       "vital_history": {
         "heart_rate": [
@@ -579,37 +549,7 @@
             }
           ]
         },
-        "tier_c": {
-          "attributions": [
-            {
-              "contribution": 0.16,
-              "feature": "Troponin (last lab)"
-            },
-            {
-              "contribution": -0.14,
-              "feature": "Beta-blocker on board"
-            },
-            {
-              "contribution": 0.05,
-              "feature": "Age"
-            },
-            {
-              "contribution": 0.04,
-              "feature": "Heart rate variability (SDNN)"
-            },
-            {
-              "contribution": 0.03,
-              "feature": "Respiratory rate vs baseline"
-            },
-            {
-              "contribution": -0.02,
-              "feature": "SpO₂ trend slope (3h)"
-            }
-          ],
-          "forecast_window": "next 1–4h",
-          "risk_probability": 0.12,
-          "scored_seconds_ago": 300.0
-        }
+        "tier_c": null
       },
       "vital_history": {
         "heart_rate": [
@@ -990,33 +930,7 @@
             }
           ]
         },
-        "tier_c": {
-          "attributions": [
-            {
-              "contribution": 0.11,
-              "feature": "Post-op day 1"
-            },
-            {
-              "contribution": 0.07,
-              "feature": "Hemoglobin (last lab)"
-            },
-            {
-              "contribution": -0.05,
-              "feature": "Temperature trend (6h)"
-            },
-            {
-              "contribution": -0.04,
-              "feature": "Heart rate trend slope (3h)"
-            },
-            {
-              "contribution": 0.02,
-              "feature": "Respiratory rate vs baseline"
-            }
-          ],
-          "forecast_window": "next 1–4h",
-          "risk_probability": 0.08,
-          "scored_seconds_ago": 540.0
-        }
+        "tier_c": null
       },
       "vital_history": {
         "heart_rate": [
@@ -1397,37 +1311,7 @@
             }
           ]
         },
-        "tier_c": {
-          "attributions": [
-            {
-              "contribution": 0.13,
-              "feature": "Creatinine trend"
-            },
-            {
-              "contribution": 0.1,
-              "feature": "BNP (last lab)"
-            },
-            {
-              "contribution": 0.08,
-              "feature": "Sodium (last lab)"
-            },
-            {
-              "contribution": 0.06,
-              "feature": "Perfusion index"
-            },
-            {
-              "contribution": 0.04,
-              "feature": "Respiratory rate vs baseline"
-            },
-            {
-              "contribution": 0.03,
-              "feature": "Labs stale (>8h)"
-            }
-          ],
-          "forecast_window": "next 1–4h",
-          "risk_probability": 0.14,
-          "scored_seconds_ago": 660.0
-        }
+        "tier_c": null
       },
       "vital_history": {
         "heart_rate": [
@@ -1808,33 +1692,7 @@
             }
           ]
         },
-        "tier_c": {
-          "attributions": [
-            {
-              "contribution": 0.08,
-              "feature": "Incomplete workup (no echo)"
-            },
-            {
-              "contribution": 0.05,
-              "feature": "Blood pressure"
-            },
-            {
-              "contribution": 0.04,
-              "feature": "Heart rate trend slope (3h)"
-            },
-            {
-              "contribution": 0.03,
-              "feature": "Respiratory rate vs baseline"
-            },
-            {
-              "contribution": 0.03,
-              "feature": "Age"
-            }
-          ],
-          "forecast_window": "next 1–4h",
-          "risk_probability": 0.09,
-          "scored_seconds_ago": 480.0
-        }
+        "tier_c": null
       },
       "vital_history": {
         "heart_rate": [
@@ -2215,33 +2073,7 @@
             }
           ]
         },
-        "tier_c": {
-          "attributions": [
-            {
-              "contribution": 0.07,
-              "feature": "Systolic blood pressure"
-            },
-            {
-              "contribution": -0.06,
-              "feature": "Labetalol response"
-            },
-            {
-              "contribution": -0.03,
-              "feature": "Heart rate trend slope (3h)"
-            },
-            {
-              "contribution": -0.02,
-              "feature": "SpO₂ (current)"
-            },
-            {
-              "contribution": 0.02,
-              "feature": "Age"
-            }
-          ],
-          "forecast_window": "next 1–4h",
-          "risk_probability": 0.05,
-          "scored_seconds_ago": 360.0
-        }
+        "tier_c": null
       },
       "vital_history": {
         "heart_rate": [
@@ -2622,33 +2454,7 @@
             }
           ]
         },
-        "tier_c": {
-          "attributions": [
-            {
-              "contribution": 0.09,
-              "feature": "Arrhythmia burden"
-            },
-            {
-              "contribution": -0.05,
-              "feature": "Rate control (6h)"
-            },
-            {
-              "contribution": -0.03,
-              "feature": "Age"
-            },
-            {
-              "contribution": -0.02,
-              "feature": "Respiratory rate vs baseline"
-            },
-            {
-              "contribution": -0.02,
-              "feature": "SpO₂ trend slope (3h)"
-            }
-          ],
-          "forecast_window": "next 1–4h",
-          "risk_probability": 0.06,
-          "scored_seconds_ago": 600.0
-        }
+        "tier_c": null
       },
       "vital_history": {
         "heart_rate": [
@@ -3029,33 +2835,7 @@
             }
           ]
         },
-        "tier_c": {
-          "attributions": [
-            {
-              "contribution": -0.06,
-              "feature": "Troponin negative (last lab)"
-            },
-            {
-              "contribution": -0.05,
-              "feature": "Age"
-            },
-            {
-              "contribution": 0.02,
-              "feature": "Heart rate trend slope (3h)"
-            },
-            {
-              "contribution": 0.01,
-              "feature": "Respiratory rate vs baseline"
-            },
-            {
-              "contribution": -0.01,
-              "feature": "SpO₂ (current)"
-            }
-          ],
-          "forecast_window": "next 1–4h",
-          "risk_probability": 0.03,
-          "scored_seconds_ago": 300.0
-        }
+        "tier_c": null
       },
       "vital_history": {
         "heart_rate": [
@@ -3436,33 +3216,7 @@
             }
           ]
         },
-        "tier_c": {
-          "attributions": [
-            {
-              "contribution": 0.05,
-              "feature": "Age"
-            },
-            {
-              "contribution": 0.04,
-              "feature": "Chronic angina history"
-            },
-            {
-              "contribution": -0.02,
-              "feature": "Heart rate trend slope (3h)"
-            },
-            {
-              "contribution": 0.01,
-              "feature": "Respiratory rate vs baseline"
-            },
-            {
-              "contribution": -0.01,
-              "feature": "SpO₂ trend slope (3h)"
-            }
-          ],
-          "forecast_window": "next 1–4h",
-          "risk_probability": 0.04,
-          "scored_seconds_ago": 4200.0
-        }
+        "tier_c": null
       },
       "vital_history": {
         "heart_rate": [
@@ -3843,33 +3597,7 @@
             }
           ]
         },
-        "tier_c": {
-          "attributions": [
-            {
-              "contribution": -0.07,
-              "feature": "Improving trajectory (24h)"
-            },
-            {
-              "contribution": -0.04,
-              "feature": "Age"
-            },
-            {
-              "contribution": -0.03,
-              "feature": "Heart rate trend slope (3h)"
-            },
-            {
-              "contribution": -0.02,
-              "feature": "Temperature trend (6h)"
-            },
-            {
-              "contribution": -0.01,
-              "feature": "Respiratory rate vs baseline"
-            }
-          ],
-          "forecast_window": "next 1–4h",
-          "risk_probability": 0.02,
-          "scored_seconds_ago": 5400.0
-        }
+        "tier_c": null
       },
       "vital_history": {
         "heart_rate": [
@@ -4538,37 +4266,7 @@
           }
         ]
       },
-      "tier_c": {
-        "attributions": [
-          {
-            "contribution": 0.31,
-            "feature": "Respiratory rate vs baseline"
-          },
-          {
-            "contribution": 0.18,
-            "feature": "BNP (last lab)"
-          },
-          {
-            "contribution": 0.14,
-            "feature": "Pulse pressure narrowing"
-          },
-          {
-            "contribution": 0.09,
-            "feature": "SpO₂ trend slope (3h)"
-          },
-          {
-            "contribution": 0.05,
-            "feature": "Heart rate trend slope (3h)"
-          },
-          {
-            "contribution": -0.06,
-            "feature": "Diuretic response (6h)"
-          }
-        ],
-        "forecast_window": "next 1–4h",
-        "risk_probability": 0.23,
-        "scored_seconds_ago": 420.0
-      },
+      "tier_c": null,
       "tier_status": [
         {
           "label": "NEWS2",
@@ -4579,11 +4277,6 @@
           "label": "Mechanism axes (demo)",
           "live": false,
           "tier": "B"
-        },
-        {
-          "label": "Outcome model (demo)",
-          "live": false,
-          "tier": "C"
         }
       ],
       "trend": "rising",
@@ -5047,37 +4740,7 @@
           }
         ]
       },
-      "tier_c": {
-        "attributions": [
-          {
-            "contribution": 0.16,
-            "feature": "Troponin (last lab)"
-          },
-          {
-            "contribution": -0.14,
-            "feature": "Beta-blocker on board"
-          },
-          {
-            "contribution": 0.05,
-            "feature": "Age"
-          },
-          {
-            "contribution": 0.04,
-            "feature": "Heart rate variability (SDNN)"
-          },
-          {
-            "contribution": 0.03,
-            "feature": "Respiratory rate vs baseline"
-          },
-          {
-            "contribution": -0.02,
-            "feature": "SpO₂ trend slope (3h)"
-          }
-        ],
-        "forecast_window": "next 1–4h",
-        "risk_probability": 0.12,
-        "scored_seconds_ago": 300.0
-      },
+      "tier_c": null,
       "tier_status": [
         {
           "label": "NEWS2",
@@ -5088,11 +4751,6 @@
           "label": "Mechanism axes (demo)",
           "live": false,
           "tier": "B"
-        },
-        {
-          "label": "Outcome model (demo)",
-          "live": false,
-          "tier": "C"
         }
       ],
       "trend": "rising",
@@ -5556,33 +5214,7 @@
           }
         ]
       },
-      "tier_c": {
-        "attributions": [
-          {
-            "contribution": 0.11,
-            "feature": "Post-op day 1"
-          },
-          {
-            "contribution": 0.07,
-            "feature": "Hemoglobin (last lab)"
-          },
-          {
-            "contribution": -0.05,
-            "feature": "Temperature trend (6h)"
-          },
-          {
-            "contribution": -0.04,
-            "feature": "Heart rate trend slope (3h)"
-          },
-          {
-            "contribution": 0.02,
-            "feature": "Respiratory rate vs baseline"
-          }
-        ],
-        "forecast_window": "next 1–4h",
-        "risk_probability": 0.08,
-        "scored_seconds_ago": 540.0
-      },
+      "tier_c": null,
       "tier_status": [
         {
           "label": "NEWS2",
@@ -5593,11 +5225,6 @@
           "label": "Mechanism axes (demo)",
           "live": false,
           "tier": "B"
-        },
-        {
-          "label": "Outcome model (demo)",
-          "live": false,
-          "tier": "C"
         }
       ],
       "trend": "stable",
@@ -6047,37 +5674,7 @@
           }
         ]
       },
-      "tier_c": {
-        "attributions": [
-          {
-            "contribution": 0.13,
-            "feature": "Creatinine trend"
-          },
-          {
-            "contribution": 0.1,
-            "feature": "BNP (last lab)"
-          },
-          {
-            "contribution": 0.08,
-            "feature": "Sodium (last lab)"
-          },
-          {
-            "contribution": 0.06,
-            "feature": "Perfusion index"
-          },
-          {
-            "contribution": 0.04,
-            "feature": "Respiratory rate vs baseline"
-          },
-          {
-            "contribution": 0.03,
-            "feature": "Labs stale (>8h)"
-          }
-        ],
-        "forecast_window": "next 1–4h",
-        "risk_probability": 0.14,
-        "scored_seconds_ago": 660.0
-      },
+      "tier_c": null,
       "tier_status": [
         {
           "label": "NEWS2",
@@ -6088,11 +5685,6 @@
           "label": "Mechanism axes (demo)",
           "live": false,
           "tier": "B"
-        },
-        {
-          "label": "Outcome model (demo)",
-          "live": false,
-          "tier": "C"
         }
       ],
       "trend": "insufficient",
@@ -6528,33 +6120,7 @@
           }
         ]
       },
-      "tier_c": {
-        "attributions": [
-          {
-            "contribution": 0.07,
-            "feature": "Systolic blood pressure"
-          },
-          {
-            "contribution": -0.06,
-            "feature": "Labetalol response"
-          },
-          {
-            "contribution": -0.03,
-            "feature": "Heart rate trend slope (3h)"
-          },
-          {
-            "contribution": -0.02,
-            "feature": "SpO₂ (current)"
-          },
-          {
-            "contribution": 0.02,
-            "feature": "Age"
-          }
-        ],
-        "forecast_window": "next 1–4h",
-        "risk_probability": 0.05,
-        "scored_seconds_ago": 360.0
-      },
+      "tier_c": null,
       "tier_status": [
         {
           "label": "NEWS2",
@@ -6565,11 +6131,6 @@
           "label": "Mechanism axes (demo)",
           "live": false,
           "tier": "B"
-        },
-        {
-          "label": "Outcome model (demo)",
-          "live": false,
-          "tier": "C"
         }
       ],
       "trend": "stable",
@@ -6985,33 +6546,7 @@
           }
         ]
       },
-      "tier_c": {
-        "attributions": [
-          {
-            "contribution": 0.08,
-            "feature": "Incomplete workup (no echo)"
-          },
-          {
-            "contribution": 0.05,
-            "feature": "Blood pressure"
-          },
-          {
-            "contribution": 0.04,
-            "feature": "Heart rate trend slope (3h)"
-          },
-          {
-            "contribution": 0.03,
-            "feature": "Respiratory rate vs baseline"
-          },
-          {
-            "contribution": 0.03,
-            "feature": "Age"
-          }
-        ],
-        "forecast_window": "next 1–4h",
-        "risk_probability": 0.09,
-        "scored_seconds_ago": 480.0
-      },
+      "tier_c": null,
       "tier_status": [
         {
           "label": "NEWS2",
@@ -7022,11 +6557,6 @@
           "label": "Mechanism axes (demo)",
           "live": false,
           "tier": "B"
-        },
-        {
-          "label": "Outcome model (demo)",
-          "live": false,
-          "tier": "C"
         }
       ],
       "trend": "stable",
@@ -7442,33 +6972,7 @@
           }
         ]
       },
-      "tier_c": {
-        "attributions": [
-          {
-            "contribution": 0.09,
-            "feature": "Arrhythmia burden"
-          },
-          {
-            "contribution": -0.05,
-            "feature": "Rate control (6h)"
-          },
-          {
-            "contribution": -0.03,
-            "feature": "Age"
-          },
-          {
-            "contribution": -0.02,
-            "feature": "Respiratory rate vs baseline"
-          },
-          {
-            "contribution": -0.02,
-            "feature": "SpO₂ trend slope (3h)"
-          }
-        ],
-        "forecast_window": "next 1–4h",
-        "risk_probability": 0.06,
-        "scored_seconds_ago": 600.0
-      },
+      "tier_c": null,
       "tier_status": [
         {
           "label": "NEWS2",
@@ -7479,11 +6983,6 @@
           "label": "Mechanism axes (demo)",
           "live": false,
           "tier": "B"
-        },
-        {
-          "label": "Outcome model (demo)",
-          "live": false,
-          "tier": "C"
         }
       ],
       "trend": "stable",
@@ -7913,33 +7412,7 @@
           }
         ]
       },
-      "tier_c": {
-        "attributions": [
-          {
-            "contribution": -0.06,
-            "feature": "Troponin negative (last lab)"
-          },
-          {
-            "contribution": -0.05,
-            "feature": "Age"
-          },
-          {
-            "contribution": 0.02,
-            "feature": "Heart rate trend slope (3h)"
-          },
-          {
-            "contribution": 0.01,
-            "feature": "Respiratory rate vs baseline"
-          },
-          {
-            "contribution": -0.01,
-            "feature": "SpO₂ (current)"
-          }
-        ],
-        "forecast_window": "next 1–4h",
-        "risk_probability": 0.03,
-        "scored_seconds_ago": 300.0
-      },
+      "tier_c": null,
       "tier_status": [
         {
           "label": "NEWS2",
@@ -7950,11 +7423,6 @@
           "label": "Mechanism axes (demo)",
           "live": false,
           "tier": "B"
-        },
-        {
-          "label": "Outcome model (demo)",
-          "live": false,
-          "tier": "C"
         }
       ],
       "trend": "stable",
@@ -8370,33 +7838,7 @@
           }
         ]
       },
-      "tier_c": {
-        "attributions": [
-          {
-            "contribution": 0.05,
-            "feature": "Age"
-          },
-          {
-            "contribution": 0.04,
-            "feature": "Chronic angina history"
-          },
-          {
-            "contribution": -0.02,
-            "feature": "Heart rate trend slope (3h)"
-          },
-          {
-            "contribution": 0.01,
-            "feature": "Respiratory rate vs baseline"
-          },
-          {
-            "contribution": -0.01,
-            "feature": "SpO₂ trend slope (3h)"
-          }
-        ],
-        "forecast_window": "next 1–4h",
-        "risk_probability": 0.04,
-        "scored_seconds_ago": 4200.0
-      },
+      "tier_c": null,
       "tier_status": [
         {
           "label": "NEWS2",
@@ -8407,11 +7849,6 @@
           "label": "Mechanism axes (demo)",
           "live": false,
           "tier": "B"
-        },
-        {
-          "label": "Outcome model (demo)",
-          "live": false,
-          "tier": "C"
         }
       ],
       "trend": "stable",
@@ -8827,33 +8264,7 @@
           }
         ]
       },
-      "tier_c": {
-        "attributions": [
-          {
-            "contribution": -0.07,
-            "feature": "Improving trajectory (24h)"
-          },
-          {
-            "contribution": -0.04,
-            "feature": "Age"
-          },
-          {
-            "contribution": -0.03,
-            "feature": "Heart rate trend slope (3h)"
-          },
-          {
-            "contribution": -0.02,
-            "feature": "Temperature trend (6h)"
-          },
-          {
-            "contribution": -0.01,
-            "feature": "Respiratory rate vs baseline"
-          }
-        ],
-        "forecast_window": "next 1–4h",
-        "risk_probability": 0.02,
-        "scored_seconds_ago": 5400.0
-      },
+      "tier_c": null,
       "tier_status": [
         {
           "label": "NEWS2",
@@ -8864,11 +8275,6 @@
           "label": "Mechanism axes (demo)",
           "live": false,
           "tier": "B"
-        },
-        {
-          "label": "Outcome model (demo)",
-          "live": false,
-          "tier": "C"
         }
       ],
       "trend": "stable",

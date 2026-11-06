@@ -1,9 +1,8 @@
 /**
  * Contract types for the BioSentry dashboard.
  *
- * Source of truth: backend/src/biosentry/schemas (Pydantic) -> frontend/contracts/openapi.json
- * -> ./generated.ts. Never hand-edit generated.ts; regenerate with `make contract`.
- * CI (`contract-drift`) fails when the committed file differs from a fresh generation.
+ * ./generated.ts is the API contract, generated from the removed backend's schemas and frozen
+ * until the new backend exists. Do not hand-edit it; regenerate it from the new schemas.
  *
  * The only hand-written shapes here are the generic Measurement<T> / MeasurementValue<T>
  * wrappers components use. The assertions at the bottom fail typecheck if they drift from

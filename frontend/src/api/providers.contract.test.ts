@@ -2,7 +2,7 @@
  * One contract suite, two providers (PLAN CP6/CP8): every assertion runs against the fixture
  * provider and, when VITE_API_URL names a running API, against the HTTP provider too.
  *
- *   make http-contract        # starts the API on :8765, runs this file against both
+ *   VITE_API_URL=http://127.0.0.1:8765 npx vitest run src/api/providers.contract.test.ts
  *
  * The same assertions hold for both: server-side scope, fail-closed identity, ordering by the
  * arbiter, gaps as null, notes, labs, admission. Behaviour that cannot match (the fixture
@@ -10,7 +10,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import synthetic from "../../../data/synthetic/synthetic.json";
+import synthetic from "../data/synthetic.json";
 import type { AdmitPatientInput } from "../types";
 import { EMPTY_DRAFT, check } from "../components/vitalsDraft";
 import { DIASTOLIC_BOUNDS, SYSTOLIC_BOUNDS } from "./bounds";

@@ -216,29 +216,6 @@ describe("escalation arbiter output (computed by the backend arbiter, not writte
   });
 });
 
-describe("Tier C stays isolated and display-only", () => {
-  it("probability is calibrated into [0,1] and the model clock is its own", () => {
-    for (const r of ward.ranked) {
-      const c = r.tier_c;
-      if (c === null) continue;
-      expect(c.risk_probability, r.id).toBeGreaterThanOrEqual(0);
-      expect(c.risk_probability, r.id).toBeLessThanOrEqual(1);
-      expect(c.forecast_window.length, r.id).toBeGreaterThan(0);
-      expect(Number.isInteger(c.scored_seconds_ago), r.id).toBe(true);
-      expect(c.scored_seconds_ago, r.id).toBeGreaterThanOrEqual(0);
-    }
-  });
-
-  it("attributions never name another tier's verdict (fuse inputs, never outputs)", () => {
-    const verdict = /news2|kdigo|tier\s*[ab]\b|finding|escalat|priority/i;
-    for (const r of ward.ranked) {
-      for (const a of r.tier_c?.attributions ?? []) {
-        expect(verdict.test(a.feature), `${r.id} "${a.feature}"`).toBe(false);
-      }
-    }
-  });
-});
-
 describe("clinician scope (fixture stand-in for server-side filtering)", () => {
   for (const clinician of CLINICIANS) {
     it(`${clinician}: ward, list and detail agree and unassigned patients are unreachable`, async () => {
