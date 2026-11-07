@@ -11,7 +11,7 @@ list, one screen per clinician.
 alerts alone have not cut mortality: the gap is unreliable alerts and too few people to act.
 BioSentry's contribution is the process, not the hardware: an offline-first ward system (patch,
 gateway and edge server, cloud sync when the network allows) that cuts false alarms and tells
-one nurse who to see next.
+each nurse and physician who to see next.
 
 The list is sorted by **NEWS2**, a published bedside early-warning score (Tier A). A patient
 who meets a NEWS2 trigger sits above one who does not. Tier B (mechanism findings) is demo
@@ -58,7 +58,7 @@ contract, frozen until the new backend exists. Every target is in the [Makefile]
 **Pending:** a backend (scoring, clinician scope and audit), Tier B in the scoring, a signal-quality model, conformal abstention, distilled
 edge models, anything measured on real patients, a sensor pipeline (IoT Device Access), a
 database, real authentication, document extraction, and a plain-language explanation of each
-ranked alert for the nurse.
+ranked alert for the nurse or physician.
 
 **Next:** deploy offline-first on Huawei Cloud (IoT Device Access, ModelArts, MindSpore Lite,
 Object Storage Service), then compare against a threshold-alarm baseline on false alarms per
