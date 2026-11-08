@@ -1,1 +1,1 @@
-"""Data access: the SQLite store."""
+"""Data access: the PostgreSQL store."""

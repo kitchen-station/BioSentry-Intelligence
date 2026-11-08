@@ -12,7 +12,6 @@ The ward simulation writes through /sim/*, gated by the X-Ingest-Key header (503
 """
 
 import secrets
-import sqlite3
 from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Annotated
@@ -27,7 +26,7 @@ from pydantic import BaseModel
 from biosentry.core.audit import AuditLog, Clock, utc_now
 from biosentry.core.config import Settings
 from biosentry.db.seed import ensure
-from biosentry.repositories.sqlite import SqliteStore, connect
+from biosentry.repositories.postgres import Conn, PostgresStore, connect
 from biosentry.schemas import (
     AbstainedRow,
     Acknowledgement,
@@ -73,8 +72,8 @@ UNAUTHENTICATED_WRITES = {
 class Context:
     """One request: its connection and the services built on it."""
 
-    conn: sqlite3.Connection
-    store: SqliteStore
+    conn: Conn
+    store: PostgresStore
     audit: AuditLog
     wards: WardService
     patients: PatientService
@@ -120,9 +119,17 @@ def identify(ctx: Context, authorization: str | None) -> str:
 
 def clinician(
     ctx: Ctx,
+    request: Request,
     authorization: Annotated[str | None, Header()] = None,
 ) -> str:
-    return identify(ctx, authorization)
+    who = identify(ctx, authorization)
+    # Identity first. Then a path parameter with a NUL names nothing (and PostgreSQL text could
+    # not hold it): the same 404 as any other missing resource, audited with the NUL dropped.
+    for value in request.path_params.values():
+        if "\x00" in str(value):
+            ctx.audit.append(who, "request", str(value), "not_found")
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+    return who
 
 
 Who = Annotated[str, Depends(clinician)]
@@ -137,14 +144,18 @@ def unprocessable(exc: RequestValidationError) -> JSONResponse:
 def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> FastAPI:
     """Build the app. `clock` is the wall clock (tests inject one)."""
     settings = settings or Settings.from_env()
-    ensure(settings.db, settings.dataset)
+    ensure(settings.database_url, settings.dataset)
 
     def open_ctx() -> Context:
-        conn = connect(settings.db)
-        store = SqliteStore(conn, clock)
-        audit = AuditLog(conn, clock, store.role_of)
-        wards = WardService(store, audit)
-        return Context(conn, store, audit, wards, PatientService(store, audit, wards))
+        conn = connect(settings.database_url)
+        try:  # a connection that cannot become a Context (no run, say) is not left open
+            store = PostgresStore(conn, clock)
+            audit = AuditLog(conn, clock, store.role_of)
+            wards = WardService(store, audit)
+            return Context(conn, store, audit, wards, PatientService(store, audit, wards))
+        except BaseException:
+            conn.close()
+            raise
 
     def ingest_gate(ctx: Ctx, x_ingest_key: Annotated[str | None, Header()] = None) -> None:
         """Fails closed: no key configured, no ingest."""

@@ -7,7 +7,8 @@ from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_DATASET = _REPO_ROOT / "frontend" / "src" / "data" / "synthetic.json"
-DEFAULT_DB = _REPO_ROOT / "backend" / "data" / "biosentry.db"
+# The dev database from compose.yaml (loopback only, dev-only password).
+DEFAULT_DATABASE_URL = "postgresql://biosentry:biosentry-dev-only@127.0.0.1:5432/biosentry"
 # The dashboard (5173, 5174) and the ward sim (5180, 5181), on either spelling of loopback.
 DEFAULT_CORS_ORIGINS = tuple(
     f"http://{host}:{port}"
@@ -18,7 +19,7 @@ DEFAULT_CORS_ORIGINS = tuple(
 
 @dataclass(frozen=True, slots=True)
 class Settings:
-    db: Path = DEFAULT_DB
+    database_url: str = DEFAULT_DATABASE_URL
     dataset: Path = DEFAULT_DATASET
     cors_origins: tuple[str, ...] = DEFAULT_CORS_ORIGINS
     # Unset: the sim ingest routes refuse everything (fail closed).
@@ -28,6 +29,6 @@ class Settings:
     def from_env(cls, env: Mapping[str, str] | None = None) -> "Settings":
         source = os.environ if env is None else env
         return cls(
-            db=Path(source.get("BIOSENTRY_DB", str(DEFAULT_DB))),
+            database_url=source.get("BIOSENTRY_DATABASE_URL") or DEFAULT_DATABASE_URL,
             ingest_key=source.get("BIOSENTRY_INGEST_KEY") or None,
         )

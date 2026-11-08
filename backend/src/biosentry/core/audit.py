@@ -3,17 +3,16 @@
 Records hold ids and outcomes only: no names, no PhilHealth PIN, no measurement values. A
 record names the clinician by id and by the role they held when they acted (a manual entry
 carries source `nurse` on the measurement; who typed it is answered here). The table refuses
-UPDATE, DELETE and overwriting a row, but not someone who can drop its triggers; the
+UPDATE, DELETE, TRUNCATE and a repeated seq, but not someone who can drop its triggers; the
 hash-chained form comes later. `resource` comes from the caller, so it is cut at 200 characters.
 """
 
-import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Literal
 
-from biosentry.repositories.sqlite import iso, parse
+from biosentry.repositories.postgres import Conn, whole
 
 RESOURCE_MAX = 200
 Outcome = Literal["ok", "not_found", "denied", "rejected"]
@@ -37,7 +36,7 @@ class AuditRecord:
 
 
 class AuditLog:
-    def __init__(self, conn: sqlite3.Connection, clock: Clock, role_of: RoleOf) -> None:
+    def __init__(self, conn: Conn, clock: Clock, role_of: RoleOf) -> None:
         self._conn = conn
         self._clock = clock
         self._role_of = role_of
@@ -47,13 +46,13 @@ class AuditLog:
     ) -> None:
         self._conn.execute(
             "INSERT INTO audit_log (at, clinician_id, role, action, resource, outcome)"
-            " VALUES (?, ?, ?, ?, ?, ?)",
+            " VALUES (%s, %s, %s, %s, %s, %s)",
             (
-                iso(self._clock()),
+                whole(self._clock()),
                 clinician_id,
                 self._role_of(clinician_id) if clinician_id is not None else None,
                 action,
-                resource[:RESOURCE_MAX],
+                resource.replace("\x00", "")[:RESOURCE_MAX],  # PostgreSQL text cannot hold a NUL
                 outcome,
             ),
         )
@@ -61,13 +60,14 @@ class AuditLog:
     def records(self, clinician_id: str | None = None) -> tuple[AuditRecord, ...]:
         """Every record, oldest first; or only this clinician's."""
         rows = self._conn.execute(
-            "SELECT * FROM audit_log WHERE ?1 IS NULL OR clinician_id = ?1 ORDER BY seq",
-            (clinician_id,),
+            "SELECT * FROM audit_log WHERE %(who)s::text IS NULL OR clinician_id = %(who)s"
+            " ORDER BY seq",
+            {"who": clinician_id},
         )
         return tuple(
             AuditRecord(
                 r["seq"],
-                parse(r["at"]),
+                r["at"],
                 r["clinician_id"],
                 r["role"],
                 r["action"],
