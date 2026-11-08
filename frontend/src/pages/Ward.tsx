@@ -134,7 +134,6 @@ export function Ward({ session, onSignOut }: Props) {
             </span>
             <span className={styles.statusDivider} />
             <span className={styles.statusItem}>
-              <span className={`${styles.liveDot} ${data.receiving_data ? styles.liveDotActive : ""}`} />
               <span className={styles.statusValue}>
                 {!data.receiving_data
                   ? "No signal"

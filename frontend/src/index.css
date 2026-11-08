@@ -1,11 +1,11 @@
 /* ============================================================
    BioSentry global tokens and resets
-   Design language: clean, two brand colours (navy primary,
-   sand secondary) plus red/green for clinical state only.
-   Colour is reserved for what needs action. See README.
+   Design language: brand book foundation v1 (Paper, Char,
+   Ember, Slate for data, Scorch to warn). Colour only marks
+   what needs action. No dots. See README.
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=Spectral:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500;600&family=Hanken+Grotesk:wght@400;500;600&display=swap');
 
 /* ---- Reset ---- */
 
@@ -18,33 +18,31 @@
 /* ---- Design tokens ---- */
 
 :root {
-  /* Palette */
-  --ink:        #1a1a1a;
-  --ground:     #f8f7f5;
-  --surface:    #ffffff;
-  --border:     #d4d2cd;
-  --label:      #6b6965;
-  --button:     #1f3a5f;
-  --button-ink: #ffffff;
+  /* Brand book "foundation v1": Paper and Char carry the page, Slate is data only (never
+     text), Scorch warns. No dots, shadows or gradients on this clinical surface. */
+  --ink:     #2a231e; /* Char */
+  --ground:  #f5f0e6; /* Paper */
+  --surface: #fbf8f2; /* Flour: cards */
+  --panel:   #ece4d6; /* Oat */
+  --border:  #ded4c3; /* Linen: hairlines */
+  --label:   #6f6457; /* Stone: quiet text */
 
-  /* Brand: primary navy, secondary sand */
-  --primary:        #1f3a5f;
-  --primary-strong: #142840;
-  --primary-tint:   #e8eef5;
-  --secondary:      #d9c6a0;
-  --secondary-tint: #f4ecdc;
-  --accent:         var(--primary);
+  --primary:        #1c1916; /* Cast iron: header, active states */
+  --primary-tint:   #ece4d6; /* Oat */
+  --secondary:      #cdb99a; /* Sand */
+  --secondary-tint: #f1e8d8;
+  --accent:         #a64b2a; /* Ember: lead accent, links */
+  --data:           #3f5a73; /* Slate: lines and fills, never text */
+  --button:         #a64b2a;
+  --button-ink:     #f5f0e6;
 
-  /* Clinical state: red = act, green = stable/good. Nothing else is coloured. */
-  --alert:      #c62828;
-  --alert-tint: #fbe9e7;
-  --ok:         #2e7d4f;
-  --ok-tint:    #e6f2ea;
+  /* Clinical state: Scorch = act; sage = stable. Nothing else carries colour. */
+  --alert:      #9b3324; /* Scorch */
+  --alert-tint: #f3e3dc;
+  --alert-edge: #d9a99b;
+  --ok:         #4d6b50;
 
-  /* Depth */
-  --radius:   6px;
-  --shadow-1: 0 1px 2px rgba(20, 40, 64, 0.06), 0 1px 3px rgba(20, 40, 64, 0.08);
-  --shadow-2: 0 4px 12px rgba(20, 40, 64, 0.10);
+  --radius: 10px;
 
   /* Spacing scale */
   --sp-1: 4px;
@@ -61,8 +59,10 @@
   --page-max: 1200px;
 
   /* Typography */
-  --font-serif: "Source Serif 4", Georgia, serif;
-  --font-sans: "Inter", system-ui, sans-serif;
+  --font-display: "Fraunces", Georgia, serif;
+  --font-serif: "Spectral", Georgia, serif;
+  --font-sans: "Hanken Grotesk", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
 
 /* ---- Base styles ---- */
@@ -86,7 +86,7 @@ a:hover {
 /* ---- Provenance cues (I2) ---- */
 
 .nurse-entered {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 13px;
 }
 

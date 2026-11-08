@@ -126,7 +126,6 @@ export function PatientDetail({ session }: { session: Session }) {
           <Link to="/ward" className={styles.back}>&larr; Ward view</Link>
           <div className={styles.stripRight}>
             <span className={styles.stripSignal}>
-              <span className={styles.liveDot} />
               Signal {patient.signal_quality}%
             </span>
             <span className={styles.stripUpdate}>

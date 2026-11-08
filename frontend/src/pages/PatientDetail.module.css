@@ -46,21 +46,6 @@
   font-size: 12px;
 }
 
-.liveDot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  background: var(--ok);
-  border-radius: 50%;
-  margin-right: 4px;
-  animation: pulse 2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
-}
-
 .stripSignal { display: flex; align-items: center; }
 .stripUpdate { opacity: 0.6; }
 .stripId { opacity: 0.4; }
@@ -106,7 +91,7 @@
 .summaryBlock[data-band="high"] .summaryBig,
 .summaryBlock[data-band="high"] .responseText { color: #fff; }
 .summaryBlock[data-band="medium"],
-.summaryBlock[data-band="low-medium"] { background: var(--alert-tint); border-color: #f2c4bf; }
+.summaryBlock[data-band="low-medium"] { background: var(--alert-tint); border-color: var(--alert-edge); }
 .summaryBlock[data-band="medium"] .summaryBig,
 .summaryBlock[data-band="low-medium"] .summaryBig,
 .summaryBlock[data-band="medium"] .responseText,
@@ -124,7 +109,7 @@
 }
 
 .summaryLabel {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -132,7 +117,7 @@
 }
 
 .summaryBig {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-weight: 600;
   font-size: 20px;
   line-height: 1;
@@ -186,7 +171,7 @@
 .drawerBtn {
   white-space: nowrap;
   border-radius: var(--radius);
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.06em;
@@ -250,7 +235,7 @@
 }
 
 .overlayTitle {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-weight: 500;
   font-size: 10px;
   letter-spacing: 0.08em;
@@ -301,11 +286,10 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: var(--shadow-1);
 }
 
 .panelEyebrow {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-weight: 500;
   font-size: 10px;
   letter-spacing: 0.08em;
@@ -315,6 +299,7 @@
 }
 
 .patientName {
+  font-family: var(--font-display);
   font-size: 24px;
   font-weight: 600;
   line-height: 1.2;
@@ -343,6 +328,7 @@
 }
 
 .scoreValue {
+  font-family: var(--font-mono);
   font-size: 36px;
   font-weight: 600;
   line-height: 1;
@@ -366,7 +352,7 @@
 
 .findingsGroupLabel {
   display: block;
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.1em;
@@ -413,7 +399,7 @@
 }
 
 .findingSource {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 9px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -482,12 +468,13 @@
 }
 
 .vitalValue {
+  font-family: var(--font-mono);
   font-size: 15px;
 }
 
 /* Per-parameter NEWS2 points: 3 = solid red, 1-2 = red tint, 0 = nothing shown. */
 .vitalPoints {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;
   padding: 1px 7px;
@@ -531,7 +518,7 @@
 }
 
 .noteSubmit {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.04em;
@@ -583,7 +570,7 @@
 }
 
 .noteRole {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -600,7 +587,7 @@
 }
 
 .noteDelete {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.04em;
   text-transform: uppercase;

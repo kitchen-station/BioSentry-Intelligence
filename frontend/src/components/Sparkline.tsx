@@ -14,7 +14,7 @@ export function Sparkline({
   data,
   width = 80,
   height = 24,
-  color = "var(--primary)",
+  color = "var(--data)",
   fill = false,
   className,
 }: Props) {

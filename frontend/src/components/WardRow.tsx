@@ -52,11 +52,13 @@ export function WardRow({ row, role, now, ageOffsetS }: Props) {
         {/* Patient info */}
         <div className={styles.infoCol}>
           <div className={styles.nameRow}>
-            <span className={styles.signalDot} data-quality={row.signal_quality > 90 ? "good" : "degraded"} />
             <span className={styles.name}>{row.name}</span>
             <span className={styles.detail}>
               {row.age ?? "--"}{row.sex ? ` ${row.sex}` : ""} &middot; Bed {row.bed}
             </span>
+            {row.signal_quality <= 90 && (
+              <span className={styles.signalLow}>Signal {row.signal_quality}%</span>
+            )}
             <span className={styles.updateTag} data-stale={age > STALE_AFTER_S || undefined}>
               {age > STALE_AFTER_S ? "Stale · " : ""}{formatAge(Math.floor(age))}
             </span>

@@ -17,7 +17,7 @@
 }
 
 .eyebrow {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-weight: 500;
   font-size: 11px;
   letter-spacing: 0.12em;
@@ -62,7 +62,7 @@
 }
 
 .sectionLabel {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-weight: 500;
   font-size: 11px;
   letter-spacing: 0.08em;
@@ -290,7 +290,7 @@
 }
 
 .footerLabel {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.08em;
   text-transform: uppercase;

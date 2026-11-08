@@ -26,20 +26,20 @@
   border: 1px solid var(--border);
   border-left: 4px solid transparent;
   border-radius: var(--radius);
-  box-shadow: var(--shadow-1);
   padding: var(--sp-3) 0;
-  transition: box-shadow 0.15s, transform 0.15s;
+  transition: border-color 0.15s;
 }
 
 .row:hover {
-  box-shadow: var(--shadow-2);
-  transform: translateY(-1px);
+  border-top-color: var(--secondary);
+  border-right-color: var(--secondary);
+  border-bottom-color: var(--secondary);
 }
 
 /* Colour only where action is due: high = solid red, medium and single-parameter = red edge. */
 .row[data-band="high"] { border-left-color: var(--alert); }
 .row[data-band="medium"],
-.row[data-band="low-medium"] { border-left-color: #e8a19b; }
+.row[data-band="low-medium"] { border-left-color: var(--alert-edge); }
 
 /* ---- Rank and score column ---- */
 
@@ -52,7 +52,7 @@
 }
 
 .rank {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-weight: 500;
   font-size: 11px;
   color: var(--label);
@@ -61,8 +61,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--border);
-  border-radius: 50%;
 }
 
 .scoreBlock {
@@ -72,7 +70,7 @@
 }
 
 .score {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-weight: 600;
   font-size: 18px;
   line-height: 1;
@@ -125,29 +123,15 @@
   flex-wrap: wrap;
 }
 
-.signalDot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.signalDot[data-quality="good"] {
-  background: var(--ok);
-  animation: blink 3s ease-in-out infinite;
-}
-
-.signalDot[data-quality="degraded"] {
-  background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--alert);
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+.signalLow {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--alert);
 }
 
 .name {
+  font-family: var(--font-display);
   font-weight: 600;
   font-size: 15px;
 }
@@ -159,7 +143,7 @@
 }
 
 .updateTag {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 10px;
   color: var(--label);
   border: 1px solid var(--border);
@@ -215,7 +199,7 @@
 }
 
 .sparkLabel {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 10px;
   color: var(--label);
   text-transform: uppercase;
@@ -224,7 +208,7 @@
 }
 
 .sparkVal {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 12px;
   min-width: 32px;
   text-align: right;
@@ -256,7 +240,7 @@
 }
 
 .nurseLabel {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 10px;
   color: var(--label);
   text-transform: uppercase;

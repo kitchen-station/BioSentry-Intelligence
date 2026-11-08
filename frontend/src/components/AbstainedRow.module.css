@@ -20,7 +20,7 @@
 }
 
 .tag {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-weight: 500;
   font-size: 10px;
   letter-spacing: 0.08em;

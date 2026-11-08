@@ -61,7 +61,7 @@
 }
 
 .tab {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.04em;
@@ -117,7 +117,7 @@
 }
 
 .sectionDivider {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.08em;
@@ -144,7 +144,7 @@
 }
 
 .label {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.04em;
@@ -178,7 +178,7 @@
 }
 
 .submitBtn {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 500;
   letter-spacing: 0.04em;
@@ -293,7 +293,7 @@
 }
 
 .cancelBtn {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 500;
   letter-spacing: 0.04em;
