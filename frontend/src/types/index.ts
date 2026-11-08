@@ -1,8 +1,8 @@
 /**
  * Contract types for the BioSentry dashboard.
  *
- * ./generated.ts is the API contract, generated from the removed backend's schemas and frozen
- * until the new backend exists. Do not hand-edit it; regenerate it from the new schemas.
+ * ./generated.ts is the API contract, generated from the backend's Pydantic schemas
+ * (`make contract`). Do not hand-edit it.
  *
  * The only hand-written shapes here are the generic Measurement<T> / MeasurementValue<T>
  * wrappers components use. The assertions at the bottom fail typecheck if they drift from
@@ -26,6 +26,7 @@ import type {
 
 export type {
   AbstainedRow,
+  Acknowledgement,
   Acvpu,
   AdmissionCondition,
   AdmissionRoute,

@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "biosentry"
+version = "0.1.0"
+description = "BioSentry Intelligence backend: a slim FastAPI over SQLite."
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "fastapi==0.143.0",
+  "pydantic==2.14.1",
+  "uvicorn==0.54.0",
+]
+
+[dependency-groups]
+dev = [
+  "httpx2==2.13.1",
+  "pytest==9.1.1",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"biosentry.db" = ["schema.sql"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests/contract"]
+addopts = "-ra --strict-markers"

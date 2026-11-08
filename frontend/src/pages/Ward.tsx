@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { AbstainedRow as AbstainedRowType, Session, VitalsRecorded, WardResponse } from "../types";
-import { getWard } from "../api";
+import { acknowledge as saveAcknowledgement, getAcknowledgements, getWard } from "../api";
 import { WardRow } from "../components/WardRow";
 import { band, obsDue, unacknowledged } from "../components/risk";
 import { formatClock } from "../components/format";
@@ -16,10 +16,6 @@ interface Props {
 }
 
 const POLL_MS = 15_000;
-
-// Acknowledgements per clinician, kept across visits to a patient page within this tab.
-// shortcut: client-side only and unaudited; move to the server (ack + audit) with the edge API.
-const ACKS = new Map<string, Map<string, number>>();
 
 function beep(): void {
   try {
@@ -45,9 +41,8 @@ export function Ward({ session, onSignOut }: Props) {
   const [failedSince, setFailedSince] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [notice, setNotice] = useState<string | null>(null);
-  const [acked, setAcked] = useState<ReadonlyMap<string, number>>(
-    () => ACKS.get(session.clinician_id) ?? new Map(),
-  );
+  // null until the server's acknowledgements arrive, so an alert already acknowledged never sounds.
+  const [acked, setAcked] = useState<ReadonlyMap<string, number> | null>(null);
   const alerted = useRef(new Set<string>());
 
   // Keeps the last good ward on screen when a fetch fails, and says since when.
@@ -74,12 +69,23 @@ export function Ward({ session, onSignOut }: Props) {
     refresh();
   }, [refresh]);
 
+  // If they cannot be loaded every alert stays open: showing one twice is safer than hiding one.
+  useEffect(() => {
+    getAcknowledgements().then(
+      (list) => setAcked(new Map(list.map((a) => [a.patient_id, a.score]))),
+      () => {
+        setAcked(new Map());
+        setNotice("Could not load your acknowledgements. Alerts you already acknowledged may show again.");
+      },
+    );
+  }, []);
+
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
 
-  const alerts = data ? unacknowledged(data.ranked, acked) : [];
+  const alerts = data && acked ? unacknowledged(data.ranked, acked) : [];
   const alertKey = alerts.map((a) => `${a.id}:${a.score}`).join(",");
 
   // Sound once per new alert, and show the count in the tab title so a background tab is seen.
@@ -92,10 +98,12 @@ export function Ward({ session, onSignOut }: Props) {
     return () => setTitle("BioSentry");
   }, [alertKey]);
 
+  // The alert closes only once the server has recorded the acknowledgement.
   const acknowledge = (id: string, score: number) => {
-    const next = new Map(acked).set(id, score);
-    ACKS.set(session.clinician_id, next);
-    setAcked(next);
+    saveAcknowledgement(id, score).then(
+      () => setAcked((prev) => new Map(prev).set(id, score)),
+      () => setNotice("Could not save the acknowledgement. The alert stays open: try again."),
+    );
   };
 
   if (!data) {
@@ -153,6 +161,12 @@ export function Ward({ session, onSignOut }: Props) {
         <p className={styles.offline} role="status">
           Cannot reach the ward server since {formatClock(failedSince)}. Showing data from{" "}
           {fetchedAt ? formatClock(fetchedAt) : "--"}; ages below keep counting. Retrying every 15 seconds.
+        </p>
+      )}
+
+      {[...data.ranked, ...data.abstained].some((r) => !r.synthetic) && (
+        <p className={styles.attribution}>
+          Real de-identified ICU data replayed. eICU-CRD Demo 2.0.1, ODbL.
         </p>
       )}
 
