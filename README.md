@@ -1,5 +1,7 @@
 # BioSentry
 
+**Live demo:** <https://biosentry-dashboard.pages.dev> (synthetic data, no real sign-in; deploys from `main`)
+
 A ranked early-warning list for hospital wards in the Philippines.
 
 BioSentry answers one question: *of your twenty patients, see this one first.* It takes
