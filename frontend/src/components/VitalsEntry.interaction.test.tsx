@@ -189,6 +189,27 @@ describe("a valid draft is one request carrying only what was entered", () => {
     expect(api.recordVitals).toHaveBeenCalledTimes(2);
   });
 
+  it("a choice set back to Not recorded is left out of the request", async () => {
+    const user = userEvent.setup();
+    api.recordVitals.mockResolvedValue(ranked(2, 3));
+    entry();
+    const [acvpuUnset, oxygenUnset, scaleUnset] = screen.getAllByLabelText("Not recorded");
+    await user.click(screen.getByLabelText("A Alert"));
+    await user.click(screen.getByLabelText("On supplemental oxygen"));
+    await user.click(screen.getByLabelText("Scale 2"));
+    await user.click(screen.getByLabelText("Scale 1"));
+    await user.click(acvpuUnset);
+    await user.click(oxygenUnset);
+    await user.click(recordButton());
+    expect(sentInput()).toStrictEqual({ spo2_scale: 1 });
+
+    await user.click(screen.getByLabelText("Scale 1"));
+    await user.click(scaleUnset);
+    await user.click(recordButton());
+    expect(screen.getByRole("alert").textContent).toBe("Record at least one value.");
+    expect(api.recordVitals).toHaveBeenCalledTimes(1);
+  });
+
   it("locks while the request is in flight, so a double click cannot send it twice", async () => {
     const user = userEvent.setup();
     let finish!: (value: VitalsRecorded) => void;
@@ -319,6 +340,15 @@ describe("the row and the ward page", () => {
 
     await user.click(screen.getAllByRole("button", { name: "Close" })[0]);
     expect(screen.queryByRole("form")).toBeNull();
+  });
+
+  it("closes from the form's own Close button too, and the row collapses with it", async () => {
+    const user = userEvent.setup();
+    render(<AbstainedRow row={row} canRecord clinicianId="rn-delacruz" />);
+    await user.click(screen.getByRole("button", { name: "Record vitals" }));
+    await user.click(screen.getAllByRole("button", { name: "Close" })[1]); // the form's, not the row toggle
+    expect(screen.queryByRole("form")).toBeNull();
+    expect(screen.getByRole("button", { name: "Record vitals" }).getAttribute("aria-expanded")).toBe("false");
   });
 
   it("fetches the ward again after a record and says where the patient now stands", async () => {

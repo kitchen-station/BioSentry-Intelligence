@@ -8,6 +8,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   acknowledge,
+  extractLabsFromFile,
+  extractPatientFromFile,
   getAcknowledgements,
   getNotes,
   getPatient,
@@ -294,5 +296,32 @@ describe("acknowledgements", () => {
     expect(await getAcknowledgements()).toEqual([]);
     setActiveClinician(null);
     expect(await getAcknowledgements()).toEqual([]);
+  });
+});
+
+// The extraction stubs stand in for OCR (v2): a fixed answer after 2 s, every value with a
+// confidence, flagged synthetic and named as the stub, so it can never pass for a real read.
+describe("document extraction stubs", () => {
+  it.each([
+    ["labs", extractLabsFromFile],
+    ["patient", extractPatientFromFile],
+  ] as const)("%s: answers after 2 s, synthetic, from the stub model", async (_, extract) => {
+    vi.useFakeTimers();
+    try {
+      let settled = false;
+      const out = extract(new File(["x"], "scan.pdf")).then((r) => {
+        settled = true;
+        return r;
+      });
+      await vi.advanceTimersByTimeAsync(1999);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      const r = await out;
+      expect(r.synthetic).toBe(true);
+      expect(r.model_id).toBe("stub-ocr-v0");
+      expect(Object.keys(r.confidence).sort()).toEqual(Object.keys(r.values).sort());
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

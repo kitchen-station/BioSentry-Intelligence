@@ -108,3 +108,51 @@ def test_models_are_frozen() -> None:
     status = TierStatus.model_validate(sample(TierStatus))
     with pytest.raises(ValidationError):
         status.label = "other"  # type: ignore[misc]
+
+
+@pytest.mark.parametrize(
+    ("change", "error"),
+    [
+        ({"rank": None}, "a ranked patient has a rank and a score"),
+        ({"not_ranked_reason": "x"}, "a ranked patient has no NOT RANKED reason"),
+        ({"ranked": False}, "a NOT RANKED patient has no rank and no score"),
+        (
+            {"ranked": False, "rank": None, "score": None, "not_ranked_reason": "x"},
+            "a NOT RANKED patient names its reason and instruction",
+        ),
+    ],
+)
+def test_a_recorded_vitals_response_is_ranked_or_not_ranked_never_both(
+    change: dict[str, Any], error: str
+) -> None:
+    from biosentry.schemas import VitalsRecorded
+
+    with pytest.raises(ValidationError, match=error):
+        VitalsRecorded.model_validate({**sample(VitalsRecorded), **change})
+
+
+def _sim_patient(pid: str, row_pid: str | None = None) -> dict[str, Any]:
+    return {
+        "id": pid, "name": "Sim, Pat", "age": 61, "sex": "F", "bed": "9A", "context": "c",
+        "story": "s", "rn": "rn-1", "md": None, "trend": "stable", "signal_quality": None,
+        "observations": [],
+        "bins": [{"patient_id": row_pid or pid, "vital": "heart_rate", "minute": 0, "value": 1.0}],
+    }  # fmt: skip
+
+
+@pytest.mark.parametrize(
+    ("patients", "error"),
+    [
+        ([_sim_patient("s-1", row_pid="s-2")], "carry that patient's id"),
+        ([_sim_patient("s-1"), _sim_patient("s-1")], "patient ids must be unique"),
+    ],
+)
+def test_a_sim_run_names_each_patient_once_and_rows_belong_to_their_patient(
+    patients: list[dict[str, Any]], error: str
+) -> None:
+    from biosentry.schemas.ingest import NewRun
+
+    body = {"source": "synthetic", "seed": 1, "origin": "2026-01-01T00:00:00Z"}
+    NewRun.model_validate({**body, "patients": [_sim_patient("s-1")]})  # the valid shape
+    with pytest.raises(ValidationError, match=error):
+        NewRun.model_validate({**body, "patients": patients})

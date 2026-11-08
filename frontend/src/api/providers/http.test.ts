@@ -113,3 +113,48 @@ describe("httpProvider acknowledgements", () => {
     await expect(httpProvider.acknowledge("p-999", 9)).rejects.toBeInstanceOf(ApiError);
   });
 });
+
+describe("httpProvider maps each call to its endpoint", () => {
+  const sent = (call = 0) => {
+    const [path, init = {}] = fetchMock.mock.calls[call] as [string, RequestInit?];
+    const body = init.body;
+    return {
+      path,
+      method: init.method ?? "GET",
+      body: typeof body === "string" ? JSON.parse(body) : body,
+    };
+  };
+  const file = new File(["x"], "labs.pdf", { type: "application/pdf" });
+
+  it.each([
+    ["getNotes", () => httpProvider.getNotes("p-1"), "GET", "/patients/p-1/notes", undefined],
+    ["addNote", () => httpProvider.addNote("p-1", "RN Cruz", "RN", "Restless"), "POST", "/patients/p-1/notes", { author: "RN Cruz", role: "RN", content: "Restless" }],
+    ["listAllPatients", () => httpProvider.listAllPatients(), "GET", "/patients", undefined],
+    ["admitPatient", () => httpProvider.admitPatient({ firstName: "A" } as never), "POST", "/patients", { firstName: "A" }],
+    ["enterLabResults", () => httpProvider.enterLabResults("p-1", { creatinine: 1.2 } as never), "POST", "/patients/p-1/labs", { creatinine: 1.2 }],
+    ["recordVitals", () => httpProvider.recordVitals("p-1", { systolic: 120, diastolic: 80 }), "POST", "/patients/p-1/vitals", { systolic: 120, diastolic: 80 }],
+    ["getAcknowledgements", () => httpProvider.getAcknowledgements(), "GET", "/acknowledgements", undefined],
+    ["acknowledge", () => httpProvider.acknowledge("p-1", 9), "POST", "/patients/p-1/acknowledgement", { score: 9 }],
+  ] as const)("%s", async (_, call, method, path, body) => {
+    fetchMock.mockResolvedValue(reply(200, { ok: true }));
+    await expect(call()).resolves.toEqual({ ok: true });
+    expect(sent()).toEqual({ path, method, body });
+  });
+
+  it("deleteNote sends a DELETE to the note", async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
+    await expect(httpProvider.deleteNote("p-1", "n-002")).resolves.toBeUndefined();
+    expect(sent()).toMatchObject({ path: "/patients/p-1/notes/n-002", method: "DELETE" });
+  });
+
+  it.each([
+    ["extractLabsFromFile", () => httpProvider.extractLabsFromFile(file), "/extract/labs"],
+    ["extractPatientFromFile", () => httpProvider.extractPatientFromFile(file), "/extract/patient"],
+  ] as const)("%s uploads the file", async (_, call, path) => {
+    fetchMock.mockResolvedValue(reply(200, { values: {} }));
+    await expect(call()).resolves.toEqual({ values: {} });
+    const { path: sentPath, method, body } = sent();
+    expect([sentPath, method]).toEqual([path, "POST"]);
+    expect((body as FormData).get("file")).toBeInstanceOf(File);
+  });
+});

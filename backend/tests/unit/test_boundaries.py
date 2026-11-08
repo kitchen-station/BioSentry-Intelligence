@@ -1,0 +1,51 @@
+"""Small boundaries: settings from the environment, the wall clock, the blood pressure parser and
+the ward row's patch-signal guard."""
+
+from datetime import UTC, datetime
+
+import pytest
+
+from biosentry.core.audit import utc_now
+from biosentry.core.config import DEFAULT_DATABASE_URL, Settings
+from biosentry.domain.arbiter import Ranked
+from biosentry.schemas import UnscoredPatient
+from biosentry.services.patients import RejectedError, split_blood_pressure
+from biosentry.services.scoring import decide
+from biosentry.services.ward import score_row
+from samples import measurement, present, unscored  # isort: skip
+
+
+def test_settings_read_the_environment_and_an_empty_value_is_unset() -> None:
+    url = "postgresql://u@db.example/x"
+    given = Settings.from_env({"BIOSENTRY_DATABASE_URL": url, "BIOSENTRY_INGEST_KEY": "k"})
+    assert (given.database_url, given.ingest_key) == (url, "k")
+    empty = Settings.from_env({"BIOSENTRY_DATABASE_URL": "", "BIOSENTRY_INGEST_KEY": ""})
+    assert (empty.database_url, empty.ingest_key) == (DEFAULT_DATABASE_URL, None)
+
+
+def test_settings_default_to_the_process_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BIOSENTRY_INGEST_KEY", "from-env")
+    assert Settings.from_env().ingest_key == "from-env"
+
+
+def test_the_wall_clock_is_utc() -> None:
+    before = datetime.now(UTC)
+    now = utc_now()
+    assert now.tzinfo is UTC and before <= now <= datetime.now(UTC)
+
+
+@pytest.mark.parametrize("text", ["120", "120/", "/80", "a/80", "120/8o", "-1/80"])
+def test_a_blood_pressure_that_is_not_systolic_slash_diastolic_is_rejected(text: str) -> None:
+    with pytest.raises(RejectedError, match="systolic/diastolic"):
+        split_blood_pressure(text)
+
+
+def test_a_ranked_row_needs_a_patch_signal() -> None:
+    payload = unscored()
+    payload["vitals"]["supplemental_o2"] = measurement(present(False))
+    payload["vitals"]["spo2_scale"] = measurement(present(1))
+    state = UnscoredPatient.model_validate({**payload, "signal_quality": None})
+    decision = decide(state)
+    assert isinstance(decision, Ranked)
+    with pytest.raises(ValueError, match="ranked without a patch signal"):
+        score_row(state, 1, decision, [])
