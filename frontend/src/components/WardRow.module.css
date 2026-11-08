@@ -84,14 +84,14 @@
   color: var(--primary);
 }
 
-.row[data-band="high"] .score { background: var(--alert); color: #fff; }
+.row[data-band="high"] .score { background: var(--alert); color: var(--button-ink); }
 .row[data-band="medium"] .score,
 .row[data-band="low-medium"] .score { background: var(--alert-tint); color: var(--alert); }
 
 .trend {
   font-family: var(--font-sans);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--label);
 }
 
@@ -102,7 +102,7 @@
 .response {
   font-family: var(--font-sans);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--primary);
   margin-top: var(--sp-1);
 }
@@ -126,13 +126,13 @@
 .signalLow {
   font-family: var(--font-sans);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--alert);
 }
 
 .name {
   font-family: var(--font-display);
-  font-weight: 600;
+  font-weight: 500;
   font-size: 15px;
 }
 
@@ -155,7 +155,7 @@
 .updateTag[data-stale] {
   color: var(--alert);
   border-color: var(--alert);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .context {
@@ -203,7 +203,7 @@
   font-size: 10px;
   color: var(--label);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.12em;
   min-width: 28px;
 }
 
@@ -220,7 +220,7 @@
 .sparkRow[data-points="2"] .sparkVal,
 .sparkRow[data-points="3"] .sparkVal,
 .nursePair[data-points="2"],
-.nursePair[data-points="3"] { color: var(--alert); font-weight: 600; }
+.nursePair[data-points="3"] { color: var(--alert); font-weight: 500; }
 
 /* ---- Meta column ---- */
 
@@ -324,5 +324,5 @@
 
 .obsDue[data-overdue] {
   color: var(--alert);
-  font-weight: 600;
+  font-weight: 500;
 }

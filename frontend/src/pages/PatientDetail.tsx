@@ -4,7 +4,6 @@ import type { ClinicalNote, PatientDetail as PatientDetailType, Session, Session
 import { getPatient, getNotes, addNote } from "../api";
 import { CurrentVitals, VitalRow } from "../components/CurrentVitals";
 import { TrendChart } from "../components/TrendChart";
-import { Sparkline } from "../components/Sparkline";
 import { band, response } from "../components/risk";
 import styles from "./PatientDetail.module.css";
 
@@ -247,24 +246,24 @@ export function PatientDetail({ session }: { session: Session }) {
                 <TrendChart
                   data={patient.vital_history.heart_rate}
                   label="Heart rate"
+                  color="var(--trace-hr)"
                   unit="bpm"
-                  color="#e74c3c"
                   warningHigh={100}
                   warningLow={60}
                 />
                 <TrendChart
                   data={patient.vital_history.respiratory_rate}
                   label="Respiratory rate"
+                  color="var(--trace-rr)"
                   unit="/min"
-                  color="#2980b9"
                   warningHigh={20}
                   warningLow={12}
                 />
                 <TrendChart
                   data={patient.vital_history.spo2}
                   label="SpO2"
+                  color="var(--trace-spo2)"
                   unit="%"
-                  color="#27ae60"
                   warningLow={94}
                 />
               </div>
@@ -291,12 +290,6 @@ export function PatientDetail({ session }: { session: Session }) {
               <span className={styles.scoreValue}>{patient.score}</span>
               <span className={styles.scoreLabel}>NEWS2</span>
             </div>
-            <Sparkline
-              data={patient.vital_trends.heart_rate}
-              width={200}
-              height={32}
-              fill
-            />
           </div>
 
           <div className={styles.panel}>

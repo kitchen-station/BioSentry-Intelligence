@@ -16,7 +16,7 @@
 
 .title {
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .sub,
@@ -38,7 +38,7 @@
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 500;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--label);
   padding: 0;
@@ -132,7 +132,7 @@
 
 .standing {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .actions {
@@ -142,11 +142,9 @@
 
 .primary,
 .secondary {
-  font-family: var(--font-mono);
-  font-size: 12px;
+  font-family: var(--font-sans);
+  font-size: 14px;
   font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   padding: var(--sp-2) var(--sp-4);
   border: 1px solid var(--button);
   border-radius: 0;

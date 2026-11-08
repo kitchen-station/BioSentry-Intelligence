@@ -23,7 +23,7 @@
   font-family: var(--font-mono);
   font-weight: 500;
   font-size: 10px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--label);
   border: 1px solid var(--border);
@@ -41,7 +41,7 @@
 }
 
 .name {
-  font-weight: 600;
+  font-weight: 500;
   font-size: 15px;
 }
 

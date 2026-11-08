@@ -97,3 +97,19 @@ export function labelIndexes(n: number): number[] {
   if (n <= 0) return [];
   return [...new Set([0, Math.floor(n / 2), n - 1])];
 }
+
+/**
+ * How many bins `next` adds at its end compared with `prev`, allowing the window to slide
+ * (oldest bins dropped). 0 = nothing new; null = not an extension, so redraw it all.
+ */
+export function appendedCount<T>(prev: readonly T[], next: readonly T[]): number | null {
+  for (let k = 0; k < next.length; k++) {
+    const keep = next.length - k;
+    if (keep > prev.length) continue;
+    const offset = prev.length - keep;
+    let same = true;
+    for (let i = 0; i < keep && same; i++) same = next[i] === prev[offset + i];
+    if (same) return k;
+  }
+  return null;
+}

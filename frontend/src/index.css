@@ -5,7 +5,7 @@
    what needs action. No dots. See README.
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=Spectral:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500;600&family=Hanken+Grotesk:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400&family=Spectral:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500;600&family=Hanken+Grotesk:wght@400;500&display=swap');
 
 /* ---- Reset ---- */
 
@@ -40,7 +40,15 @@
   --alert:      #9b3324; /* Scorch */
   --alert-tint: #f3e3dc;
   --alert-edge: #d9a99b;
-  --ok:         #4d6b50;
+  --ok:         #6f6457; /* Stone: stable reads quiet; the brand has no green */
+
+  /* Chart lines only: bedside-monitor colours, darkened to >= 4:1 on Paper and Flour.
+     Never text, never a warning (Scorch alone means act). */
+  --trace-hr:   #1e8449; /* green   4.15:1 Paper */
+  --trace-spo2: #0e7c8c; /* cyan    4.32:1 */
+  --trace-rr:   #8f6e00; /* yellow  4.20:1 */
+  --trace-bp:   #c2185b; /* crimson 5.17:1, pinker than Scorch */
+  --trace-temp: #c25400; /* orange  4.05:1 */
 
   --radius: 10px;
 
@@ -69,8 +77,8 @@
 
 body {
   font-family: var(--font-serif);
-  font-size: 16px;
-  line-height: 1.5;
+  font-size: 17px;
+  line-height: 1.6;
   color: var(--ink);
   background: var(--ground);
 }

@@ -89,7 +89,7 @@
 .summaryBlock[data-band="high"] { background: var(--alert); border-color: var(--alert); }
 .summaryBlock[data-band="high"] .summaryLabel,
 .summaryBlock[data-band="high"] .summaryBig,
-.summaryBlock[data-band="high"] .responseText { color: #fff; }
+.summaryBlock[data-band="high"] .responseText { color: var(--button-ink); }
 .summaryBlock[data-band="medium"],
 .summaryBlock[data-band="low-medium"] { background: var(--alert-tint); border-color: var(--alert-edge); }
 .summaryBlock[data-band="medium"] .summaryBig,
@@ -103,7 +103,7 @@
 
 .responseText {
   font-family: var(--font-sans);
-  font-weight: 600;
+  font-weight: 500;
   font-size: 13px;
   line-height: 1.3;
 }
@@ -111,7 +111,7 @@
 .summaryLabel {
   font-family: var(--font-mono);
   font-size: 10px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--label);
 }
@@ -171,11 +171,9 @@
 .drawerBtn {
   white-space: nowrap;
   border-radius: var(--radius);
-  font-family: var(--font-mono);
-  font-size: 11px;
+  font-family: var(--font-sans);
+  font-size: 14px;
   font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--label);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -213,7 +211,7 @@
 .overlayBackdrop {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(28, 25, 22, 0.4); /* Cast iron */
 }
 
 .overlayPanel {
@@ -238,7 +236,7 @@
   font-family: var(--font-mono);
   font-weight: 500;
   font-size: 10px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--label);
 }
@@ -292,7 +290,7 @@
   font-family: var(--font-mono);
   font-weight: 500;
   font-size: 10px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--label);
   margin-bottom: var(--sp-3);
@@ -301,7 +299,7 @@
 .patientName {
   font-family: var(--font-display);
   font-size: 24px;
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1.2;
 }
 
@@ -377,7 +375,7 @@
 }
 
 .findingSignificant .findingValue {
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .findingLabel {
@@ -401,7 +399,7 @@
 .findingSource {
   font-family: var(--font-mono);
   font-size: 9px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--label);
   border: 1px solid var(--border);
@@ -483,9 +481,9 @@
   color: var(--alert);
 }
 
-.vitalRow[data-points="3"] .vitalPoints { background: var(--alert); color: #fff; }
+.vitalRow[data-points="3"] .vitalPoints { background: var(--alert); color: var(--button-ink); }
 .vitalRow[data-points="2"] .vitalValue,
-.vitalRow[data-points="3"] .vitalValue { color: var(--alert); font-weight: 600; }
+.vitalRow[data-points="3"] .vitalValue { color: var(--alert); font-weight: 500; }
 
 /* ---- Clinical notes ---- */
 
@@ -521,7 +519,7 @@
   font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   background: var(--primary);
   color: var(--button-ink);
@@ -566,13 +564,13 @@
 .noteAuthor {
   font-family: var(--font-sans);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .noteRole {
   font-family: var(--font-mono);
   font-size: 10px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--label);
   border: 1px solid var(--border);
@@ -589,7 +587,7 @@
 .noteDelete {
   font-family: var(--font-mono);
   font-size: 10px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--label);
   background: none;
@@ -600,8 +598,8 @@
 }
 
 .noteDelete:hover {
-  color: #c0392b;
-  border-color: #c0392b;
+  color: var(--alert);
+  border-color: var(--alert);
 }
 
 .noteContent {

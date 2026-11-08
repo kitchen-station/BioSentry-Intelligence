@@ -9,6 +9,7 @@ import {
   xByTime,
   type Pt,
 } from "./chartPath";
+import { DrawOn, Tick, useDrawFrom } from "./DrawOn";
 
 interface DataPoint {
   time: string; // ISO 8601 start of the bin
@@ -34,10 +35,11 @@ export function TrendChart({
   width = 400,
   height = 140,
   responsive = true,
-  color = "var(--ink)",
+  color = "var(--data)",
   warningHigh,
   warningLow,
 }: Props) {
+  const draw = useDrawFrom(data.map((d) => `${d.time}|${d.value}`));
   const values = data.map((d) => d.value);
   const known = present(values);
   if (data.length < 2 || known.length === 0) return null;
@@ -65,6 +67,7 @@ export function TrendChart({
   const latest = points[points.length - 1];
   const latestValue = values[values.length - 1];
   const timesUsable = xByTime(times, padL, plotW) !== null;
+  const fromX = draw.from < 0 ? padL : xs[draw.from];
 
   // Y-axis ticks
   const ticks = 3;
@@ -96,7 +99,7 @@ export function TrendChart({
         }}
       >
         <span>{label}</span>
-        <span>
+        <span style={{ fontFamily: "var(--font-mono)", color: "var(--ink)" }}>
           {latestValue === null ? "--" : `${latestValue} ${unit}`}
         </span>
       </div>
@@ -126,9 +129,9 @@ export function TrendChart({
             <>
               <line
                 x1={padL} y1={y} x2={width - padR} y2={y}
-                stroke="#c0392b" strokeWidth={1} strokeDasharray="6,4" opacity={0.5}
+                stroke="var(--alert)" strokeWidth={1} strokeDasharray="6,4" opacity={0.5}
               />
-              <text x={width - padR + 2} y={y + 3} fontSize={8} fill="#c0392b" fontFamily="var(--font-sans)" opacity={0.7}>
+              <text x={width - padR + 2} y={y + 3} fontSize={8} fill="var(--alert)" fontFamily="var(--font-sans)" opacity={0.7}>
                 {warningHigh}
               </text>
             </>
@@ -140,40 +143,32 @@ export function TrendChart({
             <>
               <line
                 x1={padL} y1={y} x2={width - padR} y2={y}
-                stroke="#c0392b" strokeWidth={1} strokeDasharray="6,4" opacity={0.5}
+                stroke="var(--alert)" strokeWidth={1} strokeDasharray="6,4" opacity={0.5}
               />
-              <text x={width - padR + 2} y={y + 3} fontSize={8} fill="#c0392b" fontFamily="var(--font-sans)" opacity={0.7}>
+              <text x={width - padR + 2} y={y + 3} fontSize={8} fill="var(--alert)" fontFamily="var(--font-sans)" opacity={0.7}>
                 {warningLow}
               </text>
             </>
           );
         })()}
 
-        {/* Fill */}
-        <path d={areaPath(points, padT + plotH)} fill={color} opacity={0.06} />
-
-        {/* Line */}
-        <path
-          d={linePath(points)}
-          fill="none"
-          stroke={color}
-          strokeWidth={1.5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-
-        {/* Readings that stand alone between gaps */}
-        {isolatedPoints(points).map((p) => (
-          <circle key={`${p.x},${p.y}`} cx={p.x} cy={p.y} r={2} fill={color} />
-        ))}
-
-        {/* Current dot with pulse: only when the latest bin has a reading */}
-        {latest !== null && (
-          <circle cx={latest.x} cy={latest.y} r={3} fill={color}>
-            <animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite" />
-            <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite" />
-          </circle>
-        )}
+        <DrawOn fromX={fromX} toX={width} height={height} version={draw.version}>
+          <path d={areaPath(points, padT + plotH)} fill={color} opacity={0.06} />
+          <path
+            d={linePath(points)}
+            fill="none"
+            stroke={color}
+            strokeWidth={1.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          {/* Readings that stand alone between gaps */}
+          {isolatedPoints(points).map((p) => (
+            <Tick key={`${p.x},${p.y}`} x={p.x} y={p.y} color={color} />
+          ))}
+          {/* Live end: only when the latest bin has a reading */}
+          {latest !== null && <Tick x={latest.x} y={latest.y} color={color} half={6} />}
+        </DrawOn>
 
         {/* Y labels */}
         {yTicks.map((t) => (

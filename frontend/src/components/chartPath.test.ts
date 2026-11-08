@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   agoLabel,
+  appendedCount,
   areaPath,
   isolatedPoints,
   labelIndexes,
@@ -153,4 +154,17 @@ describe("labelIndexes", () => {
   ])("%s bins -> %j", (n, expected) => {
     expect(labelIndexes(n)).toEqual(expected);
   });
+});
+
+describe("appendedCount", () => {
+  it("0 when nothing changed", () => expect(appendedCount([1, 2, 3], [1, 2, 3])).toBe(0));
+  it("counts bins added to a growing series", () =>
+    expect(appendedCount([1, 2], [1, 2, 3, 4])).toBe(2));
+  it("counts bins added while the window slides", () =>
+    expect(appendedCount([70, 72, 74], [72, 74, 76])).toBe(1));
+  it("treats a gap as a value, so a new missing bin still extends", () =>
+    expect(appendedCount([1, null], [1, null, null])).toBe(1));
+  it("null when the old bins changed, so the line redraws", () =>
+    expect(appendedCount([1, 2, 3], [9, 9, 9])).toBeNull());
+  it("null from an empty series", () => expect(appendedCount([], [1])).toBeNull());
 });

@@ -1,4 +1,5 @@
 import { areaPath, isolatedPoints, linePath, present, xByIndex, type Pt } from "./chartPath";
+import { DrawOn, Tick, useDrawFrom } from "./DrawOn";
 
 interface Props {
   // Oldest first, evenly spaced bins. null is a gap: the line breaks, nothing is bridged.
@@ -18,6 +19,7 @@ export function Sparkline({
   fill = false,
   className,
 }: Props) {
+  const draw = useDrawFrom(data);
   const values = present(data);
   if (values.length === 0) return null;
 
@@ -35,6 +37,7 @@ export function Sparkline({
         },
   );
   const latest = points[points.length - 1];
+  const fromX = draw.from < 0 ? 0 : xByIndex(draw.from, data.length, pad, width - pad * 2);
 
   return (
     <svg
@@ -44,20 +47,22 @@ export function Sparkline({
       className={className}
       style={{ display: "block" }}
     >
-      {fill && <path d={areaPath(points, height - pad)} fill={color} opacity={0.08} />}
-      <path
-        d={linePath(points)}
-        fill="none"
-        stroke={color}
-        strokeWidth={1.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      {isolatedPoints(points).map((p) => (
-        <circle key={`${p.x},${p.y}`} cx={p.x} cy={p.y} r={1.5} fill={color} />
-      ))}
-      {/* Current value dot: only when the latest bin has a reading */}
-      {latest !== null && <circle cx={latest.x} cy={latest.y} r={2} fill={color} />}
+      <DrawOn fromX={fromX} toX={width} height={height} version={draw.version}>
+        {fill && <path d={areaPath(points, height - pad)} fill={color} opacity={0.08} />}
+        <path
+          d={linePath(points)}
+          fill="none"
+          stroke={color}
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        {isolatedPoints(points).map((p) => (
+          <Tick key={`${p.x},${p.y}`} x={p.x} y={p.y} color={color} half={3} />
+        ))}
+        {/* Live end: only when the latest bin has a reading */}
+        {latest !== null && <Tick x={latest.x} y={latest.y} color={color} half={3} />}
+      </DrawOn>
     </svg>
   );
 }

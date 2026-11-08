@@ -76,21 +76,21 @@ export function WardRow({ row, role, now, ageOffsetS }: Props) {
         <div className={styles.sparkCol}>
           <div className={styles.sparkRow} data-points={p.heart_rate}>
             <span className={styles.sparkLabel}>HR</span>
-            <Sparkline data={row.vital_trends.heart_rate} width={72} height={20} fill />
+            <Sparkline data={row.vital_trends.heart_rate} width={72} height={20} color="var(--trace-hr)" fill />
             <span className={styles.sparkVal}>
               <MeasurementDisplay measurement={row.vitals.heart_rate} />
             </span>
           </div>
           <div className={styles.sparkRow} data-points={p.respiratory_rate}>
             <span className={styles.sparkLabel}>RR</span>
-            <Sparkline data={row.vital_trends.respiratory_rate} width={72} height={20} fill />
+            <Sparkline data={row.vital_trends.respiratory_rate} width={72} height={20} color="var(--trace-rr)" fill />
             <span className={styles.sparkVal}>
               <MeasurementDisplay measurement={row.vitals.respiratory_rate} />
             </span>
           </div>
           <div className={styles.sparkRow} data-points={p.spo2}>
             <span className={styles.sparkLabel}>SpO2</span>
-            <Sparkline data={row.vital_trends.spo2} width={72} height={20} fill />
+            <Sparkline data={row.vital_trends.spo2} width={72} height={20} color="var(--trace-spo2)" fill />
             <span className={styles.sparkVal}>
               <MeasurementDisplay measurement={row.vitals.spo2} format={(v) => `${v}%`} />
             </span>

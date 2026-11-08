@@ -27,8 +27,9 @@
 }
 
 .heading {
+  font-family: var(--font-display);
   font-size: 20px;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.2;
   margin-bottom: 0;
 }
@@ -65,7 +66,7 @@
   font-family: var(--font-mono);
   font-weight: 500;
   font-size: 11px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--label);
   margin-bottom: var(--sp-3);
@@ -96,7 +97,7 @@
 }
 
 .roleTitle {
-  font-weight: 600;
+  font-weight: 500;
   font-size: 17px;
 }
 
@@ -143,7 +144,7 @@
 }
 
 .profileName {
-  font-weight: 600;
+  font-weight: 500;
   font-size: 15px;
 }
 
@@ -177,8 +178,9 @@
 }
 
 .selectedName {
+  font-family: var(--font-display);
   display: block;
-  font-weight: 600;
+  font-weight: 400;
   font-size: 18px;
 }
 
@@ -257,7 +259,7 @@
 }
 
 .destTitle {
-  font-weight: 600;
+  font-weight: 500;
   font-size: 15px;
 }
 
@@ -292,7 +294,7 @@
 .footerLabel {
   font-family: var(--font-mono);
   font-size: 10px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--label);
 }
