@@ -90,3 +90,23 @@ describe("the attribution banner", () => {
     expect(screen.queryByText(text)).toBeNull();
   });
 });
+
+describe("when the server fails", () => {
+  it("says the ward server cannot be reached when the first load fails", async () => {
+    api.getWard.mockRejectedValue(new Error("down"));
+    page();
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "The ward server cannot be reached. Retrying every 15 seconds.",
+    );
+  });
+
+  it("keeps every alert open, says so, and lets the notice be dismissed", async () => {
+    const user = userEvent.setup();
+    api.getAcknowledgements.mockRejectedValue(new Error("down"));
+    page();
+    expect(await screen.findByText(/Could not load your acknowledgements/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Acknowledge" })).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByText(/Could not load your acknowledgements/)).toBeNull();
+  });
+});

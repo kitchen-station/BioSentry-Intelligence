@@ -459,3 +459,13 @@ def test_degraded_quality_values_are_still_scored() -> None:
     payload["heart_rate"]["provenance"]["quality"] = "degraded"
     result = score_news2(inputs_from_vitals(Vitals.model_validate(payload)))
     assert isinstance(result, News2Score)
+
+
+def test_a_value_matching_no_band_or_two_bands_is_an_error_not_a_guess() -> None:
+    from biosentry.domain.scoring.tier_a.news2 import _band_for
+
+    one = t.HEART_RATE[0]  # <=40
+    with pytest.raises(AssertionError, match="2 NEWS2 bands match 30"):
+        _band_for((one, one), Decimal(30), on_oxygen=False)
+    with pytest.raises(AssertionError, match="0 NEWS2 bands match 99"):
+        _band_for((one,), Decimal(99), on_oxygen=False)

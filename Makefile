@@ -37,7 +37,7 @@ api-dev:
 api-test:
 	@cd $(BACKEND) && uv run python -c "import psycopg; from biosentry.core.config import Settings; psycopg.connect(Settings.from_env().database_url, connect_timeout=3).close()" 2>/dev/null \
 		|| { echo "api-test needs PostgreSQL and it is not reachable: run 'make db-up' first" >&2; exit 1; }
-	cd $(BACKEND) && uv run pytest
+	cd $(BACKEND) && uv run coverage run -m pytest && uv run coverage report  # fails below 100% of lines
 
 # Start the local PostgreSQL (compose.yaml, 127.0.0.1:5432) and wait until it is healthy. Needs Docker.
 db-up:

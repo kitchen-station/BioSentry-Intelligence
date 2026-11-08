@@ -304,3 +304,11 @@ describe.skipIf(!API_URL)("http provider: nurse-recorded vitals", () => {
 function httpSignIn(clinicianId: string): void {
   void openSession(clinicianId); // requests wait for the token
 }
+
+describe("the fixture provider", () => {
+  it("refuses to record vitals: only the API can re-rank (D4)", async () => {
+    await expect(fixtureProvider.recordVitals("p-004", { systolic: 120, diastolic: 80 })).rejects.toThrow(
+      "Recording vitals needs the API",
+    );
+  });
+});

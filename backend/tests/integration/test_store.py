@@ -908,3 +908,65 @@ def test_numbers_and_dates_outside_what_the_database_holds_are_422(api: Api) -> 
     body = batch()
     body["counts"] = {"received": 2**63 - 1, "rejected": 0, "abstained": 0}
     assert api.post("/sim/runs/2/batch", body).status_code == 204
+
+
+# --- Edges: a database with no run, a connection that cannot be set up, what was never recorded --
+
+
+def test_a_database_with_no_run_fails_the_request_and_closes_its_connection(
+    api: Api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from biosentry.api import app as app_module
+
+    opened: list[psycopg.Connection[Any]] = []
+
+    def tracked(url: str) -> psycopg.Connection[Any]:
+        opened.append(connect(url))
+        return opened[-1]
+
+    headers = api.as_("rn-delacruz")
+    with connect(api.url) as conn:
+        conn.execute("DELETE FROM run")
+    monkeypatch.setattr(app_module, "connect", tracked)
+    with pytest.raises(RuntimeError, match="the database has no run"):
+        api.client.get("/wards/W4/rows", headers=headers)
+    assert [c.closed for c in opened] == [True]
+
+
+def test_a_connection_that_cannot_be_set_to_utc_is_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    from biosentry.repositories import postgres
+
+    class Refusing:
+        closed = False
+
+        def execute(self, *args: Any) -> None:
+            raise psycopg.OperationalError("SET TIME ZONE refused")
+
+        def close(self) -> None:
+            self.closed = True
+
+    made = Refusing()
+    monkeypatch.setattr(postgres.psycopg, "connect", lambda *a, **k: made)
+    with pytest.raises(psycopg.OperationalError, match="SET TIME ZONE refused"):
+        connect("postgresql://unused")
+    assert made.closed
+
+
+def test_an_unknown_patient_reads_as_none_and_a_never_recorded_input_is_missing(api: Api) -> None:
+    from biosentry.repositories.postgres import PostgresStore
+
+    patient = sim_patient()
+    patient["observations"] = [o for o in patient["observations"] if o["code"] != "heart_rate"]
+    patient["observations"] = [o for o in patient["observations"] if o["code"] != "consciousness"]
+    start(api, patients=[patient])
+    with connect(api.url) as conn:
+        store = PostgresStore(conn, api.wall)
+        assert store.read("nobody") is None
+        state = store.read("s-1")
+    assert state is not None
+    for code, source in (("heart_rate", "device"), ("consciousness", "nurse")):
+        m = getattr(state.vitals, code)
+        assert m.data.present is False and m.data.reason == "not_recorded"
+        assert (m.provenance.source.value, m.provenance.quality.value) == (source, "missing")
+    (row,) = api.ward("rn-delacruz")["abstained"]  # never imputed: NOT RANKED, naming both
+    assert "Heart rate missing" in row["reason"] and "Level of consciousness missing" in row["reason"]
