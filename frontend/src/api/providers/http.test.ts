@@ -94,3 +94,22 @@ describe("httpProvider requests", () => {
     expect(new Headers(init.headers).has("Authorization")).toBe(false);
   });
 });
+
+describe("httpProvider acknowledgements", () => {
+  it("lists them from the server", async () => {
+    fetchMock.mockResolvedValue(reply(200, [{ patient_id: "p-001", score: 9 }]));
+    await expect(httpProvider.getAcknowledgements()).resolves.toEqual([{ patient_id: "p-001", score: 9 }]);
+    expect(fetchMock.mock.calls[0][0]).toBe("/acknowledgements");
+  });
+
+  it("posts the score to the patient's route and rejects when the server refuses", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await expect(httpProvider.acknowledge("p-001", 9)).resolves.toBeUndefined();
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/patients/p-001/acknowledgement");
+    expect(JSON.parse(init.body as string)).toEqual({ score: 9 });
+
+    fetchMock.mockResolvedValueOnce(reply(404, { detail: "Not found" }));
+    await expect(httpProvider.acknowledge("p-999", 9)).rejects.toBeInstanceOf(ApiError);
+  });
+});

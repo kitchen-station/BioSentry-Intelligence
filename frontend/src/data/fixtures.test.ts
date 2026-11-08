@@ -7,6 +7,8 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  acknowledge,
+  getAcknowledgements,
   getNotes,
   getPatient,
   getWard,
@@ -278,5 +280,19 @@ describe("fixture clock", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("acknowledgements", () => {
+  it("are kept per clinician and only for their own patients", async () => {
+    setActiveClinician("rn-delacruz");
+    await acknowledge("p-001", 9);
+    await acknowledge("p-001", 10);
+    expect(await getAcknowledgements()).toEqual([{ patient_id: "p-001", score: 10 }]);
+    await expect(acknowledge("p-003", 5)).rejects.toThrow("Not found");
+    setActiveClinician("rn-reyes");
+    expect(await getAcknowledgements()).toEqual([]);
+    setActiveClinician(null);
+    expect(await getAcknowledgements()).toEqual([]);
   });
 });

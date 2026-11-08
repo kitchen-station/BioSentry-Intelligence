@@ -23,6 +23,14 @@ export interface components {
             readonly synthetic: boolean;
         };
         /**
+         * Acknowledgement
+         * @description A clinician's acknowledgement of a patient at a NEWS2 score (GET /acknowledgements).
+         */
+        readonly Acknowledgement: {
+            readonly patient_id: string;
+            readonly score: number;
+        };
+        /**
          * Acvpu
          * @description NEWS2 level of consciousness: Alert, new Confusion, Voice, Pain, Unresponsive.
          * @enum {string}
@@ -662,6 +670,7 @@ export interface components {
     pathItems: never;
 }
 export type AbstainedRow = components['schemas']['AbstainedRow'];
+export type Acknowledgement = components['schemas']['Acknowledgement'];
 export type Acvpu = components['schemas']['Acvpu'];
 export type AcvpuMeasurement = components['schemas']['AcvpuMeasurement'];
 export type AcvpuPresent = components['schemas']['AcvpuPresent'];

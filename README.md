@@ -17,15 +17,17 @@ The list is sorted by **NEWS2**, a published bedside early-warning score (Tier A
 who meets a NEWS2 trigger sits above one who does not. Tier B (mechanism findings) is demo
 content, not part of the scoring.
 
-**This repository is frontend-only for now.** The backend, the ML models and the training code
-were removed ahead of the Huawei overhaul; the dashboard runs on a committed synthetic ward
-(`frontend/src/data/synthetic.json`). The earlier backend is in git history.
+**What is here.** The dashboard (`frontend/`) and a slim API (`backend/`: FastAPI over SQLite). The
+ML models and the training code were removed ahead of the Huawei overhaul and are in git history. The
+API serves the committed synthetic ward (`frontend/src/data/synthetic.json`), seeded into the database,
+and takes a live ward from the ward simulation.
 
 **This is not a diagnosis system.** It ranks and displays. A human decides.
 
 ## Run it
 
-You need Node.js `^20.19` or `>=22.12`, and make. From the repository root:
+You need Node.js `^20.19` or `>=22.12`, make, and [uv](https://docs.astral.sh/uv/) for the API
+(it fetches Python 3.11 itself). From the repository root:
 
 ```bash
 make web-install
@@ -33,10 +35,26 @@ make web-dev
 ```
 
 Open the URL Vite prints, choose a department and a clinician, and sign in with any
-passphrase. Whatever you enter is kept in memory and is gone on reload.
+passphrase. With no API, the dashboard serves the fixture from memory; whatever you enter is gone on reload.
 
-`make check` runs lint, types and tests. `frontend/src/types/generated.ts` is the API
-contract, frozen until the new backend exists. Every target is in the [Makefile](Makefile).
+**With the API**, so that scores are computed by the real NEWS2 and arbiter, and everything you
+record is kept:
+
+```bash
+make api-install
+make api-dev                       # http://127.0.0.1:8000, loopback only
+cd frontend && VITE_API_URL=http://127.0.0.1:8000 npm run dev
+```
+
+`VITE_API_URL` is read when the dashboard is built or started: set, it talks to the API and carries
+no dataset; unset, it uses the fixture. The API allows the dashboard on `localhost` and `127.0.0.1`,
+ports 5173 and 5174 (the ward sim on 5180 and 5181). The ward sim posts to `/sim/*` with the header
+`X-Ingest-Key`, which must equal the API's `BIOSENTRY_INGEST_KEY` (`make api-dev` sets `dev-local`;
+with the variable unset the ingest routes answer 503).
+
+`make check` runs lint, types and tests for both halves. `make db-reset` drops the database and
+seeds it again. `make contract` regenerates `frontend/src/types/generated.ts` from the Pydantic
+schemas. Every target is in the [Makefile](Makefile).
 
 ## What you will see
 
@@ -48,17 +66,33 @@ contract, frozen until the new backend exists. Every target is in the [Makefile]
 - **Station:** admit a patient, enter lab results, or upload a document (extraction is a
   placeholder).
 
+## What the database stores
+
+`backend/data/biosentry.db` (SQLite, WAL, git-ignored; `BIOSENTRY_DB` moves it). The schema is
+`backend/src/biosentry/db/schema.sql`. Everything is scoped to a **run**, and the newest run is the
+active one: the seeded fixture ward, or a simulated ward posted to `/sim/*`.
+
+- **Stored:** runs, clinicians and who cares for which patient, patients, every observation with its
+  source, tier, time and quality (a value, or the reason there is none), 15-minute vital bins (a gap
+  is NULL), notes (soft-deleted), acknowledgements, sessions (the token hashed, 12 hours), the
+  audit log (ids and outcomes only; the database refuses UPDATE, DELETE and overwriting a row, but not a user who can drop its triggers or the table), and the
+  sim's event feed.
+- **Never stored:** scores, ranks, reasons and the NOT RANKED text. They are computed on every read.
+
 ## Status
 
-**Built**, on synthetic data:
+**Built**:
 
-- The dashboard: ward list, patient detail and station views, on a fixture provider.
-- An HTTP provider that talks to an API with the same contract (no API in the repo yet).
+- The dashboard: ward list, patient detail and station views, on a fixture provider or the API.
+- The API: sign-in to a session token, server-side clinician scope, audit on every view, NEWS2 and the
+  escalation arbiter computed on read, notes, labs, admission, nurse-recorded vitals,
+  acknowledgements, and ingest from the ward simulation.
 
-**Pending:** a backend (scoring, clinician scope and audit), Tier B in the scoring, a signal-quality model, conformal abstention, distilled
-edge models, anything measured on real patients, a sensor pipeline (IoT Device Access), a
-database, real authentication, document extraction, and a plain-language explanation of each
-ranked alert for the nurse or physician.
+**Pending:** real authentication (sign-in today takes any known clinician id, no passphrase, and
+a successful sign-in is not audited), cloud sync, a hash-chained audit log, Tier B in the scoring, a
+signal-quality model, conformal abstention, distilled edge models, anything measured on real
+patients, a sensor pipeline (IoT Device Access), document extraction, and a plain-language
+explanation of each ranked alert for the nurse or physician.
 
 **Next:** deploy offline-first on Huawei Cloud (IoT Device Access, ModelArts, MindSpore Lite,
 Object Storage Service), then compare against a threshold-alarm baseline on false alarms per
@@ -91,7 +125,7 @@ applied to made-up patients.
 
   The fixture data follows rules 1 and 4.
 - **Ward view** must be filtered server-side to the signed-in clinician's patients, on every
-  call. The fixture provider stands in for that filter.
+  call. The API does this from its care assignments; the fixture provider stands in when there is no API.
 - **Look:** follows the studio brand book (foundation v1), kept quiet for a clinical surface.
   Paper ground, Flour cards, Linen hairlines, Char ink; Slate only for chart lines, never text;
   Scorch marks what needs action (NEWS2 7+ solid, 5-6 or a single 3 as an edge), sage marks
@@ -102,8 +136,13 @@ applied to made-up patients.
 
 ## Before you expose it anywhere
 
-- **Synthetic data only.** No real patient data exists in this repository.
-- **Identity is a stub.** Sign-in accepts any passphrase. There is no real authentication.
+- **Synthetic data only.** No real patient data exists in this repository. The ward sim can replay
+  eICU-CRD Demo 2.0.1 (ODbL) as an `eicu_demo` run, which is the only data marked `synthetic: false`.
+  Kitchen's competition rule is synthetic only, and ODbL has its own terms. **Run
+  `make db-purge-eicu` before anything holding replay data is shared** (the database file, a backup,
+  a demo laptop). It deletes every `eicu_demo` run and its rows; the audit trail stays.
+- **Identity is a stub.** Sign-in accepts any passphrase, and `POST /session` gives a token to any
+  known clinician id. There is no real authentication. Keep the API on loopback.
 
 ## Licence
 

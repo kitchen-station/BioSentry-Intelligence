@@ -42,6 +42,9 @@ function lazyFixtureProvider(): ApiProvider {
       fixtures().then((m) => m.fixtureProvider.enterLabResults(patientId, labs)),
     recordVitals: (patientId, input) =>
       fixtures().then((m) => m.fixtureProvider.recordVitals(patientId, input)),
+    getAcknowledgements: () => fixtures().then((m) => m.fixtureProvider.getAcknowledgements()),
+    acknowledge: (patientId, score) =>
+      fixtures().then((m) => m.fixtureProvider.acknowledge(patientId, score)),
     extractLabsFromFile: (file) =>
       fixtures().then((m) => m.fixtureProvider.extractLabsFromFile(file)),
     extractPatientFromFile: (file) =>
@@ -60,6 +63,8 @@ export const listAllPatients = provider.listAllPatients;
 export const admitPatient = provider.admitPatient;
 export const enterLabResults = provider.enterLabResults;
 export const recordVitals = provider.recordVitals;
+export const getAcknowledgements = provider.getAcknowledgements;
+export const acknowledge = provider.acknowledge;
 
 /**
  * Whether this build can record nurse-entered vitals. Only the API re-ranks (D4: the frontend

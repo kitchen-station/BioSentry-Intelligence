@@ -78,6 +78,16 @@ jobs:
       - run: make web-install
       - run: make web-test
 
+  backend:
+    name: backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+      - run: make api-install
+      - run: make api-test
+
   audit:
     name: audit (informational)
     runs-on: ubuntu-latest
@@ -91,12 +101,12 @@ jobs:
       - run: npm audit --audit-level=high
         working-directory: frontend
 
-  # The one check to require. Add every new required job to `needs` (a test enforces it);
-  # only informational jobs (audit) stay out.
+  # The one check to require. Add every new required job to `needs`;
+  # only informational jobs (audit) stay out. Nothing checks this: do it by hand.
   ci-gate:
     name: ci-gate
     if: always()
-    needs: [typecheck, build, lint, test]
+    needs: [typecheck, build, lint, test, backend]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
