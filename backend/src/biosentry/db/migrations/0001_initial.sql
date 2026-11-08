@@ -1,4 +1,6 @@
--- BioSentry schema (PostgreSQL). Idempotent: safe to run on every start.
+-- BioSentry schema (PostgreSQL), migration 0001: the schema as it stood before migrations.
+-- Keep it idempotent (IF NOT EXISTS, OR REPLACE): it also runs on databases that schema.sql built,
+-- and there it must change nothing. Later migrations need not be idempotent; each runs once.
 -- Scores, ranks and reasons are computed on read (NEWS2, then the arbiter), not stored. The one
 -- exception is acknowledgement.score: the score the clinician acknowledged, kept as they saw it.
 -- Times are TIMESTAMPTZ, written in whole seconds and served as ISO 8601 UTC with a Z suffix. Stored

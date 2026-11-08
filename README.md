@@ -78,8 +78,10 @@ schemas. Every target is in the [Makefile](Makefile).
 ## What the database stores
 
 A PostgreSQL database (the `biosentry` database of the `compose.yaml` container, or whatever
-`BIOSENTRY_DATABASE_URL` names). The schema is `backend/src/biosentry/db/schema.sql`; the API applies it
-on start. Everything is scoped to a **run**, and the newest run is the
+`BIOSENTRY_DATABASE_URL` names). The schema is the numbered SQL files in `backend/src/biosentry/db/migrations/`;
+the API applies any not yet applied on start (`make db-migrate` does it without starting the API), and
+`schema_migration` records which ran. To change the schema, add the next file
+(`0002_what_it_does.sql`); never edit one that is merged. Everything is scoped to a **run**, and the newest run is the
 active one: the seeded fixture ward, or a simulated ward posted to `/sim/*`.
 
 - **Stored:** runs, clinicians and who cares for which patient, patients, every observation with its

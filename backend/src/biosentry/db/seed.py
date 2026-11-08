@@ -1,4 +1,4 @@
-"""Create the schema, the clinicians and the fixture run from the committed synthetic ward.
+"""Migrate the schema, then create the clinicians and the fixture run from the committed synthetic ward.
 
     python -m biosentry.db.seed [--url DATABASE_URL] [--reset]
 
@@ -15,6 +15,7 @@ from typing import Any
 from psycopg.conninfo import conninfo_to_dict
 
 from biosentry.core.config import DEFAULT_DATASET, Settings
+from biosentry.db.migrate import SETUP_LOCK, migrate
 from biosentry.repositories.postgres import (
     HISTORY_VITALS,
     Conn,
@@ -29,10 +30,6 @@ from biosentry.repositories.postgres import (
     whole,
 )
 
-SCHEMA = Path(__file__).with_name("schema.sql")
-# One key for "this database is being set up": two API processes starting at once take turns, so
-# neither trips over the other's CREATE or seeds the fixture twice. (Run locks use small run ids.)
-SETUP_LOCK = 0x62696F7365656400
 parse = datetime.fromisoformat  # the fixture file's times; the database hands back datetimes
 
 
@@ -145,11 +142,11 @@ def seed(conn: Conn, fixture: Path = DEFAULT_DATASET) -> None:
 
 
 def ensure(url: str, fixture: Path = DEFAULT_DATASET) -> None:
-    """Make the database ready to serve: schema, clinicians, fixture run. Idempotent, and safe
+    """Make the database ready to serve: migrations, clinicians, fixture run. Idempotent, and safe
     when several processes do it at once (one transaction, behind the setup lock)."""
     with connect(url) as conn, transaction(conn):
         conn.execute("SELECT pg_advisory_xact_lock(%s)", (SETUP_LOCK,))
-        conn.execute(SCHEMA.read_text(encoding="utf-8"))
+        migrate(conn)
         seed(conn, fixture)
 
 

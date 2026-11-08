@@ -1,5 +1,5 @@
 .PHONY: web-install web-dev web-build web-typecheck web-lint web-test check \
-        api-install api-dev api-test db-up db-down db-reset db-purge-eicu contract
+        api-install api-dev api-test db-up db-down db-migrate db-reset db-purge-eicu contract
 
 FRONTEND := frontend
 BACKEND := backend
@@ -46,6 +46,10 @@ db-up:
 # Stop it. The data stays in the named volume; `docker compose down -v` also deletes that.
 db-down:
 	docker compose down
+
+# Apply pending migrations (backend/src/biosentry/db/migrations/) without starting the API.
+db-migrate:
+	cd $(BACKEND) && uv run python -m biosentry.db.migrate
 
 # Drop every table and seed again (schema, clinicians, the fixture ward). The audit trail goes too.
 db-reset:
