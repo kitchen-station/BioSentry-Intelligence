@@ -77,7 +77,8 @@ export function initSession(clinicianId: string, token?: string): void {
   if (USE_FIXTURES) {
     void fixtures().then((m) => m.setActiveClinician(clinicianId));
   } else {
-    setAuthToken(token ?? clinicianId);
+    // Never the clinician id: that is not a secret. No token means the API answers 401 (fails closed).
+    setAuthToken(token ?? null);
   }
 }
 

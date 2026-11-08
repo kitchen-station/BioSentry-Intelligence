@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import type { AbstainedRow as AbstainedRowType, Session, VitalsRecorded, WardResponse } from "../types";
 import { getWard } from "../api";
 import { WardRow } from "../components/WardRow";
-import { band } from "../components/risk";
+import { band, obsDue, unacknowledged } from "../components/risk";
+import { formatClock } from "../components/format";
 import { SessionMenu } from "../components/SessionMenu";
 import { standing } from "../components/vitalsDraft";
 import { NotRankedSection } from "./NotRankedSection";
@@ -13,30 +15,106 @@ interface Props {
   onSignOut: () => void;
 }
 
+const POLL_MS = 15_000;
+
+// Acknowledgements per clinician, kept across visits to a patient page within this tab.
+// shortcut: client-side only and unaudited; move to the server (ack + audit) with the edge API.
+const ACKS = new Map<string, Map<string, number>>();
+
+function beep(): void {
+  try {
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    osc.frequency.value = 880;
+    osc.connect(ctx.destination);
+    osc.onended = () => void ctx.close();
+    osc.start();
+    osc.stop(ctx.currentTime + 0.4);
+  } catch {
+    // No audio available: the banner still shows.
+  }
+}
+
+function setTitle(title: string): void {
+  document.title = title;
+}
+
 export function Ward({ session, onSignOut }: Props) {
   const [data, setData] = useState<WardResponse | null>(null);
-  const [now, setNow] = useState(() => new Date());
+  const [fetchedAt, setFetchedAt] = useState<number | null>(null);
+  const [failedSince, setFailedSince] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const [notice, setNotice] = useState<string | null>(null);
+  const [acked, setAcked] = useState<ReadonlyMap<string, number>>(
+    () => ACKS.get(session.clinician_id) ?? new Map(),
+  );
+  const alerted = useRef(new Set<string>());
+
+  // Keeps the last good ward on screen when a fetch fails, and says since when.
+  const refresh = useCallback(() => {
+    getWard()
+      .then((w) => {
+        setData(w);
+        setFetchedAt(Date.now());
+        setFailedSince(null);
+      })
+      .catch(() => setFailedSince((t) => t ?? Date.now()));
+  }, []);
 
   useEffect(() => {
-    getWard().then(setData);
-  }, []);
+    refresh();
+    const t = setInterval(refresh, POLL_MS);
+    return () => clearInterval(t);
+  }, [refresh]);
 
   // A recorded value changes a patient's standing, which only the server can compute: say
   // what it said, then fetch the ward again so the ranking on screen is the server's.
   const handleRecorded = useCallback((row: AbstainedRowType, recorded: VitalsRecorded) => {
     setNotice(`Recorded for ${row.name}. ${standing(recorded)}`);
-    getWard()
-      .then(setData)
-      .catch(() => setNotice("Recorded, but the ward could not be refreshed. Reload to see the ranking."));
-  }, []);
+    refresh();
+  }, [refresh]);
 
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
+    const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
 
-  if (!data) return null;
+  const alerts = data ? unacknowledged(data.ranked, acked) : [];
+  const alertKey = alerts.map((a) => `${a.id}:${a.score}`).join(",");
+
+  // Sound once per new alert, and show the count in the tab title so a background tab is seen.
+  useEffect(() => {
+    const fresh = alertKey.split(",").filter((k) => k && !alerted.current.has(k));
+    if (fresh.length > 0) beep();
+    fresh.forEach((k) => alerted.current.add(k));
+    const n = alertKey ? alertKey.split(",").length : 0;
+    setTitle(n > 0 ? `(${n}) BioSentry` : "BioSentry");
+    return () => setTitle("BioSentry");
+  }, [alertKey]);
+
+  const acknowledge = (id: string, score: number) => {
+    const next = new Map(acked).set(id, score);
+    ACKS.set(session.clinician_id, next);
+    setAcked(next);
+  };
+
+  if (!data) {
+    return (
+      <main className={styles.container}>
+        <p role={failedSince ? "alert" : "status"}>
+          {failedSince
+            ? "The ward server cannot be reached. Retrying every 15 seconds."
+            : "Loading ward…"}
+        </p>
+      </main>
+    );
+  }
+
+  const ageOffsetS = fetchedAt ? Math.max(0, Math.floor((now - fetchedAt) / 1000)) : 0;
+  const overdue = data.ranked.filter((r) => {
+    const due = obsDue(r);
+    return due !== "continuous" && due <= now;
+  }).length;
 
   const liveTiers = data.tier_status.filter((t) => t.live);
   const bands = data.ranked.map(band);
@@ -58,9 +136,11 @@ export function Ward({ session, onSignOut }: Props) {
             <span className={styles.statusItem}>
               <span className={`${styles.liveDot} ${data.receiving_data ? styles.liveDotActive : ""}`} />
               <span className={styles.statusValue}>
-                {data.receiving_data
-                  ? now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
-                  : "No signal"}
+                {!data.receiving_data
+                  ? "No signal"
+                  : failedSince
+                    ? `Offline since ${formatClock(failedSince)}`
+                    : `Updated ${fetchedAt ? formatClock(fetchedAt) : "--"}`}
               </span>
             </span>
           </div>
@@ -69,6 +149,13 @@ export function Ward({ session, onSignOut }: Props) {
           </div>
         </div>
       </div>
+
+      {failedSince && (
+        <p className={styles.offline} role="status">
+          Cannot reach the ward server since {formatClock(failedSince)}. Showing data from{" "}
+          {fetchedAt ? formatClock(fetchedAt) : "--"}; ages below keep counting. Retrying every 15 seconds.
+        </p>
+      )}
 
       {/* Summary cards */}
       <div className={styles.summary}>
@@ -89,9 +176,9 @@ export function Ward({ session, onSignOut }: Props) {
             <span className={styles.summaryNumber}>{data.abstained.length}</span>
             <span className={styles.summaryLabel}>Not ranked &middot; act</span>
           </div>
-          <div className={styles.summaryCard}>
-            <span className={styles.summaryNumber}>{data.ranked.length}</span>
-            <span className={styles.summaryLabel}>Ranked</span>
+          <div className={styles.summaryCard} data-tone={overdue > 0 ? "alert-soft" : undefined}>
+            <span className={styles.summaryNumber}>{overdue}</span>
+            <span className={styles.summaryLabel}>Obs overdue</span>
           </div>
         </div>
       </div>
@@ -105,6 +192,22 @@ export function Ward({ session, onSignOut }: Props) {
           </p>
         </div>
 
+        {alerts.length > 0 && (
+          <div className={styles.alerts}>
+            {alerts.map((a) => (
+              <div key={a.id} className={styles.alert} role="alert">
+                <span>
+                  <strong>NEWS2 {a.score}</strong> &middot; Bed {a.bed} &middot;{" "}
+                  <Link to={`/patient/${a.id}`}>{a.name}</Link>
+                </span>
+                <button type="button" className={styles.alertAck} onClick={() => acknowledge(a.id, a.score)}>
+                  Acknowledge
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {notice !== null && (
           <p className={styles.notice} role="status">
             {notice}{" "}
@@ -116,7 +219,7 @@ export function Ward({ session, onSignOut }: Props) {
 
         <div className={styles.rowList}>
           {data.ranked.map((row) => (
-            <WardRow key={row.id} row={row} role={session.role} />
+            <WardRow key={row.id} row={row} role={session.role} now={now} ageOffsetS={ageOffsetS} />
           ))}
         </div>
 

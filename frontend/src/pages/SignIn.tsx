@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import type { Session, SessionRole } from "../types";
 import ch from "../components/Crosshair.module.css";
 import styles from "./SignIn.module.css";
@@ -77,6 +77,8 @@ const PROFILES: Profile[] = [
 
 export function SignIn({ onSignIn }: Props) {
   const navigate = useNavigate();
+  // Set when a signed-out link (e.g. a patient page) sent the clinician here: return them to it.
+  const from: unknown = (useLocation().state as { from?: unknown } | null)?.from;
   const [department, setDepartment] = useState<Department | null>(null);
   const [selected, setSelected] = useState<Profile | null>(null);
   const [passphrase, setPassphrase] = useState("anything");
@@ -88,7 +90,7 @@ export function SignIn({ onSignIn }: Props) {
       ward: profile.ward,
       role: profile.sessionRole,
     });
-    navigate(path);
+    navigate(typeof from === "string" && from.startsWith("/") && from !== "/" ? from : path);
   };
 
   const handlePickDepartment = (dept: Department) => {
@@ -292,7 +294,7 @@ export function SignIn({ onSignIn }: Props) {
         <div className={styles.footerGrid}>
           <div className={styles.footerItem}>
             <span className={styles.footerLabel}>Privacy</span>
-            <span>RA 10173 compliant</span>
+            <span>Pilot build: synthetic data, no real authentication or audit yet</span>
           </div>
         </div>
       </footer>

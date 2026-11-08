@@ -264,3 +264,19 @@ describe("no identity fails closed (the server answers 401)", () => {
     await expect(getNotes("p-001")).rejects.toThrow(/not found/i);
   });
 });
+
+describe("fixture clock", () => {
+  it("is rebased to load time, and device data ages as wall time passes", async () => {
+    setActiveClinician("md-santos");
+    const first = (await getWard()).ranked[0];
+    const observed = Date.parse(first.vitals.heart_rate.provenance.observed_at);
+    expect(Math.abs(Date.now() - first.last_update_s * 1000 - observed)).toBeLessThan(120_000);
+    vi.useFakeTimers({ now: Date.now() + 60_000 });
+    try {
+      const later = (await getWard()).ranked[0];
+      expect(later.last_update_s - first.last_update_s).toBeGreaterThanOrEqual(59);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

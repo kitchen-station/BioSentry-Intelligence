@@ -322,3 +322,15 @@
     margin-top: 0;
   }
 }
+
+.obsDue {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--label);
+  margin-top: var(--sp-1);
+}
+
+.obsDue[data-overdue] {
+  color: var(--alert);
+  font-weight: 600;
+}

@@ -26,3 +26,8 @@ export function formatAge(seconds: number): string {
   if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
   return `${Math.floor(seconds / 3600)} h ago`;
 }
+
+/** "07:40": wall-clock hour and minute, for due times and last-update stamps. */
+export function formatClock(ms: number): string {
+  return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}

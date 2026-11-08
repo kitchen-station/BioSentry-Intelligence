@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import type { ClinicalNote, PatientDetail as PatientDetailType, SessionRole, TierBFinding } from "../types";
-import { getPatient, getNotes, addNote, deleteNote } from "../api";
+import type { ClinicalNote, PatientDetail as PatientDetailType, Session, SessionRole, TierBFinding } from "../types";
+import { getPatient, getNotes, addNote } from "../api";
 import { CurrentVitals, VitalRow } from "../components/CurrentVitals";
 import { TrendChart } from "../components/TrendChart";
 import { Sparkline } from "../components/Sparkline";
@@ -45,9 +45,12 @@ const SECONDARY_AXES = new Set(["hrv"]);
 
 type Drawer = "notes" | "charts" | null;
 
+const ROLE_LABEL: Record<SessionRole, string> = { rn: "RN", charge_rn: "Charge RN", md: "MD" };
+
 // --- Main component ---
 
-export function PatientDetail({ role }: { role: SessionRole }) {
+export function PatientDetail({ session }: { session: Session }) {
+  const role = session.role;
   const { id } = useParams<{ id: string }>();
   const [patient, setPatient] = useState<PatientDetailType | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -56,29 +59,34 @@ export function PatientDetail({ role }: { role: SessionRole }) {
   const [noteText, setNoteText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [drawer, setDrawer] = useState<Drawer>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [noteError, setNoteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
-    getPatient(id).then((p) => {
-      if (p) setPatient(p);
-      else setNotFound(true);
-    });
-    getNotes(id).then(setNotes);
+    getPatient(id)
+      .then((p) => {
+        if (p) setPatient(p);
+        else setNotFound(true);
+      })
+      .catch(() => setLoadError(true));
+    getNotes(id).then(setNotes).catch(() => setNoteError("Notes could not be loaded."));
   }, [id]);
 
   const handleAddNote = async () => {
     if (!id || !noteText.trim() || submitting) return;
     setSubmitting(true);
-    const note = await addNote(id, "RN Dela Cruz", "RN", noteText.trim());
-    setNotes((prev) => [note, ...prev]);
-    setNoteText("");
-    setSubmitting(false);
-  };
-
-  const handleDeleteNote = async (noteId: string) => {
-    if (!id) return;
-    await deleteNote(id, noteId);
-    setNotes((prev) => prev.filter((n) => n.id !== noteId));
+    setNoteError(null);
+    try {
+      // The signed-in clinician is the author. Notes are append-only: no delete in the UI.
+      const note = await addNote(id, session.clinician_id, ROLE_LABEL[role], noteText.trim());
+      setNotes((prev) => [note, ...prev]);
+      setNoteText("");
+    } catch {
+      setNoteError("The note was not saved. Your text is kept; try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const toggleDrawer = (d: Drawer) => setDrawer((prev) => prev === d ? null : d);
@@ -92,6 +100,15 @@ export function PatientDetail({ role }: { role: SessionRole }) {
     return (
       <main className={styles.page}>
         <p>Patient not found.</p>
+        <Link to="/ward">Back to ward</Link>
+      </main>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <main className={styles.page}>
+        <p role="alert">This patient could not be loaded. Check the connection and reload.</p>
         <Link to="/ward">Back to ward</Link>
       </main>
     );
@@ -206,6 +223,7 @@ export function PatientDetail({ role }: { role: SessionRole }) {
                     Add note
                   </button>
                 </div>
+                {noteError !== null && <p role="alert">{noteError}</p>}
                 {notes.length > 0 && (
                   <div className={styles.notesList}>
                     {notes.map((note) => (
@@ -216,13 +234,6 @@ export function PatientDetail({ role }: { role: SessionRole }) {
                           <span className={styles.noteTime}>
                             {new Date(note.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                           </span>
-                          <button
-                            type="button"
-                            className={styles.noteDelete}
-                            onClick={() => handleDeleteNote(note.id)}
-                          >
-                            Delete
-                          </button>
                         </div>
                         <p className={styles.noteContent}>{note.content}</p>
                       </div>

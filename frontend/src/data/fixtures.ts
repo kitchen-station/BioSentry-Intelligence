@@ -36,8 +36,26 @@ interface SyntheticWard {
   readonly notes: ClinicalNote[];
 }
 
+// The dataset is a snapshot. Its clock is moved to load time so ages and due times read against
+// the wall clock; gaps between values are unchanged. No values are made up: from load on, device
+// data simply ages, as it would with no patch streaming.
+const LOADED_AT = Date.now();
+const SHIFT_MS = LOADED_AT - Date.parse(synthetic.as_of);
+const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
+
+function rebase(v: unknown): unknown {
+  if (typeof v === "string") return ISO_UTC.test(v) ? new Date(Date.parse(v) + SHIFT_MS).toISOString() : v;
+  if (Array.isArray(v)) return v.map(rebase);
+  if (v !== null && typeof v === "object") {
+    return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, rebase(x)]));
+  }
+  return v;
+}
+
+const elapsedS = (): number => Math.floor((Date.now() - LOADED_AT) / 1000);
+
 // This is the typed view of the JSON. Copies, so runtime admits and lab entries never mutate the module's data.
-const data = structuredClone(synthetic) as unknown as SyntheticWard;
+const data = rebase(synthetic) as SyntheticWard;
 const ranked: ScoreRow[] = data.ranked;
 const abstained: AbstainedRow[] = data.abstained;
 const TIERS = ranked[0]?.tier_status ?? [];
@@ -87,7 +105,7 @@ export async function getWard(): Promise<WardResponse> {
   const filteredAbstained = abstained.filter((a) => allowed.has(a.id));
 
   // Re-rank after filtering so ranks are contiguous
-  const reRanked = filteredRanked.map((r, i) => ({ ...r, rank: i + 1 }));
+  const reRanked = filteredRanked.map((r, i) => ({ ...r, rank: i + 1, last_update_s: r.last_update_s + elapsedS() }));
 
   return {
     ward: "W4",
@@ -294,5 +312,10 @@ export async function getPatient(id: string): Promise<PatientDetail | null> {
   const row = ranked.find((r) => r.id === id);
   const detail = data.details[id];
   if (!row || !detail) return null;
-  return { ...row, vital_history: detail.vital_history, tier_breakdown: detail.tier_breakdown };
+  return {
+    ...row,
+    last_update_s: row.last_update_s + elapsedS(),
+    vital_history: detail.vital_history,
+    tier_breakdown: detail.tier_breakdown,
+  };
 }

@@ -29,3 +29,35 @@ const RESPONSE: Record<"nurse" | "physician", Record<Band, string>> = {
 export function response(b: Band, role: SessionRole): string {
   return RESPONSE[role === "md" ? "physician" : "nurse"][b];
 }
+
+// RCP 2017 Chart 3, minimum observation frequency per band. "low" splits: score 0 is 12-hourly,
+// 1-4 is 4-6-hourly (the stricter 4 h is used). High risk is continuous monitoring.
+const OBS_INTERVAL_MIN: Record<Exclude<Band, "high">, number> = { medium: 60, "low-medium": 60, low: 240 };
+
+/**
+ * When the next full set of observations is due, in epoch ms, or "continuous" for a high-risk
+ * patient. The clock starts at the oldest nurse-entered NEWS2 input (BP, consciousness): the
+ * patch streams the rest. A missing input is never observed, so the set is due now (I1).
+ */
+export function obsDue(row: Pick<ScoreRow, "score" | "escalation_reasons" | "vitals">): number | "continuous" {
+  const b = band(row);
+  if (b === "high") return "continuous";
+  const minutes = b === "low" && row.score === 0 ? 720 : OBS_INTERVAL_MIN[b];
+  const last = Math.min(
+    ...[row.vitals.blood_pressure, row.vitals.consciousness].map((m) =>
+      m.data.present ? Date.parse(m.provenance.observed_at) : -Infinity,
+    ),
+  );
+  return last + minutes * 60_000;
+}
+
+/**
+ * High-risk patients the clinician has not acknowledged at their current score. An
+ * acknowledgement holds until the score rises past the one acknowledged.
+ */
+export function unacknowledged<R extends Pick<ScoreRow, "id" | "score" | "escalation_reasons">>(
+  rows: readonly R[],
+  acked: ReadonlyMap<string, number>,
+): R[] {
+  return rows.filter((r) => band(r) === "high" && r.score > (acked.get(r.id) ?? -1));
+}

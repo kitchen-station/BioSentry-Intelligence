@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { band, response } from "./risk";
+import { band, obsDue, response, unacknowledged } from "./risk";
 
 const r = (score: number, ...texts: string[]) => ({
   score,
@@ -21,5 +21,39 @@ describe("NEWS2 band", () => {
     expect(response("high", "rn")).toMatch(/medical team/);
     expect(response("high", "charge_rn")).toBe(response("high", "rn"));
     expect(response("high", "md")).toMatch(/Emergency assessment/);
+  });
+});
+
+describe("observations due", () => {
+  const at = (iso: string) => ({ data: { present: true, value: 0 }, provenance: { observed_at: iso } });
+  const row = (score: number, bpAt: string, avpuAt: string, ...texts: string[]) =>
+    ({ ...r(score, ...texts), vitals: { blood_pressure: at(bpAt), consciousness: at(avpuAt) } }) as unknown as Parameters<typeof obsDue>[0];
+  const t0 = "2026-09-03T06:00:00Z";
+  const plus = (min: number) => Date.parse(t0) + min * 60_000;
+
+  it("follows the RCP minimum frequency, from the oldest nurse-entered input", () => {
+    expect(obsDue(row(7, t0, t0))).toBe("continuous");
+    expect(obsDue(row(5, t0, "2026-09-03T06:30:00Z"))).toBe(plus(60));
+    expect(obsDue(row(3, t0, t0, "Single parameter at 3: systolic BP"))).toBe(plus(60));
+    expect(obsDue(row(2, t0, t0))).toBe(plus(240));
+    expect(obsDue(row(0, t0, t0))).toBe(plus(720));
+  });
+
+  it("is due now when a nurse-entered input was never observed", () => {
+    const missing = { data: { present: false, reason: "not recorded" }, provenance: { observed_at: t0 } };
+    const r0 = { ...r(2), vitals: { blood_pressure: missing, consciousness: at(t0) } } as unknown as Parameters<typeof obsDue>[0];
+    expect(obsDue(r0)).toBe(-Infinity);
+  });
+});
+
+describe("unacknowledged high-risk alerts", () => {
+  const row = (id: string, score: number) => ({ id, ...r(score) });
+
+  it("alerts high risk only, until acknowledged, and again when the score rises", () => {
+    const rows = [row("a", 9), row("b", 7), row("c", 5)];
+    expect(unacknowledged(rows, new Map()).map((x) => x.id)).toEqual(["a", "b"]);
+    expect(unacknowledged(rows, new Map([["a", 9]])).map((x) => x.id)).toEqual(["b"]);
+    expect(unacknowledged([row("a", 10)], new Map([["a", 9]])).map((x) => x.id)).toEqual(["a"]);
+    expect(unacknowledged([row("a", 8)], new Map([["a", 9]]))).toEqual([]);
   });
 });

@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
 import type { ScoreRow, SessionRole } from "../types";
-import { formatAge, formatBloodPressure, STALE_AFTER_S } from "./format";
+import { formatAge, formatBloodPressure, formatClock, STALE_AFTER_S } from "./format";
 import { MeasurementDisplay } from "./MeasurementDisplay";
-import { band, response } from "./risk";
+import { band, obsDue, response } from "./risk";
 import { Sparkline } from "./Sparkline";
 import styles from "./WardRow.module.css";
 
@@ -16,10 +16,25 @@ const TREND_CHAR: Record<string, string> = {
 interface Props {
   row: ScoreRow;
   role: SessionRole;
+  /** Wall clock, epoch ms. */
+  now: number;
+  /** Seconds since the ward was fetched, added to the server's data age so it keeps ticking. */
+  ageOffsetS: number;
 }
 
-export function WardRow({ row, role }: Props) {
+function ObsDue({ due, now }: { due: number | "continuous"; now: number }) {
+  if (due === "continuous") return <div className={styles.obsDue}>Obs continuous</div>;
+  if (due > now) return <div className={styles.obsDue}>Obs due {formatClock(due)}</div>;
+  return (
+    <div className={styles.obsDue} data-overdue>
+      {due === -Infinity ? "Obs due now" : `Obs overdue ${formatAge(Math.floor((now - due) / 1000)).replace(" ago", "")}`}
+    </div>
+  );
+}
+
+export function WardRow({ row, role, now, ageOffsetS }: Props) {
   const b = band(row);
+  const age = row.last_update_s + ageOffsetS;
   return (
     <Link to={`/patient/${row.id}`} className={styles.link}>
       <div className={styles.row} data-band={b}>
@@ -40,8 +55,8 @@ export function WardRow({ row, role }: Props) {
             <span className={styles.detail}>
               {row.age ?? "--"}{row.sex ? ` ${row.sex}` : ""} &middot; Bed {row.bed}
             </span>
-            <span className={styles.updateTag} data-stale={row.last_update_s > STALE_AFTER_S || undefined}>
-              {row.last_update_s > STALE_AFTER_S ? "Stale · " : ""}{formatAge(row.last_update_s)}
+            <span className={styles.updateTag} data-stale={age > STALE_AFTER_S || undefined}>
+              {age > STALE_AFTER_S ? "Stale · " : ""}{formatAge(Math.floor(age))}
             </span>
           </div>
           <div className={styles.context}>{row.admitting_context}</div>
@@ -96,6 +111,7 @@ export function WardRow({ row, role }: Props) {
               ? `Labs ${row.labs.freshness_hours}h`
               : "No labs"}
           </div>
+          <ObsDue due={obsDue(row)} now={now} />
         </div>
       </div>
     </Link>
