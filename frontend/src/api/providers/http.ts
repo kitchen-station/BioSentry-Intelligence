@@ -7,6 +7,7 @@
  *   GET  /wards/{ward}/rows
  *   GET  /patients/{id}
  *   POST /session
+ *   GET  /acknowledgements, POST /patients/{id}/acknowledgement
  *   plus notes, labs, and extraction sub-resources.
  *
  * Stubs raise -- they do not return plausible values (house rule).
@@ -15,6 +16,7 @@
 import type { ApiProvider } from "../contract";
 import type {
   AbstainedRow,
+  Acknowledgement,
   AdmitPatientInput,
   ClinicalNote,
   LabExtractionResult,
@@ -90,6 +92,14 @@ export const httpProvider: ApiProvider = {
 
   recordVitals(patientId: string, input: NurseVitalsInput): Promise<VitalsRecorded> {
     return postJson<VitalsRecorded>(`/patients/${patientId}/vitals`, input);
+  },
+
+  getAcknowledgements(): Promise<Acknowledgement[]> {
+    return fetchJson<Acknowledgement[]>(`/acknowledgements`);
+  },
+
+  acknowledge(patientId: string, score: number): Promise<void> {
+    return postJson<void>(`/patients/${patientId}/acknowledgement`, { score });
   },
 
   extractLabsFromFile(file: File): Promise<LabExtractionResult> {

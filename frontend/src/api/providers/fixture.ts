@@ -18,6 +18,8 @@ export const fixtureProvider: ApiProvider = {
   listAllPatients: fixtures.listAllPatients,
   admitPatient: fixtures.admitPatient,
   enterLabResults: fixtures.enterLabResults,
+  getAcknowledgements: fixtures.getAcknowledgements,
+  acknowledge: fixtures.acknowledge,
   // The frontend never computes a score (D4), so fixture mode cannot re-rank a patient.
   recordVitals: () =>
     Promise.reject(new Error("Recording vitals needs the API: the frontend never computes a score")),

@@ -14,7 +14,7 @@ import synthetic from "../data/synthetic.json";
 import type { AdmitPatientInput } from "../types";
 import { EMPTY_DRAFT, check } from "../components/vitalsDraft";
 import { DIASTOLIC_BOUNDS, SYSTOLIC_BOUNDS } from "./bounds";
-import { setAuthToken } from "./client";
+import { openSession, setAuthToken } from "./client";
 import type { ApiProvider } from "./contract";
 import { fixtureProvider, setActiveClinician } from "./providers/fixture";
 import { httpProvider } from "./providers/http";
@@ -38,7 +38,8 @@ const harnesses: Harness[] = [
         {
           name: `http provider (${API_URL})`,
           provider: httpProvider,
-          signIn: (id: string | null) => setAuthToken(id),
+          // Requests wait for the session in flight; an unknown id gets no token and a 401.
+          signIn: (id: string | null) => (id === null ? setAuthToken(null) : httpSignIn(id)),
         },
       ]
     : []),
@@ -301,5 +302,5 @@ describe.skipIf(!API_URL)("http provider: nurse-recorded vitals", () => {
 });
 
 function httpSignIn(clinicianId: string): void {
-  setAuthToken(clinicianId);
+  void openSession(clinicianId); // requests wait for the token
 }

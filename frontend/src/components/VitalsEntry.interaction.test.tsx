@@ -21,10 +21,17 @@ import { Ward } from "../pages/Ward";
 // React's act() environment is normally switched on by a global the runner does not provide.
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const api = vi.hoisted(() => ({ recordVitals: vi.fn(), getWard: vi.fn() }));
+const api = vi.hoisted(() => ({
+  recordVitals: vi.fn(),
+  getWard: vi.fn(),
+  getAcknowledgements: vi.fn(),
+  acknowledge: vi.fn(),
+}));
 vi.mock("../api", () => ({
   recordVitals: api.recordVitals,
   getWard: api.getWard,
+  getAcknowledgements: api.getAcknowledgements,
+  acknowledge: api.acknowledge,
   canRecordVitals: true,
 }));
 
@@ -65,6 +72,7 @@ const row: AbstainedRowType = {
 beforeEach(() => {
   api.recordVitals.mockReset();
   api.getWard.mockReset();
+  api.getAcknowledgements.mockReset().mockResolvedValue([]);
 });
 afterEach(cleanup);
 

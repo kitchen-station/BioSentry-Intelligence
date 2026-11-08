@@ -1,0 +1,331 @@
+"""The HTTP API: the routes the frontend's http provider calls (frontend/src/api/providers/http.ts).
+
+POST /session turns a clinician id into a random bearer token (stored hashed, expires in 12
+hours); this is still a stub for real authentication. Missing, malformed, unknown or expired
+credentials get 401 and nothing is served. Identity comes first on every route, including for a
+body that fails validation. Everything else is scoped to the caller's patients on the server,
+on every call, and a patient who does not exist and one who is not yours get the same 404. A
+write whose body fails validation leaves a `rejected` audit row (ids only, no values). Responses
+are `Cache-Control: no-store`. The service serves nothing unauthenticated except /healthz and
+POST /session: no docs or schema routes (the contract is frontend/contracts/openapi.json).
+The ward simulation writes through /sim/*, gated by the X-Ingest-Key header (503 if unset).
+"""
+
+import secrets
+import sqlite3
+from collections.abc import Iterator
+from dataclasses import dataclass
+from typing import Annotated
+
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+
+from biosentry.core.audit import AuditLog, Clock, utc_now
+from biosentry.core.config import Settings
+from biosentry.db.seed import ensure
+from biosentry.repositories.sqlite import SqliteStore, connect
+from biosentry.schemas import (
+    AbstainedRow,
+    Acknowledgement,
+    AdmitPatientInput,
+    ClinicalNote,
+    LabPanel,
+    NewAcknowledgement,
+    NewNote,
+    NurseVitalsInput,
+    PartialLabInput,
+    PatientDetail,
+    PatientSummary,
+    SessionRequest,
+    SessionToken,
+    VitalsRecorded,
+    WardResponse,
+)
+from biosentry.schemas.ingest import Batch, NewRun
+from biosentry.services import ingest
+from biosentry.services.patients import PatientService, RejectedError
+from biosentry.services.ward import WardService
+
+NOT_FOUND = "Not found"
+
+# The body-bearing write routes and the action their audit rows carry. A body that fails
+# validation never reaches the handler, so its audit row is written by the validation handler.
+WRITE_ACTIONS = {
+    ("POST", "/patients"): "admit_patient",
+    ("POST", "/patients/{patient_id}/notes"): "add_note",
+    ("POST", "/patients/{patient_id}/labs"): "enter_labs",
+    ("POST", "/patients/{patient_id}/vitals"): "record_vitals",
+    ("POST", "/patients/{patient_id}/acknowledgement"): "acknowledge",
+}
+# Body-bearing routes that are not behind a bearer token: sign-in, and the sim's ingest key.
+UNAUTHENTICATED_WRITES = {
+    ("POST", "/session"),
+    ("POST", "/sim/runs"),
+    ("POST", "/sim/runs/{run_id}/batch"),
+}
+
+
+@dataclass(slots=True)
+class Context:
+    """One request: its connection and the services built on it."""
+
+    conn: sqlite3.Connection
+    store: SqliteStore
+    audit: AuditLog
+    wards: WardService
+    patients: PatientService
+
+    def close(self) -> None:
+        self.conn.close()
+
+
+class AuditEntry(BaseModel):
+    """What a clinician may read back about their own activity: ids and outcomes only."""
+
+    seq: int
+    at: str
+    action: str
+    resource: str
+    outcome: str
+
+
+def context(request: Request) -> Iterator[Context]:
+    ctx: Context = request.app.state.open_ctx()
+    try:
+        yield ctx
+    finally:
+        ctx.close()
+
+
+Ctx = Annotated[Context, Depends(context)]
+
+
+def identify(ctx: Context, authorization: str | None) -> str:
+    """The clinician a live session token names. Otherwise 401, audited without an identity."""
+    scheme, _, token = (authorization or "").partition(" ")
+    who = ctx.store.clinician_for(token.strip()) if scheme.lower() == "bearer" else None
+    if who is None:
+        ctx.audit.append(None, "authenticate", "-", "denied")
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return who
+
+
+def clinician(
+    ctx: Ctx,
+    authorization: Annotated[str | None, Header()] = None,
+) -> str:
+    return identify(ctx, authorization)
+
+
+Who = Annotated[str, Depends(clinician)]
+
+
+def unprocessable(exc: RequestValidationError) -> JSONResponse:
+    """FastAPI's 422 body without `input` and `ctx`: a rejected value (a PIN) is never echoed."""
+    errors = [{k: v for k, v in e.items() if k not in ("input", "ctx")} for e in exc.errors()]
+    return JSONResponse(status_code=422, content={"detail": jsonable_encoder(errors)})
+
+
+def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> FastAPI:
+    """Build the app. `clock` is the wall clock (tests inject one)."""
+    settings = settings or Settings.from_env()
+    ensure(settings.db, settings.dataset)
+
+    def open_ctx() -> Context:
+        conn = connect(settings.db)
+        store = SqliteStore(conn, clock)
+        audit = AuditLog(conn, clock, store.role_of)
+        wards = WardService(store, audit)
+        return Context(conn, store, audit, wards, PatientService(store, audit, wards))
+
+    def ingest_gate(ctx: Ctx, x_ingest_key: Annotated[str | None, Header()] = None) -> None:
+        """Fails closed: no key configured, no ingest."""
+        # ponytail: one shared static key. Upgrade: a key per sim, rotated, or mTLS.
+        if settings.ingest_key is None:
+            ctx.audit.append(None, "ingest", "-", "denied")
+            raise HTTPException(status_code=503, detail="Ingest is not configured")
+        given = (x_ingest_key or "").encode()
+        if not secrets.compare_digest(given, settings.ingest_key.encode()):
+            ctx.audit.append(None, "ingest", "-", "denied")
+            raise HTTPException(status_code=403, detail="Forbidden")
+
+    app = FastAPI(
+        title="BioSentry Intelligence API",
+        version="0.1.0",
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+    )
+    app.state.open_ctx = open_ctx
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=list(settings.cors_origins),
+        allow_methods=["GET", "POST", "DELETE"],
+        allow_headers=["Authorization", "Content-Type", "X-Ingest-Key"],
+    )
+
+    @app.middleware("http")
+    async def no_store(request: Request, call_next):  # type: ignore[no-untyped-def]
+        response = await call_next(request)
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @app.exception_handler(RejectedError)
+    async def rejected(_: Request, exc: RejectedError) -> JSONResponse:
+        return JSONResponse(status_code=422, content={"detail": str(exc)})
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(request: Request, exc: RequestValidationError) -> Response:
+        route = request.scope.get("route")
+        key = (request.method, getattr(route, "path", ""))
+        if key in UNAUTHENTICATED_WRITES:
+            return unprocessable(exc)
+        # Identity first, as on every route: a body that is not JSON fails before the
+        # dependencies run, and an unidentified caller must be told nothing about it.
+        ctx = open_ctx()
+        try:
+            who = identify(ctx, request.headers.get("authorization"))
+            action = WRITE_ACTIONS.get(key)
+            if action is not None:  # ids and outcome only: the rejected values are never logged
+                resource = str(request.path_params.get("patient_id", "-"))
+                ctx.audit.append(who, action, resource, "rejected")
+        except HTTPException as denied:
+            return JSONResponse(
+                status_code=denied.status_code,
+                content={"detail": denied.detail},
+                headers=denied.headers,
+            )
+        finally:
+            ctx.close()
+        return unprocessable(exc)
+
+    @app.get("/healthz")
+    def healthz() -> dict[str, str]:
+        return {"status": "ok"}
+
+    @app.post("/session", response_model=SessionToken)
+    def sign_in(body: SessionRequest, ctx: Ctx) -> SessionToken:
+        # ponytail: any known clinician id gets a token (no passphrase), and a successful
+        # sign-in is not audited. Upgrade: real authentication, audited, before non-synthetic use.
+        if not ctx.store.knows_clinician(body.clinician_id):
+            ctx.audit.append(None, "authenticate", "-", "denied")
+            raise HTTPException(status_code=403, detail="Unknown identity")
+        return SessionToken(token=ctx.store.open_session(body.clinician_id))
+
+    @app.get("/wards/{ward}/rows", response_model=WardResponse)
+    def ward_rows(ward: str, ctx: Ctx, who: Who) -> WardResponse:
+        if ward != ctx.store.ward:
+            ctx.audit.append(who, "view_ward", ward, "not_found")
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return ctx.wards.ward(who)
+
+    @app.get("/patients", response_model=list[PatientSummary])
+    def list_patients(ctx: Ctx, who: Who) -> list[PatientSummary]:
+        return ctx.wards.summaries(who)
+
+    @app.get("/patients/{patient_id}", response_model=PatientDetail)
+    def get_patient(patient_id: str, ctx: Ctx, who: Who) -> PatientDetail:
+        found = ctx.wards.patient(who, patient_id)
+        if found is None:
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return found
+
+    @app.post("/patients", response_model=AbstainedRow, status_code=201)
+    def admit_patient(form: AdmitPatientInput, ctx: Ctx, who: Who) -> AbstainedRow:
+        return ctx.patients.admit(who, form)
+
+    @app.get("/patients/{patient_id}/notes", response_model=list[ClinicalNote])
+    def get_notes(patient_id: str, ctx: Ctx, who: Who) -> list[ClinicalNote]:
+        notes = ctx.patients.notes(who, patient_id)
+        if notes is None:
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return notes
+
+    @app.post("/patients/{patient_id}/notes", response_model=ClinicalNote, status_code=201)
+    def add_note(patient_id: str, body: NewNote, ctx: Ctx, who: Who) -> ClinicalNote:
+        note = ctx.patients.add_note(who, patient_id, body)
+        if note is None:
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return note
+
+    @app.delete("/patients/{patient_id}/notes/{note_id}", status_code=204)
+    def delete_note(patient_id: str, note_id: str, ctx: Ctx, who: Who) -> Response:
+        if not ctx.patients.delete_note(who, patient_id, note_id):
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return Response(status_code=204)
+
+    @app.post("/patients/{patient_id}/labs", response_model=LabPanel)
+    def enter_labs(patient_id: str, labs: PartialLabInput, ctx: Ctx, who: Who) -> LabPanel:
+        panel = ctx.patients.enter_labs(who, patient_id, labs)
+        if panel is None:
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return panel
+
+    @app.post("/patients/{patient_id}/vitals", response_model=VitalsRecorded)
+    def record_vitals(
+        patient_id: str, body: NurseVitalsInput, ctx: Ctx, who: Who
+    ) -> VitalsRecorded:
+        recorded = ctx.patients.record_vitals(who, patient_id, body)
+        if recorded is None:
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return recorded
+
+    @app.get("/acknowledgements", response_model=list[Acknowledgement])
+    def get_acknowledgements(ctx: Ctx, who: Who) -> list[dict[str, object]]:
+        return ctx.patients.acknowledgements(who)
+
+    @app.post("/patients/{patient_id}/acknowledgement", status_code=204)
+    def acknowledge(patient_id: str, body: NewAcknowledgement, ctx: Ctx, who: Who) -> Response:
+        if not ctx.patients.acknowledge(who, patient_id, body.score):
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return Response(status_code=204)
+
+    @app.post("/extract/labs", status_code=501)
+    def extract_labs(who: Who) -> JSONResponse:
+        return JSONResponse(
+            status_code=501, content={"detail": "Document extraction is not implemented (v2)"}
+        )
+
+    @app.post("/extract/patient", status_code=501)
+    def extract_patient(who: Who) -> JSONResponse:
+        return JSONResponse(
+            status_code=501, content={"detail": "Document extraction is not implemented (v2)"}
+        )
+
+    @app.get("/audit", response_model=list[AuditEntry])
+    def my_audit(ctx: Ctx, who: Who) -> list[AuditEntry]:
+        """The caller's own audit trail: not a window onto anyone else's activity."""
+        return [
+            AuditEntry(
+                seq=r.seq,
+                at=r.at.isoformat().replace("+00:00", "Z"),
+                action=r.action,
+                resource=r.resource,
+                outcome=r.outcome,
+            )
+            for r in ctx.audit.for_clinician(who)
+        ]
+
+    @app.post("/sim/runs", status_code=201)
+    def start_sim_run(
+        body: NewRun, ctx: Ctx, _: Annotated[None, Depends(ingest_gate)]
+    ) -> dict[str, int]:
+        return {"run_id": ingest.start_run(ctx.conn, body, clock)}
+
+    @app.post("/sim/runs/{run_id}/batch", status_code=204)
+    def add_sim_batch(
+        run_id: int, body: Batch, ctx: Ctx, _: Annotated[None, Depends(ingest_gate)]
+    ) -> Response:
+        if not ingest.add_batch(ctx.conn, run_id, body, clock):
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return Response(status_code=204)
+
+    return app

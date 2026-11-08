@@ -6,6 +6,7 @@
 
 import type {
   AbstainedRow,
+  Acknowledgement,
   AdmitPatientInput,
   ClinicalNote,
   LabExtractionResult,
@@ -38,6 +39,9 @@ export interface ApiProvider {
     labs: PartialLabInput,
   ): Promise<LabPanel>;
   recordVitals(patientId: string, input: NurseVitalsInput): Promise<VitalsRecorded>;
+  /** The signed-in clinician's acknowledgements: the patient and the NEWS2 score they saw. */
+  getAcknowledgements(): Promise<Acknowledgement[]>;
+  acknowledge(patientId: string, score: number): Promise<void>;
   extractLabsFromFile(file: File): Promise<LabExtractionResult>;
   extractPatientFromFile(file: File): Promise<PatientExtractionResult>;
 }

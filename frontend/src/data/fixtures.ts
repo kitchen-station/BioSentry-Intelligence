@@ -7,6 +7,7 @@ import synthetic from "./synthetic.json";
 import { DIASTOLIC_BOUNDS, SYSTOLIC_BOUNDS } from "../api/bounds";
 import type {
   AbstainedRow,
+  Acknowledgement,
   AdmitPatientInput,
   ClinicalNote,
   LabExtractionResult,
@@ -117,6 +118,22 @@ export async function getWard(): Promise<WardResponse> {
     ranked: reRanked,
     abstained: filteredAbstained,
   };
+}
+
+// --- Acknowledgements: in memory, per clinician, for the life of the page (the API keeps them in the database) ---
+
+const acknowledgements = new Map<string, Map<string, number>>();
+
+export async function getAcknowledgements(): Promise<Acknowledgement[]> {
+  const mine = acknowledgements.get(_activeClinician ?? "");
+  return Array.from(mine ?? [], ([patient_id, score]) => ({ patient_id, score }));
+}
+
+export async function acknowledge(patientId: string, score: number): Promise<void> {
+  if (_activeClinician === null) throw new Error("Sign in to acknowledge");
+  requireVisible(patientId);
+  const mine = acknowledgements.get(_activeClinician) ?? new Map<string, number>();
+  acknowledgements.set(_activeClinician, mine.set(patientId, score));
 }
 
 // --- Clinical notes (in-memory, replaced by API at CP6) ---
