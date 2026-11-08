@@ -7,9 +7,34 @@
 const BASE_URL: string = import.meta.env.VITE_API_URL ?? "";
 
 let _token: string | null = null;
+// Requests wait for a sign-in in flight. The generation drops a token that arrives after sign-out.
+let _pending: Promise<void> = Promise.resolve();
+let _generation = 0;
 
 export function setAuthToken(token: string | null): void {
+  _generation++;
+  _pending = Promise.resolve();
   _token = token;
+}
+
+/**
+ * Asks the API for a token (POST /session). Until it answers, other requests wait. If it refuses,
+ * requests go out without a token and the API answers 401: the client fails closed.
+ */
+export function openSession(clinicianId: string): Promise<void> {
+  const generation = ++_generation;
+  _token = null;
+  _pending = request<{ token: string }>(
+    "/session",
+    { method: "POST", body: JSON.stringify({ clinician_id: clinicianId }) },
+    false,
+  ).then(
+    (r) => {
+      if (generation === _generation) _token = r.token;
+    },
+    () => {},
+  );
+  return _pending;
 }
 
 export function getAuthToken(): string | null {
@@ -33,7 +58,9 @@ export class ApiError extends Error {
 async function request<T>(
   path: string,
   init: RequestInit = {},
+  waitForSession = true,
 ): Promise<T> {
+  if (waitForSession) await _pending;
   const headers = new Headers(init.headers);
 
   if (_token) {

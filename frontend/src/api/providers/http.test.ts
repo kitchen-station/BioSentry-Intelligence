@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiError, setAuthToken } from "../client";
+import { ApiError, openSession, setAuthToken } from "../client";
 import { httpProvider } from "./http";
 
 function reply(status: number, body: unknown): Response {
@@ -40,6 +40,40 @@ describe("httpProvider.getPatient", () => {
     const failure = await httpProvider.getPatient("p-001").catch((e: unknown) => e);
     expect(failure).toBeInstanceOf(ApiError);
     expect((failure as ApiError).status).toBe(status);
+  });
+});
+
+describe("openSession", () => {
+  it("asks the API for a token and holds requests until it arrives", async () => {
+    fetchMock
+      .mockResolvedValueOnce(reply(200, { token: "t-123" }))
+      .mockResolvedValueOnce(reply(200, { ranked: [], abstained: [] }));
+    void openSession("md-santos");
+    await httpProvider.getWard();
+    expect(fetchMock.mock.calls[0][0]).toBe("/session");
+    expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)).toEqual({ clinician_id: "md-santos" });
+    const init = fetchMock.mock.calls[1][1] as RequestInit;
+    expect(new Headers(init.headers).get("Authorization")).toBe("Bearer t-123");
+  });
+
+  it("fails closed when the API refuses: no token, never the clinician id", async () => {
+    fetchMock.mockResolvedValueOnce(reply(403, { detail: "no" })).mockResolvedValueOnce(reply(401, { detail: "no" }));
+    void openSession("rn-reyes");
+    await expect(httpProvider.getWard()).rejects.toBeInstanceOf(ApiError);
+    const init = fetchMock.mock.calls[1][1] as RequestInit;
+    expect(new Headers(init.headers).has("Authorization")).toBe(false);
+  });
+
+  it("drops a token that arrives after sign-out", async () => {
+    let answer!: (r: Response) => void;
+    fetchMock.mockReturnValueOnce(new Promise<Response>((r) => (answer = r)));
+    const opening = openSession("md-santos");
+    setAuthToken(null);
+    answer(reply(200, { token: "late" }));
+    await opening;
+    fetchMock.mockResolvedValueOnce(reply(200, []));
+    await httpProvider.listAllPatients();
+    expect(new Headers((fetchMock.mock.calls[1][1] as RequestInit).headers).has("Authorization")).toBe(false);
   });
 });
 

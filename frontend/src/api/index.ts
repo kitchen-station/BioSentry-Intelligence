@@ -12,7 +12,7 @@
 
 import type { ApiProvider } from "./contract";
 import { httpProvider } from "./providers/http";
-import { setAuthToken } from "./client";
+import { openSession, setAuthToken } from "./client";
 
 const USE_FIXTURES = !import.meta.env.VITE_API_URL;
 
@@ -76,9 +76,11 @@ export const extractPatientFromFile = provider.extractPatientFromFile;
 export function initSession(clinicianId: string, token?: string): void {
   if (USE_FIXTURES) {
     void fixtures().then((m) => m.setActiveClinician(clinicianId));
+  } else if (token) {
+    setAuthToken(token);
   } else {
-    // Never the clinician id: that is not a secret. No token means the API answers 401 (fails closed).
-    setAuthToken(token ?? null);
+    // Never the clinician id as the token: it is not a secret. The API issues one, or refuses (401).
+    void openSession(clinicianId);
   }
 }
 
