@@ -17,3 +17,12 @@ export function formatOxygen(onOxygen: boolean): string {
 export function formatSpo2Scale(scale: Spo2Scale): string {
   return `Scale ${scale}`;
 }
+
+// Device data older than this is stale: the row's vitals may no longer be current.
+export const STALE_AFTER_S = 300;
+
+export function formatAge(seconds: number): string {
+  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+  return `${Math.floor(seconds / 3600)} h ago`;
+}

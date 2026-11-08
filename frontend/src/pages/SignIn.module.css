@@ -134,7 +134,7 @@
   justify-content: center;
   width: 40px;
   height: 40px;
-  background: var(--ink);
+  background: var(--primary);
   color: var(--button-ink);
   font-family: var(--font-sans);
   font-weight: 500;

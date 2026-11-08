@@ -11,7 +11,7 @@
 /* ---- Status bar ---- */
 
 .statusBar {
-  background: var(--ink);
+  background: var(--primary);
   color: var(--button-ink);
   padding: 0 var(--sp-4);
 }
@@ -61,13 +61,13 @@
   display: inline-block;
   width: 6px;
   height: 6px;
-  background: #555;
+  background: rgba(255, 255, 255, 0.35);
   border-radius: 50%;
   margin-right: 2px;
 }
 
 .liveDotActive {
-  background: #4ade80;
+  background: var(--ok);
   animation: pulse 2s ease-in-out infinite;
 }
 
@@ -79,8 +79,7 @@
 /* ---- Summary cards ---- */
 
 .summary {
-  border-bottom: 1px solid var(--border);
-  padding: var(--sp-3) var(--sp-4);
+  padding: var(--sp-3) var(--sp-4) 0;
 }
 
 .summaryInner {
@@ -88,12 +87,14 @@
   margin: 0 auto;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 1px;
-  background: var(--border);
+  gap: var(--sp-2);
 }
 
 .summaryCard {
   background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-1);
   padding: var(--sp-3);
   display: flex;
   flex-direction: column;
@@ -102,9 +103,18 @@
 
 .summaryNumber {
   font-family: var(--font-sans);
-  font-weight: 500;
-  font-size: 18px;
+  font-weight: 600;
+  font-size: 24px;
+  line-height: 1.1;
+  color: var(--primary);
 }
+
+.summaryCard[data-tone="alert"] { background: var(--alert); border-color: var(--alert); }
+.summaryCard[data-tone="alert"] .summaryNumber,
+.summaryCard[data-tone="alert"] .summaryLabel { color: #fff; }
+.summaryCard[data-tone="alert-soft"] { background: var(--alert-tint); border-color: #f2c4bf; }
+.summaryCard[data-tone="alert-soft"] .summaryNumber { color: var(--alert); }
+.summaryCard[data-tone="secondary"] { background: var(--secondary-tint); border-color: var(--secondary); }
 
 .summaryLabel {
   font-family: var(--font-sans);
@@ -156,6 +166,7 @@
 .rowList {
   display: flex;
   flex-direction: column;
+  gap: var(--sp-2);
 }
 
 /* ---- Footer ---- */
@@ -194,7 +205,20 @@
 
 @media (max-width: 480px) {
   .summaryInner {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--sp-1);
+  }
+
+  .summaryCard {
+    padding: var(--sp-2);
+  }
+
+  .summaryNumber {
+    font-size: 20px;
+  }
+
+  .summaryLabel {
+    font-size: 9px;
   }
 
   .summary {

@@ -11,7 +11,7 @@
 /* ---- Status bar ---- */
 
 .statusBar {
-  background: var(--ink);
+  background: var(--primary);
   color: var(--button-ink);
   height: 36px;
   display: flex;
@@ -169,7 +169,7 @@
 .select:focus,
 .textarea:focus {
   outline: none;
-  border-color: var(--ink);
+  border-color: var(--primary);
 }
 
 .textarea {
@@ -183,7 +183,7 @@
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  background: var(--ink);
+  background: var(--primary);
   color: var(--button-ink);
   border: none;
   padding: var(--sp-2) var(--sp-4);
@@ -307,7 +307,7 @@
 
 .cancelBtn:hover {
   color: var(--ink);
-  border-color: var(--ink);
+  border-color: var(--primary);
 }
 
 /* ---- Responsive: tablet ---- */

@@ -1,10 +1,11 @@
 /* ============================================================
    BioSentry global tokens and resets
-   Design language: no border-radius, Inter + Source Serif,
-   near-white ground. See README, "Design rules".
+   Design language: clean, two brand colours (navy primary,
+   sand secondary) plus red/green for clinical state only.
+   Colour is reserved for what needs action. See README.
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600&family=Inter:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600&family=Inter:wght@400;500;600&display=swap');
 
 /* ---- Reset ---- */
 
@@ -23,9 +24,27 @@
   --surface:    #ffffff;
   --border:     #d4d2cd;
   --label:      #6b6965;
-  --accent:     #2c5ea0;
-  --button:     #1a1a1a;
+  --button:     #1f3a5f;
   --button-ink: #ffffff;
+
+  /* Brand: primary navy, secondary sand */
+  --primary:        #1f3a5f;
+  --primary-strong: #142840;
+  --primary-tint:   #e8eef5;
+  --secondary:      #d9c6a0;
+  --secondary-tint: #f4ecdc;
+  --accent:         var(--primary);
+
+  /* Clinical state: red = act, green = stable/good. Nothing else is coloured. */
+  --alert:      #c62828;
+  --alert-tint: #fbe9e7;
+  --ok:         #2e7d4f;
+  --ok-tint:    #e6f2ea;
+
+  /* Depth */
+  --radius:   6px;
+  --shadow-1: 0 1px 2px rgba(20, 40, 64, 0.06), 0 1px 3px rgba(20, 40, 64, 0.08);
+  --shadow-2: 0 4px 12px rgba(20, 40, 64, 0.10);
 
   /* Spacing scale */
   --sp-1: 4px;

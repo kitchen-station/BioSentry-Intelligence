@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
-import type { ScoreRow } from "../types";
-import { formatBloodPressure } from "./format";
+import type { ScoreRow, SessionRole } from "../types";
+import { formatAge, formatBloodPressure, STALE_AFTER_S } from "./format";
 import { MeasurementDisplay } from "./MeasurementDisplay";
+import { band, response } from "./risk";
 import { Sparkline } from "./Sparkline";
 import styles from "./WardRow.module.css";
 
@@ -14,18 +15,20 @@ const TREND_CHAR: Record<string, string> = {
 
 interface Props {
   row: ScoreRow;
+  role: SessionRole;
 }
 
-export function WardRow({ row }: Props) {
+export function WardRow({ row, role }: Props) {
+  const b = band(row);
   return (
     <Link to={`/patient/${row.id}`} className={styles.link}>
-      <div className={styles.row}>
+      <div className={styles.row} data-band={b}>
         {/* Rank + score */}
         <div className={styles.rankCol}>
           <span className={styles.rank}>{row.rank}</span>
           <div className={styles.scoreBlock}>
-            <span className={styles.score}>{row.score}</span>
-            <span className={styles.trend}>{TREND_CHAR[row.trend]}</span>
+            <span className={styles.score} aria-label={`NEWS2 ${row.score}, ${b} risk`}>{row.score}</span>
+            <span className={styles.trend} data-trend={row.trend}>{TREND_CHAR[row.trend]}</span>
           </div>
         </div>
 
@@ -37,9 +40,12 @@ export function WardRow({ row }: Props) {
             <span className={styles.detail}>
               {row.age ?? "--"}{row.sex ? ` ${row.sex}` : ""} &middot; Bed {row.bed}
             </span>
-            <span className={styles.updateTag}>{row.last_update_s}s ago</span>
+            <span className={styles.updateTag} data-stale={row.last_update_s > STALE_AFTER_S || undefined}>
+              {row.last_update_s > STALE_AFTER_S ? "Stale · " : ""}{formatAge(row.last_update_s)}
+            </span>
           </div>
           <div className={styles.context}>{row.admitting_context}</div>
+          {b !== "low" && <div className={styles.response}>{response(b, role)}</div>}
           {row.escalation_reasons.length > 0 && (
             <div className={styles.reasonLine}>
               {row.escalation_reasons.map((r) => r.text).join(" · ")}

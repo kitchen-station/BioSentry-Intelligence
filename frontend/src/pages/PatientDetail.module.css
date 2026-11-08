@@ -11,7 +11,7 @@
 /* ---- Status strip ---- */
 
 .statusStrip {
-  background: var(--ink);
+  background: var(--primary);
   color: var(--button-ink);
   padding: 0 var(--sp-4);
 }
@@ -50,7 +50,7 @@
   display: inline-block;
   width: 6px;
   height: 6px;
-  background: #4ade80;
+  background: var(--ok);
   border-radius: 50%;
   margin-right: 4px;
   animation: pulse 2s ease-in-out infinite;
@@ -83,18 +83,44 @@
 
 .summaryInner {
   display: flex;
-  gap: 1px;
-  background: var(--border);
+  gap: var(--sp-2);
   width: fit-content;
+  align-items: stretch;
 }
 
 .summaryBlock {
   background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   padding: var(--sp-2) var(--sp-4);
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 2px;
   min-width: 100px;
+}
+
+/* Colour only where action is due (same rule as the ward list). */
+.summaryBlock[data-band="high"] { background: var(--alert); border-color: var(--alert); }
+.summaryBlock[data-band="high"] .summaryLabel,
+.summaryBlock[data-band="high"] .summaryBig,
+.summaryBlock[data-band="high"] .responseText { color: #fff; }
+.summaryBlock[data-band="medium"],
+.summaryBlock[data-band="low-medium"] { background: var(--alert-tint); border-color: #f2c4bf; }
+.summaryBlock[data-band="medium"] .summaryBig,
+.summaryBlock[data-band="low-medium"] .summaryBig,
+.summaryBlock[data-band="medium"] .responseText,
+.summaryBlock[data-band="low-medium"] .responseText { color: var(--alert); }
+.summaryBlock[data-kind="response"] { max-width: 240px; }
+.summaryBlock[data-signal="good"] .summaryBig { color: var(--ok); }
+.summaryBlock[data-signal="degraded"] { background: var(--alert-tint); }
+.summaryBlock[data-signal="degraded"] .summaryBig { color: var(--alert); }
+
+.responseText {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.3;
 }
 
 .summaryLabel {
@@ -115,7 +141,6 @@
 /* ---- Escalation reasons ---- */
 
 .reasonBlock {
-  background: var(--surface);
   padding: var(--sp-2) var(--sp-4);
   display: flex;
   flex-direction: column;
@@ -134,9 +159,10 @@
   font-size: 11px;
   font-weight: 500;
   color: var(--ink);
-  background: var(--ground);
-  border: 1px solid var(--border);
-  padding: 1px 6px;
+  background: var(--primary-tint);
+  color: var(--primary);
+  border-radius: 4px;
+  padding: 2px 8px;
 }
 
 .reasonPathway {
@@ -158,6 +184,8 @@
 }
 
 .drawerBtn {
+  white-space: nowrap;
+  border-radius: var(--radius);
   font-family: var(--font-sans);
   font-size: 11px;
   font-weight: 500;
@@ -173,13 +201,13 @@
 
 .drawerBtn:hover {
   color: var(--ink);
-  border-color: var(--ink);
+  border-color: var(--primary);
 }
 
 .drawerBtnActive {
   color: var(--button-ink);
-  background: var(--ink);
-  border-color: var(--ink);
+  background: var(--primary);
+  border-color: var(--primary);
 }
 
 /* ---- Overlay panel ---- */
@@ -254,25 +282,26 @@
   flex: 1;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4) var(--sp-6);
+  align-items: start;
 }
 
-.sidebar {
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid var(--border);
-}
-
+.sidebar,
 .main {
   display: flex;
   flex-direction: column;
+  gap: var(--sp-3);
 }
 
 /* ---- Panels (always open — no collapsing) ---- */
 
 .panel {
   padding: var(--sp-4) var(--sp-5);
-  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-1);
 }
 
 .panelEyebrow {
@@ -479,7 +508,7 @@
 
 .noteTextarea:focus {
   outline: none;
-  border-color: var(--ink);
+  border-color: var(--primary);
 }
 
 .noteTextarea::placeholder {
@@ -492,7 +521,7 @@
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  background: var(--ink);
+  background: var(--primary);
   color: var(--button-ink);
   border: none;
   padding: var(--sp-2) var(--sp-3);

@@ -92,9 +92,13 @@ applied to made-up patients.
   The fixture data follows rules 1 and 4.
 - **Ward view** must be filtered server-side to the signed-in clinician's patients, on every
   call. The fixture provider stands in for that filter.
-- **Look:** clinical instrument. Near-white ground, near-black ink, Source Serif 4 for clinical
-  values, Inter for chrome, no radius, shadows or gradients, no colour in the ranked list. Tokens
-  are in `frontend/src/index.css`.
+- **Look:** clean clinical instrument with depth. Two brand colours (navy primary, sand
+  secondary) and two state colours: red means act (NEWS2 7+ solid, 5-6 or a single 3 as a red
+  edge), green means stable or a good signal. Everything else stays neutral, so colour only
+  marks what needs attention. Cards with a soft shadow; Source Serif 4 for clinical values,
+  Inter for chrome. Tokens are in `frontend/src/index.css`.
+- **Role-aware:** each row shows the NEWS2 response for the signed-in role (RCP 2017, Chart 4):
+  a nurse sees whom to call, a physician sees what assessment is due.
 
 ## Before you expose it anywhere
 

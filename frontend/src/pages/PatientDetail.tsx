@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import type { ClinicalNote, PatientDetail as PatientDetailType, TierBFinding } from "../types";
+import type { ClinicalNote, PatientDetail as PatientDetailType, SessionRole, TierBFinding } from "../types";
 import { getPatient, getNotes, addNote, deleteNote } from "../api";
 import { CurrentVitals, VitalRow } from "../components/CurrentVitals";
 import { TrendChart } from "../components/TrendChart";
 import { Sparkline } from "../components/Sparkline";
+import { band, response } from "../components/risk";
 import styles from "./PatientDetail.module.css";
 
 // --- Shared sub-components ---
@@ -46,7 +47,7 @@ type Drawer = "notes" | "charts" | null;
 
 // --- Main component ---
 
-export function PatientDetail() {
+export function PatientDetail({ role }: { role: SessionRole }) {
   const { id } = useParams<{ id: string }>();
   const [patient, setPatient] = useState<PatientDetailType | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -123,11 +124,17 @@ export function PatientDetail() {
       <div className={styles.summaryBar}>
         <div className={styles.summaryRow}>
           <div className={styles.summaryInner}>
-            <div className={styles.summaryBlock}>
+            <div className={styles.summaryBlock} data-band={band(patient)}>
               <span className={styles.summaryLabel}>NEWS2</span>
               <span className={styles.summaryBig}>{patient.score}</span>
             </div>
-            <div className={styles.summaryBlock}>
+            {band(patient) !== "low" && (
+              <div className={styles.summaryBlock} data-band={band(patient)} data-kind="response">
+                <span className={styles.summaryLabel}>Next step</span>
+                <span className={styles.responseText}>{response(band(patient), role)}</span>
+              </div>
+            )}
+            <div className={styles.summaryBlock} data-signal={patient.signal_quality > 90 ? "good" : "degraded"}>
               <span className={styles.summaryLabel}>Signal</span>
               <span className={styles.summaryBig}>{patient.signal_quality}%</span>
             </div>

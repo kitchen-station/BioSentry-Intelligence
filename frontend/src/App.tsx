@@ -39,7 +39,7 @@ export function App() {
       <Route
         path="/patient/:id"
         element={
-          session ? <PatientDetail /> : <Navigate to="/" replace />
+          session ? <PatientDetail role={session.role} /> : <Navigate to="/" replace />
         }
       />
       <Route

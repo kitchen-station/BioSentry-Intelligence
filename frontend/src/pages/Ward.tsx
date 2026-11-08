@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { AbstainedRow as AbstainedRowType, Session, VitalsRecorded, WardResponse } from "../types";
 import { getWard } from "../api";
 import { WardRow } from "../components/WardRow";
+import { band } from "../components/risk";
 import { SessionMenu } from "../components/SessionMenu";
 import { standing } from "../components/vitalsDraft";
 import { NotRankedSection } from "./NotRankedSection";
@@ -38,7 +39,10 @@ export function Ward({ session, onSignOut }: Props) {
   if (!data) return null;
 
   const liveTiers = data.tier_status.filter((t) => t.live);
-  const pendingTiers = data.tier_status.filter((t) => !t.live);
+  const bands = data.ranked.map(band);
+  const high = bands.filter((b) => b === "high").length;
+  const medium = bands.filter((b) => b === "medium" || b === "low-medium").length;
+  const rising = data.ranked.filter((r) => r.trend === "rising").length;
 
   return (
     <div className={styles.page}>
@@ -69,33 +73,25 @@ export function Ward({ session, onSignOut }: Props) {
       {/* Summary cards */}
       <div className={styles.summary}>
         <div className={styles.summaryInner}>
+          <div className={styles.summaryCard} data-tone={high > 0 ? "alert" : undefined}>
+            <span className={styles.summaryNumber}>{high}</span>
+            <span className={styles.summaryLabel}>High risk &middot; NEWS2 7+</span>
+          </div>
+          <div className={styles.summaryCard} data-tone={medium > 0 ? "alert-soft" : undefined}>
+            <span className={styles.summaryNumber}>{medium}</span>
+            <span className={styles.summaryLabel}>Medium &middot; 5&ndash;6 / single 3</span>
+          </div>
+          <div className={styles.summaryCard}>
+            <span className={styles.summaryNumber}>{rising}</span>
+            <span className={styles.summaryLabel}>Rising</span>
+          </div>
+          <div className={styles.summaryCard} data-tone={data.abstained.length > 0 ? "secondary" : undefined}>
+            <span className={styles.summaryNumber}>{data.abstained.length}</span>
+            <span className={styles.summaryLabel}>Not ranked &middot; act</span>
+          </div>
           <div className={styles.summaryCard}>
             <span className={styles.summaryNumber}>{data.ranked.length}</span>
             <span className={styles.summaryLabel}>Ranked</span>
-          </div>
-          <div className={styles.summaryCard}>
-            <span className={styles.summaryNumber}>{data.abstained.length}</span>
-            <span className={styles.summaryLabel}>Not ranked</span>
-          </div>
-          <div className={styles.summaryCard}>
-            <span className={styles.summaryNumber}>
-              {data.ranked.filter((r) => r.trend === "rising").length}
-            </span>
-            <span className={styles.summaryLabel}>Rising</span>
-          </div>
-          <div className={styles.summaryCard}>
-            <span className={styles.summaryNumber}>
-              {liveTiers.map((t) => t.label).join(", ") || "None"}
-            </span>
-            <span className={styles.summaryLabel}>Active tiers</span>
-          </div>
-          <div className={styles.summaryCard}>
-            <span className={styles.summaryNumber}>
-              {pendingTiers.length > 0
-                ? pendingTiers.map((t) => t.tier).join(", ")
-                : "None"}
-            </span>
-            <span className={styles.summaryLabel}>Pending</span>
           </div>
         </div>
       </div>
@@ -105,7 +101,7 @@ export function Ward({ session, onSignOut }: Props) {
         <div className={styles.sectionHeader}>
           <p className={styles.eyebrow}>Priority queue</p>
           <p className={styles.sortInfo}>
-            Sorted on Tier {data.sort_tier}
+            Sorted on {liveTiers.map((t) => t.label).join(", ") || `Tier ${data.sort_tier}`}
           </p>
         </div>
 
@@ -120,7 +116,7 @@ export function Ward({ session, onSignOut }: Props) {
 
         <div className={styles.rowList}>
           {data.ranked.map((row) => (
-            <WardRow key={row.id} row={row} />
+            <WardRow key={row.id} row={row} role={session.role} />
           ))}
         </div>
 

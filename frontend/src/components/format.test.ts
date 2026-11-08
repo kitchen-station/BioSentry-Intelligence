@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { formatBloodPressure, formatOxygen, formatSpo2Scale } from "./format";
+import { formatAge, formatBloodPressure, formatOxygen, formatSpo2Scale } from "./format";
+
+describe("formatAge", () => {
+  it("uses seconds, then minutes, then hours", () => {
+    expect(formatAge(8)).toBe("8s ago");
+    expect(formatAge(1208)).toBe("20 min ago");
+    expect(formatAge(7300)).toBe("2 h ago");
+  });
+});
 
 describe("formatBloodPressure", () => {
   it("writes systolic over diastolic", () => {
