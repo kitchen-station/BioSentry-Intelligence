@@ -131,6 +131,7 @@ describe("a draft that cannot be sent never reaches the network", () => {
     expect(api.recordVitals).not.toHaveBeenCalled();
   });
 
+  // Timed out at the default 5s on a slow Cloudflare build.
   it("clears the complaint as soon as the nurse changes the value", async () => {
     const user = userEvent.setup();
     entry();
@@ -141,7 +142,7 @@ describe("a draft that cannot be sent never reaches the network", () => {
 
     await user.type(field("Systolic"), "0");
     expect(screen.queryByText("Systolic must be 20 to 300.")).toBeNull();
-  });
+  }, 15000);
 });
 
 describe("a valid draft is one request carrying only what was entered", () => {

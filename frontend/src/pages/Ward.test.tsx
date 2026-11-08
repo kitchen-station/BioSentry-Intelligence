@@ -49,13 +49,14 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("acknowledging an alert", () => {
+  // Timed out at the default 5s on a slow Cloudflare build.
   it("saves through the API and closes the alert once it is saved", async () => {
     const user = userEvent.setup();
     page();
     await user.click(await screen.findByRole("button", { name: "Acknowledge" }));
     expect(api.acknowledge).toHaveBeenCalledWith("p-001", 9);
     await waitFor(() => expect(screen.queryByRole("button", { name: "Acknowledge" })).toBeNull());
-  });
+  }, 15000);
 
   it("shows a failed save and leaves the alert open", async () => {
     const user = userEvent.setup();
