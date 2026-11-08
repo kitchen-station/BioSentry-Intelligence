@@ -4,11 +4,12 @@ Not part of the dashboard contract. Lists are capped; a value is a number or tex
 reason there is none (I1). Times arrive as minutes from the run's origin.
 """
 
+from datetime import UTC, datetime
 from typing import Annotated, Literal, Self
 
-from pydantic import AwareDatetime, Field, model_validator
+from pydantic import AfterValidator, AwareDatetime, Field, model_validator
 
-from .base import Age, Contract, Flag, NonNegInt, Num, Percent
+from .base import Age, Contract, Flag, Num, Percent
 from .clinical import LabPanel
 from .common import ProvenanceSource, QualityLevel, Trend
 
@@ -28,6 +29,19 @@ Code = Literal[
 ]
 Vital = Literal["heart_rate", "respiratory_rate", "spo2", "temperature"]
 MAX_ROWS = 20_000
+BIGINT_MAX = 2**63 - 1  # the database columns for these are BIGINT: more is a 422, not a 500
+Seed = Annotated[int, Field(ge=-(2**63), le=BIGINT_MAX)]
+Count = Annotated[int, Field(strict=True, ge=0, le=BIGINT_MAX)]
+
+
+def _sane_origin(moment: datetime) -> datetime:
+    """Years 2000 to 2100: outside that, minute offsets and time-zone maths overflow."""
+    if not datetime(2000, 1, 1, tzinfo=UTC) <= moment < datetime(2101, 1, 1, tzinfo=UTC):
+        raise ValueError("origin must fall in the years 2000 to 2100")
+    return moment
+
+
+Origin = Annotated[AwareDatetime, AfterValidator(_sane_origin)]
 
 
 class Obs(Contract):
@@ -89,8 +103,8 @@ class NewRunPatient(Contract):
 
 class NewRun(Contract):
     source: Literal["synthetic", "eicu_demo"]
-    seed: int | None
-    origin: AwareDatetime
+    seed: Seed | None
+    origin: Origin
     patients: Annotated[list[NewRunPatient], Field(min_length=1, max_length=200)]
 
     @model_validator(mode="after")
@@ -102,9 +116,9 @@ class NewRun(Contract):
 
 
 class Counts(Contract):
-    received: NonNegInt
-    rejected: NonNegInt
-    abstained: NonNegInt
+    received: Count
+    rejected: Count
+    abstained: Count
 
 
 class BatchPatient(Contract):

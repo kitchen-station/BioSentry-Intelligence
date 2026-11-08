@@ -1,1 +1,1 @@
-"""The SQLite schema and the seed."""
+"""The PostgreSQL schema and the seed."""

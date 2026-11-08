@@ -6,10 +6,8 @@ with `RejectedError`; an omitted field stays as it was. A write is stored throug
 `record_vitals` reports the result in its response.
 """
 
-import json
-
 from biosentry.core.audit import AuditLog
-from biosentry.repositories.sqlite import DEVICE_VITALS, Obs, SqliteStore, iso
+from biosentry.repositories.postgres import DEVICE_VITALS, Obs, PostgresStore, iso
 from biosentry.schemas import (
     AbstainedRow,
     AdmitPatientInput,
@@ -59,7 +57,7 @@ def split_blood_pressure(text: str) -> BloodPressure:
 
 
 class PatientService:
-    def __init__(self, store: SqliteStore, audit: AuditLog, wards: WardService) -> None:
+    def __init__(self, store: PostgresStore, audit: AuditLog, wards: WardService) -> None:
         self._store = store
         self._audit = audit
         self._wards = wards
@@ -159,7 +157,7 @@ class PatientService:
                     "mechanism": "Admitted; not ranked until a patch is applied and every input is recorded.",
                     "supporting": "",
                     "trend": "insufficient",
-                    "admission": json.dumps({"admitted_at": iso(now), "admitted_by": clinician_id}),
+                    "admission": {"admitted_at": iso(now), "admitted_by": clinician_id},
                 },
             )
 

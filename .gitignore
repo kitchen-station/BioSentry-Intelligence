@@ -2,8 +2,7 @@ node_modules/
 dist/
 .DS_Store
 
-# Backend: the SQLite database (it may hold replay data), the venv, Python caches
-backend/data/
+# Backend: the venv, Python caches
 .venv/
 __pycache__/
 *.egg-info/

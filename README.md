@@ -19,7 +19,7 @@ The list is sorted by **NEWS2**, a published bedside early-warning score (Tier A
 who meets a NEWS2 trigger sits above one who does not. Tier B (mechanism findings) is demo
 content, not part of the scoring.
 
-**What is here.** The dashboard (`frontend/`) and a slim API (`backend/`: FastAPI over SQLite). The
+**What is here.** The dashboard (`frontend/`) and a slim API (`backend/`: FastAPI over PostgreSQL). The
 ML models and the training code were removed ahead of the Huawei overhaul and are in git history. The
 API serves the committed synthetic ward (`frontend/src/data/synthetic.json`), seeded into the database,
 and takes a live ward from the ward simulation.
@@ -28,8 +28,9 @@ and takes a live ward from the ward simulation.
 
 ## Run it
 
-You need Node.js `^20.19` or `>=22.12`, make, and [uv](https://docs.astral.sh/uv/) for the API
-(it fetches Python 3.11 itself). From the repository root:
+You need Node.js `^20.19` or `>=22.12` and make. For the API you also need
+[uv](https://docs.astral.sh/uv/) (it fetches Python 3.11 itself) and [Docker](https://docs.docker.com/get-docker/)
+(the API's database is PostgreSQL, run from `compose.yaml`). From the repository root:
 
 ```bash
 make web-install
@@ -44,9 +45,14 @@ record is kept:
 
 ```bash
 make api-install
-make api-dev                       # http://127.0.0.1:8000, loopback only
+make db-up                         # PostgreSQL 18 in Docker on 127.0.0.1:5432, waits until healthy
+make api-dev                       # http://127.0.0.1:8000, loopback only; creates the schema and seeds on start
 cd frontend && VITE_API_URL=http://127.0.0.1:8000 npm run dev
 ```
+
+`make db-down` stops the database (the data stays in a Docker volume). The API reaches it through
+`BIOSENTRY_DATABASE_URL`, which defaults to the dev database in `compose.yaml` (its password is for
+that local container only).
 
 `VITE_API_URL` is read when the dashboard is built or started: set, it talks to the API and carries
 no dataset; unset, it uses the fixture. The API allows the dashboard on `localhost` and `127.0.0.1`,
@@ -54,8 +60,9 @@ ports 5173 and 5174 (the ward sim on 5180 and 5181). The ward sim posts to `/sim
 `X-Ingest-Key`, which must equal the API's `BIOSENTRY_INGEST_KEY` (`make api-dev` sets `dev-local`;
 with the variable unset the ingest routes answer 503).
 
-`make check` runs lint, types and tests for both halves. `make db-reset` drops the database and
-seeds it again. `make contract` regenerates `frontend/src/types/generated.ts` from the Pydantic
+`make check` runs lint, types and tests for both halves; the API tests need the database, so run
+`make db-up` first (each test works in its own copy of a seeded database and drops it). `make db-reset`
+drops every table and seeds again. `make contract` regenerates `frontend/src/types/generated.ts` from the Pydantic
 schemas. Every target is in the [Makefile](Makefile).
 
 ## What you will see
@@ -70,16 +77,18 @@ schemas. Every target is in the [Makefile](Makefile).
 
 ## What the database stores
 
-`backend/data/biosentry.db` (SQLite, WAL, git-ignored; `BIOSENTRY_DB` moves it). The schema is
-`backend/src/biosentry/db/schema.sql`. Everything is scoped to a **run**, and the newest run is the
+A PostgreSQL database (the `biosentry` database of the `compose.yaml` container, or whatever
+`BIOSENTRY_DATABASE_URL` names). The schema is `backend/src/biosentry/db/schema.sql`; the API applies it
+on start. Everything is scoped to a **run**, and the newest run is the
 active one: the seeded fixture ward, or a simulated ward posted to `/sim/*`.
 
 - **Stored:** runs, clinicians and who cares for which patient, patients, every observation with its
   source, tier, time and quality (a value, or the reason there is none), 15-minute vital bins (a gap
   is NULL), notes (soft-deleted), acknowledgements, sessions (the token hashed, 12 hours), the
-  audit log (ids and outcomes only; the database refuses UPDATE, DELETE and overwriting a row, but not a user who can drop its triggers or the table), and the
+  audit log (ids and outcomes only; the database refuses UPDATE, DELETE, TRUNCATE and a repeated sequence number, but not a user who can drop its triggers or the table), and the
   sim's event feed.
-- **Never stored:** scores, ranks, reasons and the NOT RANKED text. They are computed on every read.
+- **Never stored:** scores, ranks, reasons and the NOT RANKED text. They are computed on every read
+  (an acknowledgement keeps the score the clinician acknowledged, as they saw it).
 
 ## Status
 
@@ -141,8 +150,8 @@ applied to made-up patients.
 - **Synthetic data only.** No real patient data exists in this repository. The ward sim can replay
   eICU-CRD Demo 2.0.1 (ODbL) as an `eicu_demo` run, which is the only data marked `synthetic: false`.
   Kitchen's competition rule is synthetic only, and ODbL has its own terms. **Run
-  `make db-purge-eicu` before anything holding replay data is shared** (the database file, a backup,
-  a demo laptop). It deletes every `eicu_demo` run and its rows; the audit trail stays.
+  `make db-purge-eicu` before anything holding replay data is shared** (the database volume, a dump,
+  a backup, a demo laptop). It deletes every `eicu_demo` run and its rows; the audit trail stays.
 - **Identity is a stub.** Sign-in accepts any passphrase, and `POST /session` gives a token to any
   known clinician id. There is no real authentication. Keep the API on loopback.
 

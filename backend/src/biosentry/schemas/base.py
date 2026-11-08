@@ -8,9 +8,9 @@ Contract rules enforced here, once:
   - no value field is given a default anywhere; optional input fields default to None only.
 """
 
-from typing import Annotated
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic.alias_generators import to_camel
 
 # Strict scalars. Strict float still accepts JSON integers (118 is a valid heart rate).
@@ -25,6 +25,14 @@ Age = Annotated[int, Field(strict=True, ge=0, le=150)]
 
 class Contract(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid", allow_inf_nan=False)
+
+    @field_validator("*", mode="after")
+    @classmethod
+    def _no_nul(cls, value: Any) -> Any:
+        """PostgreSQL text cannot hold a NUL: refuse it at the boundary (a 422), never a 500."""
+        if isinstance(value, str) and "\x00" in value:
+            raise ValueError("text cannot contain a NUL character")
+        return value
 
 
 class CamelContract(Contract):

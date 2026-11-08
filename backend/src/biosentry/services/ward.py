@@ -10,7 +10,7 @@ record, including reads that find nothing.
 from biosentry.core.audit import AuditLog
 from biosentry.domain.arbiter import NotRanked, Ranked, rank_ward
 from biosentry.domain.scoring.tier_a import News2Score
-from biosentry.repositories.sqlite import SqliteStore
+from biosentry.repositories.postgres import PostgresStore
 from biosentry.schemas import (
     AbstainedRow,
     PatientDetail,
@@ -95,7 +95,7 @@ def abstained_row(state: UnscoredPatient, decision: NotRanked) -> AbstainedRow:
 
 
 class WardService:
-    def __init__(self, store: SqliteStore, audit: AuditLog) -> None:
+    def __init__(self, store: PostgresStore, audit: AuditLog) -> None:
         self._store = store
         self._audit = audit
 
