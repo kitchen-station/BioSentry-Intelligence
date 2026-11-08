@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import type { ScoreRow, SessionRole } from "../types";
 import { formatAge, formatBloodPressure, formatClock, STALE_AFTER_S } from "./format";
 import { MeasurementDisplay } from "./MeasurementDisplay";
+import { news2Points } from "./news2";
 import { band, obsDue, response } from "./risk";
 import { Sparkline } from "./Sparkline";
 import styles from "./WardRow.module.css";
@@ -34,6 +35,7 @@ function ObsDue({ due, now }: { due: number | "continuous"; now: number }) {
 
 export function WardRow({ row, role, now, ageOffsetS }: Props) {
   const b = band(row);
+  const p = news2Points(row.vitals);
   const age = row.last_update_s + ageOffsetS;
   return (
     <Link to={`/patient/${row.id}`} className={styles.link}>
@@ -70,21 +72,21 @@ export function WardRow({ row, role, now, ageOffsetS }: Props) {
 
         {/* Sparklines */}
         <div className={styles.sparkCol}>
-          <div className={styles.sparkRow}>
+          <div className={styles.sparkRow} data-points={p.heart_rate}>
             <span className={styles.sparkLabel}>HR</span>
             <Sparkline data={row.vital_trends.heart_rate} width={72} height={20} fill />
             <span className={styles.sparkVal}>
               <MeasurementDisplay measurement={row.vitals.heart_rate} />
             </span>
           </div>
-          <div className={styles.sparkRow}>
+          <div className={styles.sparkRow} data-points={p.respiratory_rate}>
             <span className={styles.sparkLabel}>RR</span>
             <Sparkline data={row.vital_trends.respiratory_rate} width={72} height={20} fill />
             <span className={styles.sparkVal}>
               <MeasurementDisplay measurement={row.vitals.respiratory_rate} />
             </span>
           </div>
-          <div className={styles.sparkRow}>
+          <div className={styles.sparkRow} data-points={p.spo2}>
             <span className={styles.sparkLabel}>SpO2</span>
             <Sparkline data={row.vital_trends.spo2} width={72} height={20} fill />
             <span className={styles.sparkVal}>
@@ -95,14 +97,14 @@ export function WardRow({ row, role, now, ageOffsetS }: Props) {
 
         {/* Nurse-entered + meta */}
         <div className={styles.metaCol}>
-          <div className={styles.nursePair}>
+          <div className={styles.nursePair} data-points={p.blood_pressure}>
             <span className={styles.nurseLabel}>BP</span>
             <MeasurementDisplay
               measurement={row.vitals.blood_pressure}
               format={formatBloodPressure}
             />
           </div>
-          <div className={styles.nursePair}>
+          <div className={styles.nursePair} data-points={p.consciousness}>
             <span className={styles.nurseLabel}>AVPU</span>
             <MeasurementDisplay measurement={row.vitals.consciousness} />
           </div>

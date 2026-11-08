@@ -230,6 +230,14 @@
   text-align: right;
 }
 
+/* A vital that adds NEWS2 points turns red (bold at 2+), so the eye finds what drives the score. */
+.sparkRow[data-points="1"] .sparkVal,
+.nursePair[data-points="1"] { color: var(--alert); }
+.sparkRow[data-points="2"] .sparkVal,
+.sparkRow[data-points="3"] .sparkVal,
+.nursePair[data-points="2"],
+.nursePair[data-points="3"] { color: var(--alert); font-weight: 600; }
+
 /* ---- Meta column ---- */
 
 .metaCol {
