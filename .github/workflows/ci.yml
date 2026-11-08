@@ -82,6 +82,24 @@ jobs:
     name: backend
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # The same PostgreSQL as compose.yaml (keep the digest in step). The password is for this
+    # throwaway CI container only.
+    services:
+      postgres:
+        image: postgres:18@sha256:e3d24f6906d0760bf4da0dae872415391ededefad23fd471c47dc53b0ddf3c42
+        env:
+          POSTGRES_USER: biosentry
+          POSTGRES_PASSWORD: biosentry-dev-only
+          POSTGRES_DB: biosentry
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U biosentry -d biosentry"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      BIOSENTRY_DATABASE_URL: postgresql://biosentry:biosentry-dev-only@localhost:5432/biosentry
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0

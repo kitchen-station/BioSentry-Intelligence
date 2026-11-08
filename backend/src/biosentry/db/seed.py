@@ -1,34 +1,39 @@
 """Create the schema, the clinicians and the fixture run from the committed synthetic ward.
 
-    python -m biosentry.db.seed [--db PATH]
+    python -m biosentry.db.seed [--url DATABASE_URL] [--reset]
 
-A no-op once a fixture run exists. The fixture is the dashboard's own dataset
+`--reset` drops everything first (make db-reset). Otherwise a no-op once a fixture run exists. The fixture is the dashboard's own dataset
 (frontend/src/data/synthetic.json); the API serves it from here, scored on read.
 """
 
 import argparse
 import json
-import sqlite3
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from biosentry.core.config import DEFAULT_DATASET, DEFAULT_DB, Settings
-from biosentry.repositories.sqlite import (
+from psycopg.conninfo import conninfo_to_dict
+
+from biosentry.core.config import DEFAULT_DATASET, Settings
+from biosentry.repositories.postgres import (
     HISTORY_VITALS,
+    Conn,
     Obs,
     assign,
     connect,
     insert_observations,
     insert_patient,
     insert_run,
-    iso,
-    parse,
     transaction,
     upsert_bins,
+    whole,
 )
 
 SCHEMA = Path(__file__).with_name("schema.sql")
+# One key for "this database is being set up": two API processes starting at once take turns, so
+# neither trips over the other's CREATE or seeds the fixture twice. (Run locks use small run ids.)
+SETUP_LOCK = 0x62696F7365656400
+parse = datetime.fromisoformat  # the fixture file's times; the database hands back datetimes
 
 
 def _obs(patient_id: str, code: str, m: dict[str, Any]) -> Obs:
@@ -44,17 +49,18 @@ def _obs(patient_id: str, code: str, m: dict[str, Any]) -> Obs:
     return Obs(*common, num=float(value))
 
 
-def seed(conn: sqlite3.Connection, fixture: Path = DEFAULT_DATASET) -> None:
+def seed(conn: Conn, fixture: Path = DEFAULT_DATASET) -> None:
     if conn.execute("SELECT 1 FROM run WHERE source = 'fixture'").fetchone():
         return
     raw = json.loads(fixture.read_text(encoding="utf-8"))
     as_of = parse(raw["as_of"])
     patients = {p["id"]: p for p in raw["ranked"] + raw["unscored"]}
     with transaction(conn):
-        conn.executemany(
-            "INSERT OR IGNORE INTO clinician (id, role) VALUES (?, ?)",
-            [(cid, c["role"]) for cid, c in raw["clinicians"].items()],
-        )
+        with conn.cursor() as cur:
+            cur.executemany(
+                "INSERT INTO clinician (id, role) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                [(cid, c["role"]) for cid, c in raw["clinicians"].items()],
+            )
         run_id = insert_run(
             conn,
             source="fixture",
@@ -88,9 +94,11 @@ def seed(conn: sqlite3.Connection, fixture: Path = DEFAULT_DATASET) -> None:
                             "signal_quality",
                         )
                     },
-                    "last_sample_at": None if age is None else iso(as_of - timedelta(seconds=age)),
-                    "tier_b": json.dumps(p["tier_b"]) if p["tier_b"] else None,
-                    "tier_c": json.dumps(p["tier_c"]) if p["tier_c"] else None,
+                    "last_sample_at": (
+                        None if age is None else whole(as_of - timedelta(seconds=age))
+                    ),
+                    "tier_b": p["tier_b"] or None,
+                    "tier_c": p["tier_c"] or None,
                     "story": raw["labels"][pid]["story"],
                 },
             )
@@ -117,39 +125,55 @@ def seed(conn: sqlite3.Connection, fixture: Path = DEFAULT_DATASET) -> None:
                 assign(conn, run_id, pid, cid)
         insert_observations(conn, run_id, True, observations, ignore=True)
         upsert_bins(conn, run_id, bins)
-        conn.executemany(
-            "INSERT INTO clinical_note (run_id, id, patient_id, author, role, timestamp, content,"
-            " synthetic) VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
-            [
-                (
-                    run_id,
-                    n["id"],
-                    n["patient_id"],
-                    n["author"],
-                    n["role"],
-                    iso(parse(n["timestamp"])),
-                    n["content"],
-                )
-                for n in raw["notes"]
-            ],
-        )
+        with conn.cursor() as cur:
+            cur.executemany(
+                "INSERT INTO clinical_note (run_id, id, patient_id, author, role, timestamp,"
+                " content, synthetic) VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE)",
+                [
+                    (
+                        run_id,
+                        n["id"],
+                        n["patient_id"],
+                        n["author"],
+                        n["role"],
+                        whole(parse(n["timestamp"])),
+                        n["content"],
+                    )
+                    for n in raw["notes"]
+                ],
+            )
 
 
-def ensure(db: Path = DEFAULT_DB, fixture: Path = DEFAULT_DATASET) -> None:
-    """Make the database ready to serve: schema, clinicians, fixture run. Idempotent."""
-    db.parent.mkdir(parents=True, exist_ok=True)
-    conn = connect(db)
-    try:
-        conn.executescript(SCHEMA.read_text(encoding="utf-8"))
+def ensure(url: str, fixture: Path = DEFAULT_DATASET) -> None:
+    """Make the database ready to serve: schema, clinicians, fixture run. Idempotent, and safe
+    when several processes do it at once (one transaction, behind the setup lock)."""
+    with connect(url) as conn, transaction(conn):
+        conn.execute("SELECT pg_advisory_xact_lock(%s)", (SETUP_LOCK,))
+        conn.execute(SCHEMA.read_text(encoding="utf-8"))
         seed(conn, fixture)
-    finally:
-        conn.close()
+
+
+LOOPBACK = ("127.0.0.1", "localhost", "::1")
+
+
+def reset(url: str) -> None:
+    """Drop every table (and the audit trail with them), then set up again from the fixture.
+    Only on this machine: the database host must be loopback."""
+    host = conninfo_to_dict(url).get("host")
+    if host not in LOOPBACK:
+        raise SystemExit(f"refusing to reset a database whose host is {host!r}: only loopback")
+    with connect(url) as conn:
+        conn.execute("DROP SCHEMA public CASCADE")
+        conn.execute("CREATE SCHEMA public")
+    ensure(url)
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--db", type=Path, default=Settings.from_env().db)
-    ensure(parser.parse_args(argv).db)
+    parser.add_argument("--url", default=Settings.from_env().database_url)
+    parser.add_argument("--reset", action="store_true")
+    args = parser.parse_args(argv)
+    (reset if args.reset else ensure)(args.url)
     return 0
 
 

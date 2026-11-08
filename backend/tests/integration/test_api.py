@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from conftest import dump_database
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
@@ -14,7 +15,7 @@ from biosentry.api.app import UNAUTHENTICATED_WRITES, WRITE_ACTIONS, Context, cr
 from biosentry.core.config import DEFAULT_DATASET, Settings
 from biosentry.domain.arbiter import arbitrate, rank_ward
 from biosentry.domain.scoring.tier_a import inputs_from_vitals, score_news2
-from biosentry.repositories.sqlite import Obs
+from biosentry.repositories.postgres import Obs
 from biosentry.schemas import (
     AbstainedRow,
     PatientDetail,
@@ -55,8 +56,8 @@ def as_(clinician: str) -> dict[str, str]:
 
 
 @pytest.fixture
-def app_and_client(tmp_path: Path) -> tuple[Any, TestClient]:
-    app = create_app(Settings(db=tmp_path / "test.db"), clock=lambda: NOW)
+def app_and_client(database_url: str) -> tuple[Any, TestClient]:
+    app = create_app(Settings(database_url=database_url), clock=lambda: NOW)
     return app, use(TestClient(app))
 
 
@@ -168,13 +169,18 @@ def test_not_yours_and_not_there_are_indistinguishable(client: TestClient) -> No
 
 def test_a_known_clinician_with_no_patients_sees_nobody(
     tmp_path: Path,
+    blank_database_url: str,
 ) -> None:
     data = json.loads(DEFAULT_DATASET.read_text(encoding="utf-8"))
     data["clinicians"]["rn-empty"] = {"role": "rn", "patients": []}
     path = tmp_path / "ward.json"
     path.write_text(json.dumps(data), encoding="utf-8")
     client = use(
-        TestClient(create_app(Settings(dataset=path, db=tmp_path / "t.db"), clock=lambda: NOW))
+        TestClient(
+            create_app(
+                Settings(dataset=path, database_url=blank_database_url), clock=lambda: NOW
+            )
+        )
     )
     ward = client.get("/wards/W4/rows", headers=as_("rn-empty")).json()
     assert ward["ranked"] == []
@@ -460,7 +466,7 @@ def test_admission_does_not_keep_what_it_does_not_use(
         "allergies": "penicillin",
     }  # fmt: skip
     assert client.post("/patients", headers=as_("rn-delacruz"), json=form).status_code == 201
-    stored = "\n".join(ctx(app_and_client).conn.iterdump())  # the whole database
+    stored = dump_database(ctx(app_and_client).conn)  # every row of every table
     for dropped in ("98-765432109-8", "0917-555-0100", "1980-07-04", "penicillin"):
         assert dropped not in stored  # nothing sensitive is held in plaintext (W5)
 
@@ -899,7 +905,7 @@ def test_audit_rows_record_the_role_held_when_acting(
 
 # --- Every route demands identity first ---------------------------------------------------
 
-# Sign-in has no token yet; the sim's routes are gated by the ingest key (test_sqlite_store.py).
+# Sign-in has no token yet; the sim's routes are gated by the ingest key (test_store.py).
 PUBLIC_ROUTES = {("GET", "/healthz"), *UNAUTHENTICATED_WRITES}
 VALID_BODIES: dict[tuple[str, str], dict[str, Any]] = {
     ("POST", "/patients/{patient_id}/acknowledgement"): {"score": 3},
@@ -998,8 +1004,8 @@ def _frontend_routes() -> set[tuple[str, str]]:
     return found
 
 
-def _app_routes(tmp_path: Path) -> set[tuple[str, str]]:
-    app = create_app(Settings(db=tmp_path / "routes.db"), clock=lambda: NOW)
+def _app_routes(database_url: str) -> set[tuple[str, str]]:
+    app = create_app(Settings(database_url=database_url), clock=lambda: NOW)
     out: set[tuple[str, str]] = set()
     for route in app.routes:
         methods = getattr(route, "methods", None)
@@ -1011,10 +1017,10 @@ def _app_routes(tmp_path: Path) -> set[tuple[str, str]]:
     return out
 
 
-def test_the_api_serves_every_route_the_http_provider_calls(tmp_path: Path) -> None:
+def test_the_api_serves_every_route_the_http_provider_calls(database_url: str) -> None:
     frontend = _frontend_routes()
     assert len(frontend) >= 9, frontend
     # The provider names the ward by id; the route is parameterised.
     normalised = {(m, "/wards/{}/rows" if p == "/wards/W4/rows" else p) for m, p in frontend}
-    missing = normalised - _app_routes(tmp_path)
+    missing = normalised - _app_routes(database_url)
     assert missing == set()
