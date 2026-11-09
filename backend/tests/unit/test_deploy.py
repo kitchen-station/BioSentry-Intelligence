@@ -31,7 +31,9 @@ def test_the_database_publishes_nothing_and_the_api_only_the_hosts_loopback() ->
     code = _code(DEPLOY / "compose.yaml")
     assert code.count("ports:") == 1  # only the API publishes anything
     assert code[code.index("ports:") + 1] == '- "127.0.0.1:8000:8000"'
-    assert "network_mode: host" not in code
+    assert "network_mode: host" not in code  # no service runs on the host's network
+    assert code[code.index("build:") :].count("network: host") == 1  # only the build does
+    assert code.index("network: host") < code.index("restart: unless-stopped", code.index("build:"))
     postgres = code[code.index("postgres:") : code.index("api:")]
     assert "networks: [backend]" in postgres and "ports:" not in postgres
     assert any(ln.startswith("internal: true") for ln in code)  # the database's network

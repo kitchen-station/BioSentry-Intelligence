@@ -31,6 +31,9 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
+      # The build only (uv sync): the host's outbound network, because a host firewall that drops
+      # forwarded traffic leaves build containers with none. The running API needs no outbound access.
+      network: host
     restart: unless-stopped
     depends_on:
       postgres:

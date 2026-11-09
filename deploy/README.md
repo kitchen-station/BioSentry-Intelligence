@@ -23,8 +23,14 @@ Tailscale; nothing listens on the public interface.
 2. **Install Docker Engine and the compose plugin** from Docker's own instructions for your distribution
    (<https://docs.docker.com/engine/install/>), and add yourself to the `docker` group (log out and in).
    Check: `docker compose version`.
-3. **Install Tailscale on the host** (<https://tailscale.com/download/linux>), then
-   `sudo tailscale up` and open the login URL it prints in your own browser, signing in yourself.
+3. **Install Tailscale on the host** (<https://tailscale.com/download/linux>). On a host whose firewall
+   drops forwarded traffic and all inbound but SSH, Tailscale must run in userspace networking, because
+   kernel-mode `tailscale0` inbound connections would be dropped and containers have no outbound network
+   (this is why the image build uses the host network, see `compose.yaml`). Set
+   `FLAGS="--tun=userspace-networking"` in `/etc/default/tailscaled`, run
+   `sudo systemctl restart tailscaled`, and only then
+   `sudo tailscale up --hostname=biosentry-api --accept-dns=false`. Open the login URL it prints in your
+   own browser, signing in yourself. Do not change the firewall.
    In the Tailscale admin console, turn on MagicDNS and HTTPS certificates (DNS page); this is needed
    for `tailscale serve --https`. Share the node with the other two teammates (or add them to the tailnet).
 4. **Clone** the repository: `git clone <the repository URL> biosentry && cd biosentry`.
