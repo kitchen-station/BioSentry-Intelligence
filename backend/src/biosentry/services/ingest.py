@@ -1,11 +1,15 @@
 """The ward simulation's writes: start a run, append a batch. Each is one transaction.
 
 The run, never the client, says whether data is synthetic. A body that is refused writes nothing.
+One shared ward: the newest run is the ward. A different client cannot start a run while the
+newest is live (ConflictError), and a batch for a run that is no longer the newest is refused the
+same way, so a superseded sim stops writing.
 """
 
 from collections.abc import Callable
 from datetime import datetime, timedelta
 
+from biosentry.db.migrate import SETUP_LOCK
 from biosentry.repositories.postgres import (
     Conn,
     Obs,
@@ -13,6 +17,7 @@ from biosentry.repositories.postgres import (
     insert_observations,
     insert_patient,
     insert_run,
+    is_live,
     lock_run,
     transaction,
     upsert_bins,
@@ -22,6 +27,10 @@ from biosentry.schemas.ingest import Batch, Bin, NewRun
 from biosentry.schemas.ingest import Obs as IngestObs
 
 from .patients import RejectedError
+
+class ConflictError(Exception):
+    """The ward's state refuses this write (409). Nothing was written."""
+
 
 WARD = "W4"
 MECHANISM = "Sorted on NEWS2 (Tier A). Live from the ward simulation."
@@ -57,6 +66,18 @@ def start_run(conn: Conn, body: NewRun, clock: Callable[[], datetime]) -> int:
             raise RejectedError("rn and md must be known clinicians")
     origin = body.origin
     with transaction(conn):
+        # Runs are created under the setup lock (as the fixture is), so two registrations take
+        # turns and the second sees the first. Then the newest run's lock: a batch in flight on it
+        # finishes first, so its last_batch_at is what is judged below.
+        conn.execute("SELECT pg_advisory_xact_lock(%s)", (SETUP_LOCK,))
+        newest = conn.execute("SELECT id FROM run ORDER BY id DESC LIMIT 1").fetchone()
+        if newest is not None:
+            lock_run(conn, newest["id"])
+            run = conn.execute("SELECT * FROM run WHERE id = %s", (newest["id"],)).fetchone()
+            assert run is not None
+            live = is_live(run["last_batch_at"], run["ended"], clock())
+            if live and run["client_id"] != body.client_id:
+                raise ConflictError("Another ward simulation is live")
         run_id = insert_run(
             conn,
             source=body.source,
@@ -64,8 +85,9 @@ def start_run(conn: Conn, body: NewRun, clock: Callable[[], datetime]) -> int:
             ward=WARD,
             origin=origin,
             as_of=origin,
-            last_batch_at=clock(),
+            last_batch_at=clock(),  # a new run is live from creation
             tier_status=TIER_STATUS,
+            client_id=body.client_id,
         )
         for p in body.patients:
             device = [
@@ -93,7 +115,7 @@ def start_run(conn: Conn, body: NewRun, clock: Callable[[], datetime]) -> int:
             insert_observations(
                 conn,
                 run_id,
-                body.source != "eicu_demo",
+                True,
                 [_obs(origin, o) for o in p.observations],
                 ignore=True,
             )
@@ -110,6 +132,10 @@ def add_batch(conn: Conn, run_id: int, body: Batch, clock: Callable[[], datetime
         run = conn.execute("SELECT * FROM run WHERE id = %s", (run_id,)).fetchone()
         if run is None:
             return False
+        newest = conn.execute("SELECT max(id) AS id FROM run").fetchone()
+        assert newest is not None  # an aggregate always answers
+        if newest["id"] != run_id:
+            raise ConflictError("This run has been replaced by a newer one")
         origin = run["origin"]
         members = {
             r["id"] for r in conn.execute("SELECT id FROM patient WHERE run_id = %s", (run_id,))

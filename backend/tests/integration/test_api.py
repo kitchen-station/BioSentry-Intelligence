@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 
 from biosentry.api.app import UNAUTHENTICATED_WRITES, WRITE_ACTIONS, Context, create_app
 from biosentry.core.config import DEFAULT_DATASET, Settings
+from biosentry.db.seed import DEV_PASSPHRASE
 from biosentry.domain.arbiter import arbitrate, rank_ward
 from biosentry.domain.scoring.tier_a import inputs_from_vitals, score_news2
 from biosentry.repositories.postgres import Obs
@@ -50,7 +51,8 @@ def as_(clinician: str) -> dict[str, str]:
     if clinician == "rn-nobody":
         return {"Authorization": "Bearer rn-nobody"}
     if clinician not in _SIGNED_IN:
-        response = _CLIENT[0].post("/session", json={"clinician_id": clinician})
+        body = {"clinician_id": clinician, "passphrase": DEV_PASSPHRASE}
+        response = _CLIENT[0].post("/session", json=body)
         _SIGNED_IN[clinician] = response.json()["token"]
     return {"Authorization": f"Bearer {_SIGNED_IN[clinician]}"}
 
@@ -69,6 +71,13 @@ def client(app_and_client: tuple[Any, TestClient]) -> TestClient:
 def ctx(app_and_client: tuple[Any, TestClient]) -> Context:
     found: Context = app_and_client[0].state.open_ctx()
     return found
+
+
+def trail(app_and_client: tuple[Any, TestClient], clinician: str | None = None) -> list[Any]:
+    """The audit rows other than sign-ins (which test_sign_in.py covers): what a test did after."""
+    return [
+        r for r in ctx(app_and_client).audit.records(clinician) if r.action != "sign_in"
+    ]
 
 
 # --- Identity ----------------------------------------------------------------------------
@@ -105,7 +114,7 @@ def test_failed_authentication_is_audited_without_an_identity(
     _, client = app_and_client
     client.get("/patients")
     client.get("/patients", headers=as_("rn-nobody"))
-    records = ctx(app_and_client).audit.records()
+    records = trail(app_and_client)
     assert [(r.clinician_id, r.action, r.outcome) for r in records] == [
         (None, "authenticate", "denied"),
         (None, "authenticate", "denied"),
@@ -206,7 +215,7 @@ def test_every_read_is_audited_including_refused_ones(
     client.get("/patients/p-003", headers=h)
     client.get("/patients/p-001", headers=h)  # not theirs
     client.get("/patients/p-003/notes", headers=h)
-    records = ctx(app_and_client).audit.for_clinician("md-aquino")
+    records = trail(app_and_client, "md-aquino")
     assert [(r.action, r.resource, r.outcome) for r in records] == [
         ("view_ward", "W4", "ok"),
         ("list_patients", "-", "ok"),
@@ -224,7 +233,7 @@ def test_a_refused_view_is_logged_exactly_like_a_missing_one(
     _, client = app_and_client
     client.get("/patients/p-001", headers=as_("md-aquino"))
     client.get("/patients/p-999", headers=as_("md-aquino"))
-    refused, missing = ctx(app_and_client).audit.for_clinician("md-aquino")
+    refused, missing = trail(app_and_client, "md-aquino")
     assert (refused.action, refused.outcome) == (missing.action, missing.outcome)
 
 
@@ -236,7 +245,7 @@ def test_writes_are_audited(app_and_client: tuple[Any, TestClient]) -> None:
     )
     client.post("/patients/p-001/labs", headers=h, json={"potassium": 4.2})
     client.delete("/patients/p-001/notes/n-001", headers=h)
-    actions = [r.action for r in ctx(app_and_client).audit.for_clinician("rn-manalo")]
+    actions = [r.action for r in trail(app_and_client, "rn-manalo")]
     assert actions == ["add_note", "enter_labs", "delete_note"]
 
 
@@ -244,9 +253,7 @@ def test_my_audit_returns_only_my_own_trail(client: TestClient) -> None:
     client.get("/patients", headers=as_("md-aquino"))
     client.get("/patients", headers=as_("rn-manalo"))
     mine = client.get("/audit", headers=as_("md-aquino")).json()
-    assert {e["action"] for e in mine} == {"list_patients", "view_audit"} or all(
-        e["action"] in {"list_patients"} for e in mine
-    )
+    assert {e["action"] for e in mine} == {"sign_in", "list_patients"}
     assert all(set(e) == {"seq", "at", "action", "resource", "outcome"} for e in mine)
 
 
@@ -272,11 +279,9 @@ def test_the_audit_trail_holds_no_patient_data(app_and_client: tuple[Any, TestCl
         },
     )  # fmt: skip
     assert admitted.status_code == 201
-    audit = ctx(app_and_client).audit
-    dumped = json.dumps(
-        [r.__dict__ if hasattr(r, "__dict__") else repr(r) for r in audit.records()], default=str
-    )
-    dumped += repr(audit.records()) + client.get("/audit", headers=h).text
+    everything = ctx(app_and_client).audit.records()  # sign-ins included
+    dumped = json.dumps([r.__dict__ if hasattr(r, "__dict__") else repr(r) for r in everything], default=str)
+    dumped += repr(everything) + client.get("/audit", headers=h).text
     secrets = [
         "Santos", "Maria", "4.37191", "1234.5678", "Zzyzx", "UNIQUE-NOTE-TEXT-9f3a",
         "Quillfeather", "Ottoline", "1969-02-03", "UNIQUE-COMPLAINT-77", "UNIQUE-CONTEXT-88",
@@ -284,7 +289,7 @@ def test_the_audit_trail_holds_no_patient_data(app_and_client: tuple[Any, TestCl
     ]  # fmt: skip
     for secret in secrets:
         assert secret not in dumped, f"{secret!r} leaked into the audit trail"
-    assert len(audit.for_clinician("rn-delacruz")) >= 4
+    assert len(trail(app_and_client, "rn-delacruz")) >= 4
 
 
 @pytest.mark.parametrize(
@@ -301,13 +306,12 @@ def test_every_refused_action_is_logged_like_a_missing_one(
     app_and_client: tuple[Any, TestClient], method: str, path: str, action: str, body: Any
 ) -> None:
     _, client = app_and_client
-    audit = ctx(app_and_client).audit
     h = as_("md-aquino")
     outcomes = []
     for pid in ("p-001", "p-999"):  # exists but not theirs / does not exist
-        before = len(audit.records())
+        before = len(trail(app_and_client))
         response = client.request(method, path.format(pid), headers=h, json=body)
-        new = audit.records()[before:]
+        new = trail(app_and_client)[before:]
         assert len(new) == 1, (pid, new)
         outcomes.append((response.status_code, response.json(), new[0].action, new[0].outcome))
     assert outcomes[0] == outcomes[1]
@@ -320,7 +324,7 @@ def test_an_unknown_ward_is_audited_and_logged_like_any_other_miss(
     _, client = app_and_client
     client.get("/wards/ICU/rows", headers=as_("rn-manalo"))
     client.get("/wards/XYZ/rows", headers=as_("rn-manalo"))
-    first, second = ctx(app_and_client).audit.for_clinician("rn-manalo")
+    first, second = trail(app_and_client, "rn-manalo")
     assert (
         (first.action, first.outcome)
         == (second.action, second.outcome)
@@ -731,14 +735,13 @@ def test_recording_for_a_patient_that_is_not_yours_is_not_found(
     app_and_client: tuple[Any, TestClient],
 ) -> None:
     _, client = app_and_client
-    audit = ctx(app_and_client).audit
     h = as_("md-aquino")
     body = {"systolic": 120, "diastolic": 80}
     refused = client.post("/patients/p-004/vitals", headers=h, json=body)
     missing = client.post("/patients/p-999/vitals", headers=h, json=body)
     assert (refused.status_code, refused.json()) == (missing.status_code, missing.json())
     assert refused.status_code == 404
-    first, second = audit.for_clinician("md-aquino")
+    first, second = trail(app_and_client, "md-aquino")
     assert (first.action, first.outcome) == (second.action, second.outcome)
     assert (first.action, first.outcome) == ("record_vitals", "not_found")
 
@@ -755,7 +758,7 @@ def test_recorded_values_never_reach_the_audit_trail(
     client.post(
         "/patients/p-004/vitals", headers=as_("rn-delacruz"), json={"systolic": 20, "diastolic": 80}
     )
-    records = ctx(app_and_client).audit.for_clinician("rn-delacruz")
+    records = trail(app_and_client, "rn-delacruz")
     assert [(r.action, r.outcome) for r in records] == [
         ("record_vitals", "ok"),
         ("record_vitals", "rejected"),
@@ -803,10 +806,9 @@ def test_a_rejected_record_leaves_exactly_one_audit_row_and_no_values(
     app_and_client: tuple[Any, TestClient], body: dict[str, Any]
 ) -> None:
     _, client = app_and_client
-    audit = ctx(app_and_client).audit
     response = client.post("/patients/p-004/vitals", headers=as_("rn-delacruz"), json=body)
     assert response.status_code == 422
-    rows = audit.records()
+    rows = trail(app_and_client)
     assert [(r.clinician_id, r.role, r.action, r.resource, r.outcome) for r in rows] == [
         ("rn-delacruz", "rn", "record_vitals", "p-004", "rejected")
     ]
@@ -819,17 +821,17 @@ def test_a_body_that_is_not_json_is_audited_once_identified_and_refused_before_t
     app_and_client: tuple[Any, TestClient],
 ) -> None:
     _, client = app_and_client
-    audit = ctx(app_and_client).audit
     json_header = {"Content-Type": "application/json"}
     identified = {**as_("rn-delacruz"), **json_header}
     refused = client.post("/patients/p-004/vitals", content=b"{not json", headers=identified)
     assert refused.status_code == 422
-    assert [(r.action, r.outcome) for r in audit.for_clinician("rn-delacruz")] == [
+    assert [(r.action, r.outcome) for r in trail(app_and_client, "rn-delacruz")] == [
         ("record_vitals", "rejected")
     ]
     anonymous = client.post("/patients/p-004/vitals", content=b"{not json", headers=json_header)
     assert anonymous.status_code == 401
-    assert (audit.records()[-1].clinician_id, audit.records()[-1].action) == (None, "authenticate")
+    last = trail(app_and_client)[-1]
+    assert (last.clinician_id, last.action) == (None, "authenticate")
 
 
 @pytest.mark.parametrize(
@@ -849,7 +851,7 @@ def test_a_bad_body_without_identity_is_refused_on_identity_not_on_validation(
     response = client.post("/patients/p-004/vitals", headers=headers, json={"systolic": "9187x"})
     assert response.status_code == status
     assert "9187x" not in response.text  # nothing about the body is told to an unidentified caller
-    rows = ctx(app_and_client).audit.records()
+    rows = trail(app_and_client)
     assert [(r.clinician_id, r.role, r.action, r.resource, r.outcome) for r in rows] == [
         (None, None, "authenticate", "-", "denied")
     ]
@@ -864,7 +866,7 @@ def test_a_bad_body_is_answered_the_same_for_not_yours_and_nonexistent(
     missing = client.post("/patients/p-999/vitals", headers=h, json={"systolic": "x"})
     assert refused.status_code == missing.status_code == 422
     assert refused.json() == missing.json()
-    first, second = ctx(app_and_client).audit.for_clinician("md-aquino")
+    first, second = trail(app_and_client, "md-aquino")
     assert (first.action, first.outcome) == (second.action, second.outcome)
     assert (first.action, first.outcome) == ("record_vitals", "rejected")
 
@@ -884,7 +886,7 @@ def test_every_write_route_audits_a_body_that_fails_validation(
     _, client = app_and_client
     response = client.request(method, path, headers=as_("rn-manalo"), json=body)
     assert response.status_code == 422
-    rows = ctx(app_and_client).audit.for_clinician("rn-manalo")
+    rows = trail(app_and_client, "rn-manalo")
     assert [(r.action, r.outcome) for r in rows] == [(action, "rejected")]
 
 
@@ -895,7 +897,7 @@ def test_audit_rows_record_the_role_held_when_acting(
     client.get("/patients", headers=as_("rn-manalo"))
     client.get("/patients", headers=as_("md-aquino"))
     client.get("/patients")
-    rows = ctx(app_and_client).audit.records()
+    rows = trail(app_and_client)
     assert [(r.clinician_id, r.role) for r in rows] == [
         ("rn-manalo", "charge_rn"),
         ("md-aquino", "md"),

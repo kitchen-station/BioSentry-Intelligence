@@ -12,10 +12,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from psycopg.conninfo import conninfo_to_dict
-
-from biosentry.core.config import DEFAULT_DATASET, Settings
+from biosentry.core.config import DEFAULT_DATASET, Settings, is_loopback, restricted
 from biosentry.db.migrate import SETUP_LOCK, migrate
+from biosentry.db.passphrase import hash_passphrase
 from biosentry.repositories.postgres import (
     HISTORY_VITALS,
     Conn,
@@ -29,6 +28,12 @@ from biosentry.repositories.postgres import (
     upsert_bins,
     whole,
 )
+
+# Local development only: seeding gives every clinician this passphrase when the connection it is
+# seeding over is to loopback (judged on the established connection, see is_loopback) and the
+# process is not in production, whatever the host. Anywhere else a database is seeded with none:
+# set them with `make db-passphrase`. It is public, in the README.
+DEV_PASSPHRASE = "dev-passphrase-local"
 
 parse = datetime.fromisoformat  # the fixture file's times; the database hands back datetimes
 
@@ -46,7 +51,7 @@ def _obs(patient_id: str, code: str, m: dict[str, Any]) -> Obs:
     return Obs(*common, num=float(value))
 
 
-def seed(conn: Conn, fixture: Path = DEFAULT_DATASET) -> None:
+def seed(conn: Conn, fixture: Path = DEFAULT_DATASET, dev_passphrase: bool = False) -> None:
     if conn.execute("SELECT 1 FROM run WHERE source = 'fixture'").fetchone():
         return
     raw = json.loads(fixture.read_text(encoding="utf-8"))
@@ -55,8 +60,12 @@ def seed(conn: Conn, fixture: Path = DEFAULT_DATASET) -> None:
     with transaction(conn):
         with conn.cursor() as cur:
             cur.executemany(
-                "INSERT INTO clinician (id, role) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-                [(cid, c["role"]) for cid, c in raw["clinicians"].items()],
+                "INSERT INTO clinician (id, role, passphrase_hash) VALUES (%s, %s, %s)"
+                " ON CONFLICT DO NOTHING",
+                [
+                    (cid, c["role"], hash_passphrase(DEV_PASSPHRASE) if dev_passphrase else None)
+                    for cid, c in raw["clinicians"].items()
+                ],
             )
         run_id = insert_run(
             conn,
@@ -141,25 +150,24 @@ def seed(conn: Conn, fixture: Path = DEFAULT_DATASET) -> None:
             )
 
 
-def ensure(url: str, fixture: Path = DEFAULT_DATASET) -> None:
+def ensure(url: str, fixture: Path = DEFAULT_DATASET, production: bool | None = None) -> None:
     """Make the database ready to serve: migrations, clinicians, fixture run. Idempotent, and safe
-    when several processes do it at once (one transaction, behind the setup lock)."""
-    with connect(url) as conn, transaction(conn):
+    when several processes do it at once (one transaction, behind the setup lock). `production`
+    None: the process's BIOSENTRY_ENV decides. Never seeds the dev passphrase in production."""
+    production = restricted() if production is None else production
+    with connect(url, production) as conn, transaction(conn):
         conn.execute("SELECT pg_advisory_xact_lock(%s)", (SETUP_LOCK,))
         migrate(conn)
-        seed(conn, fixture)
-
-
-LOOPBACK = ("127.0.0.1", "localhost", "::1")
+        seed(conn, fixture, not production and is_loopback(conn.info))
 
 
 def reset(url: str) -> None:
     """Drop every table (and the audit trail with them), then set up again from the fixture.
-    Only on this machine: the database host must be loopback."""
-    host = conninfo_to_dict(url).get("host")
-    if host not in LOOPBACK:
-        raise SystemExit(f"refusing to reset a database whose host is {host!r}: only loopback")
+    Only on this machine: the connection, once made and before anything is dropped, must be to
+    loopback."""
     with connect(url) as conn:
+        if not is_loopback(conn.info):
+            raise SystemExit("refusing to reset a database that is not on loopback")
         conn.execute("DROP SCHEMA public CASCADE")
         conn.execute("CREATE SCHEMA public")
     ensure(url)

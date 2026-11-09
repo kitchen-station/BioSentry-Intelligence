@@ -15,7 +15,7 @@ from typing import Literal
 from biosentry.repositories.postgres import Conn, whole
 
 RESOURCE_MAX = 200
-Outcome = Literal["ok", "not_found", "denied", "rejected"]
+Outcome = Literal["ok", "not_found", "denied", "rejected", "limited"]
 Clock = Callable[[], datetime]
 RoleOf = Callable[[str], str | None]
 
@@ -56,6 +56,16 @@ class AuditLog:
                 outcome,
             ),
         )
+
+    def count(self, action: str, resource: str, outcome: Outcome, since: datetime) -> int:
+        """How many records of this action on this resource with this outcome came after `since`."""
+        row = self._conn.execute(
+            "SELECT count(*) AS n FROM audit_log"
+            " WHERE action = %s AND resource = %s AND outcome = %s AND at > %s",
+            (action, resource, outcome, whole(since)),
+        ).fetchone()
+        assert row is not None
+        return int(row["n"])
 
     def records(self, clinician_id: str | None = None) -> tuple[AuditRecord, ...]:
         """Every record, oldest first; or only this clinician's."""

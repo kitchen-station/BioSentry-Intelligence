@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 /**
- * The Ward page: acknowledgements go to the API (and a failed save is shown, not swallowed),
- * and replayed real data carries its attribution.
+ * The Ward page: acknowledgements go to the API (and a failed save is shown, not swallowed).
  */
 
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
@@ -23,14 +22,14 @@ vi.mock("../api", () => ({ ...api, canRecordVitals: false, recordVitals: vi.fn()
 
 // The committed ward, p-001 first: a NEWS2 9 patient, so an alert is open.
 const rows = synthetic.ranked as unknown as WardResponse["ranked"];
-const ward = (synthetic_: boolean): WardResponse => ({
+const ward = (): WardResponse => ({
   ward: "W4",
   clinician: "rn-manalo",
   shift: "07:00",
   receiving_data: true,
   sort_tier: "A",
   tier_status: rows[0].tier_status,
-  ranked: rows.slice(0, 1).map((r) => ({ ...r, synthetic: synthetic_ })),
+  ranked: rows.slice(0, 1),
   abstained: [],
 });
 const session: Session = { clinician_id: "rn-manalo", ward: "W4", role: "charge_rn" };
@@ -42,7 +41,7 @@ const page = () =>
   );
 
 beforeEach(() => {
-  api.getWard.mockReset().mockResolvedValue(ward(true));
+  api.getWard.mockReset().mockResolvedValue(ward());
   api.getAcknowledgements.mockReset().mockResolvedValue([]);
   api.acknowledge.mockReset().mockResolvedValue(undefined);
 });
@@ -72,22 +71,6 @@ describe("acknowledging an alert", () => {
     page();
     await screen.findByText(/Priority queue/);
     expect(screen.queryByRole("button", { name: "Acknowledge" })).toBeNull();
-  });
-});
-
-describe("the attribution banner", () => {
-  const text = "Real de-identified ICU data replayed. eICU-CRD Demo 2.0.1, ODbL.";
-
-  it("shows when any row is not synthetic", async () => {
-    api.getWard.mockResolvedValue(ward(false));
-    page();
-    expect(await screen.findByText(text)).toBeTruthy();
-  });
-
-  it("is absent for synthetic data", async () => {
-    page();
-    await screen.findByText(/Priority queue/);
-    expect(screen.queryByText(text)).toBeNull();
   });
 });
 

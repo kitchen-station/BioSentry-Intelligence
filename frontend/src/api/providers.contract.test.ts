@@ -4,6 +4,9 @@
  *
  *   VITE_API_URL=http://127.0.0.1:8765 npx vitest run src/api/providers.contract.test.ts
  *
+ * Signs in with the dev passphrase (VITE_API_PASSPHRASE overrides it), which the API seeds only
+ * for a database on loopback.
+ *
  * The same assertions hold for both: server-side scope, fail-closed identity, ordering by the
  * arbiter, gaps as null, notes, labs, admission. Behaviour that cannot match (the fixture
  * provider has no 401/403, only "sees nobody") is asserted as "rejected or empty".
@@ -26,6 +29,8 @@ interface Harness {
 }
 
 const API_URL = import.meta.env.VITE_API_URL as string | undefined;
+// The API seeds this passphrase for every clinician when its database is on loopback (README).
+const PASSPHRASE = (import.meta.env.VITE_API_PASSPHRASE as string | undefined) ?? "dev-passphrase-local";
 
 const harnesses: Harness[] = [
   {
@@ -38,7 +43,8 @@ const harnesses: Harness[] = [
         {
           name: `http provider (${API_URL})`,
           provider: httpProvider,
-          // Requests wait for the session in flight; an unknown id gets no token and a 401.
+          // Requests wait for the session in flight; a refused sign-in leaves no token, so the
+          // request that follows gets a 401.
           signIn: (id: string | null) => (id === null ? setAuthToken(null) : httpSignIn(id)),
         },
       ]
@@ -302,7 +308,7 @@ describe.skipIf(!API_URL)("http provider: nurse-recorded vitals", () => {
 });
 
 function httpSignIn(clinicianId: string): void {
-  void openSession(clinicianId); // requests wait for the token
+  openSession(clinicianId, PASSPHRASE).catch(() => undefined); // requests wait for the token
 }
 
 describe("the fixture provider", () => {

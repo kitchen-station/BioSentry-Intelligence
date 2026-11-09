@@ -1,7 +1,8 @@
 /**
  * The provider switch. With no VITE_API_URL every call goes to the fixture provider, loaded on
- * first use, and the session is the fixture's active clinician. With one, the session is a bearer
- * token: one handed in, or one asked for at sign-in (never the clinician id).
+ * first use, and the session is the fixture's active clinician (no server, nothing checked). With
+ * one, the session is a bearer token asked for with the passphrase at sign-in (never the clinician
+ * id), held in memory only: a reload cannot restore it.
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -21,7 +22,11 @@ vi.mock("./providers/fixture", () => ({
   setActiveClinician: fixture.setActiveClinician,
 }));
 
-const client = vi.hoisted(() => ({ openSession: vi.fn(async () => undefined), setAuthToken: vi.fn() }));
+const client = vi.hoisted(() => ({
+  openSession: vi.fn(async () => undefined),
+  setAuthToken: vi.fn(),
+  getAuthToken: vi.fn((): string | null => null),
+}));
 vi.mock("./client", async (actual) => ({ ...(await actual<typeof import("./client")>()), ...client }));
 
 afterEach(() => {
@@ -47,26 +52,50 @@ describe("fixture mode", () => {
     }
   });
 
-  it("signs in and out by setting the fixture's active clinician, never a token", async () => {
+  it("has no server: any passphrase signs in, by setting the fixture's active clinician", async () => {
     const api = await load("");
-    api.initSession("rn-manalo", "ignored-token");
+    expect(api.usesServer).toBe(false);
+    await api.signIn("rn-manalo", "whatever");
+    expect(fixture.setActiveClinician).toHaveBeenLastCalledWith("rn-manalo");
+    await api.signIn("rn-manalo", "");
+    expect(fixture.setActiveClinician).toHaveBeenCalledTimes(2);
+    expect(client.openSession).not.toHaveBeenCalled();
+  });
+
+  it("restores a session after a reload and signs out by clearing the active clinician", async () => {
+    const api = await load("");
+    expect(api.restoreSession("rn-manalo")).toBe(true);
     await flush();
     expect(fixture.setActiveClinician).toHaveBeenLastCalledWith("rn-manalo");
     api.clearSession();
     await flush();
     expect(fixture.setActiveClinician).toHaveBeenLastCalledWith(null);
     expect(client.setAuthToken).not.toHaveBeenCalled();
-    expect(client.openSession).not.toHaveBeenCalled();
   });
 });
 
 describe("HTTP mode", () => {
-  it("uses a token it is handed, or asks the API for one, and drops it on sign-out", async () => {
+  it("signs in by asking the API for a token with the passphrase, and rejects when it refuses", async () => {
     const api = await load("http://127.0.0.1:8000");
-    api.initSession("rn-manalo", "t-1");
-    expect(client.setAuthToken).toHaveBeenLastCalledWith("t-1");
-    api.initSession("rn-manalo");
-    expect(client.openSession).toHaveBeenCalledWith("rn-manalo");
+    expect(api.usesServer).toBe(true);
+    await api.signIn("rn-manalo", "a passphrase");
+    expect(client.openSession).toHaveBeenCalledWith("rn-manalo", "a passphrase");
+    expect(fixture.setActiveClinician).not.toHaveBeenCalled();
+    client.openSession.mockRejectedValueOnce(new Error("401"));
+    await expect(api.signIn("rn-manalo", "wrong")).rejects.toThrow("401");
+  });
+
+  it("cannot restore a session after a reload: the token was only in memory", async () => {
+    const api = await load("http://127.0.0.1:8000");
+    expect(api.restoreSession("rn-manalo")).toBe(false);
+    client.getAuthToken.mockReturnValueOnce("t-1"); // still the same page: the token is there
+    expect(api.restoreSession("rn-manalo")).toBe(true);
+    expect(client.openSession).not.toHaveBeenCalled();
+    expect(fixture.setActiveClinician).not.toHaveBeenCalled();
+  });
+
+  it("drops the token on sign-out", async () => {
+    const api = await load("http://127.0.0.1:8000");
     api.clearSession();
     expect(client.setAuthToken).toHaveBeenLastCalledWith(null);
     expect(fixture.setActiveClinician).not.toHaveBeenCalled();

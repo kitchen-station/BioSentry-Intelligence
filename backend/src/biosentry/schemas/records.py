@@ -39,9 +39,10 @@ class Session(Contract):
 
 
 class SessionRequest(Contract):
-    """The body of POST /session: who is signing in. Real authentication replaces this."""
+    """The body of POST /session: who is signing in, and their passphrase (never echoed or logged)."""
 
-    clinician_id: str
+    clinician_id: Annotated[str, Field(min_length=1, max_length=64)]
+    passphrase: Annotated[str, Field(min_length=1, max_length=256)]
 
 
 class SessionToken(Contract):

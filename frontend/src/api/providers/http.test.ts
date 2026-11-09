@@ -48,18 +48,22 @@ describe("openSession", () => {
     fetchMock
       .mockResolvedValueOnce(reply(200, { token: "t-123" }))
       .mockResolvedValueOnce(reply(200, { ranked: [], abstained: [] }));
-    void openSession("md-santos");
+    void openSession("md-santos", "a passphrase");
     await httpProvider.getWard();
     expect(fetchMock.mock.calls[0][0]).toBe("/session");
-    expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)).toEqual({ clinician_id: "md-santos" });
+    expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)).toEqual({
+      clinician_id: "md-santos",
+      passphrase: "a passphrase",
+    });
     const init = fetchMock.mock.calls[1][1] as RequestInit;
     expect(new Headers(init.headers).get("Authorization")).toBe("Bearer t-123");
   });
 
   it("fails closed when the API refuses: no token, never the clinician id", async () => {
-    fetchMock.mockResolvedValueOnce(reply(403, { detail: "no" })).mockResolvedValueOnce(reply(401, { detail: "no" }));
-    void openSession("rn-reyes");
+    fetchMock.mockResolvedValueOnce(reply(401, { detail: "no" })).mockResolvedValueOnce(reply(401, { detail: "no" }));
+    const refused = expect(openSession("rn-reyes", "wrong")).rejects.toBeInstanceOf(ApiError); // the sign-in page hears of it
     await expect(httpProvider.getWard()).rejects.toBeInstanceOf(ApiError);
+    await refused;
     const init = fetchMock.mock.calls[1][1] as RequestInit;
     expect(new Headers(init.headers).has("Authorization")).toBe(false);
   });
@@ -67,7 +71,7 @@ describe("openSession", () => {
   it("drops a token that arrives after sign-out", async () => {
     let answer!: (r: Response) => void;
     fetchMock.mockReturnValueOnce(new Promise<Response>((r) => (answer = r)));
-    const opening = openSession("md-santos");
+    const opening = openSession("md-santos", "a passphrase");
     setAuthToken(null);
     answer(reply(200, { token: "late" }));
     await opening;

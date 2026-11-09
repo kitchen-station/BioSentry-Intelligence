@@ -7,8 +7,10 @@ must be allowed to create databases. Test databases are named bs_test_* and live
 """
 
 import os
+import threading
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import psycopg
@@ -52,6 +54,40 @@ def dump_database(conn: psycopg.Connection[Any]) -> str:
             cur.execute(sql.SQL("SELECT * FROM {}").format(sql.Identifier(table)))
             lines += [f"{table}: {row}" for row in cur.fetchall()]
     return "\n".join(lines)
+
+
+def together(count: int, work: Callable[[int], Any]) -> list[Any]:
+    """Run `work(i)` on `count` threads, started at the same moment. An exception is re-raised."""
+    gate = threading.Barrier(count)
+
+    def go(i: int) -> Any:
+        gate.wait()
+        return work(i)
+
+    with ThreadPoolExecutor(count) as pool:
+        return [f.result() for f in [pool.submit(go, i) for i in range(count)]]
+
+
+@pytest.fixture
+def spoofed_server_address(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Connections still go to the test database, but report that libpq reached 8.8.8.8: what
+    PGHOSTADDR or a service file would do to a URL that says 127.0.0.1."""
+    from biosentry.repositories import postgres
+
+    class Spoofed(psycopg.Connection):  # type: ignore[type-arg]
+        @property
+        def info(self) -> Any:
+            real = super().info
+
+            class Info:
+                host, hostaddr = "127.0.0.1", "8.8.8.8"
+
+                def __getattr__(self, name: str) -> Any:
+                    return getattr(real, name)
+
+            return Info()
+
+    monkeypatch.setattr(postgres.psycopg, "connect", Spoofed.connect)
 
 
 @pytest.fixture(scope="session")

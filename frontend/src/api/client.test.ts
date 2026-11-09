@@ -24,9 +24,35 @@ const sent = (i = 0) => fetchMock.mock.calls[i] as [string, RequestInit];
 describe("the session token", () => {
   it("is what sign-in returned, and gone after sign-out", async () => {
     fetchMock.mockResolvedValue(Response.json({ token: "t-1" }));
-    await openSession("rn-manalo");
+    await openSession("rn-manalo", "a passphrase");
     expect(getAuthToken()).toBe("t-1");
     setAuthToken(null);
+    expect(getAuthToken()).toBeNull();
+  });
+
+  it("is asked for with the passphrase in the body of POST /session, and nowhere else", async () => {
+    fetchMock.mockResolvedValue(Response.json({ token: "t-1" }));
+    await openSession("rn-manalo", "a passphrase");
+    const [path, init] = sent();
+    expect(path).toBe("/session");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({ clinician_id: "rn-manalo", passphrase: "a passphrase" });
+    expect(path).not.toContain("passphrase");
+    expect(new Headers(init.headers).has("Authorization")).toBe(false);
+  });
+
+  it.each([401, 429])("is refused with the API's %s, and there is no token", async (status) => {
+    fetchMock.mockResolvedValue(Response.json({ detail: "no" }, { status }));
+    const failure = await openSession("rn-manalo", "wrong").catch((e: unknown) => e);
+    expect(failure).toBeInstanceOf(ApiError);
+    expect((failure as ApiError).status).toBe(status);
+    expect(getAuthToken()).toBeNull();
+  });
+
+  it("does not keep the token of an earlier sign-in while a new one is refused", async () => {
+    setAuthToken("old");
+    fetchMock.mockResolvedValue(Response.json({ detail: "no" }, { status: 401 }));
+    await openSession("rn-reyes", "wrong").catch(() => undefined);
     expect(getAuthToken()).toBeNull();
   });
 });

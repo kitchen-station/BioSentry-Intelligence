@@ -1,32 +1,37 @@
 // @vitest-environment jsdom
 /**
- * App: the session survives a reload only when what is stored is well formed, the route guards
- * send a signed-out visitor to sign-in (remembering where they were going) and keep a staff
- * nurse out of the station, and signing out clears the session everywhere.
+ * App: the session survives a reload only when what is stored is well formed and the API can be
+ * re-armed with it (an API token lives in memory, so after a reload it cannot: sign in again), the
+ * route guards send a signed-out visitor to sign-in (remembering where they were going) and keep a
+ * staff nurse out of the station, and signing out clears the session everywhere.
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Session } from "./types";
 import { App } from "./App";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const api = vi.hoisted(() => ({ initSession: vi.fn(), clearSession: vi.fn() }));
+const api = vi.hoisted(() => ({ restoreSession: vi.fn(() => true), clearSession: vi.fn() }));
 vi.mock("./api", () => api);
 
 // The pages are stand-ins: these tests are about the shell, not what each page shows.
 vi.mock("./pages/SignIn", () => ({
   SignIn: ({ onSignIn }: { onSignIn: (s: Session) => void }) => {
     const from = (useLocation().state as { from?: string } | null)?.from;
+    const navigate = useNavigate();
     return (
       <div>
         <p>sign-in page{from ? ` from ${from}` : ""}</p>
         <button
           type="button"
-          onClick={() => onSignIn({ clinician_id: "md-santos", ward: "W4", role: "md" })}
+          onClick={() => {
+            onSignIn({ clinician_id: "md-santos", ward: "W4", role: "md" });
+            navigate("/ward"); // as the real page does once it has signed in
+          }}
         >
           sign in
         </button>
@@ -73,6 +78,7 @@ const store = (value: unknown) => sessionStorage.setItem(KEY, JSON.stringify(val
 beforeEach(() => {
   sessionStorage.clear();
   vi.clearAllMocks();
+  api.restoreSession.mockReturnValue(true);
 });
 afterEach(() => {
   cleanup();
@@ -84,7 +90,16 @@ describe("restoring the session", () => {
     store(nurse);
     at("/ward");
     expect(screen.getByText("ward page for rn-reyes")).toBeTruthy();
-    expect(api.initSession).toHaveBeenCalledWith("rn-reyes");
+    expect(api.restoreSession).toHaveBeenCalledWith("rn-reyes");
+  });
+
+  it("does not show a signed-in screen the API cannot serve: no token after a reload is sign-in again", () => {
+    api.restoreSession.mockReturnValue(false);
+    store(nurse);
+    at("/ward");
+    expect(screen.getByText("sign-in page from /ward")).toBeTruthy();
+    expect(screen.queryByText("ward page for rn-reyes")).toBeNull();
+    expect(sessionStorage.getItem(KEY)).toBeNull(); // and the stale record is dropped
   });
 
   it.each([
@@ -97,7 +112,7 @@ describe("restoring the session", () => {
     sessionStorage.setItem(KEY, raw);
     at("/ward");
     expect(screen.getByText("sign-in page from /ward")).toBeTruthy();
-    expect(api.initSession).not.toHaveBeenCalled();
+    expect(api.restoreSession).not.toHaveBeenCalled();
   });
 
   it("treats unreadable storage as signed out", () => {
@@ -141,10 +156,10 @@ describe("route guards", () => {
 });
 
 describe("signing in and out", () => {
-  it("signs in: arms the API, stores the session, and the guarded pages open", async () => {
+  it("signs in: stores who is signed in (the sign-in page has already got the token)", async () => {
     at("/");
     await userEvent.click(screen.getByRole("button", { name: "sign in" }));
-    expect(api.initSession).toHaveBeenCalledWith("md-santos");
+    expect(screen.getByText("ward page for md-santos")).toBeTruthy();
     expect(JSON.parse(sessionStorage.getItem(KEY) ?? "null")).toEqual({
       clinician_id: "md-santos",
       ward: "W4",
@@ -158,7 +173,7 @@ describe("signing in and out", () => {
     });
     at("/");
     await userEvent.click(screen.getByRole("button", { name: "sign in" }));
-    expect(api.initSession).toHaveBeenCalledWith("md-santos");
+    expect(screen.getByText("ward page for md-santos")).toBeTruthy();
   });
 
   it.each([

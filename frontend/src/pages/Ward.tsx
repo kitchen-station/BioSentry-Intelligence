@@ -164,12 +164,6 @@ export function Ward({ session, onSignOut }: Props) {
         </p>
       )}
 
-      {[...data.ranked, ...data.abstained].some((r) => !r.synthetic) && (
-        <p className={styles.attribution}>
-          Real de-identified ICU data replayed. eICU-CRD Demo 2.0.1, ODbL.
-        </p>
-      )}
-
       {/* Summary cards */}
       <div className={styles.summary}>
         <div className={styles.summaryInner}>
