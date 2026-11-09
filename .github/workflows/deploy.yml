@@ -27,6 +27,7 @@ jobs:
         working-directory: frontend
     steps:
       - id: gate
+        working-directory: .
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
             echo "::notice::CLOUDFLARE_API_TOKEN is not set, so this run skips the deploy."
