@@ -376,6 +376,19 @@ def _run(stdin: str, *argv: str, monkeypatch: pytest.MonkeyPatch) -> int:
     return passphrase_module.main(list(argv))
 
 
+def test_resetting_a_passphrase_signs_that_clinician_out_and_no_one_else(
+    cli: Server, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    old = {"Authorization": f"Bearer {cli.sign_in('rn-reyes').json()['token']}"}
+    other = {"Authorization": f"Bearer {cli.sign_in('md-santos').json()['token']}"}
+    assert cli.client.get("/patients", headers=old).status_code == 200
+    assert _run("a brand new passphrase\n", "rn-reyes", monkeypatch=monkeypatch) == 0
+    assert cli.client.get("/patients", headers=old).status_code == 401  # the old token is dead
+    assert cli.client.get("/patients", headers=other).status_code == 200  # others are untouched
+    new = cli.sign_in("rn-reyes", "a brand new passphrase")
+    assert new.status_code == 200  # and the new passphrase signs in afresh
+
+
 def test_the_command_reads_stdin_and_the_new_passphrase_signs_in(
     cli: Server, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

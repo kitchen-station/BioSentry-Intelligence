@@ -19,7 +19,7 @@ import threading
 from functools import cache
 
 from biosentry.core.config import Settings
-from biosentry.repositories.postgres import connect
+from biosentry.repositories.postgres import connect, transaction
 
 N, R, P = 2**15, 8, 1
 MIN_LENGTH, MAX_LENGTH = 12, 256  # the API refuses a longer one before hashing it
@@ -78,11 +78,13 @@ def main(argv: list[str] | None = None) -> int:
         passphrase = sys.stdin.readline().rstrip("\r\n")
     if not MIN_LENGTH <= len(passphrase) <= MAX_LENGTH or "\x00" in passphrase:
         raise SystemExit(f"the passphrase must be {MIN_LENGTH} to {MAX_LENGTH} characters")
-    with connect(Settings.from_env().database_url) as conn:
+    stored = hash_passphrase(passphrase)
+    with connect(Settings.from_env().database_url) as conn, transaction(conn):
         found = conn.execute(
-            "UPDATE clinician SET passphrase_hash = %s WHERE id = %s",
-            (hash_passphrase(passphrase), args.clinician_id),
+            "UPDATE clinician SET passphrase_hash = %s WHERE id = %s", (stored, args.clinician_id)
         ).rowcount
+        # A token issued under the old passphrase must not outlive it.
+        conn.execute("DELETE FROM session WHERE clinician_id = %s", (args.clinician_id,))
     if not found:
         raise SystemExit("no such clinician")
     print("passphrase set")
