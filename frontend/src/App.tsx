@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import type { Session } from "./types";
-import { initSession, clearSession } from "./api";
+import { restoreSession, clearSession } from "./api";
 import { SignIn } from "./pages/SignIn";
 import { Ward } from "./pages/Ward";
 import { PatientDetail } from "./pages/PatientDetail";
 import { Station } from "./pages/Station";
 
-// Per tab, gone when the tab closes: a reload or a link to a patient keeps the clinician signed
-// in, and a shared ward device does not carry one clinician's session into another's tab.
+// Per tab, gone when the tab closes. Only who is signed in is kept here, never a token: with the
+// API the token lives in memory, so a reload returns to sign-in (restoreSession says false). With
+// fixtures (no server) a reload keeps the clinician signed in.
 const SESSION_KEY = "biosentry.session";
 const ROLES = new Set(["rn", "md", "charge_rn"]);
 
@@ -47,12 +48,15 @@ function ToSignIn() {
 export function App() {
   const [session, setSession] = useState<Session | null>(() => {
     const s = loadSession();
-    if (s) initSession(s.clinician_id);
+    if (s && !restoreSession(s.clinician_id)) {
+      saveSession(null); // nothing to sign requests with: never show a signed-in screen without it
+      return null;
+    }
     return s;
   });
 
+  // SignIn has already signed in with the API (the passphrase step); this only records who.
   const handleSignIn = (s: Session) => {
-    initSession(s.clinician_id);
     saveSession(s);
     setSession(s);
   };

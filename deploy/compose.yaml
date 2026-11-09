@@ -1,0 +1,59 @@
+# The team deployment on one VPS: PostgreSQL and the API. Run from this directory or with
+# `-f deploy/compose.yaml`; deploy/setup.sh does it. Secrets come from deploy/.env (git-ignored,
+# made by setup.sh): a missing one stops compose with an error, there are no defaults.
+#
+# Nothing here listens on the public interface. PostgreSQL publishes no port at all and sits on an
+# internal network. The API is published on the host's loopback only (127.0.0.1:8000): teammates
+# reach it through `tailscale serve` on the host. Keep both ports closed in the VPS firewall too:
+# a port Docker publishes on 0.0.0.0 goes around ufw, which is why this one is bound to loopback
+# and the other is not published.
+name: biosentry-deploy
+
+services:
+  postgres:
+    # The same image as the root compose.yaml (keep the digest in step).
+    image: postgres:18@sha256:e3d24f6906d0760bf4da0dae872415391ededefad23fd471c47dc53b0ddf3c42
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: biosentry
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_DB: biosentry
+    volumes:
+      - pgdata:/var/lib/postgresql # the 18 image keeps its data in a versioned subdirectory
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U biosentry -d biosentry"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      BIOSENTRY_ENV: production
+      BIOSENTRY_DATABASE_URL: postgresql://biosentry:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}@postgres:5432/biosentry
+      BIOSENTRY_INGEST_KEY: ${BIOSENTRY_INGEST_KEY:?set BIOSENTRY_INGEST_KEY in deploy/.env}
+      # Origins the dashboard is served from, comma-separated; empty keeps the local defaults.
+      BIOSENTRY_CORS_ORIGINS: ${BIOSENTRY_CORS_ORIGINS:-}
+    ports:
+      - "127.0.0.1:8000:8000"
+    # `default` is what lets the published port work; `backend` (internal) is how it reaches the database.
+    networks: [default, backend]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+networks:
+  backend:
+    internal: true # no route out, and nothing outside reaches it
+
+volumes:
+  pgdata:

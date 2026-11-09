@@ -1,0 +1,10 @@
+# Only what the image needs. The build context is the repository root because the seed reads
+# frontend/src/data/synthetic.json.
+*
+!backend/pyproject.toml
+!backend/uv.lock
+!backend/src
+!frontend/src/data/synthetic.json
+**/__pycache__
+**/*.pyc
+**/*.egg-info

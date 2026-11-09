@@ -3,15 +3,27 @@
  * Sign-in: department, then profile, then passphrase, then destination. The session handed up
  * names the profile's clinician, ward and role; only a physician or a charge nurse is offered the
  * station; Back steps one phase at a time; a signed-out link is returned to after sign-in.
+ * With the API the passphrase is sent and the page waits for the answer: a refusal (401, 429) is
+ * said plainly and stays on the passphrase step. The public demo has no server and says so.
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError } from "../api/client";
 import { SignIn } from "./SignIn";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+const api = vi.hoisted(() => ({ usesServer: false, signIn: vi.fn() }));
+vi.mock("../api", async () => ({
+  ApiError: (await vi.importActual<typeof import("../api/client")>("../api/client")).ApiError,
+  get usesServer() {
+    return api.usesServer;
+  },
+  signIn: api.signIn,
+}));
 
 function Where() {
   return <p>at {useLocation().pathname}</p>;
@@ -30,8 +42,13 @@ const page = (from?: unknown) => {
   return onSignIn;
 };
 
-const click = (name: RegExp | string) => userEvent.click(screen.getByRole("button", { name }));
+const click = async (name: RegExp | string) =>
+  userEvent.click(await screen.findByRole("button", { name })); // a sign-in answers asynchronously
 
+beforeEach(() => {
+  api.usesServer = false;
+  api.signIn.mockReset().mockResolvedValue(undefined);
+});
 afterEach(cleanup);
 
 describe("SignIn", () => {
@@ -46,7 +63,8 @@ describe("SignIn", () => {
     await userEvent.type(passphrase, "hunter2");
     expect(passphrase.value).toBe("hunter2");
     await click("Continue");
-    expect(screen.getByText("Choose destination")).toBeTruthy();
+    expect(api.signIn).toHaveBeenCalledWith("rn-reyes", "hunter2");
+    expect(await screen.findByText("Choose destination")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Station/ })).toBeNull();
     await click(/Ward Monitor/);
     expect(onSignIn).toHaveBeenCalledWith({ clinician_id: "rn-reyes", ward: "W4", role: "rn" });
@@ -108,4 +126,115 @@ describe("SignIn", () => {
       expect(screen.getByText("at /ward")).toBeTruthy();
     },
   );
+});
+
+describe("the public demo (no server)", () => {
+  it("prefills a passphrase and says plainly that nothing is checked", async () => {
+    page();
+    await click(/Nurse/);
+    await click(/Nurse Reyes/);
+    expect((screen.getByLabelText("Passphrase") as HTMLInputElement).value).toBe("anything");
+    expect(screen.getByText(/Public demo: there is no server and no real sign-in/)).toBeTruthy();
+    expect(screen.getByText(/Any passphrase is accepted/)).toBeTruthy();
+    expect(screen.getByText(/Public demo: synthetic data, no server, no real sign-in/)).toBeTruthy();
+    expect(screen.queryByText(/hospital identity provider/)).toBeNull();
+    await click("Continue");
+    expect(api.signIn).toHaveBeenCalledWith("rn-reyes", "anything");
+  });
+
+  it("does not require a passphrase", async () => {
+    page();
+    await click(/Nurse/);
+    await click(/Nurse Reyes/);
+    expect((screen.getByLabelText("Passphrase") as HTMLInputElement).required).toBe(false);
+  });
+});
+
+describe("with the API", () => {
+  beforeEach(() => {
+    api.usesServer = true;
+  });
+
+  const toPassphrase = async () => {
+    const onSignIn = page();
+    await click(/Nurse/);
+    await click(/Nurse Reyes/);
+    return onSignIn;
+  };
+  const type = (text: string) => userEvent.type(screen.getByLabelText("Passphrase"), text);
+
+  it("starts empty and required, capped like the server, and does not claim any passphrase works", async () => {
+    await toPassphrase();
+    const input = screen.getByLabelText("Passphrase") as HTMLInputElement;
+    expect([input.value, input.required, input.maxLength]).toEqual(["", true, 256]);
+    expect(screen.queryByText(/anything/i)).toBeNull();
+    expect(screen.queryByText(/accepts any passphrase/i)).toBeNull();
+    expect(screen.getByText(/The ward server checks your passphrase/)).toBeTruthy();
+    expect(screen.getByText(/Pilot build: synthetic data only/)).toBeTruthy();
+  });
+
+  it("sends the passphrase, waits for the answer, then offers the destinations", async () => {
+    let answer!: () => void;
+    api.signIn.mockReturnValue(new Promise<void>((r) => (answer = r)));
+    await toPassphrase();
+    await type("a long passphrase");
+    await click("Continue");
+    expect(api.signIn).toHaveBeenCalledWith("rn-reyes", "a long passphrase");
+    const waiting = screen.getByRole("button", { name: "Signing in" }) as HTMLButtonElement;
+    expect(waiting.disabled).toBe(true);
+    expect(screen.queryByText("Choose destination")).toBeNull(); // not before the server says so
+    answer();
+    expect(await screen.findByText("Choose destination")).toBeTruthy();
+  });
+
+  it("does not submit twice while waiting", async () => {
+    api.signIn.mockReturnValue(new Promise<void>(() => undefined));
+    await toPassphrase();
+    await type("a long passphrase{Enter}{Enter}");
+    expect(api.signIn).toHaveBeenCalledOnce();
+  });
+
+  it("says a 401 plainly, stays on the passphrase step and empties the field", async () => {
+    api.signIn.mockRejectedValue(new ApiError(401, "Unauthorized", { detail: "Sign-in failed" }));
+    const onSignIn = await toPassphrase();
+    await type("wrong passphrase");
+    await click("Continue");
+    expect((await screen.findByRole("alert")).textContent).toMatch(/^Sign-in failed\./);
+    expect(screen.queryByText("Choose destination")).toBeNull();
+    expect((screen.getByLabelText("Passphrase") as HTMLInputElement).value).toBe("");
+    expect(onSignIn).not.toHaveBeenCalled();
+  });
+
+  it("says a 429 plainly: locked for 15 minutes", async () => {
+    api.signIn.mockRejectedValue(new ApiError(429, "Too Many Requests", { detail: "no" }));
+    await toPassphrase();
+    await type("whatever it was");
+    await click("Continue");
+    expect((await screen.findByRole("alert")).textContent).toMatch(/Too many failed attempts.*15 minutes/);
+    expect(screen.queryByText("Choose destination")).toBeNull();
+  });
+
+  it("says when the server cannot be reached, and clears the message once Back is used", async () => {
+    api.signIn.mockRejectedValue(new TypeError("Failed to fetch"));
+    await toPassphrase();
+    await type("whatever it was");
+    await click("Continue");
+    expect((await screen.findByRole("alert")).textContent).toMatch(/Cannot reach the ward server/);
+    await click(/Back/);
+    await click(/Nurse Reyes/);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("can try again after a refusal", async () => {
+    api.signIn.mockRejectedValueOnce(new ApiError(401, "Unauthorized", {}));
+    await toPassphrase();
+    await type("first try");
+    await click("Continue");
+    await screen.findByRole("alert");
+    await type("second try");
+    await click("Continue");
+    expect(await screen.findByText("Choose destination")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(api.signIn).toHaveBeenLastCalledWith("rn-reyes", "second try");
+  });
 });

@@ -102,7 +102,8 @@ class NewRunPatient(Contract):
 
 
 class NewRun(Contract):
-    source: Literal["synthetic", "eicu_demo"]
+    client_id: Id  # one per sim page load: the same client may replace its own run, others may not
+    source: Literal["synthetic"]
     seed: Seed | None
     origin: Origin
     patients: Annotated[list[NewRunPatient], Field(min_length=1, max_length=200)]

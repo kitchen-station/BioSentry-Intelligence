@@ -1,19 +1,26 @@
 """The HTTP API: the routes the frontend's http provider calls (frontend/src/api/providers/http.ts).
 
-POST /session turns a clinician id into a random bearer token (stored hashed, expires in 12
-hours); this is still a stub for real authentication. Missing, malformed, unknown or expired
-credentials get 401 and nothing is served. Identity comes first on every route, including for a
-body that fails validation. Everything else is scoped to the caller's patients on the server,
-on every call, and a patient who does not exist and one who is not yours get the same 404. A
+POST /session turns a clinician id and passphrase into a random bearer token (stored hashed,
+expires in 12 hours). An unknown id, a clinician with no passphrase set and a wrong passphrase all
+get the same 401, after the same work; five failures for an id within 15 minutes get 429 before
+anything is hashed; every attempt is audited (ids and outcome, never the passphrase). Missing,
+malformed, unknown or expired credentials get 401 and nothing is served. Identity comes first on
+every route, including for a body that fails validation. Everything else is scoped to the
+caller's patients on the server, on every call, and a patient who does not exist and one who is
+not yours get the same 404. A
 write whose body fails validation leaves a `rejected` audit row (ids only, no values). Responses
 are `Cache-Control: no-store`. The service serves nothing unauthenticated except /healthz and
 POST /session: no docs or schema routes (the contract is frontend/contracts/openapi.json).
-The ward simulation writes through /sim/*, gated by the X-Ingest-Key header (503 if unset).
+The ward simulation writes through /sim/*, gated by the X-Ingest-Key header (503 if unset). One
+shared ward: a different client cannot start a run while the newest is live, and a batch for a run
+that is no longer the newest is refused (both 409, nothing written).
 """
 
+import hashlib
 import secrets
 from collections.abc import Iterator
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
@@ -23,8 +30,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from biosentry.core.audit import AuditLog, Clock, utc_now
-from biosentry.core.config import Settings
+from biosentry.core.audit import AuditLog, Clock, Outcome, utc_now
+from biosentry.core.config import Settings, restricted
+from biosentry.db.passphrase import verify
 from biosentry.db.seed import ensure
 from biosentry.repositories.postgres import Conn, PostgresStore, connect
 from biosentry.schemas import (
@@ -50,6 +58,8 @@ from biosentry.services.patients import PatientService, RejectedError
 from biosentry.services.ward import WardService
 
 NOT_FOUND = "Not found"
+SIGN_IN_FAILURES = 5  # failed sign-ins for one id within the window, then 429
+SIGN_IN_WINDOW = timedelta(minutes=15)
 
 # The body-bearing write routes and the action their audit rows carry. A body that fails
 # validation never reaches the handler, so its audit row is written by the validation handler.
@@ -144,10 +154,11 @@ def unprocessable(exc: RequestValidationError) -> JSONResponse:
 def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> FastAPI:
     """Build the app. `clock` is the wall clock (tests inject one)."""
     settings = settings or Settings.from_env()
-    ensure(settings.database_url, settings.dataset)
+    production = settings.env == "production" or restricted()
+    ensure(settings.database_url, settings.dataset, production)
 
     def open_ctx() -> Context:
-        conn = connect(settings.database_url)
+        conn = connect(settings.database_url, production)
         try:  # a connection that cannot become a Context (no run, say) is not left open
             store = PostgresStore(conn, clock)
             audit = AuditLog(conn, clock, store.role_of)
@@ -189,6 +200,10 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
         response.headers["Cache-Control"] = "no-store"
         return response
 
+    @app.exception_handler(ingest.ConflictError)
+    async def conflict(_: Request, exc: ingest.ConflictError) -> JSONResponse:
+        return JSONResponse(status_code=409, content={"detail": str(exc)})
+
     @app.exception_handler(RejectedError)
     async def rejected(_: Request, exc: RejectedError) -> JSONResponse:
         return JSONResponse(status_code=422, content={"detail": str(exc)})
@@ -224,12 +239,39 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
 
     @app.post("/session", response_model=SessionToken)
     def sign_in(body: SessionRequest, ctx: Ctx) -> SessionToken:
-        # ponytail: any known clinician id gets a token (no passphrase), and a successful
-        # sign-in is not audited. Upgrade: real authentication, audited, before non-synthetic use.
-        if not ctx.store.knows_clinician(body.clinician_id):
-            ctx.audit.append(None, "authenticate", "-", "denied")
-            raise HTTPException(status_code=403, detail="Unknown identity")
-        return SessionToken(token=ctx.store.open_session(body.clinician_id))
+        known, stored = ctx.store.passphrase_hash(body.clinician_id)
+        # The audit resource: the id when it is a clinician, else a fixed-length digest of what was
+        # sent (bounded, never an attacker's text). The limit counts by it, so an unknown id is
+        # throttled exactly like a known one and a 429 does not say which is which.
+        resource = (
+            body.clinician_id
+            if known
+            else "unknown:" + hashlib.sha256(body.clinician_id.encode()).hexdigest()[:16]
+        )
+        with ctx.store.tx():
+            # One attempt at a time per id, so a burst cannot all pass the count below before any
+            # of it is written. Released at commit, after the audit row is in.
+            ctx.conn.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", ("sign_in:" + resource,)
+            )
+            failures = ctx.audit.count(
+                "sign_in", resource, "denied", ctx.store.clock() - SIGN_IN_WINDOW
+            )
+            if failures >= SIGN_IN_FAILURES:
+                outcome: Outcome = "limited"  # before any hashing
+            else:
+                outcome = "ok" if verify(body.passphrase, stored) else "denied"
+            ctx.audit.append(body.clinician_id if known else None, "sign_in", resource, outcome)
+            token = ctx.store.open_session(body.clinician_id) if outcome == "ok" else None
+        if outcome == "limited":  # raised outside the transaction: the audit row must be kept
+            raise HTTPException(
+                status_code=429,
+                detail="Too many failed sign-in attempts. Try again in 15 minutes.",
+                headers={"Retry-After": str(int(SIGN_IN_WINDOW.total_seconds()))},
+            )
+        if token is None:
+            raise HTTPException(status_code=401, detail="Sign-in failed")
+        return SessionToken(token=token)
 
     @app.get("/wards/{ward}/rows", response_model=WardResponse)
     def ward_rows(ward: str, ctx: Ctx, who: Who) -> WardResponse:

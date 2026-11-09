@@ -12,7 +12,7 @@
 
 import type { ApiProvider } from "./contract";
 import { httpProvider } from "./providers/http";
-import { openSession, setAuthToken } from "./client";
+import { getAuthToken, openSession, setAuthToken } from "./client";
 
 const USE_FIXTURES = !import.meta.env.VITE_API_URL;
 
@@ -74,19 +74,32 @@ export const canRecordVitals = !USE_FIXTURES;
 export const extractLabsFromFile = provider.extractLabsFromFile;
 export const extractPatientFromFile = provider.extractPatientFromFile;
 
+/** Whether this build talks to the API (and so checks a passphrase) or serves the fixture. */
+export const usesServer = !USE_FIXTURES;
+
 /**
- * Call on sign-in. For fixtures, sets the clinician filter.
- * For http, sets the bearer token (clinician filtering is server-side).
+ * Sign in. With the API: asks for a token with the passphrase, and rejects with an ApiError when
+ * refused (401 or 429). With fixtures there is no server and nothing is checked: it only sets
+ * the clinician filter, whatever the passphrase is.
  */
-export function initSession(clinicianId: string, token?: string): void {
+export async function signIn(clinicianId: string, passphrase: string): Promise<void> {
   if (USE_FIXTURES) {
-    void fixtures().then((m) => m.setActiveClinician(clinicianId));
-  } else if (token) {
-    setAuthToken(token);
+    const m = await fixtures();
+    m.setActiveClinician(clinicianId);
   } else {
-    // Never the clinician id as the token: it is not a secret. The API issues one, or refuses (401).
-    void openSession(clinicianId);
+    await openSession(clinicianId, passphrase);
   }
+}
+
+/**
+ * Re-arms a session found in sessionStorage after a reload; false when it cannot be. Fixtures keep
+ * the clinician filter only in memory, so it is set again. The API token is held in memory only
+ * (never stored): after a reload there is none, and the clinician must sign in again.
+ */
+export function restoreSession(clinicianId: string): boolean {
+  if (!USE_FIXTURES) return getAuthToken() !== null;
+  void fixtures().then((m) => m.setActiveClinician(clinicianId));
+  return true;
 }
 
 export function clearSession(): void {

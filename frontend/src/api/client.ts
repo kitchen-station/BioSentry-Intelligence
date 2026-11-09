@@ -18,23 +18,24 @@ export function setAuthToken(token: string | null): void {
 }
 
 /**
- * Asks the API for a token (POST /session). Until it answers, other requests wait. If it refuses,
- * requests go out without a token and the API answers 401: the client fails closed.
+ * Signs in (POST /session). Resolves once the token is held; rejects with the ApiError when the
+ * API refuses (401: wrong passphrase, unknown clinician or none set; 429: too many failures), so
+ * the sign-in page can say so. Until it settles, other requests wait; after a refusal they go out
+ * without a token and the API answers 401: the client fails closed. The passphrase is only ever
+ * in this request body: never stored, never logged.
  */
-export function openSession(clinicianId: string): Promise<void> {
+export function openSession(clinicianId: string, passphrase: string): Promise<void> {
   const generation = ++_generation;
   _token = null;
-  _pending = request<{ token: string }>(
+  const opening = request<{ token: string }>(
     "/session",
-    { method: "POST", body: JSON.stringify({ clinician_id: clinicianId }) },
+    { method: "POST", body: JSON.stringify({ clinician_id: clinicianId, passphrase }) },
     false,
-  ).then(
-    (r) => {
-      if (generation === _generation) _token = r.token;
-    },
-    () => {},
-  );
-  return _pending;
+  ).then((r) => {
+    if (generation === _generation) _token = r.token;
+  });
+  _pending = opening.catch(() => {});
+  return opening;
 }
 
 export function getAuthToken(): string | null {

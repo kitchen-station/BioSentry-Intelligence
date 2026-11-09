@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { ApiError, signIn, usesServer } from "../api";
 import type { Session, SessionRole } from "../types";
 import ch from "../components/Crosshair.module.css";
 import styles from "./SignIn.module.css";
@@ -73,6 +74,20 @@ const PROFILES: Profile[] = [
   },
 ];
 
+// --- Messages ---
+
+// The API answers every failed sign-in the same way (401), so the page cannot say which part was
+// wrong; 429 says the clinician is locked for a while.
+function refusal(error: unknown): string {
+  if (error instanceof ApiError && error.status === 401) {
+    return "Sign-in failed. Check the passphrase, or ask whoever set up your account.";
+  }
+  if (error instanceof ApiError && error.status === 429) {
+    return "Too many failed attempts for this clinician. Wait 15 minutes and try again.";
+  }
+  return "Cannot reach the ward server. Try again in a moment.";
+}
+
 // --- Component ---
 
 export function SignIn({ onSignIn }: Props) {
@@ -81,7 +96,10 @@ export function SignIn({ onSignIn }: Props) {
   const from: unknown = (useLocation().state as { from?: unknown } | null)?.from;
   const [department, setDepartment] = useState<Department | null>(null);
   const [selected, setSelected] = useState<Profile | null>(null);
-  const [passphrase, setPassphrase] = useState("anything");
+  // Only the public demo (no server) prefills one: nothing is checked there.
+  const [passphrase, setPassphrase] = useState(usesServer ? "" : "anything");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState<Phase>("department");
 
   const signInAndGo = (profile: Profile, path: string) => {
@@ -104,10 +122,20 @@ export function SignIn({ onSignIn }: Props) {
     setPhase("auth");
   };
 
-  const handleAuth = (e: FormEvent) => {
+  const handleAuth = async (e: FormEvent) => {
     e.preventDefault();
-    if (!selected) return;
-    setPhase("destination");
+    if (!selected || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await signIn(selected.id, passphrase);
+      setPhase("destination");
+    } catch (failure) {
+      setError(refusal(failure));
+    } finally {
+      if (usesServer) setPassphrase(""); // not kept in the page once it has been sent
+      setBusy(false);
+    }
   };
 
   const handleBack = () => {
@@ -117,6 +145,7 @@ export function SignIn({ onSignIn }: Props) {
       setPhase("department");
     } else if (phase === "auth") {
       setSelected(null);
+      setError(null);
       setPhase("profile");
     } else if (phase === "destination") {
       setPhase("auth");
@@ -234,17 +263,26 @@ export function SignIn({ onSignIn }: Props) {
                   value={passphrase}
                   onChange={(e) => setPassphrase(e.target.value)}
                   autoComplete="off"
+                  maxLength={256}
+                  required={usesServer}
                 />
               </div>
             </div>
 
-            <button type="submit" className={styles.btn}>
-              Continue
+            {error && (
+              <p className={styles.error} role="alert">
+                {error}
+              </p>
+            )}
+
+            <button type="submit" className={styles.btn} disabled={busy}>
+              {busy ? "Signing in" : "Continue"}
             </button>
 
             <p className={styles.authNote}>
-              Production deployments authenticate through the hospital
-              identity provider. This pilot build accepts any passphrase.
+              {usesServer
+                ? "The ward server checks your passphrase. After 5 failed attempts for a clinician, sign-in is locked for 15 minutes. Every attempt is recorded."
+                : "Public demo: there is no server and no real sign-in. Any passphrase is accepted, and nothing you enter is kept after a reload."}
             </p>
           </form>
         )}
@@ -294,7 +332,11 @@ export function SignIn({ onSignIn }: Props) {
         <div className={styles.footerGrid}>
           <div className={styles.footerItem}>
             <span className={styles.footerLabel}>Privacy</span>
-            <span>Pilot build: synthetic data, no real authentication or audit yet</span>
+            <span>
+              {usesServer
+                ? "Pilot build: synthetic data only. Not for real patients."
+                : "Public demo: synthetic data, no server, no real sign-in"}
+            </span>
           </div>
         </div>
       </footer>

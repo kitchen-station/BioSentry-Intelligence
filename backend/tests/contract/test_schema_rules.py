@@ -152,7 +152,7 @@ def test_a_sim_run_names_each_patient_once_and_rows_belong_to_their_patient(
 ) -> None:
     from biosentry.schemas.ingest import NewRun
 
-    body = {"source": "synthetic", "seed": 1, "origin": "2026-01-01T00:00:00Z"}
+    body = {"client_id": "c-1", "source": "synthetic", "seed": 1, "origin": "2026-01-01T00:00:00Z"}
     NewRun.model_validate({**body, "patients": [_sim_patient("s-1")]})  # the valid shape
     with pytest.raises(ValidationError, match=error):
         NewRun.model_validate({**body, "patients": patients})

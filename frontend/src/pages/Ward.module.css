@@ -252,8 +252,7 @@
 }
 
 /* ---- Connection and alerts ---- */
-.offline,
-.attribution {
+.offline {
   max-width: var(--page-max);
   margin: var(--sp-3) auto 0;
   padding: var(--sp-2) var(--sp-3);

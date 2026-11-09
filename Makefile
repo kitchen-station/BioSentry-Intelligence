@@ -1,5 +1,5 @@
 .PHONY: web-install web-dev web-build web-typecheck web-lint web-test check \
-        api-install api-dev api-test db-up db-down db-migrate db-reset db-purge-eicu contract
+        api-install api-dev api-test db-up db-down db-migrate db-reset db-passphrase contract
 
 FRONTEND := frontend
 BACKEND := backend
@@ -27,7 +27,7 @@ web-test:
 api-install:
 	cd $(BACKEND) && uv sync --locked
 
-# Loopback only: identity is a stub. The sim posts to /sim/* with this key.
+# Loopback only. Local sign-in: every clinician has the dev passphrase (README). The sim posts to /sim/* with this key.
 BIOSENTRY_INGEST_KEY ?= dev-local
 api-dev:
 	cd $(BACKEND) && BIOSENTRY_INGEST_KEY=$(BIOSENTRY_INGEST_KEY) uv run uvicorn biosentry.api.main:app --host 127.0.0.1 --port 8000
@@ -55,9 +55,11 @@ db-migrate:
 db-reset:
 	cd $(BACKEND) && uv run python -m biosentry.db.seed --reset
 
-# Run this before anything holding replay data is shared. The audit table has no foreign key to run, so the trail stays.
-db-purge-eicu:
-	cd $(BACKEND) && uv run python -c "from biosentry.core.config import Settings; from biosentry.repositories.postgres import connect, purge_eicu; c = connect(Settings.from_env().database_url); print(purge_eicu(c), 'eicu_demo run(s) removed'); c.close()"
+# Set a clinician's passphrase (prompts twice, or pipe it in): make db-passphrase id=rn-manalo
+# It writes to the database BIOSENTRY_DATABASE_URL names (the compose one when unset).
+db-passphrase:
+	@test -n "$(id)" || { echo "usage: make db-passphrase id=<clinician id>" >&2; exit 1; }
+	cd $(BACKEND) && uv run python -m biosentry.db.passphrase "$(id)"
 
 # Pydantic schemas -> frontend/contracts/openapi.json -> frontend/src/types/generated.ts
 contract:

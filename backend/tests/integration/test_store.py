@@ -5,27 +5,24 @@ import json
 import re
 import threading
 import time
-from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import Any
 
 import psycopg
 import pytest
-from conftest import dump_database
+from conftest import dump_database, together
 from fastapi.testclient import TestClient
 
 from biosentry.api.app import create_app
 from biosentry.core.config import DEFAULT_DATASET, Settings
-from biosentry.db.seed import ensure, reset
-from biosentry.repositories.postgres import connect, purge_eicu
+from biosentry.db.seed import DEV_PASSPHRASE, ensure, reset
+from biosentry.repositories.postgres import connect
 from biosentry.schemas.ingest import Batch
 from biosentry.services import ingest
 
 NOW = datetime(2026, 10, 14, 12, 0, tzinfo=UTC)
 KEY = "test-ingest-key"
-REPO = Path(__file__).resolve().parents[3]
 DATA: dict[str, Any] = json.loads(DEFAULT_DATASET.read_text(encoding="utf-8"))
 CLINICIANS: dict[str, list[str]] = {c: list(e["patients"]) for c, e in DATA["clinicians"].items()}
 
@@ -54,7 +51,8 @@ class Api:
 
     def as_(self, clinician: str) -> dict[str, str]:
         if clinician not in self.tokens:
-            token = self.client.post("/session", json={"clinician_id": clinician}).json()["token"]
+            body = {"clinician_id": clinician, "passphrase": DEV_PASSPHRASE}
+            token = self.client.post("/session", json=body).json()["token"]
             self.tokens[clinician] = {"Authorization": f"Bearer {token}"}
         return self.tokens[clinician]
 
@@ -130,8 +128,16 @@ def sim_patient(pid: str = "s-1", rn: str = "rn-delacruz", md: str | None = "md-
     }
 
 
-def new_run(source: str = "synthetic", patients: list[dict] | None = None) -> dict[str, Any]:
-    return {"source": source, "seed": 7, "origin": ORIGIN, "patients": patients or [sim_patient()]}
+def new_run(
+    source: str = "synthetic", patients: list[dict] | None = None, client_id: str = "client-a"
+) -> dict[str, Any]:
+    return {
+        "client_id": client_id,
+        "source": source,
+        "seed": 7,
+        "origin": ORIGIN,
+        "patients": patients or [sim_patient()],
+    }
 
 
 def batch(minute: int = 0, **over: Any) -> dict[str, Any]:
@@ -277,12 +283,18 @@ def test_an_observation_needs_a_value_or_a_reason_never_neither_or_both(
         )
 
 
-def test_the_synthetic_flag_must_agree_with_the_source(api: Api) -> None:
+@pytest.mark.parametrize(
+    ("source", "synthetic"),
+    [("eicu_demo", True), ("eicu_demo", False), ("synthetic", False), ("fixture", False)],
+)
+def test_a_run_is_a_fixture_or_synthetic_and_for_now_always_synthetic(
+    api: Api, source: str, synthetic: bool
+) -> None:
     with connect(api.url) as conn, pytest.raises(psycopg.errors.CheckViolation):
         conn.execute(
             "INSERT INTO run (source, synthetic, ward, origin, as_of, tier_status)"
-            " VALUES ('eicu_demo', TRUE, 'W4', %s, %s, '[]')",
-            (ORIGIN, ORIGIN),
+            " VALUES (%s, %s, 'W4', %s, %s, '[]')",
+            (source, synthetic, ORIGIN, ORIGIN),
         )
 
 
@@ -310,11 +322,10 @@ def test_sign_in_issues_a_random_token_stored_hashed(api: Api) -> None:
     with connect(api.url) as conn:
         dump = dump_database(conn)
     assert token not in dump  # only its hash is stored
-    assert api.client.post("/session", json={"clinician_id": "nobody"}).status_code == 403
+    body = {"clinician_id": "rn-manalo", "passphrase": DEV_PASSPHRASE}
+    assert api.client.post("/session", json={**body, "clinician_id": "nobody"}).status_code == 401
     assert api.client.post("/session", json={}).status_code == 422
-    assert (
-        api.client.post("/session", json={"clinician_id": "rn-manalo", "x": 1}).status_code == 422
-    )
+    assert api.client.post("/session", json={**body, "x": 1}).status_code == 422
 
 
 def test_the_clinician_id_is_not_a_bearer_token_and_tokens_expire(api: Api) -> None:
@@ -457,48 +468,6 @@ def test_the_run_decides_synthetic_not_the_client(api: Api) -> None:
     assert api.post("/sim/runs/2/batch", body).status_code == 422  # not a field the client may send
 
 
-def test_an_eicu_run_propagates_synthetic_false_and_the_purge_removes_it(api: Api) -> None:
-    run_id = start(api, source="eicu_demo")
-    api.post(f"/sim/runs/{run_id}/batch", batch(minute=1))
-    row = api.ward("rn-delacruz")["ranked"][0]
-    assert row["synthetic"] is False
-    assert all(m["provenance"]["synthetic"] is False for m in row["vitals"].values())
-    detail = api.client.get("/patients/s-1", headers=api.as_("rn-delacruz")).json()
-    assert detail["synthetic"] is False
-    api.client.post(
-        "/patients/s-1/notes",
-        headers=api.as_("rn-delacruz"),
-        json={"author": "a", "role": "RN", "content": "c"},
-    )
-    note = api.client.get("/patients/s-1/notes", headers=api.as_("rn-delacruz")).json()[0]
-    assert note["synthetic"] is False
-    api.client.post(
-        "/patients/s-1/acknowledgement", headers=api.as_("rn-delacruz"), json={"score": 10}
-    )
-    audit_before = len(api.sql("SELECT * FROM audit_log"))
-
-    makefile = (REPO / "Makefile").read_text(encoding="utf-8")
-    assert "print(purge_eicu(c)" in makefile, "the Makefile's db-purge-eicu runs purge_eicu"
-    with connect(api.url) as conn:
-        assert purge_eicu(conn) == 1
-
-    for table in (
-        "patient",
-        "care_assignment",
-        "observation",
-        "vital_bin",
-        "clinical_note",
-        "acknowledgement",
-        "sim_event",
-    ):
-        assert api.sql(f"SELECT * FROM {table} WHERE run_id = %s", run_id) == [], table
-    assert api.sql("SELECT * FROM run WHERE source = 'eicu_demo'") == []
-    assert len(api.sql("SELECT * FROM audit_log")) == audit_before  # the trail stays
-    assert (
-        api.ward("rn-manalo")["ranked"][0]["id"] == "p-001"
-    )  # the fixture is the active run again
-
-
 @pytest.mark.parametrize("key", [None, "wrong", KEY[:-1], KEY + "x"])
 def test_ingest_refuses_a_missing_or_wrong_key_and_writes_nothing(
     api: Api, key: str | None
@@ -533,6 +502,7 @@ def test_ingest_refuses_a_malformed_body(api: Api) -> None:
     for body in (
         new_run(patients=[broken]),
         {**new_run(), "source": "fixture"},
+        {**new_run(), "source": "eicu_demo"},  # the replay is gone
         {**new_run(), "patients": []},
         {**new_run(), "extra": 1},
     ):
@@ -587,7 +557,7 @@ RUN_TABLES = (
 
 
 def test_a_deleted_runs_id_is_never_reused_and_foreign_keys_always_cascade(api: Api) -> None:
-    run_id = start(api, source="eicu_demo", patients=[sim_patient("orphan")])
+    run_id = start(api, patients=[sim_patient("orphan")])
     event = {"minute": 1, "kind": "call", "patient_id": None, "staff_id": None, "text": "t"}
     body = batch(minute=1, patients=[], observations=[], bins=[], events=[event])
     assert api.post(f"/sim/runs/{run_id}/batch", body).status_code == 204
@@ -608,8 +578,9 @@ def test_a_deleted_runs_id_is_never_reused_and_foreign_keys_always_cascade(api: 
 
 
 def test_the_audit_log_refuses_overwriting_a_row_but_still_appends(api: Api) -> None:
-    api.client.get("/patients", headers=api.as_("rn-manalo"))
-    (first,) = api.sql("SELECT * FROM audit_log")
+    headers = api.as_("rn-manalo")
+    api.client.get("/patients", headers=headers)
+    first, second = api.sql("SELECT * FROM audit_log")  # the sign-in, then the view
     with connect(api.url) as conn:
         with pytest.raises(psycopg.errors.UniqueViolation):  # the primary key refuses the seq
             conn.execute(
@@ -622,9 +593,9 @@ def test_the_audit_log_refuses_overwriting_a_row_but_still_appends(api: Api) -> 
                 "INSERT INTO audit_log (seq, at, action, resource, outcome)"
                 " VALUES (999, now(), 'forged', '-', 'ok')"
             )
-    assert api.sql("SELECT * FROM audit_log") == [first]
-    api.client.get("/patients", headers=api.as_("rn-manalo"))  # ordinary appends still work
-    assert len(api.sql("SELECT * FROM audit_log")) == 2
+    assert api.sql("SELECT * FROM audit_log") == [first, second]
+    api.client.get("/patients", headers=headers)  # ordinary appends still work
+    assert len(api.sql("SELECT * FROM audit_log")) == 3
 
 
 def test_a_rejected_pin_is_not_echoed_back(api: Api) -> None:
@@ -654,7 +625,7 @@ def test_a_rejected_pin_is_not_echoed_back(api: Api) -> None:
 
 def test_a_long_resource_is_cut_in_the_audit_log(api: Api) -> None:
     api.client.get("/patients/" + "p" * 3000, headers=api.as_("rn-delacruz"))
-    (row,) = api.sql("SELECT resource, outcome FROM audit_log")
+    (row,) = api.sql("SELECT resource, outcome FROM audit_log WHERE action = 'view_patient'")
     assert (len(row["resource"]), row["outcome"]) == (200, "not_found")
 
 
@@ -726,18 +697,6 @@ def test_served_times_are_whole_seconds_with_a_z_suffix_even_after_shifting(api:
 
 THREADS = 8
 ROUNDS = 6
-
-
-def together(count: int, work: Callable[[int], Any]) -> list[Any]:
-    """Run `work(i)` on `count` threads, started at the same moment. An exception is re-raised."""
-    gate = threading.Barrier(count)
-
-    def go(i: int) -> Any:
-        gate.wait()
-        return work(i)
-
-    with ThreadPoolExecutor(count) as pool:
-        return [f.result() for f in [pool.submit(go, i) for i in range(count)]]
 
 
 def test_simultaneous_notes_get_distinct_ids(api: Api) -> None:
@@ -836,49 +795,15 @@ def test_times_are_utc_even_when_the_environment_sets_a_time_zone(
     assert len(seen) > 20 and [t for t in seen if not ISO_Z.match(t)] == []
 
 
-def test_a_purge_waits_for_a_running_batch_instead_of_deadlocking_with_it(
-    api: Api, monkeypatch: pytest.MonkeyPatch
+def test_reset_refuses_when_the_connection_made_is_not_to_loopback_and_drops_nothing(
+    database_url: str, spoofed_server_address: None
 ) -> None:
-    run_id = start(api, source="eicu_demo")
-    reached, go = threading.Event(), threading.Event()
-    real = ingest.upsert_bins
-
-    def pause(*args: Any) -> None:
-        # In the batch, after it updated the patient rows and before it updates the run row.
-        reached.set()
-        assert go.wait(20)
-        real(*args)
-
-    monkeypatch.setattr(ingest, "upsert_bins", pause)
-
-    def run_batch() -> bool:
-        with connect(api.url) as conn:
-            return ingest.add_batch(conn, run_id, Batch.model_validate(batch(minute=1)), api.wall)
-
-    def purge() -> int:
-        with connect(api.url) as conn:
-            return purge_eicu(conn)
-
-    with ThreadPoolExecutor(2) as pool:
-        batch_done = pool.submit(run_batch)
-        assert reached.wait(20)
-        purge_done = pool.submit(purge)
-        waiting = "SELECT 1 FROM pg_stat_activity WHERE wait_event_type = 'Lock'"
-        for _ in range(1000):  # until the purge is blocked behind the batch
-            if api.sql(waiting):
-                break
-            time.sleep(0.02)
-        go.set()
-        assert batch_done.result(30) is True
-        assert purge_done.result(30) == 1
-    assert api.sql("SELECT id FROM run WHERE source = 'eicu_demo'") == []
-
-
-@pytest.mark.parametrize("host", ["db.example.invalid", "192.0.2.1", ""])
-def test_reset_refuses_a_database_that_is_not_on_this_machine(host: str) -> None:
-    url = f"postgresql://u:p@{host}/x?connect_timeout=1" if host else "dbname=x"  # none: a socket
+    # The URL says 127.0.0.1; the connection libpq made went elsewhere: judged on the connection.
     with pytest.raises(SystemExit, match="loopback"):
-        reset(url)
+        reset(database_url)
+    with connect(database_url) as conn:
+        assert conn.execute("SELECT count(*) AS n FROM run").fetchone() == {"n": 1}
+        assert conn.execute("SELECT count(*) AS n FROM clinician").fetchone() == {"n": 5}
 
 
 def test_reset_on_loopback_rebuilds_from_the_seed(database_url: str) -> None:
@@ -920,8 +845,8 @@ def test_a_database_with_no_run_fails_the_request_and_closes_its_connection(
 
     opened: list[psycopg.Connection[Any]] = []
 
-    def tracked(url: str) -> psycopg.Connection[Any]:
-        opened.append(connect(url))
+    def tracked(url: str, production: bool | None = None) -> psycopg.Connection[Any]:
+        opened.append(connect(url, production))
         return opened[-1]
 
     headers = api.as_("rn-delacruz")
@@ -970,3 +895,152 @@ def test_an_unknown_patient_reads_as_none_and_a_never_recorded_input_is_missing(
         assert (m.provenance.source.value, m.provenance.quality.value) == (source, "missing")
     (row,) = api.ward("rn-delacruz")["abstained"]  # never imputed: NOT RANKED, naming both
     assert "Heart rate missing" in row["reason"] and "Level of consciousness missing" in row["reason"]
+
+
+# --- One shared ward ---------------------------------------------------------------------------
+
+LIVE = "Another ward simulation is live"
+REPLACED = "This run has been replaced by a newer one"
+
+
+def tally(api: Api) -> list[dict[str, Any]]:
+    return api.sql(
+        "SELECT (SELECT count(*) FROM run) AS runs, (SELECT count(*) FROM patient) AS patients,"
+        " (SELECT count(*) FROM observation) AS observations,"
+        " (SELECT count(*) FROM sim_event) AS events,"
+        " (SELECT count(*) FROM care_assignment) AS assignments"
+    )
+
+
+def register(api: Api, client_id: str) -> Any:
+    return api.post("/sim/runs", new_run(client_id=client_id))
+
+
+def test_a_different_client_cannot_take_over_a_live_run_and_nothing_is_written(api: Api) -> None:
+    first = start(api, client_id="client-a")
+    before = tally(api)
+    refused = register(api, "client-b")
+    assert (refused.status_code, refused.json()) == (409, {"detail": LIVE})
+    assert tally(api) == before
+    assert api.sql("SELECT max(id) AS id FROM run") == [{"id": first}]
+    assert api.ward("rn-delacruz")["receiving_data"] is True  # still the first client's ward
+    assert api.sql("SELECT client_id FROM run ORDER BY id") == [
+        {"client_id": None},  # the fixture
+        {"client_id": "client-a"},
+    ]
+
+
+def test_the_same_client_may_replace_its_own_live_run_which_is_what_a_restart_does(
+    api: Api,
+) -> None:
+    first = start(api, client_id="client-a")
+    second = start(api, client_id="client-a")
+    assert second > first
+    assert api.ward("rn-delacruz")["receiving_data"] is True
+    assert register(api, "client-b").status_code == 409  # and the new run is the one that holds it
+
+
+def test_a_new_run_is_live_from_creation_and_every_batch_renews_it(api: Api) -> None:
+    run_id = start(api, client_id="client-a")
+    assert api.ward("rn-delacruz")["receiving_data"] is True  # no batch yet
+    assert register(api, "client-b").status_code == 409  # not replaceable the moment it exists
+    api.wall.now += timedelta(seconds=30)  # the window is 30 seconds, as receiving_data's
+    assert api.ward("rn-delacruz")["receiving_data"] is True
+    assert register(api, "client-b").status_code == 409
+    api.wall.now += timedelta(seconds=1)
+    assert api.ward("rn-delacruz")["receiving_data"] is False
+    api.post(f"/sim/runs/{run_id}/batch", batch(minute=1))  # a batch makes it live again
+    assert api.ward("rn-delacruz")["receiving_data"] is True
+    api.wall.now += timedelta(seconds=30)
+    assert register(api, "client-b").status_code == 409
+    api.wall.now += timedelta(seconds=1)
+    assert register(api, "client-b").status_code == 201  # liveness and replaceability agree
+
+
+def test_a_stale_or_ended_run_may_be_replaced_by_anyone(api: Api) -> None:
+    start(api, client_id="client-a")
+    api.wall.now += timedelta(seconds=31)
+    stale = register(api, "client-b")
+    assert stale.status_code == 201
+    api.post(f"/sim/runs/{stale.json()['run_id']}/batch", batch(minute=1, ended=True))
+    assert register(api, "client-c").status_code == 201  # ended: free at once, however fresh
+
+
+def test_a_fixture_run_never_blocks(api: Api) -> None:
+    assert api.sql("SELECT source, last_batch_at FROM run") == [
+        {"source": "fixture", "last_batch_at": None}
+    ]
+    assert register(api, "client-z").status_code == 201
+
+
+def test_a_superseded_sim_gets_409_and_its_batch_writes_nothing(api: Api) -> None:
+    old = start(api, client_id="client-a")
+    api.wall.now += timedelta(seconds=31)
+    new = start(api, client_id="client-b")
+    before = tally(api)
+    (run_before,) = api.sql("SELECT * FROM run WHERE id = %s", old)
+    refused = api.post(f"/sim/runs/{old}/batch", batch(minute=5))
+    assert (refused.status_code, refused.json()) == (409, {"detail": REPLACED})
+    assert tally(api) == before
+    assert api.sql("SELECT * FROM run WHERE id = %s", old) == [run_before]
+    assert register(api, "client-a").status_code == 409  # the superseded sim cannot take it back
+    assert api.post(f"/sim/runs/{new}/batch", batch(minute=1)).status_code == 204
+    assert api.post("/sim/runs/99/batch", batch()).status_code == 404  # a missing run is not this
+
+
+@pytest.mark.parametrize("client_id", [None, "", "x" * 65, 7, ["a"]])
+def test_a_client_id_is_required_and_bounded(api: Api, client_id: Any) -> None:
+    body = new_run()
+    if client_id is None:
+        del body["client_id"]
+    else:
+        body["client_id"] = client_id
+    assert api.post("/sim/runs", body).status_code == 422
+    assert len(api.sql("SELECT id FROM run")) == 1
+    assert register(api, "x" * 64).status_code == 201  # the longest allowed
+
+
+@pytest.mark.parametrize("sims", [2, THREADS])
+def test_simultaneous_registrations_cannot_both_win(api: Api, sims: int) -> None:
+    for round_ in range(ROUNDS):
+        api.wall.now += timedelta(seconds=31)  # the last run is stale: the ward is free this round
+        before = len(api.sql("SELECT id FROM run"))
+        sent = together(sims, lambda i: register(api, f"client-{i}"))
+        assert sorted(r.status_code for r in sent) == [201] + [409] * (sims - 1), round_
+        assert len(api.sql("SELECT id FROM run")) == before + 1
+        winner = next(r for r in sent if r.status_code == 201).json()["run_id"]
+        assert api.sql("SELECT max(id) AS id FROM run") == [{"id": winner}]
+
+
+def test_a_registration_waits_for_a_batch_in_flight_on_the_run_it_would_replace(
+    api: Api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run_id = start(api, client_id="client-a")
+    api.wall.now += timedelta(seconds=40)  # the last batch is 40 seconds old: stale, until the next
+    reached, go = threading.Event(), threading.Event()
+    real = ingest.upsert_bins
+
+    def pause(*args: Any) -> None:
+        reached.set()  # in the batch, before it writes the run's last_batch_at
+        assert go.wait(20)
+        real(*args)
+
+    monkeypatch.setattr(ingest, "upsert_bins", pause)
+
+    def run_batch() -> bool:
+        with connect(api.url) as conn:
+            return ingest.add_batch(conn, run_id, Batch.model_validate(batch(minute=1)), api.wall)
+
+    with ThreadPoolExecutor(2) as pool:
+        batch_done = pool.submit(run_batch)
+        assert reached.wait(20)
+        takeover = pool.submit(register, api, "client-b")
+        for _ in range(1000):  # until the registration is blocked behind the batch
+            if api.sql("SELECT 1 FROM pg_stat_activity WHERE wait_event_type = 'Lock'"):
+                break
+            time.sleep(0.02)
+        go.set()
+        assert batch_done.result(30) is True
+        refused = takeover.result(30)
+    assert (refused.status_code, refused.json()) == (409, {"detail": LIVE})  # the batch renewed it
+    assert api.sql("SELECT max(id) AS id FROM run") == [{"id": run_id}]

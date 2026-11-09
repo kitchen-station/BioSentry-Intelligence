@@ -26,6 +26,7 @@ from psycopg.pq import TransactionStatus
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from biosentry.core.config import DEV_DATABASE_PASSWORD, ConfigError, restricted
 from biosentry.schemas import ClinicalNote, LabPanel, TierStatus, UnscoredPatient
 
 LIVE_WITHIN = timedelta(seconds=30)  # a sim run whose last batch is older is not "receiving data"
@@ -46,6 +47,12 @@ _VALUE: dict[str, Callable[[dict[str, Any]], Any]] = {
 }
 
 
+def is_live(last_batch_at: datetime | None, ended: bool, now: datetime) -> bool:
+    """A sim run is live until it ends or goes LIVE_WITHIN without a batch. Its creation counts as
+    the first batch (it is created with last_batch_at set). A fixture run has none: never live."""
+    return last_batch_at is not None and not ended and now - last_batch_at <= LIVE_WITHIN
+
+
 def whole(moment: datetime) -> datetime:
     """A time as stored: UTC, whole seconds. Keeps the served time format, the retry key and
     session expiry exactly as they were."""
@@ -56,11 +63,19 @@ def iso(moment: datetime) -> str:
     return whole(moment).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def connect(url: str) -> Conn:
+def connect(url: str, production: bool | None = None) -> Conn:
+    """Every connection the process makes comes through here. In production (`production`, or when
+    None the BIOSENTRY_ENV of the process, where anything but `local` counts) a connection whose
+    actual password is the dev one is refused, however the URL, PGPASSWORD or a passfile got it
+    there."""
     # ponytail: one connection per request, opened and closed each time. Upgrade: psycopg_pool
     # when connection time shows up in the request latency.
     conn = psycopg.connect(url, autocommit=True, row_factory=dict_row)
     try:
+        if (restricted() if production is None else production) and (
+            conn.info.password == DEV_DATABASE_PASSWORD
+        ):
+            raise ConfigError("refusing to connect in production with the dev database password")
         # Not a connection option: PGTZ in the environment would override that. Served times end in Z.
         conn.execute("SET TIME ZONE 'UTC'")
     except BaseException:
@@ -76,17 +91,6 @@ def transaction(conn: Conn) -> Iterator[None]:
         return
     with conn.transaction():
         yield
-
-
-def purge_eicu(conn: Conn) -> int:
-    """Delete every eicu_demo run and its rows; returns how many runs. Each run is locked first
-    (in id order), so a batch holding it finishes before the delete, never deadlocks with it."""
-    with transaction(conn):
-        rows = conn.execute("SELECT id FROM run WHERE source = 'eicu_demo' ORDER BY id")
-        ids = [r["id"] for r in rows]
-        for run_id in ids:
-            lock_run(conn, run_id)
-        return conn.execute("DELETE FROM run WHERE id = ANY(%s)", (ids,)).rowcount
 
 
 def lock_run(conn: Conn, run_id: int) -> None:
@@ -224,19 +228,21 @@ def insert_run(
     as_of: datetime,
     last_batch_at: datetime | None,
     tier_status: list[dict[str, Any]],
+    client_id: str | None = None,
 ) -> int:
     row = conn.execute(
-        "INSERT INTO run (source, synthetic, seed, ward, origin, as_of, last_batch_at, tier_status)"
-        " VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+        "INSERT INTO run (source, synthetic, seed, ward, origin, as_of, last_batch_at, tier_status,"
+        " client_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
         (
             source,
-            source != "eicu_demo",
+            True,  # I6: the flag stays; a future dataset of real records sets it False
             seed,
             ward,
             whole(origin),
             whole(as_of),
             whole(last_batch_at) if last_batch_at else None,
             Jsonb(tier_status),
+            client_id,
         ),
     ).fetchone()
     assert row is not None
@@ -284,23 +290,25 @@ class PostgresStore:
         return moment + self.shift
 
     def receiving_data(self) -> bool:
-        if self.last_batch_at is None:
-            return True
-        return not self.ended and self.clock() - self.last_batch_at <= LIVE_WITHIN
+        return self.last_batch_at is None or is_live(self.last_batch_at, self.ended, self.clock())
 
     def tx(self) -> AbstractContextManager[None]:
         return transaction(self.conn)
 
     # --- identity and scope --------------------------------------------------------------------
 
-    def knows_clinician(self, clinician_id: str) -> bool:
-        return self.role_of(clinician_id) is not None
-
     def role_of(self, clinician_id: str) -> str | None:
         row = self.conn.execute(
             "SELECT role FROM clinician WHERE id = %s", (clinician_id,)
         ).fetchone()
         return row["role"] if row else None
+
+    def passphrase_hash(self, clinician_id: str) -> tuple[bool, str | None]:
+        """Whether this clinician exists, and their stored hash (None: no passphrase is set)."""
+        row = self.conn.execute(
+            "SELECT passphrase_hash FROM clinician WHERE id = %s", (clinician_id,)
+        ).fetchone()
+        return (row is not None, row["passphrase_hash"] if row else None)
 
     def assigned(self, clinician_id: str) -> frozenset[str]:
         """The patients under this clinician's care. Unknown id: nobody (fails closed)."""

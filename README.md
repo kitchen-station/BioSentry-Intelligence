@@ -37,8 +37,9 @@ make web-install
 make web-dev
 ```
 
-Open the URL Vite prints, choose a department and a clinician, and sign in with any
-passphrase. With no API, the dashboard serves the fixture from memory; whatever you enter is gone on reload.
+Open the URL Vite prints, choose a department and a clinician, and sign in. With no API (this is the
+public demo) there is no server and no real sign-in: any passphrase is accepted, the dashboard serves
+the fixture from memory, and whatever you enter is gone on reload.
 
 **With the API**, so that scores are computed by the real NEWS2 and arbiter, and everything you
 record is kept:
@@ -50,6 +51,16 @@ make api-dev                       # http://127.0.0.1:8000, loopback only; creat
 cd frontend && VITE_API_URL=http://127.0.0.1:8000 npm run dev
 ```
 
+Sign in with the dev passphrase `dev-passphrase-local`, for any clinician. **Local development only:**
+seeding sets it for every clinician when, and only when, the connection it seeds over is to loopback
+(judged after connecting, from the server address libpq actually used, not from the URL; `make db-reset`
+asks the same of its connection before it drops anything) and the process is not in production
+(`BIOSENTRY_ENV` anything but `local`, which never seeds it, whatever the host). Any other database is
+seeded with no passphrases, and a clinician with none
+cannot sign in: set one with `make db-passphrase id=rn-manalo` (it prompts twice, or reads one line from
+stdin; at least 12 characters; it writes to the database `BIOSENTRY_DATABASE_URL` names). A database
+seeded before passphrases existed has none either: `make db-reset` seeds it again.
+
 `make db-down` stops the database (the data stays in a Docker volume). The API reaches it through
 `BIOSENTRY_DATABASE_URL`, which defaults to the dev database in `compose.yaml` (its password is for
 that local container only).
@@ -58,7 +69,10 @@ that local container only).
 no dataset; unset, it uses the fixture. The API allows the dashboard on `localhost` and `127.0.0.1`,
 ports 5173 and 5174 (the ward sim on 5180 and 5181). The ward sim posts to `/sim/*` with the header
 `X-Ingest-Key`, which must equal the API's `BIOSENTRY_INGEST_KEY` (`make api-dev` sets `dev-local`;
-with the variable unset the ingest routes answer 503).
+with the variable unset the ingest routes answer 503). There is one shared ward: `POST /sim/runs`
+carries a `client_id` (one per sim page load), and while the newest run is live (not ended, last batch
+or creation within 30 seconds) a different `client_id` gets 409 and nothing is written; the same one may
+replace its own run. A batch for a run that is no longer the newest also gets 409.
 
 `make check` runs lint, types and tests for both halves; the API tests need the database, so run
 `make db-up` first (each test works in its own copy of a seeded database and drops it). `make db-reset`
@@ -67,7 +81,11 @@ schemas. Every target is in the [Makefile](Makefile).
 
 ## What you will see
 
-- **Sign-in:** pick a department and a clinician profile. This build accepts any passphrase.
+- **Sign-in:** pick a department and a clinician profile, then give the passphrase. The API checks it
+  (a wrong one, an unknown clinician and one with no passphrase set all get the same refusal; 5 failures
+  for a clinician within 15 minutes lock that clinician out for the rest of the 15 minutes) and audits
+  every attempt. The token is kept in memory only, so a reload returns to sign-in. The public demo (no
+  API) checks nothing and says so.
 - **Ward:** patients in priority order, each with its score and why. A patient the system
   cannot score is listed as NOT RANKED, with the reason and what to record to fix it.
 - **Patient detail:** the score and what drives it, vitals and labs with where each value
@@ -87,7 +105,7 @@ active one: the seeded fixture ward, or a simulated ward posted to `/sim/*`.
 - **Stored:** runs, clinicians and who cares for which patient, patients, every observation with its
   source, tier, time and quality (a value, or the reason there is none), 15-minute vital bins (a gap
   is NULL), notes (soft-deleted), acknowledgements, sessions (the token hashed, 12 hours), the
-  audit log (ids and outcomes only; the database refuses UPDATE, DELETE, TRUNCATE and a repeated sequence number, but not a user who can drop its triggers or the table), and the
+  audit log (ids and outcomes only, sign-in attempts included, never a passphrase; the database refuses UPDATE, DELETE, TRUNCATE and a repeated sequence number, but not a user who can drop its triggers or the table), and the
   sim's event feed.
 - **Never stored:** scores, ranks, reasons and the NOT RANKED text. They are computed on every read
   (an acknowledgement keeps the score the clinician acknowledged, as they saw it).
@@ -101,8 +119,8 @@ active one: the seeded fixture ward, or a simulated ward posted to `/sim/*`.
   escalation arbiter computed on read, notes, labs, admission, nurse-recorded vitals,
   acknowledgements, and ingest from the ward simulation.
 
-**Pending:** real authentication (sign-in today takes any known clinician id, no passphrase, and
-a successful sign-in is not audited), cloud sync, a hash-chained audit log, Tier B in the scoring, a
+**Pending:** an identity provider in place of per-clinician passphrases (a clinician locked out by five
+bad attempts stays locked for 15 minutes, whoever made them), cloud sync, a hash-chained audit log, Tier B in the scoring, a
 signal-quality model, conformal abstention, distilled edge models, anything measured on real
 patients, a sensor pipeline (IoT Device Access), document extraction, and a plain-language
 explanation of each ranked alert for the nurse or physician.
@@ -149,13 +167,19 @@ applied to made-up patients.
 
 ## Before you expose it anywhere
 
-- **Synthetic data only.** No real patient data exists in this repository. The ward sim can replay
-  eICU-CRD Demo 2.0.1 (ODbL) as an `eicu_demo` run, which is the only data marked `synthetic: false`.
-  Kitchen's competition rule is synthetic only, and ODbL has its own terms. **Run
-  `make db-purge-eicu` before anything holding replay data is shared** (the database volume, a dump,
-  a backup, a demo laptop). It deletes every `eicu_demo` run and its rows; the audit trail stays.
-- **Identity is a stub.** Sign-in accepts any passphrase, and `POST /session` gives a token to any
-  known clinician id. There is no real authentication. Keep the API on loopback.
+- **Synthetic data only.** No real patient data exists in this repository. Every run is a `fixture`
+  or `synthetic` run and the database refuses a run whose `synthetic` flag is false; the flag stays on
+  every run and row (I6) because a later dataset will need it.
+- **Sign-in is a passphrase per clinician** (scrypt, rate-limited, audited), not an identity provider,
+  and the dev passphrase exists only for a database on loopback. The public demo has no sign-in at all.
+- **Keep the API off the internet.** Run it on loopback, or deploy it on the team VPS as described in
+  [deploy/README.md](deploy/README.md): the API is published on the host's loopback only, the database
+  not at all, and teammates reach it over Tailscale. In production (`BIOSENTRY_ENV=production`) the
+  process refuses to start on the dev database password (in the URL text, and, at every connection, in the
+  password libpq actually used: PGPASSWORD and a passfile count) or an ingest key that, once stripped, is
+  under 32 characters or has fewer than 8 distinct ones.
+  `BIOSENTRY_CORS_ORIGINS` (comma-separated) overrides the origins the dashboard may be served from; the
+  local ones stay the default.
 
 ## Licence
 
