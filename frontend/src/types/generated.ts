@@ -398,6 +398,20 @@ export interface components {
             readonly values: components["schemas"]["PartialAdmitPatientInput"];
         };
         /**
+         * PatientStay
+         * @description One stay on the ward (GET /wards/{ward}/stays): scoped to the caller. Facts only: a score
+         *     is computed on read and never stored.
+         */
+        readonly PatientStay: {
+            readonly admitted_at: string | null;
+            readonly bed: string;
+            readonly id: string;
+            readonly left_at: string | null;
+            readonly name: string;
+            readonly outcome: ("discharged" | "higher_care") | null;
+            readonly synthetic: boolean;
+        };
+        /**
          * PatientSummary
          * @description One line of the patient picker (GET /patients): scoped to the caller.
          */
@@ -698,6 +712,7 @@ export type PartialAdmitPatientInput = components['schemas']['PartialAdmitPatien
 export type PartialLabInput = components['schemas']['PartialLabInput'];
 export type PatientDetail = components['schemas']['PatientDetail'];
 export type PatientExtractionResult = components['schemas']['PatientExtractionResult'];
+export type PatientStay = components['schemas']['PatientStay'];
 export type PatientSummary = components['schemas']['PatientSummary'];
 export type Provenance = components['schemas']['Provenance'];
 export type ProvenanceSource = components['schemas']['ProvenanceSource'];

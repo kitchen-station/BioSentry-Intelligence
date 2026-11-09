@@ -30,6 +30,7 @@ from biosentry.schemas import (
     PartialLabInput,
     PatientDetail,
     PatientExtractionResult,
+    PatientStay,
     PatientSummary,
     Provenance,
     ScoreRow,
@@ -317,6 +318,15 @@ _BUILDERS: dict[type[BaseModel], Any] = {
     Session: lambda: {"clinician_id": "c-01", "ward": "4 East", "role": "rn"},
     Acknowledgement: lambda: {"patient_id": "p-001", "score": 9},
     NewNote: lambda: {"author": "RN Dela Cruz", "role": "RN", "content": "Patient restless."},
+    PatientStay: lambda: {
+        "id": "p-001",
+        "name": "Santos, Maria",
+        "bed": "4A",
+        "admitted_at": NOW,
+        "left_at": None,
+        "outcome": None,
+        "synthetic": True,
+    },
     PatientSummary: lambda: {"id": "p-001", "name": "Santos, Maria", "bed": "4A", "ranked": True},
     NurseVitalsInput: lambda: {"systolic": 120, "diastolic": 80},
     VitalsRecorded: lambda: {

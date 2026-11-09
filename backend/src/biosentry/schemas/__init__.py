@@ -50,6 +50,7 @@ from .records import (
 from .rows import (
     AbstainedRow,
     PatientDetail,
+    PatientStay,
     PatientSummary,
     ScoreRow,
     TierAScore,
@@ -107,6 +108,7 @@ CONTRACT_MODELS: tuple[type[BaseModel], ...] = (
     Acknowledgement,
     NewNote,
     NurseVitalsInput,
+    PatientStay,
     PatientSummary,
     Session,
     UnscoredPatient,
@@ -151,6 +153,7 @@ __all__ = [
     "PartialLabInput",
     "PatientDetail",
     "PatientExtractionResult",
+    "PatientStay",
     "PatientSummary",
     "Provenance",
     "ProvenanceSource",

@@ -7,7 +7,7 @@ with `RejectedError`; an omitted field stays as it was. A write is stored throug
 """
 
 from biosentry.core.audit import AuditLog
-from biosentry.repositories.postgres import DEVICE_VITALS, Obs, PostgresStore, iso
+from biosentry.repositories.postgres import DEVICE_VITALS, Obs, PostgresStore, iso, whole
 from biosentry.schemas import (
     AbstainedRow,
     AdmitPatientInput,
@@ -158,6 +158,7 @@ class PatientService:
                     "supporting": "",
                     "trend": "insufficient",
                     "admission": {"admitted_at": iso(now), "admitted_by": clinician_id},
+                    "admitted_at": whole(now),
                 },
             )
 

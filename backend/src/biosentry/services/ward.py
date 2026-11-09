@@ -14,6 +14,7 @@ from biosentry.repositories.postgres import PostgresStore
 from biosentry.schemas import (
     AbstainedRow,
     PatientDetail,
+    PatientStay,
     PatientSummary,
     ScoreRow,
     Tier,
@@ -156,6 +157,11 @@ class WardService:
         return PatientDetail(
             **row.model_dump(), vital_history=state.vital_history, tier_breakdown=breakdown
         )
+
+    def stays(self, clinician_id: str) -> list[PatientStay]:
+        ids = self._store.assigned(clinician_id, including_left=True)
+        self._audit.append(clinician_id, "view_stays", self._store.ward, "ok")
+        return [PatientStay.model_validate(row) for row in self._store.stays(ids)]
 
     def summaries(self, clinician_id: str) -> list[PatientSummary]:
         ranked, abstained = self.compute(self.visible(clinician_id))

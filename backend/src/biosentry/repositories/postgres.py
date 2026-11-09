@@ -184,6 +184,7 @@ _PATIENT = (
     "tier_b",
     "tier_c",
     "story",
+    "admitted_at",
 )
 
 
@@ -310,11 +311,14 @@ class PostgresStore:
         ).fetchone()
         return (row is not None, row["passphrase_hash"] if row else None)
 
-    def assigned(self, clinician_id: str) -> frozenset[str]:
-        """The patients under this clinician's care. Unknown id: nobody (fails closed)."""
+    def assigned(self, clinician_id: str, *, including_left: bool = False) -> frozenset[str]:
+        """The patients under this clinician's care. Unknown id: nobody (fails closed). Someone who
+        has left the ward is out of every live view, and stays only in the stay history."""
         rows = self.conn.execute(
-            "SELECT patient_id FROM care_assignment WHERE run_id = %s AND clinician_id = %s",
-            (self.run_id, clinician_id),
+            "SELECT a.patient_id FROM care_assignment a JOIN patient p"
+            " ON p.run_id = a.run_id AND p.id = a.patient_id"
+            " WHERE a.run_id = %s AND a.clinician_id = %s AND (%s OR p.left_at IS NULL)",
+            (self.run_id, clinician_id, including_left),
         )
         return frozenset(r["patient_id"] for r in rows)
 
@@ -449,6 +453,22 @@ class PostgresStore:
                 "synthetic": self.synthetic,
             }
         )
+
+    def stays(self, ids: frozenset[str]) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT id, name, bed, admitted_at, left_at, outcome FROM patient"
+            " WHERE run_id = %s AND id = ANY(%s) ORDER BY id",
+            (self.run_id, sorted(ids)),
+        )
+        return [
+            {
+                **r,
+                "admitted_at": self._when(r["admitted_at"]) if r["admitted_at"] else None,
+                "left_at": self._when(r["left_at"]) if r["left_at"] else None,
+                "synthetic": self.synthetic,
+            }
+            for r in rows
+        ]
 
     # --- writing -------------------------------------------------------------------------------
 

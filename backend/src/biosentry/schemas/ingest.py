@@ -101,6 +101,16 @@ class NewRunPatient(Contract):
         return self
 
 
+class Admission(NewRunPatient):
+    minute: Minute
+
+
+class Departure(Contract):
+    patient_id: Id
+    minute: Minute
+    outcome: Literal["discharged", "higher_care"]
+
+
 class NewRun(Contract):
     client_id: Id  # one per sim page load: the same client may replace its own run, others may not
     source: Literal["synthetic"]
@@ -137,3 +147,5 @@ class Batch(Contract):
     observations: Annotated[list[Obs], Field(max_length=MAX_ROWS)]
     bins: Annotated[list[Bin], Field(max_length=MAX_ROWS)]
     events: Annotated[list[Event], Field(max_length=2_000)]
+    admissions: Annotated[list[Admission], Field(max_length=200)] = []
+    departures: Annotated[list[Departure], Field(max_length=200)] = []

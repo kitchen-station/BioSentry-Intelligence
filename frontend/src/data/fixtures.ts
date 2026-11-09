@@ -4,6 +4,7 @@
 // patient is written here.
 
 import synthetic from "./synthetic.json";
+import pastStays from "./stays.json";
 import { DIASTOLIC_BOUNDS, SYSTOLIC_BOUNDS } from "../api/bounds";
 import type {
   AbstainedRow,
@@ -16,6 +17,7 @@ import type {
   PartialLabInput,
   PatientDetail,
   PatientExtractionResult,
+  PatientStay,
   Provenance,
   ScoreRow,
   VitalHistoryFull,
@@ -313,6 +315,40 @@ export async function extractPatientFromFile(
 }
 
 // --- Patient lookup ---
+
+/**
+ * Finished stays from a headless run of the ward simulation, in minutes before now, then whoever
+ * is on the fixture ward. Those patients' arrival is not known, so it stays null (I1).
+ */
+export async function getStays(): Promise<PatientStay[]> {
+  const now = Date.now();
+  const at = (minutes: number) => new Date(now + minutes * 60_000).toISOString();
+  const past = pastStays
+    .filter((s) => _activeClinician !== null && s.care.includes(_activeClinician))
+    .map(
+      (s): PatientStay => ({
+        id: s.id,
+        name: s.name,
+        bed: s.bed,
+        admitted_at: s.admitted_min === null ? null : at(s.admitted_min),
+        left_at: at(s.left_min),
+        outcome: s.outcome as PatientStay["outcome"],
+        synthetic: true,
+      }),
+    );
+  const current = (await listAllPatients()).map(
+    (p): PatientStay => ({
+      id: p.id,
+      name: p.name,
+      bed: p.bed,
+      admitted_at: null,
+      left_at: null,
+      outcome: null,
+      synthetic: true,
+    }),
+  );
+  return [...past, ...current];
+}
 
 export async function listAllPatients(): Promise<Array<{ id: string; name: string; bed: string; ranked: boolean }>> {
   const allowed = visiblePatientIds();

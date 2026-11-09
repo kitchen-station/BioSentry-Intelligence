@@ -92,6 +92,11 @@
   flex: 1;
 }
 
+.tabBar.wide,
+.container.wide {
+  max-width: 1040px;
+}
+
 /* ---- Form ---- */
 
 .form {

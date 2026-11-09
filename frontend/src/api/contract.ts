@@ -15,6 +15,7 @@ import type {
   PartialLabInput,
   PatientDetail,
   PatientExtractionResult,
+  PatientStay,
   VitalsRecorded,
   WardResponse,
 } from "../types";
@@ -33,6 +34,8 @@ export interface ApiProvider {
   listAllPatients(): Promise<
     Array<{ id: string; name: string; bed: string; ranked: boolean }>
   >;
+  /** Every stay the caller may see, on the ward now or already gone. */
+  getStays(): Promise<PatientStay[]>;
   admitPatient(input: AdmitPatientInput): Promise<AbstainedRow>;
   enterLabResults(
     patientId: string,

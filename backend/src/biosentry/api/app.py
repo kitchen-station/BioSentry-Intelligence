@@ -46,6 +46,7 @@ from biosentry.schemas import (
     NurseVitalsInput,
     PartialLabInput,
     PatientDetail,
+    PatientStay,
     PatientSummary,
     SessionRequest,
     SessionToken,
@@ -279,6 +280,13 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
             ctx.audit.append(who, "view_ward", ward, "not_found")
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return ctx.wards.ward(who)
+
+    @app.get("/wards/{ward}/stays", response_model=list[PatientStay])
+    def ward_stays(ward: str, ctx: Ctx, who: Who) -> list[PatientStay]:
+        if ward != ctx.store.ward:
+            ctx.audit.append(who, "view_stays", ward, "not_found")
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return ctx.wards.stays(who)
 
     @app.get("/patients", response_model=list[PatientSummary])
     def list_patients(ctx: Ctx, who: Who) -> list[PatientSummary]:

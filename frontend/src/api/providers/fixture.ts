@@ -16,6 +16,7 @@ export const fixtureProvider: ApiProvider = {
   addNote: fixtures.addNote,
   deleteNote: fixtures.deleteNote,
   listAllPatients: fixtures.listAllPatients,
+  getStays: fixtures.getStays,
   admitPatient: fixtures.admitPatient,
   enterLabResults: fixtures.enterLabResults,
   getAcknowledgements: fixtures.getAcknowledgements,

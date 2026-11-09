@@ -90,8 +90,8 @@ schemas. Every target is in the [Makefile](Makefile).
   cannot score is listed as NOT RANKED, with the reason and what to record to fix it.
 - **Patient detail:** the score and what drives it, vitals and labs with where each value
   came from, notes, and trend charts.
-- **Station:** admit a patient, enter lab results, or upload a document (extraction is a
-  placeholder).
+- **Station:** admit a patient, enter lab results, upload a document (extraction is a
+  placeholder), or see patient flow: who came and went, length of stay and 14 days of bed use.
 
 ## What the database stores
 
@@ -106,7 +106,8 @@ active one: the seeded fixture ward, or a simulated ward posted to `/sim/*`.
   source, tier, time and quality (a value, or the reason there is none), 15-minute vital bins (a gap
   is NULL), notes (soft-deleted), acknowledgements, sessions (the token hashed, 12 hours), the
   audit log (ids and outcomes only, sign-in attempts included, never a passphrase; the database refuses UPDATE, DELETE, TRUNCATE and a repeated sequence number, but not a user who can drop its triggers or the table), and the
-  sim's event feed.
+  sim's event feed. A patient row is one stay: `admitted_at` (NULL when the arrival is not known), `left_at`
+  and `outcome`. Someone who has left drops out of every live view and stays in the history.
 - **Never stored:** scores, ranks, reasons and the NOT RANKED text. They are computed on every read
   (an acknowledgement keeps the score the clinician acknowledged, as they saw it).
 

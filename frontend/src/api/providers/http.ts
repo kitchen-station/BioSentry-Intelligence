@@ -26,6 +26,7 @@ import type {
   PatientDetail,
   PatientExtractionResult,
   VitalsRecorded,
+  PatientStay,
   WardResponse,
 } from "../../types";
 import {
@@ -39,6 +40,10 @@ import {
 export const httpProvider: ApiProvider = {
   getWard(): Promise<WardResponse> {
     return fetchJson<WardResponse>("/wards/W4/rows");
+  },
+
+  getStays(): Promise<PatientStay[]> {
+    return fetchJson<PatientStay[]>("/wards/W4/stays");
   },
 
   async getPatient(id: string): Promise<PatientDetail | null> {

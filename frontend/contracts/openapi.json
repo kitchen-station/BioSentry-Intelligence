@@ -1644,6 +1644,71 @@
         "title": "PatientExtractionResult",
         "type": "object"
       },
+      "PatientStay": {
+        "additionalProperties": false,
+        "description": "One stay on the ward (GET /wards/{ward}/stays): scoped to the caller. Facts only: a score\nis computed on read and never stored.",
+        "properties": {
+          "admitted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bed": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "left_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "enum": [
+                  "discharged",
+                  "higher_care"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "synthetic": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "bed",
+          "admitted_at",
+          "left_at",
+          "outcome",
+          "synthetic"
+        ],
+        "title": "PatientStay",
+        "type": "object"
+      },
       "PatientSummary": {
         "additionalProperties": false,
         "description": "One line of the patient picker (GET /patients): scoped to the caller.",
