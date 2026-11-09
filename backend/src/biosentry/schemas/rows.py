@@ -1,8 +1,8 @@
 """Ward rows, abstained rows and the API response envelopes."""
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from pydantic import Field
+from pydantic import AwareDatetime, Field
 
 from .base import Age, Contract, Flag, NonNegNum, Percent
 from .clinical import LabPanel, VitalHistoryFull, Vitals, VitalTrends
@@ -77,6 +77,22 @@ class TierBreakdown(Contract):
 class PatientDetail(ScoreRow):
     vital_history: VitalHistoryFull
     tier_breakdown: TierBreakdown
+
+
+StayOutcome = Literal["discharged", "higher_care"]
+
+
+class PatientStay(Contract):
+    """One stay on the ward (GET /wards/{ward}/stays): scoped to the caller. Facts only: a score
+    is computed on read and never stored."""
+
+    id: str
+    name: str
+    bed: str
+    admitted_at: AwareDatetime | None  # None: the arrival is not known (I1)
+    left_at: AwareDatetime | None  # None: still on the ward
+    outcome: StayOutcome | None
+    synthetic: Flag
 
 
 class PatientSummary(Contract):

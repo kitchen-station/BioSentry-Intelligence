@@ -6,7 +6,7 @@ newest is live (ConflictError), and a batch for a run that is no longer the newe
 same way, so a superseded sim stops writing.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from datetime import datetime, timedelta
 
 from biosentry.db.migrate import SETUP_LOCK
@@ -23,7 +23,7 @@ from biosentry.repositories.postgres import (
     upsert_bins,
     whole,
 )
-from biosentry.schemas.ingest import Batch, Bin, NewRun
+from biosentry.schemas.ingest import Batch, Bin, NewRun, NewRunPatient
 from biosentry.schemas.ingest import Obs as IngestObs
 
 from .patients import RejectedError
@@ -59,11 +59,45 @@ def _bin(origin: datetime, b: Bin) -> tuple[str, str, datetime, float | None]:
     return (b.patient_id, b.vital, _at(origin, b.minute), b.value)
 
 
-def start_run(conn: Conn, body: NewRun, clock: Callable[[], datetime]) -> int:
+def _check_clinicians(conn: Conn, patients: Iterable[NewRunPatient]) -> None:
     known = {r["id"] for r in conn.execute("SELECT id FROM clinician")}
-    for p in body.patients:
+    for p in patients:
         if p.rn not in known or (p.md is not None and p.md not in known):
             raise RejectedError("rn and md must be known clinicians")
+
+
+def _add_patient(
+    conn: Conn, run_id: int, origin: datetime, p: NewRunPatient, admitted_at: datetime | None
+) -> None:
+    device = [o.minute for o in p.observations if o.source == "device" and o.absent_reason is None]
+    insert_patient(
+        conn,
+        run_id,
+        p.id,
+        {
+            "name": p.name,
+            "age": p.age,
+            "sex": p.sex,
+            "bed": p.bed,
+            "admitting_context": p.context,
+            "mechanism": MECHANISM,
+            "supporting": "",
+            "trend": p.trend,
+            "signal_quality": p.signal_quality,
+            "story": p.story,
+            "last_sample_at": _at(origin, max(device)) if device else None,
+            "admitted_at": admitted_at,
+        },
+    )
+    assign(conn, run_id, p.id, p.rn, p.md)
+    insert_observations(
+        conn, run_id, True, [_obs(origin, o) for o in p.observations], ignore=True
+    )
+    upsert_bins(conn, run_id, [_bin(origin, b) for b in p.bins])
+
+
+def start_run(conn: Conn, body: NewRun, clock: Callable[[], datetime]) -> int:
+    _check_clinicians(conn, body.patients)
     origin = body.origin
     with transaction(conn):
         # Runs are created under the setup lock (as the fixture is), so two registrations take
@@ -90,36 +124,7 @@ def start_run(conn: Conn, body: NewRun, clock: Callable[[], datetime]) -> int:
             client_id=body.client_id,
         )
         for p in body.patients:
-            device = [
-                o.minute for o in p.observations if o.source == "device" and o.absent_reason is None
-            ]
-            insert_patient(
-                conn,
-                run_id,
-                p.id,
-                {
-                    "name": p.name,
-                    "age": p.age,
-                    "sex": p.sex,
-                    "bed": p.bed,
-                    "admitting_context": p.context,
-                    "mechanism": MECHANISM,
-                    "supporting": "",
-                    "trend": p.trend,
-                    "signal_quality": p.signal_quality,
-                    "story": p.story,
-                    "last_sample_at": _at(origin, max(device)) if device else None,
-                },
-            )
-            assign(conn, run_id, p.id, p.rn, p.md)
-            insert_observations(
-                conn,
-                run_id,
-                True,
-                [_obs(origin, o) for o in p.observations],
-                ignore=True,
-            )
-            upsert_bins(conn, run_id, [_bin(origin, b) for b in p.bins])
+            _add_patient(conn, run_id, origin, p, None)
     return run_id
 
 
@@ -140,7 +145,13 @@ def add_batch(conn: Conn, run_id: int, body: Batch, clock: Callable[[], datetime
         members = {
             r["id"] for r in conn.execute("SELECT id FROM patient WHERE run_id = %s", (run_id,))
         }
+        _check_clinicians(conn, body.admissions)
+        for a in body.admissions:
+            if a.id not in members:  # a retried batch adds nobody twice
+                _add_patient(conn, run_id, origin, a, whole(_at(origin, a.minute)))
+                members.add(a.id)
         named = {
+            *(d.patient_id for d in body.departures),
             *(p.id for p in body.patients),
             *(o.patient_id for o in body.observations),
             *(b.patient_id for b in body.bins),
@@ -163,6 +174,12 @@ def add_batch(conn: Conn, run_id: int, body: Batch, clock: Callable[[], datetime
             ignore=True,
         )
         upsert_bins(conn, run_id, [_bin(origin, b) for b in body.bins])
+        for d in body.departures:
+            conn.execute(
+                "UPDATE patient SET left_at = %s, outcome = %s"
+                " WHERE run_id = %s AND id = %s AND left_at IS NULL",
+                (whole(_at(origin, d.minute)), d.outcome, run_id, d.patient_id),
+            )
         row = conn.execute(
             "SELECT COALESCE(MAX(seq), 0) AS last FROM sim_event WHERE run_id = %s", (run_id,)
         ).fetchone()

@@ -20,6 +20,7 @@ from biosentry.db.seed import DEV_PASSPHRASE, ensure, reset
 from biosentry.repositories.postgres import connect
 from biosentry.schemas.ingest import Batch
 from biosentry.services import ingest
+from samples import admit_input  # isort: skip
 
 NOW = datetime(2026, 10, 14, 12, 0, tzinfo=UTC)
 KEY = "test-ingest-key"
@@ -1044,3 +1045,97 @@ def test_a_registration_waits_for_a_batch_in_flight_on_the_run_it_would_replace(
         refused = takeover.result(30)
     assert (refused.status_code, refused.json()) == (409, {"detail": LIVE})  # the batch renewed it
     assert api.sql("SELECT max(id) AS id FROM run") == [{"id": run_id}]
+
+
+# --- Stays --------------------------------------------------------------------------------------
+
+
+def stays(api: Api, who: str) -> dict[str, dict[str, Any]]:
+    response = api.client.get("/wards/W4/stays", headers=api.as_(who))
+    assert response.status_code == 200, response.text
+    return {s["id"]: s for s in response.json()}
+
+
+def ward_ids(api: Api, who: str) -> set[str]:
+    ward = api.ward(who)
+    return {r["id"] for r in (*ward["ranked"], *ward["abstained"])}
+
+
+def admission(pid: str = "s-2", minute: int = 30, **kw: Any) -> dict[str, Any]:
+    return {**sim_patient(pid, **kw), "minute": minute}
+
+
+def test_a_ward_takes_admissions_and_departures_while_it_runs(api: Api) -> None:
+    run_id = start(api)
+    body = batch(
+        minute=30,
+        admissions=[admission()],
+        departures=[{"patient_id": "s-1", "minute": 30, "outcome": "higher_care"}],
+    )
+    assert api.post(f"/sim/runs/{run_id}/batch", body).status_code == 204
+    assert ward_ids(api, "rn-manalo") == {"s-2"}
+
+    everyone = stays(api, "rn-manalo")
+    assert everyone["s-1"]["admitted_at"] is None  # on the ward before the run: arrival unknown
+    assert everyone["s-1"]["outcome"] == "higher_care"
+    assert everyone["s-1"]["left_at"] is not None
+    assert everyone["s-2"]["admitted_at"] is not None
+    assert (everyone["s-2"]["left_at"], everyone["s-2"]["outcome"]) == (None, None)
+    assert all(s["synthetic"] for s in everyone.values())
+
+    # A retry changes nothing, and the first departure time stands.
+    before = api.sql("SELECT id, left_at, outcome FROM patient WHERE run_id = %s ORDER BY id", run_id)
+    assert api.post(f"/sim/runs/{run_id}/batch", body).status_code == 204
+    late = {**body, "departures": [{"patient_id": "s-1", "minute": 99, "outcome": "discharged"}]}
+    assert api.post(f"/sim/runs/{run_id}/batch", late).status_code == 204
+    after = api.sql("SELECT id, left_at, outcome FROM patient WHERE run_id = %s ORDER BY id", run_id)
+    assert before == after
+
+
+def test_someone_who_has_left_is_out_of_every_live_view(api: Api) -> None:
+    run_id = start(api)
+    body = batch(minute=5, departures=[{"patient_id": "s-1", "minute": 5, "outcome": "discharged"}])
+    assert api.post(f"/sim/runs/{run_id}/batch", body).status_code == 204
+    headers = api.as_("rn-manalo")
+    assert api.client.get("/patients", headers=headers).json() == []
+    assert api.client.get("/patients/s-1", headers=headers).status_code == 404
+
+
+def test_stays_are_scoped_and_audited(api: Api) -> None:
+    run_id = start(api)
+    body = batch(minute=5, admissions=[admission(rn="rn-reyes", md=None)])
+    assert api.post(f"/sim/runs/{run_id}/batch", body).status_code == 204
+    assert set(stays(api, "rn-delacruz")) == {"s-1"}
+    assert set(stays(api, "rn-reyes")) == {"s-2"}
+    assert set(stays(api, "rn-manalo")) == {"s-1", "s-2"}
+    rows = api.sql("SELECT resource, outcome FROM audit_log WHERE action = 'view_stays'")
+    assert rows == [{"resource": "W4", "outcome": "ok"}] * 3
+
+
+def test_stays_for_another_ward_are_not_found(api: Api) -> None:
+    response = api.client.get("/wards/W9/stays", headers=api.as_("rn-manalo"))
+    assert response.status_code == 404
+    (row,) = api.sql("SELECT resource, outcome FROM audit_log WHERE action = 'view_stays'")
+    assert row == {"resource": "W9", "outcome": "not_found"}
+
+
+def test_an_app_admission_records_when(api: Api) -> None:
+    response = api.client.post("/patients", json=admit_input(), headers=api.as_("rn-manalo"))
+    assert response.status_code == 201, response.text
+    everyone = stays(api, "rn-manalo")
+    assert everyone[response.json()["id"]]["admitted_at"] is not None
+
+
+@pytest.mark.parametrize(
+    "over",
+    [
+        {"departures": [{"patient_id": "ghost", "minute": 5, "outcome": "discharged"}]},
+        {"departures": [{"patient_id": "s-1", "minute": 5, "outcome": "vanished"}]},
+        {"admissions": [admission(rn="nobody")]},
+    ],
+)
+def test_a_bad_move_is_refused_and_writes_nothing(api: Api, over: dict[str, Any]) -> None:
+    run_id = start(api)
+    assert api.post(f"/sim/runs/{run_id}/batch", batch(minute=5, **over)).status_code == 422
+    rows = api.sql("SELECT id, left_at FROM patient WHERE run_id = %s", run_id)
+    assert rows == [{"id": "s-1", "left_at": None}]

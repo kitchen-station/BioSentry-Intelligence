@@ -20,6 +20,7 @@ const api = vi.hoisted(() => ({
   extractLabsFromFile: vi.fn(),
   extractPatientFromFile: vi.fn(),
   listAllPatients: vi.fn(),
+  getStays: vi.fn(),
 }));
 vi.mock("../api", () => api);
 
@@ -66,6 +67,13 @@ afterEach(() => {
 });
 
 describe("Station tabs", () => {
+  it("opens patient flow", async () => {
+    api.getStays.mockResolvedValue([]);
+    page();
+    fireEvent.click(screen.getByRole("button", { name: "Patient flow" }));
+    expect(await screen.findByText("No arrivals or departures yet.")).toBeTruthy();
+  });
+
   it("opens on admission, names the ward, and switches between the three sections", async () => {
     const user = userEvent.setup();
     page();

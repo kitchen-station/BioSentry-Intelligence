@@ -37,6 +37,7 @@ function lazyFixtureProvider(): ApiProvider {
     deleteNote: (patientId, noteId) =>
       fixtures().then((m) => m.fixtureProvider.deleteNote(patientId, noteId)),
     listAllPatients: () => fixtures().then((m) => m.fixtureProvider.listAllPatients()),
+    getStays: () => fixtures().then((m) => m.fixtureProvider.getStays()),
     admitPatient: (input) => fixtures().then((m) => m.fixtureProvider.admitPatient(input)),
     enterLabResults: (patientId, labs) =>
       fixtures().then((m) => m.fixtureProvider.enterLabResults(patientId, labs)),
@@ -60,6 +61,7 @@ export const getNotes = provider.getNotes;
 export const addNote = provider.addNote;
 export const deleteNote = provider.deleteNote;
 export const listAllPatients = provider.listAllPatients;
+export const getStays = provider.getStays;
 export const admitPatient = provider.admitPatient;
 export const enterLabResults = provider.enterLabResults;
 export const recordVitals = provider.recordVitals;

@@ -82,6 +82,13 @@ describe("openSession", () => {
 });
 
 describe("httpProvider requests", () => {
+  it("reads the ward's stays", async () => {
+    setAuthToken("rn-manalo");
+    fetchMock.mockResolvedValue(reply(200, []));
+    await expect(httpProvider.getStays()).resolves.toEqual([]);
+    expect(fetchMock.mock.calls[0][0]).toBe("/wards/W4/stays");
+  });
+
   it("sends the bearer token the session set", async () => {
     setAuthToken("rn-manalo");
     fetchMock.mockResolvedValue(reply(200, { ranked: [], abstained: [] }));

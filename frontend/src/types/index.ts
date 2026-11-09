@@ -67,6 +67,7 @@ export type {
   VitalTrends,
   Vitals,
   VitalsRecorded,
+  PatientStay,
   WardResponse,
 } from "./generated";
 

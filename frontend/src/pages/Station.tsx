@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { Session, AdmitPatientInput, LabExtractionResult, PatientExtractionResult } from "../types";
 import { admitPatient, enterLabResults, extractLabsFromFile, extractPatientFromFile, listAllPatients } from "../api";
 import { SessionMenu } from "../components/SessionMenu";
+import { FlowSection } from "./Flow";
 import styles from "./Station.module.css";
 
 interface Props {
@@ -16,7 +17,7 @@ const PHYSICIANS = [
   "Dr. Villanueva",
 ];
 
-type Section = "admit" | "labs" | "upload";
+type Section = "admit" | "labs" | "upload" | "flow";
 
 export function Station({ session, onSignOut }: Props) {
   const [section, setSection] = useState<Section>("admit");
@@ -35,7 +36,7 @@ export function Station({ session, onSignOut }: Props) {
         </div>
       </div>
 
-      <div className={styles.tabBar}>
+      <div className={`${styles.tabBar} ${section === "flow" ? styles.wide : ""}`}>
         <button
           type="button"
           className={`${styles.tab} ${section === "admit" ? styles.tabActive : ""}`}
@@ -57,12 +58,20 @@ export function Station({ session, onSignOut }: Props) {
         >
           Upload
         </button>
+        <button
+          type="button"
+          className={`${styles.tab} ${section === "flow" ? styles.tabActive : ""}`}
+          onClick={() => setSection("flow")}
+        >
+          Patient flow
+        </button>
       </div>
 
-      <main className={styles.container}>
+      <main className={`${styles.container} ${section === "flow" ? styles.wide : ""}`}>
         {section === "admit" && <AdmitForm />}
         {section === "labs" && <LabForm />}
         {section === "upload" && <UploadForm />}
+        {section === "flow" && <FlowSection />}
       </main>
     </div>
   );

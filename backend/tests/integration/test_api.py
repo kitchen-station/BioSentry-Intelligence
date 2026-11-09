@@ -1023,6 +1023,6 @@ def test_the_api_serves_every_route_the_http_provider_calls(database_url: str) -
     frontend = _frontend_routes()
     assert len(frontend) >= 9, frontend
     # The provider names the ward by id; the route is parameterised.
-    normalised = {(m, "/wards/{}/rows" if p == "/wards/W4/rows" else p) for m, p in frontend}
+    normalised = {(m, p.replace("/wards/W4/", "/wards/{}/")) for m, p in frontend}
     missing = normalised - _app_routes(database_url)
     assert missing == set()
