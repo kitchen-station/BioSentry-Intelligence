@@ -1,0 +1,55 @@
+name: deploy
+
+# Builds on GitHub and uploads the finished files to Cloudflare Pages, so
+# Cloudflare does not need to run its own build. Does nothing (and stays
+# green) until the CLOUDFLARE_API_TOKEN secret exists. Same commands the
+# Cloudflare build ran: a failing lint or test means no deploy.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - id: gate
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::notice::CLOUDFLARE_API_TOKEN is not set, so this run skips the deploy."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.gate.outputs.go == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - if: steps.gate.outputs.go == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - if: steps.gate.outputs.go == 'true'
+        run: npm ci
+      - if: steps.gate.outputs.go == 'true'
+        run: npm run lint
+      - if: steps.gate.outputs.go == 'true'
+        run: npm test
+      # Do not set VITE_API_URL here: VITE_ values end up in the public JS.
+      - if: steps.gate.outputs.go == 'true'
+        run: npm run build
+      - if: steps.gate.outputs.go == 'true'
+        run: npx --yes wrangler@4.155.0 pages deploy dist --project-name=biosentry-dashboard --branch=main --commit-hash=${{ github.sha }}
