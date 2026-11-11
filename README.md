@@ -73,6 +73,8 @@ with the variable unset the ingest routes answer 503). There is one shared ward:
 carries a `client_id` (one per sim page load), and while the newest run is live (not ended, last batch
 or creation within 30 seconds) a different `client_id` gets 409 and nothing is written; the same one may
 replace its own run. A batch for a run that is no longer the newest also gets 409.
+`POST /patients` refuses a bed that a patient still in the ward already has (compared trimmed, ignoring
+case) with 409 and writes nothing; a bed whose patient has left is free again.
 `GET /sim/runs/{id}/actions?after={seq}` (same key) tells the sim what clinicians did: one row per
 acknowledgement, vitals entry, note (never its text) or admission, at most 200 in `seq` order after the cursor.
 

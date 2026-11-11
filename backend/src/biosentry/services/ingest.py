@@ -30,11 +30,7 @@ from biosentry.repositories.postgres import (
 from biosentry.schemas.ingest import Batch, Bin, LiveView, NewRun, NewRunPatient
 from biosentry.schemas.ingest import Obs as IngestObs
 
-from .patients import RejectedError
-
-class ConflictError(Exception):
-    """The ward's state refuses this write (409). Nothing was written."""
-
+from .patients import ConflictError, RejectedError
 
 WARD = "W4"
 MECHANISM = "Sorted on NEWS2 (Tier A). Live from the ward simulation."

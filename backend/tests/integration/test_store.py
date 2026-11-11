@@ -781,13 +781,29 @@ def test_simultaneous_admissions_get_distinct_patient_ids(api: Api) -> None:
     }  # fmt: skip
     h = api.as_("rn-delacruz")
     ids: list[str] = []
-    for _ in range(ROUNDS):
-        sent = together(THREADS, lambda i: api.client.post("/patients", headers=h, json=form))
+    for round_ in range(ROUNDS):
+
+        def admit(i: int, round_: int = round_) -> Any:  # a bed each: one bed takes one patient
+            body = {**form, "bed": f"{round_}-{i}"}
+            return api.client.post("/patients", headers=h, json=body)
+
+        sent = together(THREADS, admit)
         assert [r.status_code for r in sent] == [201] * THREADS
         ids += [r.json()["id"] for r in sent]
     assert len(set(ids)) == len(ids) == THREADS * ROUNDS
     numbers = sorted(int(i.removeprefix("p-")) for i in ids)
     assert numbers == list(range(numbers[0], numbers[0] + len(ids)))  # no id skipped or repeated
+
+
+def test_simultaneous_admissions_to_one_bed_admit_one_patient(api: Api) -> None:
+    form = {
+        "lastName": "Cruz", "firstName": "Pat", "dateOfBirth": "1980-01-01", "age": 44,
+        "sex": "F", "bed": "1A", "admissionRoute": "transfer", "chiefComplaint": "c",
+        "admittingContext": "a", "attendingPhysician": "p",
+    }  # fmt: skip
+    h = api.as_("rn-delacruz")
+    sent = together(THREADS, lambda i: api.client.post("/patients", headers=h, json=form))
+    assert sorted(r.status_code for r in sent) == [201] + [409] * (THREADS - 1)
 
 
 def test_simultaneous_batches_on_one_run_give_each_event_its_own_seq(api: Api) -> None:
@@ -1174,7 +1190,8 @@ def test_stays_for_another_ward_are_not_found(api: Api) -> None:
 
 
 def test_an_app_admission_records_when(api: Api) -> None:
-    response = api.client.post("/patients", json=admit_input(), headers=api.as_("rn-manalo"))
+    form = {**admit_input(), "bed": "12A"}  # the sample's 4A is taken
+    response = api.client.post("/patients", json=form, headers=api.as_("rn-manalo"))
     assert response.status_code == 201, response.text
     everyone = stays(api, "rn-manalo")
     assert everyone[response.json()["id"]]["admitted_at"] is not None
@@ -1333,7 +1350,7 @@ def test_each_clinician_write_puts_one_row_on_the_feed(api: Api) -> None:
     assert post("/patients/s-1/vitals", headers=h, json={"on_oxygen": False}).status_code == 200
     assert post("/patients/s-1/notes", headers=h, json=NOTE).status_code == 201
     assert post("/patients", headers=h, json=full).status_code == 201
-    assert post("/patients", headers=h, json=admit_input()).status_code == 201
+    assert post("/patients", headers=h, json={**admit_input(), "bed": "4B"}).status_code == 201
 
     audited = api.sql("SELECT count(*) AS n FROM audit_log")
     response = actions(api, run_id)
@@ -1347,7 +1364,7 @@ def test_each_clinician_write_puts_one_row_on_the_feed(api: Api) -> None:
         {"kind": "add_note", "patient_id": "s-1"},
         {"kind": "admit_patient", "patient_id": "p-001", **admitted}
         | {"systolic": 118, "diastolic": 76, "acvpu": "C"},
-        {"kind": "admit_patient", "patient_id": "p-002", **admitted},
+        {"kind": "admit_patient", "patient_id": "p-002", **admitted, "bed": "4B"},
     ]
     rows = response.json()["actions"]
     seqs = [r.pop("seq") for r in rows]
