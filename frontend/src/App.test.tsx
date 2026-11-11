@@ -52,6 +52,9 @@ vi.mock("./pages/Ward", () => ({
 vi.mock("./pages/PatientDetail", () => ({
   PatientDetail: ({ session }: { session: Session }) => <p>patient page for {session.clinician_id}</p>,
 }));
+vi.mock("./pages/Research", () => ({
+  Research: ({ session }: { session: Session }) => <p>research page for {session.clinician_id}</p>,
+}));
 vi.mock("./pages/Station", () => ({
   Station: ({ session, onSignOut }: { session: Session; onSignOut: () => void }) => (
     <div>
@@ -125,7 +128,7 @@ describe("restoring the session", () => {
 });
 
 describe("route guards", () => {
-  it.each(["/ward", "/patient/p-001", "/station"])(
+  it.each(["/ward", "/patient/p-001", "/station", "/research"])(
     "sends a signed-out visitor from %s to sign-in, remembering where they were going",
     (path) => {
       at(path);
@@ -137,6 +140,12 @@ describe("route guards", () => {
     store(nurse);
     at("/patient/p-001");
     expect(screen.getByText("patient page for rn-reyes")).toBeTruthy();
+  });
+
+  it("shows the research numbers to any signed-in clinician", () => {
+    store(nurse);
+    at("/research");
+    expect(screen.getByText("research page for rn-reyes")).toBeTruthy();
   });
 
   it("keeps a staff nurse out of the station: back to the ward", () => {

@@ -44,6 +44,13 @@ describe("SessionMenu", () => {
     expect(screen.queryByText("Ward W4")).toBeNull();
   });
 
+  it("links to the research numbers for every role", async () => {
+    menu({ clinician_id: "rn-reyes", ward: "W4", role: "rn" });
+    await open("rn-reyes");
+    await userEvent.click(screen.getByRole("link", { name: "Research numbers" }));
+    expect(screen.getByText("at /research")).toBeTruthy();
+  });
+
   it("closes when the backdrop is clicked", async () => {
     menu({ clinician_id: "rn-reyes", ward: "W4", role: "rn" });
     await open("rn-reyes");
