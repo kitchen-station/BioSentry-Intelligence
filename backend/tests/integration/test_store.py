@@ -460,6 +460,59 @@ def test_a_repeated_batch_adds_no_rows(api: Api) -> None:
     assert once["events"] == 1
 
 
+def test_a_batch_into_a_new_sim_hour_prunes_what_is_older_than_the_retention(api: Api) -> None:
+    old_run = start(api)
+    kept = (
+        "SELECT (SELECT count(*) FROM observation WHERE run_id = %s) AS observations,"
+        " (SELECT count(*) FROM vital_bin WHERE run_id = %s) AS bins"
+    )
+    (other,) = api.sql(kept, old_run, old_run)
+    run_id = start(api)  # the same client restarts: the first run's rows are as old, and not its
+    week = 7 * 24 * 60
+    assert api.post(f"/sim/runs/{run_id}/batch", batch(minute=week + 30)).status_code == 204
+    (before,) = api.sql(kept, run_id, run_id)
+    # Still inside the hour the last batch reached: nothing is pruned, however old.
+    late = batch(
+        minute=week + 59,
+        observations=[obs("s-1", "heart_rate", m, num=120) for m in (10, week + 59)],
+        bins=[
+            {"patient_id": "s-1", "vital": "heart_rate", "minute": m, "value": 120.0}
+            for m in (10, week + 59)
+        ],
+    )
+    assert api.post(f"/sim/runs/{run_id}/batch", late).status_code == 204
+    (same_hour,) = api.sql(kept, run_id, run_id)
+    assert same_hour == {"observations": before["observations"] + 2, "bins": before["bins"] + 2}
+
+    assert api.post(f"/sim/runs/{run_id}/batch", batch(minute=week + 60)).status_code == 204
+    cutoff = datetime(2026, 1, 1, 1, 0, tzinfo=UTC)  # the new as_of less seven days
+    bins = api.sql("SELECT bin_at FROM vital_bin WHERE run_id = %s ORDER BY bin_at", run_id)
+    newest = [cutoff + timedelta(days=7, minutes=m) for m in (-30, -1, 0)]
+    assert [b["bin_at"] for b in bins] == newest
+    left = api.sql(
+        "SELECT code FROM observation WHERE run_id = %s AND observed_at < %s", run_id, cutoff
+    )
+    # The old heart rates were superseded and are gone; every other old reading is the newest of
+    # its code, so it stays and is still what the patient read serves.
+    assert {o["code"] for o in left} == {
+        "respiratory_rate",
+        "spo2",
+        "temperature",
+        "blood_pressure",
+        "consciousness",
+        "supplemental_o2",
+        "spo2_scale",
+    }
+    assert len(left) == 7
+    vitals = api.ward("rn-delacruz")["ranked"][0]["vitals"]
+    assert vitals["heart_rate"]["data"]["value"] == 120
+    assert vitals["blood_pressure"]["data"]["value"] == {"systolic": 88, "diastolic": 52}
+    assert vitals["blood_pressure"]["provenance"]["observed_at"] == iso(
+        api.wall.now - timedelta(minutes=week + 70)
+    )
+    assert api.sql(kept, old_run, old_run) == [other]  # another run is never pruned
+
+
 def test_the_run_decides_synthetic_not_the_client(api: Api) -> None:
     start(api)
     rows = api.sql("SELECT DISTINCT synthetic FROM observation WHERE run_id = 2")
@@ -1030,7 +1083,7 @@ def test_a_registration_waits_for_a_batch_in_flight_on_the_run_it_would_replace(
 
     def run_batch() -> bool:
         with connect(api.url) as conn:
-            return ingest.add_batch(conn, run_id, Batch.model_validate(batch(minute=1)), api.wall)
+            return ingest.add_batch(conn, run_id, Batch.model_validate(batch(minute=1)), api.wall, 7)
 
     with ThreadPoolExecutor(2) as pool:
         batch_done = pool.submit(run_batch)

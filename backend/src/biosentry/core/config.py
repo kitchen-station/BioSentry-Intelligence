@@ -5,6 +5,8 @@
     BIOSENTRY_INGEST_KEY     the ward sim's key; unset: the sim routes refuse everything
     BIOSENTRY_CORS_ORIGINS   comma-separated origins the dashboard is served from; the local
                              dashboard and sim ports when unset
+    BIOSENTRY_RETENTION_DAYS days of sim time a run keeps its vital bins and superseded observations
+                             (7 when unset); a whole number from 1 to 36500
 
 In production the process refuses to start on a database URL that holds the dev password (an early
 check on the text) or an ingest key that is not 32 or more characters, at least 8 of them distinct,
@@ -37,6 +39,7 @@ LOOPBACK = ("127.0.0.1", "localhost", "::1")
 ENVIRONMENTS = ("local", "production")
 MIN_INGEST_KEY = 32
 MIN_INGEST_KEY_DISTINCT = 8
+MAX_RETENTION_DAYS = 36500  # a century: the cutoff stays a date Python and PostgreSQL hold
 
 
 class ConfigError(ValueError):
@@ -69,8 +72,13 @@ class Settings:
     # Unset: the sim ingest routes refuse everything (fail closed).
     ingest_key: str | None = None
     env: str = "local"
+    retention_days: int = 7
 
     def __post_init__(self) -> None:
+        if not 1 <= self.retention_days <= MAX_RETENTION_DAYS:
+            raise ConfigError(
+                f"BIOSENTRY_RETENTION_DAYS must be a whole number from 1 to {MAX_RETENTION_DAYS}"
+            )
         if self.env not in ENVIRONMENTS:
             raise ConfigError("BIOSENTRY_ENV must be local or production")
         if self.env != "production":
@@ -92,9 +100,14 @@ class Settings:
     def from_env(cls, env: Mapping[str, str] | None = None) -> "Settings":
         source = os.environ if env is None else env
         origins = tuple(o.strip() for o in source.get("BIOSENTRY_CORS_ORIGINS", "").split(","))
+        try:
+            retention_days = int(source.get("BIOSENTRY_RETENTION_DAYS", "").strip() or 7)
+        except ValueError:
+            retention_days = 0  # refused below, by the one message
         return cls(
             database_url=source.get("BIOSENTRY_DATABASE_URL") or DEFAULT_DATABASE_URL,
             ingest_key=source.get("BIOSENTRY_INGEST_KEY", "").strip() or None,
             cors_origins=tuple(o for o in origins if o) or DEFAULT_CORS_ORIGINS,
             env=(source.get("BIOSENTRY_ENV") or "local").strip().lower(),
+            retention_days=retention_days,
         )

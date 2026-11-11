@@ -393,7 +393,7 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
     def add_sim_batch(
         run_id: int, body: Batch, ctx: Ctx, _: Annotated[None, Depends(ingest_gate)]
     ) -> Response:
-        if not ingest.add_batch(ctx.conn, run_id, body, clock):
+        if not ingest.add_batch(ctx.conn, run_id, body, clock, settings.retention_days):
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return Response(status_code=204)
 
