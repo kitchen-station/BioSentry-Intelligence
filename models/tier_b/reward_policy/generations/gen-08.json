@@ -1,0 +1,94 @@
+{
+ "accepted": true,
+ "best_candidate": {
+  "params": {
+   "p": 2,
+   "theta": 2.9727,
+   "weights": {
+    "heart_rate": 0.1114,
+    "respiratory_rate": 0.1965,
+    "spo2": 0.3152,
+    "temperature": 1.0633
+   }
+  },
+  "train_reward": 1.452409
+ },
+ "candidates": 30,
+ "current_before": {
+  "params": {
+   "p": 3,
+   "theta": 3.1587,
+   "weights": {
+    "heart_rate": 0.3159,
+    "respiratory_rate": 0.5372,
+    "spo2": 0.3794,
+    "temperature": 1.2989
+   }
+  },
+  "train_reward": 1.131942
+ },
+ "generation": 8,
+ "generator_seed": 20261120,
+ "params": {
+  "p": 2,
+  "theta": 2.9727,
+  "weights": {
+   "heart_rate": 0.1114,
+   "respiratory_rate": 0.1965,
+   "spo2": 0.3152,
+   "temperature": 1.0633
+  }
+ },
+ "rejected_time_in_alert": 1,
+ "sigma": {
+  "p": 0.478297,
+  "theta": 0.239148,
+  "w": 0.239148
+ },
+ "synthetic": true,
+ "temperature": true,
+ "train_seeds": [
+  52,
+  53,
+  54
+ ],
+ "validated": false,
+ "validation": {
+  "per_seed": [
+   {
+    "alerts_per_patient_12h": 0.261293,
+    "caught_early": 1,
+    "episodes": 5,
+    "news2_time_in_alert": 0.148455,
+    "reward": -0.82554,
+    "seed": 8,
+    "time_in_alert": 0.045355
+   },
+   {
+    "alerts_per_patient_12h": 0.262926,
+    "caught_early": 2,
+    "episodes": 2,
+    "news2_time_in_alert": 0.117307,
+    "reward": 1.406528,
+    "seed": 9,
+    "time_in_alert": 0.049597
+   },
+   {
+    "alerts_per_patient_12h": 0.255149,
+    "caught_early": 2,
+    "episodes": 2,
+    "news2_time_in_alert": 0.100459,
+    "reward": 1.157895,
+    "seed": 10,
+    "time_in_alert": 0.06942
+   }
+  ],
+  "rejected_time_in_alert": false,
+  "reward": 0.579628,
+  "seeds": [
+   8,
+   9,
+   10
+  ]
+ }
+}

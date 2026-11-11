@@ -180,6 +180,65 @@ Run (inside `biosentry-research-venv`, see the gate below):
 
 `--out` defaults to `models/tier_c/student_vitals/`.
 
+## The reward-driven alerting policy (slice B6)
+
+Written before any run. Code: `reward_policy.py` (the policy and the reward) and `reward_loop.py`
+(the loop and the held-out command). Standard library only; the tests are in `tests/`.
+
+- Policy: six numbers, four non-negative weights (heart rate, respiratory rate, SpO2,
+  temperature), a threshold theta and a persistence p (integer 1 to 8). Per bin, for each vital,
+  z from the patient's own baseline (`baseline_finding` with the detector's DEFAULTS window and
+  floors, called on the bins up to this one, as in B4 and B5), clipped at 0 in the bad direction.
+  Score = the weighted sum. Alerting when the score is at least theta in p consecutive scored
+  bins. A NOT RANKED bin is not scored: it is not alerting and ends a run (abstention is an
+  output). A bin with no row ends a run. A vital whose value is missing, or whose baseline is
+  still forming, contributes nothing; nothing is filled in. Causal: a bin reads itself and
+  earlier bins only.
+- Generation 0 is the B4 rule's equivalent: weights 1, 1, 1, 1, theta 3.0, p 4. B4 alerts when
+  ONE vital has z at least 3 for 4 bins; the sum form cannot express "any one", so with equal
+  weights and theta = k it alerts whenever B4 does on RANKED bins, and also when several vitals
+  are moderately off together (a superset). Unlike B4 it never alerts on a NOT RANKED bin. The
+  weights and theta are only defined up to a common factor; the search does not use that.
+- Reward for one trial: C - lambda * S * a. C = evaluated episodes (the windows above) with the
+  policy alerting in a bin from `episode_start` to fully in (caught early). a = the policy's
+  alerts per patient per 12 h on the trial (alert rule above). S = E / a_news2: E evaluated
+  episodes of the trial over the NEWS2 chart trigger's alerts per patient per 12 h on the same
+  trial, so the penalty is lambda * E * (a / a_news2) and both terms are in episodes. lambda =
+  0.5: a policy with NEWS2's alert count must catch more than half the episodes early to score
+  above a silent one (judgement, fixed now, never tuned). Hard constraint: time in alert
+  (alerting bins over cohort rows) at most the NEWS2 chart trigger's on the same trial; a
+  candidate that breaks it on any trial of the set is rejected. `outcome`/higher care is never
+  part of the reward. A set of trials is scored by the mean reward.
+- Loop: generation g (1 to 10) learns on three training seeds no other generation sees: 31-33,
+  34-36, ..., 58-60 of `ward-v1-train`. It samples 30 candidates around the current parameters
+  (weights and theta: plus a normal draw times sigma, weights floored at 0, theta at 0.1; p:
+  plus a normal draw times sigma_p, rounded and clipped to 1-8; values rounded to 4 decimals),
+  from a SplitMix64 generator (seed 20261112 + g, Box-Muller normals). sigma starts at 0.5 for
+  weights and theta and 1.0 for p, and is multiplied by 0.9 after each generation. The current
+  policy and every candidate are scored on the generation's three seeds; the policy moves to
+  the best non-rejected candidate only if its mean reward is strictly higher than the current
+  policy's on those seeds (ties: the first drawn). A (1+30) evolution step: black-box search
+  with a reward, not deep or per-step reinforcement learning.
+- Validation and stop: after each generation (and at generation 0) the current policy is scored
+  on ward-v1 seeds 8 to 10. The shipped policy is the generation with the highest validation
+  reward among those not rejected there (ties: the earlier generation). Seeds 1 to 7 are not used.
+- Files: `models/tier_b/reward_policy/generations/gen-NN.json` and `policy.json` (with its own
+  sha256); the no-temperature run writes the same under `no_temperature/`. Same inputs give the
+  same bytes.
+- No-temperature run: the same loop with the temperature weight fixed at exactly 0 (never
+  sampled), generation 0 weights 1, 1, 1, 0.
+- The loaders open `<root>/seed-NN` only for the seeds named above, read `manifest.json` first,
+  and refuse a seed that differs from the folder name or is one of 11 to 30 before any other
+  file is opened. Held-out seeds 11 to 30 are scored once, by `--evaluate`, which refuses a
+  `policy.json` whose sha256 does not match its content. Rows: generation 0 and the shipped
+  policy, each alone and OR NEWS2 chart trigger, for both runs, next to NEWS2 and the B4 rows,
+  through `research.evaluate` (same windows, chance control, bootstrap).
+
+Run (either venv):
+
+    python -m research.reward_loop --train /data/trials/ward-v1-train --validate /data/trials/ward-v1 --out models/tier_b/reward_policy [--no-temperature]
+    python -m research.reward_loop --evaluate /data/trials/ward-v1 --out models/tier_b/reward_policy
+
 ## Limits
 
 - Temperature is flattered. The sim adds a fixed rise (`INJECT_TEMPERATURE = 0.6`) in every episode

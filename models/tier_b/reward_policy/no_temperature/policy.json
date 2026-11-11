@@ -1,0 +1,136 @@
+{
+ "chosen_generation": 9,
+ "curve": [
+  {
+   "accepted": null,
+   "generation": 0,
+   "train_reward_before": null,
+   "train_reward_best": null,
+   "validation_reward": 0.373317
+  },
+  {
+   "accepted": true,
+   "generation": 1,
+   "train_reward_before": 0.269743,
+   "train_reward_best": 0.941256,
+   "validation_reward": 1.041741
+  },
+  {
+   "accepted": true,
+   "generation": 2,
+   "train_reward_before": 1.257448,
+   "train_reward_best": 1.578527,
+   "validation_reward": 0.512189
+  },
+  {
+   "accepted": true,
+   "generation": 3,
+   "train_reward_before": 0.369069,
+   "train_reward_best": 1.352444,
+   "validation_reward": 0.965733
+  },
+  {
+   "accepted": true,
+   "generation": 4,
+   "train_reward_before": 0.259085,
+   "train_reward_best": 0.567397,
+   "validation_reward": 0.596167
+  },
+  {
+   "accepted": true,
+   "generation": 5,
+   "train_reward_before": 0.86026,
+   "train_reward_best": 1.392044,
+   "validation_reward": 0.399859
+  },
+  {
+   "accepted": true,
+   "generation": 6,
+   "train_reward_before": 0.625023,
+   "train_reward_best": 0.928446,
+   "validation_reward": 0.252226
+  },
+  {
+   "accepted": true,
+   "generation": 7,
+   "train_reward_before": 0.591929,
+   "train_reward_best": 1.113071,
+   "validation_reward": 0.466523
+  },
+  {
+   "accepted": true,
+   "generation": 8,
+   "train_reward_before": 0.734049,
+   "train_reward_best": 0.839599,
+   "validation_reward": 0.204827
+  },
+  {
+   "accepted": true,
+   "generation": 9,
+   "train_reward_before": 2.156559,
+   "train_reward_best": 2.585718,
+   "validation_reward": 1.072809
+  },
+  {
+   "accepted": true,
+   "generation": 10,
+   "train_reward_before": 0.811101,
+   "train_reward_best": 0.930716,
+   "validation_reward": 0.538354
+  }
+ ],
+ "lambda": 0.5,
+ "name": "tier_b/reward_policy/no_temperature",
+ "params": {
+  "p": 6,
+  "theta": 3.2414,
+  "weights": {
+   "heart_rate": 0.4372,
+   "respiratory_rate": 1.1302,
+   "spo2": 0.3457,
+   "temperature": 0.0
+  }
+ },
+ "sha256": "2a20d944d8fe7f9fecc875ff96078ffb7d039a4d74b9cdd5c1320c11be6587d9",
+ "synthetic": true,
+ "temperature": false,
+ "train_seeds": [
+  31,
+  32,
+  33,
+  34,
+  35,
+  36,
+  37,
+  38,
+  39,
+  40,
+  41,
+  42,
+  43,
+  44,
+  45,
+  46,
+  47,
+  48,
+  49,
+  50,
+  51,
+  52,
+  53,
+  54,
+  55,
+  56,
+  57,
+  58,
+  59,
+  60
+ ],
+ "validated": false,
+ "validation_reward": 1.072809,
+ "validation_seeds": [
+  8,
+  9,
+  10
+ ]
+}
