@@ -35,6 +35,10 @@ class RejectedError(ValueError):
     """The input cannot be a real reading. The caller gets a 422; nothing is stored."""
 
 
+class ConflictError(Exception):
+    """The ward's state refuses this write (409). Nothing was written."""
+
+
 def check_blood_pressure(systolic: int, diastolic: int) -> BloodPressure:
     """The bounds for any recorded blood pressure. Out of range is rejected, never clamped."""
     low, high = SYSTOLIC_RANGE
@@ -147,56 +151,69 @@ class PatientService:
                 raise
         store = self._store
         now = store.run_now
-        with store.tx():
-            patient_id = store.next_patient_id()
-            store.add_patient(
-                patient_id,
-                clinician_id,
-                {
+        try:
+            with store.tx():
+                patient_id = store.next_patient_id()  # takes the run lock: the check below holds
+                if store.bed_occupied(form.bed):
+                    raise ConflictError(f"Bed {form.bed} is occupied")
+                store.add_patient(
+                    patient_id,
+                    clinician_id,
+                    {
+                        "name": f"{form.last_name}, {form.first_name}",
+                        "age": form.age,
+                        "sex": form.sex.value,
+                        "bed": form.bed,
+                        "admitting_context": form.admitting_context,
+                        "mechanism": "Admitted; not ranked until a patch is applied and every input is recorded.",
+                        "supporting": "",
+                        "trend": "insufficient",
+                        "admission": {"admitted_at": iso(now), "admitted_by": clinician_id},
+                        "admitted_at": whole(now),
+                    },
+                )
+
+                # No patch yet, so no device data. Each missing input says why (I1).
+                def missing(code: str, source: str, why: str) -> Obs:
+                    return Obs(patient_id, code, now, source, "missing", absent_reason=why)
+
+                obs = [missing(c, "device", "no_patch") for c in DEVICE_VITALS]
+                obs += [
+                    missing(c, "nurse", "not_recorded") for c in ("supplemental_o2", "spo2_scale")
+                ]
+                obs.append(
+                    missing("blood_pressure", "nurse", "not_measured")
+                    if bp is None
+                    else Obs(
+                        patient_id,
+                        "blood_pressure",
+                        now,
+                        "nurse",
+                        num=bp.systolic,
+                        num2=bp.diastolic,
+                    )
+                )
+                obs.append(
+                    missing("consciousness", "nurse", "not_measured")
+                    if form.initial_avpu is None
+                    else Obs(patient_id, "consciousness", now, "nurse", txt=form.initial_avpu.value)
+                )
+                store.record(obs)
+                action: dict[str, object] = {
                     "name": f"{form.last_name}, {form.first_name}",
                     "age": form.age,
                     "sex": form.sex.value,
                     "bed": form.bed,
-                    "admitting_context": form.admitting_context,
-                    "mechanism": "Admitted; not ranked until a patch is applied and every input is recorded.",
-                    "supporting": "",
-                    "trend": "insufficient",
-                    "admission": {"admitted_at": iso(now), "admitted_by": clinician_id},
-                    "admitted_at": whole(now),
-                },
-            )
-
-            # No patch yet, so no device data. Each missing input says why (I1).
-            def missing(code: str, source: str, why: str) -> Obs:
-                return Obs(patient_id, code, now, source, "missing", absent_reason=why)
-
-            obs = [missing(c, "device", "no_patch") for c in DEVICE_VITALS]
-            obs += [missing(c, "nurse", "not_recorded") for c in ("supplemental_o2", "spo2_scale")]
-            obs.append(
-                missing("blood_pressure", "nurse", "not_measured")
-                if bp is None
-                else Obs(
-                    patient_id, "blood_pressure", now, "nurse", num=bp.systolic, num2=bp.diastolic
-                )
-            )
-            obs.append(
-                missing("consciousness", "nurse", "not_measured")
-                if form.initial_avpu is None
-                else Obs(patient_id, "consciousness", now, "nurse", txt=form.initial_avpu.value)
-            )
-            store.record(obs)
-            action: dict[str, object] = {
-                "name": f"{form.last_name}, {form.first_name}",
-                "age": form.age,
-                "sex": form.sex.value,
-                "bed": form.bed,
-                "context": form.admitting_context,
-            }
-            if bp is not None:
-                action |= {"systolic": bp.systolic, "diastolic": bp.diastolic}
-            if form.initial_avpu is not None:
-                action["acvpu"] = form.initial_avpu.value
-            store.add_action("admit_patient", clinician_id, patient_id, action)
+                    "context": form.admitting_context,
+                }
+                if bp is not None:
+                    action |= {"systolic": bp.systolic, "diastolic": bp.diastolic}
+                if form.initial_avpu is not None:
+                    action["acvpu"] = form.initial_avpu.value
+                store.add_action("admit_patient", clinician_id, patient_id, action)
+        except ConflictError:  # audited after the rollback, or the row would go with it
+            self._audit.append(clinician_id, "admit_patient", "-", "rejected")
+            raise
         self._audit.append(clinician_id, "admit_patient", patient_id, "ok")
         _, abstained = self._wards.compute(frozenset({patient_id}))
         return next(a for a in abstained if a.id == patient_id)

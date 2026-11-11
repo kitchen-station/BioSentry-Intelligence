@@ -553,6 +553,46 @@ def test_an_implausible_or_malformed_admission_blood_pressure_is_rejected_not_cl
     assert ctx(app_and_client).store.assigned("rn-manalo") == everyone
 
 
+def _written(app_and_client: tuple[Any, TestClient]) -> list[int]:
+    """How many patients, observations and feed rows there are."""
+    conn = ctx(app_and_client).conn
+    return [
+        conn.execute(f"SELECT count(*) AS n FROM {table}").fetchone()["n"]
+        for table in ("patient", "observation", "clinician_action")
+    ]
+
+
+@pytest.mark.parametrize("bed", ["4A", " 4a ", "4a\t"])  # p-001 is in 4A
+def test_admission_to_an_occupied_bed_is_refused_and_writes_nothing(
+    app_and_client: tuple[Any, TestClient], bed: str
+) -> None:
+    _, client = app_and_client
+    before = _written(app_and_client)
+    form = _admission("120/80") | {"bed": bed}
+    response = client.post("/patients", headers=as_("rn-delacruz"), json=form)
+    assert response.status_code == 409
+    assert response.json() == {"detail": f"Bed {bed} is occupied"}
+    assert _written(app_and_client) == before
+    assert [(r.action, r.resource, r.outcome) for r in trail(app_and_client)] == [
+        ("admit_patient", "-", "rejected")
+    ]
+
+
+def test_a_bed_is_free_again_once_its_patient_has_left(
+    app_and_client: tuple[Any, TestClient],
+) -> None:
+    _, client = app_and_client
+    form = _admission("120/80")  # bed 1A, which nobody has
+    first = client.post("/patients", headers=as_("rn-delacruz"), json=form)
+    assert first.status_code == 201
+    assert client.post("/patients", headers=as_("rn-delacruz"), json=form).status_code == 409
+    ctx(app_and_client).conn.execute(
+        "UPDATE patient SET left_at = admitted_at, outcome = 'discharged' WHERE id = %s",
+        (first.json()["id"],),
+    )
+    assert client.post("/patients", headers=as_("rn-delacruz"), json=form).status_code == 201
+
+
 @pytest.mark.parametrize("bp", ["20/10", "45/20", "300/200"])
 def test_a_critical_but_possible_admission_blood_pressure_is_accepted_as_typed(
     app_and_client: tuple[Any, TestClient], bp: str

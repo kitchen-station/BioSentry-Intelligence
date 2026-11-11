@@ -498,6 +498,16 @@ class PostgresStore:
         numbers = [int(m[1]) for r in rows if (m := re.fullmatch(r"p-(\d+)", r["id"]))]
         return f"p-{max(numbers, default=0) + 1:03d}"
 
+    def bed_occupied(self, bed: str) -> bool:
+        """Whether a patient still in the ward has this bed. Call it after `next_patient_id`,
+        which holds the run's lock, so two admissions to one bed cannot both pass."""
+        row = self.conn.execute(
+            "SELECT 1 FROM patient WHERE run_id = %s AND left_at IS NULL"
+            " AND lower(btrim(bed)) = lower(%s) LIMIT 1",
+            (self.run_id, bed.strip()),
+        ).fetchone()
+        return row is not None
+
     def add_patient(self, patient_id: str, clinician_id: str, fields: dict[str, Any]) -> None:
         with self.tx():
             insert_patient(self.conn, self.run_id, patient_id, fields)
