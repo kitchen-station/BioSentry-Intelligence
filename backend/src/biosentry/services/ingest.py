@@ -1,5 +1,5 @@
 """The ward simulation's writes: start a run, append a batch, replace the live view. Each is one
-transaction.
+transaction. And its one read: the clinician actions it has not applied yet.
 
 The run, never the client, says whether data is synthetic. A body that is refused writes nothing.
 One shared ward: the newest run is the ward. A different client cannot start a run while the
@@ -15,6 +15,7 @@ from biosentry.db.migrate import SETUP_LOCK
 from biosentry.repositories.postgres import (
     Conn,
     Obs,
+    PostgresStore,
     assign,
     insert_observations,
     insert_patient,
@@ -144,8 +145,11 @@ def _locked_newest(conn: Conn, run_id: int) -> dict[str, Any] | None:
     return run
 
 
-def add_batch(conn: Conn, run_id: int, body: Batch, clock: Callable[[], datetime]) -> bool:
-    """False when there is no such run. A patient outside the run is refused (RejectedError)."""
+def add_batch(
+    conn: Conn, run_id: int, body: Batch, clock: Callable[[], datetime], retention_days: int
+) -> bool:
+    """False when there is no such run. A patient outside the run is refused (RejectedError).
+    A batch that moves the run into a new sim hour prunes what is older than `retention_days`."""
     with transaction(conn):
         # A batch holds the run's lock from its first read to its commit: two batches on a run take
         # turns (the sim_event seq is max + 1, and the patient and run rows are updated in order).
@@ -218,11 +222,24 @@ def add_batch(conn: Conn, run_id: int, body: Batch, clock: Callable[[], datetime
                     for i, e in enumerate(body.events, 1)
                 ],
             )
+        as_of = whole(_at(origin, body.minute))
+        if as_of.replace(minute=0, second=0) != run["as_of"].replace(minute=0, second=0):
+            cutoff = as_of - timedelta(days=retention_days)
+            conn.execute("DELETE FROM vital_bin WHERE run_id = %s AND bin_at < %s", (run_id, cutoff))
+            # The read takes the newest row per patient and code, and the sim sends a value only
+            # when it changes: that row is the current value whatever its age, so it is kept.
+            conn.execute(
+                "DELETE FROM observation AS o WHERE o.run_id = %s AND o.observed_at < %s"
+                " AND EXISTS (SELECT 1 FROM observation AS n WHERE n.run_id = o.run_id"
+                " AND n.patient_id = o.patient_id AND n.code = o.code"
+                " AND (n.observed_at, n.id) > (o.observed_at, o.id))",
+                (run_id, cutoff),
+            )
         conn.execute(
             "UPDATE run SET as_of = %s, last_batch_at = %s, ended = %s, received = %s,"
             " rejected = %s, abstained = %s WHERE id = %s",
             (
-                whole(_at(origin, body.minute)),
+                as_of,
                 whole(clock()),
                 body.ended,
                 body.counts.received,
@@ -241,3 +258,11 @@ def set_view(conn: Conn, run_id: int, body: LiveView) -> bool:
             return False
         set_live_view(conn, run_id, body.model_dump())
     return True
+
+
+def actions(store: PostgresStore, run_id: int, after: int) -> list[dict[str, Any]] | None:
+    """The run's clinician actions after `after`. None when there is no such run."""
+    with transaction(store.conn):  # under the run's lock: a write in flight commits first
+        if _locked_newest(store.conn, run_id) is None:
+            return None
+        return store.actions(run_id, after)

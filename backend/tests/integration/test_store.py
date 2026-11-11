@@ -460,6 +460,59 @@ def test_a_repeated_batch_adds_no_rows(api: Api) -> None:
     assert once["events"] == 1
 
 
+def test_a_batch_into_a_new_sim_hour_prunes_what_is_older_than_the_retention(api: Api) -> None:
+    old_run = start(api)
+    kept = (
+        "SELECT (SELECT count(*) FROM observation WHERE run_id = %s) AS observations,"
+        " (SELECT count(*) FROM vital_bin WHERE run_id = %s) AS bins"
+    )
+    (other,) = api.sql(kept, old_run, old_run)
+    run_id = start(api)  # the same client restarts: the first run's rows are as old, and not its
+    week = 7 * 24 * 60
+    assert api.post(f"/sim/runs/{run_id}/batch", batch(minute=week + 30)).status_code == 204
+    (before,) = api.sql(kept, run_id, run_id)
+    # Still inside the hour the last batch reached: nothing is pruned, however old.
+    late = batch(
+        minute=week + 59,
+        observations=[obs("s-1", "heart_rate", m, num=120) for m in (10, week + 59)],
+        bins=[
+            {"patient_id": "s-1", "vital": "heart_rate", "minute": m, "value": 120.0}
+            for m in (10, week + 59)
+        ],
+    )
+    assert api.post(f"/sim/runs/{run_id}/batch", late).status_code == 204
+    (same_hour,) = api.sql(kept, run_id, run_id)
+    assert same_hour == {"observations": before["observations"] + 2, "bins": before["bins"] + 2}
+
+    assert api.post(f"/sim/runs/{run_id}/batch", batch(minute=week + 60)).status_code == 204
+    cutoff = datetime(2026, 1, 1, 1, 0, tzinfo=UTC)  # the new as_of less seven days
+    bins = api.sql("SELECT bin_at FROM vital_bin WHERE run_id = %s ORDER BY bin_at", run_id)
+    newest = [cutoff + timedelta(days=7, minutes=m) for m in (-30, -1, 0)]
+    assert [b["bin_at"] for b in bins] == newest
+    left = api.sql(
+        "SELECT code FROM observation WHERE run_id = %s AND observed_at < %s", run_id, cutoff
+    )
+    # The old heart rates were superseded and are gone; every other old reading is the newest of
+    # its code, so it stays and is still what the patient read serves.
+    assert {o["code"] for o in left} == {
+        "respiratory_rate",
+        "spo2",
+        "temperature",
+        "blood_pressure",
+        "consciousness",
+        "supplemental_o2",
+        "spo2_scale",
+    }
+    assert len(left) == 7
+    vitals = api.ward("rn-delacruz")["ranked"][0]["vitals"]
+    assert vitals["heart_rate"]["data"]["value"] == 120
+    assert vitals["blood_pressure"]["data"]["value"] == {"systolic": 88, "diastolic": 52}
+    assert vitals["blood_pressure"]["provenance"]["observed_at"] == iso(
+        api.wall.now - timedelta(minutes=week + 70)
+    )
+    assert api.sql(kept, old_run, old_run) == [other]  # another run is never pruned
+
+
 def test_the_run_decides_synthetic_not_the_client(api: Api) -> None:
     start(api)
     rows = api.sql("SELECT DISTINCT synthetic FROM observation WHERE run_id = 2")
@@ -554,6 +607,7 @@ RUN_TABLES = (
     "clinical_note",
     "acknowledgement",
     "sim_event",
+    "clinician_action",
 )
 
 
@@ -1030,7 +1084,7 @@ def test_a_registration_waits_for_a_batch_in_flight_on_the_run_it_would_replace(
 
     def run_batch() -> bool:
         with connect(api.url) as conn:
-            return ingest.add_batch(conn, run_id, Batch.model_validate(batch(minute=1)), api.wall)
+            return ingest.add_batch(conn, run_id, Batch.model_validate(batch(minute=1)), api.wall, 7)
 
     with ThreadPoolExecutor(2) as pool:
         batch_done = pool.submit(run_batch)
@@ -1246,3 +1300,148 @@ def test_a_live_view_at_the_size_limit_is_stored(api: Api) -> None:
     body = {"shared": most, "patients": [{"id": "s-1", "view": most}]}
     assert api.post(f"/sim/runs/{run_id}/view", body).status_code == 204
     assert live(api, "rn-delacruz") == body
+
+
+# --- The feed of clinician actions the ward sim reads -------------------------------------------
+
+NOTE = {"author": "a", "role": "RN", "content": "SECRET-NOTE-TEXT"}
+NOT_APPLICABLE = dict.fromkeys(
+    ("score", "systolic", "diastolic", "acvpu", "on_oxygen", "spo2_scale")
+    + ("name", "age", "sex", "bed", "context")
+)
+
+
+def actions(api: Api, run_id: int, key: str | None = KEY, **params: Any) -> Any:
+    headers = {"X-Ingest-Key": key} if key is not None else {}
+    return api.client.get(f"/sim/runs/{run_id}/actions", params=params, headers=headers)
+
+
+def feed(api: Api, run_id: int, **params: Any) -> list[dict[str, Any]]:
+    response = actions(api, run_id, **params)
+    assert response.status_code == 200, response.text
+    rows: list[dict[str, Any]] = response.json()["actions"]
+    return rows
+
+
+def test_each_clinician_write_puts_one_row_on_the_feed(api: Api) -> None:
+    run_id = start(api)
+    h, post = api.as_("rn-delacruz"), api.client.post
+    every = {"systolic": 120, "diastolic": 80, "acvpu": "V", "on_oxygen": True, "spo2_scale": 2}
+    full = {**admit_input(), "initialBp": "118/76", "initialAvpu": "C"}
+    assert post("/patients/s-1/acknowledgement", headers=h, json={"score": 9}).status_code == 204
+    assert post("/patients/s-1/vitals", headers=h, json=every).status_code == 200
+    assert post("/patients/s-1/vitals", headers=h, json={"on_oxygen": False}).status_code == 200
+    assert post("/patients/s-1/notes", headers=h, json=NOTE).status_code == 201
+    assert post("/patients", headers=h, json=full).status_code == 201
+    assert post("/patients", headers=h, json=admit_input()).status_code == 201
+
+    audited = api.sql("SELECT count(*) AS n FROM audit_log")
+    response = actions(api, run_id)
+    assert api.sql("SELECT count(*) AS n FROM audit_log") == audited  # not a clinician's read
+    admitted = {"name": "Santos, Maria", "age": 67, "sex": "F", "bed": "4A"}
+    admitted["context"] = "Acute decompensated heart failure"
+    expected = [
+        {"kind": "acknowledge", "patient_id": "s-1", "score": 9},
+        {"kind": "record_vitals", "patient_id": "s-1", **every},
+        {"kind": "record_vitals", "patient_id": "s-1", "on_oxygen": False},
+        {"kind": "add_note", "patient_id": "s-1"},
+        {"kind": "admit_patient", "patient_id": "p-001", **admitted}
+        | {"systolic": 118, "diastolic": 76, "acvpu": "C"},
+        {"kind": "admit_patient", "patient_id": "p-002", **admitted},
+    ]
+    rows = response.json()["actions"]
+    seqs = [r.pop("seq") for r in rows]
+    assert seqs == sorted(set(seqs))
+    assert rows == [{**NOT_APPLICABLE, "clinician_id": "rn-delacruz", **e} for e in expected]
+    assert "SECRET" not in response.text  # a note's text never reaches the feed
+    assert "SECRET" not in str(api.sql("SELECT * FROM clinician_action"))
+
+
+def test_a_refused_write_labs_and_a_deleted_note_put_nothing_on_the_feed(api: Api) -> None:
+    run_id = start(api)
+    mine, theirs, post = api.as_("rn-delacruz"), api.as_("rn-reyes"), api.client.post
+    for path, body in (
+        ("/patients/s-1/acknowledgement", {"score": 9}),
+        ("/patients/s-1/vitals", {"acvpu": "A"}),
+        ("/patients/s-1/notes", NOTE),
+    ):
+        assert post(path, headers=theirs, json=body).status_code == 404  # not their patient
+    bad = {"systolic": 500, "diastolic": 80}
+    assert post("/patients/s-1/vitals", headers=mine, json=bad).status_code == 422
+    refused = {**admit_input(), "initialBp": "999/80"}
+    assert post("/patients", headers=mine, json=refused).status_code == 422
+    assert post("/patients/s-1/acknowledgement", headers=mine, json={"score": 99}).status_code == 422
+    assert feed(api, run_id) == []
+
+    assert post("/patients/s-1/labs", headers=mine, json={"potassium": 4.0}).status_code == 200
+    note = post("/patients/s-1/notes", headers=mine, json=NOTE).json()["id"]
+    assert api.client.delete(f"/patients/s-1/notes/{note}", headers=mine).status_code == 204
+    assert [r["kind"] for r in feed(api, run_id)] == ["add_note"]
+
+
+def test_a_write_and_its_feed_row_are_one_transaction(
+    api: Api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from biosentry.repositories.postgres import PostgresStore
+
+    def fail(*args: Any, **kw: Any) -> None:
+        raise RuntimeError("the database went away")
+
+    start(api)
+    h = api.as_("rn-delacruz")
+    count = (
+        "SELECT (SELECT count(*) FROM clinician_action) AS actions,"
+        " (SELECT count(*) FROM acknowledgement) AS acks, (SELECT count(*) FROM patient) AS patients,"
+        " (SELECT count(*) FROM clinical_note) AS notes, (SELECT count(*) FROM observation) AS obs"
+    )
+    before = api.sql(count)
+    monkeypatch.setattr(PostgresStore, "acknowledge", fail)  # the write fails: no feed row
+    with pytest.raises(RuntimeError):
+        api.client.post("/patients/s-1/acknowledgement", headers=h, json={"score": 9})
+    monkeypatch.setattr(PostgresStore, "add_action", fail)  # the feed row fails: no write
+    for path, body in (
+        ("/patients/s-1/vitals", {"acvpu": "V"}),
+        ("/patients/s-1/notes", NOTE),
+        ("/patients", admit_input()),
+    ):
+        with pytest.raises(RuntimeError):
+            api.client.post(path, headers=h, json=body)
+    assert api.sql(count) == before
+
+
+def test_the_feed_is_read_in_order_200_rows_at_a_time_after_a_cursor(api: Api) -> None:
+    h = api.as_("rn-delacruz")
+    api.client.post("/patients/p-001/acknowledgement", headers=h, json={"score": 9})
+    assert [r["kind"] for r in feed(api, 1)] == ["acknowledge"]  # the fixture ward has a feed too
+    run_id = start(api)
+    assert feed(api, run_id) == []  # nothing yet, and never another run's rows
+    seqs = [
+        r["seq"]
+        for r in api.sql(
+            "INSERT INTO clinician_action (run_id, kind, patient_id, clinician_id, at, data)"
+            " SELECT %s, 'add_note', 's-1', 'rn-delacruz', now(), '{}'::jsonb"
+            " FROM generate_series(1, 205) RETURNING seq",
+            run_id,
+        )
+    ]
+    first = [r["seq"] for r in feed(api, run_id)]
+    assert first == seqs[:200] == [r["seq"] for r in feed(api, run_id, after=0)]
+    assert [r["seq"] for r in feed(api, run_id, after=first[-1])] == seqs[200:]
+    assert feed(api, run_id, after=seqs[-1]) == feed(api, run_id, after=2**63 - 1) == []
+    for after in (-1, 2**63, "x", 1.5):
+        assert actions(api, run_id, after=after).status_code == 422, after
+
+
+def test_the_feed_needs_the_ingest_key_and_the_newest_run(api: Api) -> None:
+    old = start(api, client_id="client-a")
+    for key in (None, "wrong"):
+        assert actions(api, old, key=key).status_code == 403
+        assert actions(api, old, key=key, after=-1).status_code == 403  # the key comes first
+    assert actions(Api(api.url, ingest_key=None), old).status_code == 503
+    assert actions(api, 99).status_code == 404
+    api.wall.now += timedelta(seconds=31)
+    start(api, client_id="client-b")
+    refused = actions(api, old)
+    assert (refused.status_code, refused.json()) == (409, {"detail": REPLACED})
+    rows = api.sql("SELECT clinician_id, action, resource, outcome FROM audit_log")
+    assert rows == [{"clinician_id": None, "action": "ingest", "resource": "-", "outcome": "denied"}] * 5

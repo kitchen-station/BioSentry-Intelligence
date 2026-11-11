@@ -79,7 +79,9 @@ class PatientService:
     def add_note(self, clinician_id: str, patient_id: str, body: NewNote) -> ClinicalNote | None:
         if not self._visible(clinician_id, patient_id, "add_note"):
             return None
-        note = self._store.add_note(patient_id, body.author, body.role, body.content)
+        with self._store.tx():
+            self._store.add_action("add_note", clinician_id, patient_id, {})  # never the text
+            note = self._store.add_note(patient_id, body.author, body.role, body.content)
         self._audit.append(clinician_id, "add_note", patient_id, "ok")
         return note
 
@@ -99,7 +101,9 @@ class PatientService:
     def acknowledge(self, clinician_id: str, patient_id: str, score: int) -> bool:
         if not self._visible(clinician_id, patient_id, "acknowledge"):
             return False
-        self._store.acknowledge(clinician_id, patient_id, score)
+        with self._store.tx():
+            self._store.add_action("acknowledge", clinician_id, patient_id, {"score": score})
+            self._store.acknowledge(clinician_id, patient_id, score)
         self._audit.append(clinician_id, "acknowledge", patient_id, "ok")
         return True
 
@@ -181,6 +185,18 @@ class PatientService:
                 else Obs(patient_id, "consciousness", now, "nurse", txt=form.initial_avpu.value)
             )
             store.record(obs)
+            action: dict[str, object] = {
+                "name": f"{form.last_name}, {form.first_name}",
+                "age": form.age,
+                "sex": form.sex.value,
+                "bed": form.bed,
+                "context": form.admitting_context,
+            }
+            if bp is not None:
+                action |= {"systolic": bp.systolic, "diastolic": bp.diastolic}
+            if form.initial_avpu is not None:
+                action["acvpu"] = form.initial_avpu.value
+            store.add_action("admit_patient", clinician_id, patient_id, action)
         self._audit.append(clinician_id, "admit_patient", patient_id, "ok")
         _, abstained = self._wards.compute(frozenset({patient_id}))
         return next(a for a in abstained if a.id == patient_id)
@@ -226,7 +242,14 @@ class PatientService:
             obs["spo2_scale"] = Obs(
                 patient_id, "spo2_scale", now, "nurse", num=float(body.spo2_scale)
             )
-        self._store.record(obs.values())
+        with self._store.tx():
+            self._store.add_action(
+                "record_vitals",
+                clinician_id,
+                patient_id,
+                body.model_dump(mode="json", exclude_none=True),  # only what was entered
+            )
+            self._store.record(obs.values())
         self._audit.append(clinician_id, "record_vitals", patient_id, "ok")
 
         state = self._store.read(patient_id)

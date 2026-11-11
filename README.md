@@ -73,6 +73,8 @@ with the variable unset the ingest routes answer 503). There is one shared ward:
 carries a `client_id` (one per sim page load), and while the newest run is live (not ended, last batch
 or creation within 30 seconds) a different `client_id` gets 409 and nothing is written; the same one may
 replace its own run. A batch for a run that is no longer the newest also gets 409.
+`GET /sim/runs/{id}/actions?after={seq}` (same key) tells the sim what clinicians did: one row per
+acknowledgement, vitals entry, note (never its text) or admission, at most 200 in `seq` order after the cursor.
 
 `make check` runs lint, types and tests for both halves; the API tests need the database, so run
 `make db-up` first (each test works in its own copy of a seeded database and drops it). `make db-reset`
@@ -108,6 +110,10 @@ active one: the seeded fixture ward, or a simulated ward posted to `/sim/*`.
   audit log (ids and outcomes only, sign-in attempts included, never a passphrase; the database refuses UPDATE, DELETE, TRUNCATE and a repeated sequence number, but not a user who can drop its triggers or the table), and the
   sim's event feed. A patient row is one stay: `admitted_at` (NULL when the arrival is not known), `left_at`
   and `outcome`. Someone who has left drops out of every live view and stays in the history.
+- **Pruned:** when a sim batch moves its run into a new sim hour, that run's vital bins older than
+  `BIOSENTRY_RETENTION_DAYS` days of sim time (7 when unset) are deleted, and so are its observations
+  that old which a newer one of the same patient and code has replaced. The newest observation of each
+  patient and code is always kept, so a value that has not changed is still served.
 - **Never stored:** scores, ranks, reasons and the NOT RANKED text. They are computed on every read
   (an acknowledgement keeps the score the clinician acknowledged, as they saw it).
 
