@@ -95,9 +95,9 @@ so it does not trigger; with the baseline spread at the fitted wander SD the z v
 | NEWS2 OR baseline | 0.473 | 0.924 | 0.550 | +0.374 | 0.444 (12/27) |
 | NEWS2 OR baseline, no temperature | 0.462 | 0.747 (59/79) | 0.533 | +0.213 | 0.111 (3/27) |
 
-- Without temperature, NEWS2 OR baseline has an excess of +0.213, below NEWS2 alone at +0.237: on
-  this simulator the baseline adds nothing measurable beyond the temperature artefact. Baseline
-  alone without temperature has any-bin 0.557, chance 0.137, excess +0.420, 0.139 alerts per
+- Without temperature, NEWS2 OR baseline has an excess of +0.213, below NEWS2 alone at +0.237: so
+  added to NEWS2, the baseline without temperature gives no excess over NEWS2 alone (the excess
+  has no interval). Baseline alone without temperature still has any-bin 0.557, chance 0.137, excess +0.420, 0.139 alerts per
   patient per 12 h and catches 0 of 27 hypotensive episodes as new alerts. Excess is not
   comparable across policies with different chance rates.
 - Cause: the ward simulator adds a fixed temperature rise in every episode kind
