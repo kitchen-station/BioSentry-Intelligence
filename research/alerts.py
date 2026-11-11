@@ -20,6 +20,9 @@ class Policy:
     name: str
     alerting: Callable[[Row], bool]
     abstains: Callable[[Row], bool]
+    # Policies that need a patient's history (the baseline) give every bin's state at once, built
+    # causally: the state at a bin never reads a later bin. `alerting` is then not called.
+    states: Callable[[Mapping[int, Row]], Mapping[int, bool]] | None = None
 
 
 def _chart_trigger(row: Row) -> bool:
@@ -50,13 +53,14 @@ def scan(policy: Policy, rows: Mapping[int, Row]) -> tuple[list[int], list[int]]
     """
     fired: list[int] = []
     on: list[int] = []
+    states = policy.states(rows) if policy.states else None
     quiet = REARM_BINS  # consecutive not-alerting bins; starts armed
     previous: int | None = None
     for minute in sorted(rows):
         if previous is not None:
             quiet += (minute - previous) // BIN_MINUTES - 1
         previous = minute
-        if policy.alerting(rows[minute]):
+        if states[minute] if states is not None else policy.alerting(rows[minute]):
             on.append(minute)
             if quiet >= REARM_BINS:
                 fired.append(minute)

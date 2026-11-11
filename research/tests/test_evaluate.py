@@ -9,6 +9,11 @@ from research.trials import Episode, TrialError, load_trial
 
 CHART, TOTAL5 = POLICIES
 
+
+@pytest.fixture(autouse=True)
+def _no_params_file(tmp_path, monkeypatch):
+    monkeypatch.setattr(evaluate, "PARAMS_PATH", tmp_path / "none.json")  # the DEFAULTS rows
+
 # Hand-computed from the toy cohort (sequences in cohort.csv). Windows: n-0001 [300, 510] fully in
 # 390; n-0002 [600, 780] fully in 660. Chance control: n-0003 (admit 30, no episode) gets
 # [270, 480] and [510, 690]. patient-days is set by hand to 2.5.
@@ -70,9 +75,9 @@ def test_toy_output_exact_and_repeatable(capsys):
 def test_tuning_seed_is_loaded_but_never_scored(tmp_path):
     other = copy_toy(tmp_path / "tuning", **{"manifest.json": ('"seed": 11', '"seed": 1')})
     text = run([str(TOY), str(other)])
-    assert "nothing is tuned here: 1\n" in text and "held-out seeds (11 to 30), the only ones scored: 11\n" in text
+    assert "not scored here (the sweep tunes on them): 1\n" in text and "held-out seeds (11 to 30), the only ones scored: 11\n" in text
     assert "parity: 82 cohort rows" in text
-    assert text.replace("parity: 82", "parity: 41").replace("nothing is tuned here: 1", "nothing is tuned here: none") == TOY_OUTPUT
+    assert text.replace("parity: 82", "parity: 41").replace("not scored here (the sweep tunes on them): 1", "not scored here (the sweep tunes on them): none") == TOY_OUTPUT
 
 
 def test_input_order_does_not_change_output(tmp_path):
@@ -295,3 +300,50 @@ def test_no_folders_and_refusal_exit_code(capsys, tmp_path):
     assert main([str(tmp_path / "missing")]) == 2
     out = capsys.readouterr()
     assert out.out == "" and out.err.count("\n") == 2 and out.err.startswith("refused: ")
+
+
+# --- params.json ----------------------------------------------------------------------------
+
+
+def _with_params(monkeypatch, tmp_path, content):
+    p = tmp_path / "params.json"
+    if content is not None:
+        p.write_bytes(content if isinstance(content, bytes) else content.encode())
+    monkeypatch.setattr(evaluate, "PARAMS_PATH", p)
+    return p
+
+
+def test_params_file_is_read(tmp_path, monkeypatch):
+    _with_params(monkeypatch, tmp_path, '{"k": 3, "p": 4}')
+    text = run([str(TOY)])
+    assert "baseline policies: k=3.0, p=4, from chosen on seeds 1-10 (params.json)" in text
+    assert "no_temp" in text
+
+
+@pytest.mark.parametrize("content, reason", [
+    ("{", "not valid JSON"), ("[1]", "not a JSON object"), ('{"p": 3}', "k must"),
+    ('{"k": 2}', "p must"), ('{"k": true, "p": 3}', "k must"), ('{"k": "2", "p": 3}', "k must"),
+    ('{"k": 1e999, "p": 3}', "k must"), ('{"k": 0, "p": 3}', "k must"), ('{"k": 2, "p": 3.0}', "p must"),
+    ('{"k": 2, "p": true}', "p must"), ('{"k": 2, "p": 0}', "p must"), ('{"k": 2, "p": 97}', "p must"),
+    ("[" * 30000, "not valid JSON"), (b"{" + b" " * 70000 + b"}", "larger than"),
+])
+def test_bad_params_file_is_refused_in_one_line(tmp_path, monkeypatch, capsys, content, reason):
+    _with_params(monkeypatch, tmp_path, content)
+    assert main([str(TOY)]) == 2
+    out = capsys.readouterr()
+    assert out.out == "" and out.err.startswith("refused: params.json: ") and reason in out.err
+    assert out.err.count("\n") == 1
+
+
+def test_params_that_is_a_directory_is_refused(tmp_path, monkeypatch, capsys):
+    d = tmp_path / "params.json"
+    d.mkdir()
+    monkeypatch.setattr(evaluate, "PARAMS_PATH", d)
+    assert main([str(TOY)]) == 2 and "params.json: cannot be read" in capsys.readouterr().err
+
+
+def test_params_rejected_by_the_detector_is_refused(tmp_path, monkeypatch):
+    _with_params(monkeypatch, tmp_path, '{"k": 2, "p": 3}')
+    monkeypatch.setattr(evaluate, "BaselineParams", lambda **kw: (_ for _ in ()).throw(ValueError("nope")))
+    with pytest.raises(TrialError, match="params.json: nope"):
+        run([str(TOY)])

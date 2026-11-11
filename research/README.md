@@ -29,7 +29,7 @@ Trials must share format version, days, speed and scenario hash.
 ## The split
 
 Seeds 1 to 10 are "tuning", 11 to 30 "held out". Metrics use the held-out seeds only. Tuning seeds
-are loaded and parity-checked, then not scored; nothing is tuned in this slice. A seed outside
+are loaded and parity-checked, then not scored here. `research.sweep` chooses the baseline's k and p on them. A seed outside
 1 to 30 is refused.
 
 ## Definitions
@@ -73,8 +73,43 @@ are loaded and parity-checked, then not scored; nothing is tuned in this slice. 
   2.5th to 97.5th percentile, for the alert rate and for the two sensitivities. Exposure per
   patient is the stay inside the trial.
 
+## Baseline policies and the sweep (slice B4)
+
+Two policies use each patient's own baseline (`baseline_policy.py`, which calls the backend's
+`baseline_finding` on the bins up to each bin, so a bin never sees the future): "baseline alone"
+(any of heart rate, respiratory rate, SpO2, temperature is significant) and "NEWS2 chart trigger
+OR baseline" (either one alerts). The alert rule, windows, chance control and bootstrap are the
+ones above.
+
+How a bin is treated, as decided by the detector itself and not by us: before a patient has 24
+valid bins there is no finding (baseline forming) and the bin is not alerting. A bin with no
+cohort row has no state and is not alerting. A row whose value for a vital is missing gives no
+finding for that vital (latest bin missing), and a gap ends a run; nothing is filled in. A NOT
+RANKED row (NEWS2 abstains) is still judged on the vitals it has. The "abstention" lines for the
+two new policies repeat NEWS2's NOT RANKED count; the detector has no abstention count of its own.
+
+Choosing k and p (`python -m research.sweep <trial folders>`). Written before the sweep was run:
+
+- Grid: k in 1.5, 2.0, 2.5, 3.0, 3.5, 4.0 and p in 2, 3, 4, 6, 8. Window and floors stay at the
+  detector's defaults.
+- Only tuning seeds 1 to 10 are scored. Held-out trials in the folder list are skipped and are
+  never part of any number.
+- Budget: a setting qualifies when "NEWS2 OR baseline" raises at most 25% more alerts per patient
+  per 12 hours than the NEWS2 chart trigger alone, on the tuning seeds.
+- Among qualifying settings, pick the largest excess over chance of ALERTING in any bin, on
+  episodes not cut short, for "NEWS2 OR baseline" (sensitivity minus the control-window rate).
+- Ties go to fewer alerts, then larger k, then larger p.
+- If no setting qualifies, nothing is chosen. That is a valid result.
+
+The command writes nothing unless `--write-params <path>` is given. `evaluate` then adds the two
+rows for the chosen k and p, read from `models/tier_b/baseline/params.json` when it exists,
+otherwise the detector's DEFAULTS (it prints which).
+
 ## Limits
 
+- Temperature is flattered. The sim adds a fixed rise (`INJECT_TEMPERATURE = 0.6`) in every episode
+  kind and uses a fixed noise of 0.02 (`src/sim/source.ts`, both `shortcut:`, uncited), so any
+  detector that reads temperature looks better than it should until those have a source.
 - Circular. The data and the episodes come from the same simulator that the alerts are judged
   on, so this says how a rule behaves on this simulator, not on patients. A model trained on
   simulator trials and then scored on simulator trials is circular in the same way. Output ends

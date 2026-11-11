@@ -5,13 +5,19 @@
 Prints plain deterministic text (no clock, no paths). Exit 2 with one line on any refusal.
 """
 
+import json
+import math
 import statistics
 import sys
 from bisect import bisect_left
 from collections import defaultdict
 from dataclasses import dataclass, field
+from pathlib import Path
+
+from biosentry.domain.scoring.tier_b.baseline import DEFAULTS, BaselineParams
 
 from . import bootstrap
+from .baseline_policy import NO_TEMP, baseline_policies, clear_cache
 from .alerts import POLICIES, REARM_BINS, Policy, scan
 from .events import control_windows, expected_bins, stay_days, windows
 from .rescore import check_parity
@@ -20,6 +26,7 @@ from .trials import BIN_MINUTES, KINDS, Trial, TrialError, load_trial
 TUNING = range(1, 11)
 HELD_OUT = range(11, 31)
 SHIFT_HOURS = 12
+PARAMS_PATH = Path(__file__).parent.parent / "models" / "tier_b" / "baseline" / "params.json"
 LAST_LINE = "synthetic, not validated: evaluated on the same simulator that generated the data"
 
 
@@ -221,7 +228,7 @@ def _table(pool: Pool, policies: tuple[Policy, ...]) -> list[str]:
         *[f"any-bin alerting, {k} episodes" for k in KINDS],
     ]
     width = max(len(x) for x in labels) + 2
-    col = 24
+    col = 28
     out = ["".ljust(width) + "".join(p.name.ljust(col) for p in policies)]
     for i, label in enumerate(labels):
         out.append(label.ljust(width) + "".join(cells[p.name][i].ljust(col) for p in policies))
@@ -237,9 +244,52 @@ def _sanity(pool: Pool, policies: tuple[Policy, ...]) -> None:
             raise TrialError(f"{p.name}: sensitivity 1.0 with no alerts outside episode windows")
 
 
-def run(folders: list[str], policies: tuple[Policy, ...] = POLICIES) -> str:
+MAX_PARAMS_BYTES = 64 * 1024
+MAX_P = 96  # one day of 15-minute bins
+
+
+def _bad(reason: str) -> TrialError:
+    return TrialError(f"params.json: {reason}")
+
+
+def _baseline_params() -> tuple[BaselineParams, str]:
+    """The file when it exists (any fault is an error, never a silent fallback), else DEFAULTS."""
+    try:
+        with open(PARAMS_PATH, "rb") as f:
+            data = f.read(MAX_PARAMS_BYTES + 1)
+    except FileNotFoundError:
+        return DEFAULTS, "the detector's DEFAULTS (no params.json)"
+    except OSError:
+        raise _bad("cannot be read") from None
+    if len(data) > MAX_PARAMS_BYTES:
+        raise _bad(f"larger than {MAX_PARAMS_BYTES} bytes")
+    try:
+        obj = json.loads(data)
+    except (ValueError, RecursionError):
+        raise _bad("not valid JSON (or nested too deeply)") from None
+    if not isinstance(obj, dict):
+        raise _bad("not a JSON object")
+    k, p = obj.get("k"), obj.get("p")
+    if type(k) not in (int, float) or not math.isfinite(k) or k <= 0:
+        raise _bad("k must be a finite number above 0")
+    if type(p) is not int or not 1 <= p <= MAX_P:
+        raise _bad(f"p must be an integer from 1 to {MAX_P}")
+    try:
+        return BaselineParams(k=float(k), p=p), "chosen on seeds 1-10 (params.json)"
+    except ValueError as e:
+        raise _bad(str(e)) from None
+
+
+def run(folders: list[str], policies: tuple[Policy, ...] | None = None) -> str:
     if not folders:
         raise TrialError("no trial folders given")
+    params, source = _baseline_params()
+    if policies is None:
+        policies = (
+            POLICIES
+            + baseline_policies(params.k, params.p)
+            + baseline_policies(params.k, params.p, "_no_temp", NO_TEMP)  # sensitivity check, not tuned
+        )
     pool, first, seeds, shapes, parity_rows = Pool(), None, {}, defaultdict(set), 0
     for folder in sorted(folders):
         trial = load_trial(folder)
@@ -257,6 +307,7 @@ def run(folders: list[str], policies: tuple[Policy, ...] = POLICIES) -> str:
         parity_rows += check_parity(trial)
         if trial.seed in HELD_OUT:
             score_trial(trial, policies, pool)
+            clear_cache()
     _sanity(pool, policies)
 
     days, speed, sha = first
@@ -272,8 +323,10 @@ def run(folders: list[str], policies: tuple[Policy, ...] = POLICIES) -> str:
         f"simulator speed: {speed}x",
         f"scenario sha256: {sha}",
         f"parity: {parity_rows} cohort rows re-scored with the backend NEWS2, 0 mismatches",
-        f"tuning seeds (1 to 10), loaded and parity-checked but not scored; nothing is tuned here: "
+        f"tuning seeds (1 to 10), loaded and parity-checked but not scored here (the sweep tunes on them): "
         f"{join(tuning) or 'none'}",
+        f"baseline policies: k={params.k}, p={params.p}, from {source}; the *_no_temp rows are a "
+        "sensitivity check (temperature left out, same k and p, not tuned)",
         f"held-out seeds (11 to 30), the only ones scored: {join(held)}",
         f"held-out patients: {pool.patients}",
         f"held-out patient-days (summary.json): {pool.patient_days:.1f}",
