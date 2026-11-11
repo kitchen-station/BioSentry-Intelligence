@@ -1,0 +1,27 @@
+{
+  "format_version": 1,
+  "synthetic": true,
+  "seed": 11,
+  "days": 1,
+  "speed": 60,
+  "scenario": {
+    "format_version": 1,
+    "name": "toy",
+    "staffing": {
+      "staff_nurses": 2,
+      "charge_nurses": 1,
+      "physicians": 2
+    },
+    "beds": 20,
+    "arrivals": {
+      "occupancy_target": 0.75
+    },
+    "case_mix": "w4-default"
+  },
+  "scenario_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "sim_commit": "abcdef1",
+  "node_major": 22,
+  "bin_minutes": 15,
+  "patients": 4,
+  "episodes": 2
+}

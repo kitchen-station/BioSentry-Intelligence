@@ -1,0 +1,8 @@
+{
+  "admitted": 3,
+  "discharged": 3,
+  "higher_care": 0,
+  "turned_away": 0,
+  "patient_days": 2.5,
+  "episodes_per_admission": 1
+}
