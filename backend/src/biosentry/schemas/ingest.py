@@ -1,13 +1,17 @@
-"""Bodies of the ward simulation's routes (POST /sim/runs, POST /sim/runs/{id}/batch).
+"""Bodies of the ward simulation's routes (POST /sim/runs, POST /sim/runs/{id}/batch, POST
+/sim/runs/{id}/view) and of the ward viewer's read of that view (GET /wards/{ward}/live).
 
 Not part of the dashboard contract. Lists are capped; a value is a number or text, or the
 reason there is none (I1). Times arrive as minutes from the run's origin.
 """
 
+import json
+import math
+import re
 from datetime import UTC, datetime
-from typing import Annotated, Literal, Self
+from typing import Annotated, Any, Literal, Self
 
-from pydantic import AfterValidator, AwareDatetime, Field, model_validator
+from pydantic import AfterValidator, AwareDatetime, Field, JsonValue, model_validator
 
 from .base import Age, Contract, Flag, Num, Percent
 from .clinical import LabPanel
@@ -149,3 +153,62 @@ class Batch(Contract):
     events: Annotated[list[Event], Field(max_length=2_000)]
     admissions: Annotated[list[Admission], Field(max_length=200)] = []
     departures: Annotated[list[Departure], Field(max_length=200)] = []
+
+
+VIEW_MAX = 65_536  # characters of compact JSON, per object
+
+
+_UNSTORABLE = re.compile("[\x00\ud800-\udfff]")
+
+
+def _storable(value: Any) -> bool:
+    """JSONB holds no NUL, lone surrogate, NaN or Infinity (a 422 here, never a 500). The base
+    model checks top-level text only."""
+    if isinstance(value, str):
+        return _UNSTORABLE.search(value) is None
+    if isinstance(value, float):
+        return math.isfinite(value)
+    if isinstance(value, list):
+        return all(_storable(v) for v in value)
+    if isinstance(value, dict):
+        return all(_storable(k) and _storable(v) for k, v in value.items())
+    return True
+
+
+def _small_object(view: dict[str, JsonValue]) -> dict[str, JsonValue]:
+    if not _storable(view):
+        raise ValueError("a view cannot hold a NUL character, a lone surrogate, NaN or Infinity")
+    if len(json.dumps(view, separators=(",", ":"), ensure_ascii=False)) > VIEW_MAX:
+        raise ValueError(f"a view is at most {VIEW_MAX} characters of JSON")
+    return view
+
+
+# Any JSON object: the server stores and serves it, and never reads inside it.
+View = Annotated[dict[str, JsonValue], AfterValidator(_small_object)]
+
+
+class PatientView(Contract):
+    id: Id
+    view: View
+
+
+class LiveView(Contract):
+    """What the ward viewer draws. `shared` goes to every clinician of the ward, so it carries no
+    patient names; each patient's `view` goes only to that patient's clinicians."""
+
+    shared: View
+    patients: Annotated[list[PatientView], Field(max_length=200)]
+
+    @model_validator(mode="after")
+    def _unique_ids(self) -> Self:
+        ids = [p.id for p in self.patients]
+        if len(ids) != len(set(ids)):
+            raise ValueError("patient ids must be unique")
+        return self
+
+
+class LiveWard(Contract):
+    """The stored LiveView as one clinician may see it. `shared` is null until a view is stored."""
+
+    shared: View | None
+    patients: list[PatientView]

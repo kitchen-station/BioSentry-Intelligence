@@ -1139,3 +1139,110 @@ def test_a_bad_move_is_refused_and_writes_nothing(api: Api, over: dict[str, Any]
     assert api.post(f"/sim/runs/{run_id}/batch", batch(minute=5, **over)).status_code == 422
     rows = api.sql("SELECT id, left_at FROM patient WHERE run_id = %s", run_id)
     assert rows == [{"id": "s-1", "left_at": None}]
+
+
+# --- The live view the ward viewer draws ---------------------------------------------------------
+
+
+def view(*ids: str, **shared: Any) -> dict[str, Any]:
+    return {"shared": shared, "patients": [{"id": pid, "view": {"bed": pid}} for pid in ids]}
+
+
+def live(api: Api, who: str) -> dict[str, Any]:
+    response = api.client.get("/wards/W4/live", headers=api.as_(who))
+    assert response.status_code == 200, response.text
+    body: dict[str, Any] = response.json()
+    return body
+
+
+def test_the_live_view_is_scoped_audited_and_replaced_whole(api: Api) -> None:
+    run_id = start(api)
+    assert live(api, "rn-manalo") == {"shared": None, "patients": []}  # nothing published yet
+    body = batch(minute=5, admissions=[admission(rn="rn-reyes", md=None), admission("s-3")])
+    assert api.post(f"/sim/runs/{run_id}/batch", body).status_code == 204
+    # Any JSON goes in and comes back as it was. "s-9" is nobody's patient: nobody is served it.
+    shared = {"staff": [{"id": "rn-reyes", "x": 1.5, "y": -2, "busy": False, "at": None}], "t": 0}
+    sent = {**view("s-1", "s-2", "s-3", "s-9"), "shared": shared}
+    assert api.post(f"/sim/runs/{run_id}/view", sent).status_code == 204
+
+    assert live(api, "rn-reyes") == {**sent, "patients": sent["patients"][1:2]}
+    assert live(api, "rn-delacruz") == {**sent, "patients": sent["patients"][0:3:2]}
+    assert live(api, "rn-manalo") == {**sent, "patients": sent["patients"][:3]}
+
+    gone = batch(minute=6, departures=[{"patient_id": "s-1", "minute": 6, "outcome": "discharged"}])
+    assert api.post(f"/sim/runs/{run_id}/batch", gone).status_code == 204
+    assert [p["id"] for p in live(api, "rn-manalo")["patients"]] == ["s-2", "s-3"]
+
+    assert api.post(f"/sim/runs/{run_id}/view", view("s-2", minute=7)).status_code == 204
+    assert live(api, "rn-manalo") == view("s-2", minute=7)  # replaced, not merged
+    rows = api.sql(
+        "SELECT clinician_id, resource, outcome FROM audit_log WHERE action = 'view_live'"
+    )
+    assert [r["clinician_id"] for r in rows] == [
+        "rn-manalo", "rn-reyes", "rn-delacruz", "rn-manalo", "rn-manalo", "rn-manalo",
+    ]  # fmt: skip
+    assert {(r["resource"], r["outcome"]) for r in rows} == {("W4", "ok")}
+
+
+def test_a_live_view_for_another_ward_is_not_found(api: Api) -> None:
+    response = api.client.get("/wards/W9/live", headers=api.as_("rn-manalo"))
+    assert response.status_code == 404
+    (row,) = api.sql("SELECT resource, outcome FROM audit_log WHERE action = 'view_live'")
+    assert row == {"resource": "W9", "outcome": "not_found"}
+
+
+def test_a_live_view_needs_the_ingest_key_and_the_newest_run(api: Api) -> None:
+    old = start(api, client_id="client-a")
+    for key in (None, "wrong"):
+        assert api.post(f"/sim/runs/{old}/view", view("s-1"), key=key).status_code == 403
+    assert Api(api.url, ingest_key=None).post(f"/sim/runs/{old}/view", view()).status_code == 503
+    assert api.post("/sim/runs/99/view", view("s-1")).status_code == 404
+    api.wall.now += timedelta(seconds=31)
+    start(api, client_id="client-b")
+    refused = api.post(f"/sim/runs/{old}/view", view("s-1"))
+    assert (refused.status_code, refused.json()) == (409, {"detail": REPLACED})
+    assert api.sql("SELECT count(*) AS n FROM run WHERE live_view IS NOT NULL") == [{"n": 0}]
+    assert api.sql("SELECT * FROM audit_log WHERE action LIKE 'view%%'") == []
+
+
+def _raw(text: str) -> str:
+    return '{"shared": {"k": %s}, "patients": []}' % text
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {**view(), "shared": {"k": "x" * 65_529}},  # {"k":"…"} is 65,537 characters
+        {"shared": {}, "patients": [{"id": "s-1", "view": {"k": "x" * 65_529}}]},
+        view("s-1", "s-1"),
+        {"shared": {}, "patients": [{"id": f"s-{i}", "view": {}} for i in range(201)]},
+        {"shared": {}, "patients": [{"id": "", "view": {}}]},
+        {"shared": {}, "patients": [{"id": "s-1", "view": {}, "name": "x"}]},
+        {"shared": [], "patients": []},
+        {"shared": None, "patients": []},
+        {"patients": []},
+        {**view(), "extra": 1},
+        {**view(), "shared": {"deep": [{"text": "a\x00b"}]}},
+        {**view(), "shared": {"a\x00b": 1}},
+        _raw("NaN"),
+        _raw('[1, {"a": -Infinity}]'),
+        _raw('"\\ud800"'),  # a lone surrogate is not text PostgreSQL can hold
+    ],
+)
+def test_a_live_view_that_is_refused_writes_nothing(api: Api, body: Any) -> None:
+    run_id = start(api)
+    assert api.post(f"/sim/runs/{run_id}/view", view("s-1", kept=True)).status_code == 204
+    headers = {"X-Ingest-Key": KEY, "Content-Type": "application/json"}
+    content = body if isinstance(body, str) else json.dumps(body)
+    refused = api.client.post(f"/sim/runs/{run_id}/view", content=content, headers=headers)
+    assert refused.status_code == 422, refused.text
+    assert "xxxx" not in refused.text  # the refused value is not echoed
+    assert live(api, "rn-manalo") == view("s-1", kept=True)
+
+
+def test_a_live_view_at_the_size_limit_is_stored(api: Api) -> None:
+    run_id = start(api)
+    most = {"k": "é" * 65_528}  # characters, not bytes
+    body = {"shared": most, "patients": [{"id": "s-1", "view": most}]}
+    assert api.post(f"/sim/runs/{run_id}/view", body).status_code == 204
+    assert live(api, "rn-delacruz") == body

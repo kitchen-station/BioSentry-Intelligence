@@ -53,7 +53,7 @@ from biosentry.schemas import (
     VitalsRecorded,
     WardResponse,
 )
-from biosentry.schemas.ingest import Batch, NewRun
+from biosentry.schemas.ingest import Batch, LiveView, LiveWard, NewRun
 from biosentry.services import ingest
 from biosentry.services.patients import PatientService, RejectedError
 from biosentry.services.ward import WardService
@@ -76,6 +76,7 @@ UNAUTHENTICATED_WRITES = {
     ("POST", "/session"),
     ("POST", "/sim/runs"),
     ("POST", "/sim/runs/{run_id}/batch"),
+    ("POST", "/sim/runs/{run_id}/view"),
 }
 
 
@@ -288,6 +289,13 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return ctx.wards.stays(who)
 
+    @app.get("/wards/{ward}/live", response_model=LiveWard)
+    def ward_live(ward: str, ctx: Ctx, who: Who) -> LiveWard:
+        if ward != ctx.store.ward:
+            ctx.audit.append(who, "view_live", ward, "not_found")
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return ctx.wards.live(who)
+
     @app.get("/patients", response_model=list[PatientSummary])
     def list_patients(ctx: Ctx, who: Who) -> list[PatientSummary]:
         return ctx.wards.summaries(who)
@@ -386,6 +394,14 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
         run_id: int, body: Batch, ctx: Ctx, _: Annotated[None, Depends(ingest_gate)]
     ) -> Response:
         if not ingest.add_batch(ctx.conn, run_id, body, clock):
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return Response(status_code=204)
+
+    @app.post("/sim/runs/{run_id}/view", status_code=204)
+    def set_sim_view(
+        run_id: int, body: LiveView, ctx: Ctx, _: Annotated[None, Depends(ingest_gate)]
+    ) -> Response:
+        if not ingest.set_view(ctx.conn, run_id, body):
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return Response(status_code=204)
 

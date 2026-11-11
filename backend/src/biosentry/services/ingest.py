@@ -1,13 +1,15 @@
-"""The ward simulation's writes: start a run, append a batch. Each is one transaction.
+"""The ward simulation's writes: start a run, append a batch, replace the live view. Each is one
+transaction.
 
 The run, never the client, says whether data is synthetic. A body that is refused writes nothing.
 One shared ward: the newest run is the ward. A different client cannot start a run while the
 newest is live (ConflictError), and a batch for a run that is no longer the newest is refused the
-same way, so a superseded sim stops writing.
+same way (as is its live view), so a superseded sim stops writing.
 """
 
 from collections.abc import Callable, Iterable
 from datetime import datetime, timedelta
+from typing import Any
 
 from biosentry.db.migrate import SETUP_LOCK
 from biosentry.repositories.postgres import (
@@ -19,11 +21,12 @@ from biosentry.repositories.postgres import (
     insert_run,
     is_live,
     lock_run,
+    set_live_view,
     transaction,
     upsert_bins,
     whole,
 )
-from biosentry.schemas.ingest import Batch, Bin, NewRun, NewRunPatient
+from biosentry.schemas.ingest import Batch, Bin, LiveView, NewRun, NewRunPatient
 from biosentry.schemas.ingest import Obs as IngestObs
 
 from .patients import RejectedError
@@ -128,19 +131,27 @@ def start_run(conn: Conn, body: NewRun, clock: Callable[[], datetime]) -> int:
     return run_id
 
 
+def _locked_newest(conn: Conn, run_id: int) -> dict[str, Any] | None:
+    """Takes the run's lock and reads the run. None: no such run. Not the newest: ConflictError."""
+    lock_run(conn, run_id)
+    run = conn.execute("SELECT * FROM run WHERE id = %s", (run_id,)).fetchone()
+    if run is None:
+        return None
+    newest = conn.execute("SELECT max(id) AS id FROM run").fetchone()
+    assert newest is not None  # an aggregate always answers
+    if newest["id"] != run_id:
+        raise ConflictError("This run has been replaced by a newer one")
+    return run
+
+
 def add_batch(conn: Conn, run_id: int, body: Batch, clock: Callable[[], datetime]) -> bool:
     """False when there is no such run. A patient outside the run is refused (RejectedError)."""
     with transaction(conn):
         # A batch holds the run's lock from its first read to its commit: two batches on a run take
         # turns (the sim_event seq is max + 1, and the patient and run rows are updated in order).
-        lock_run(conn, run_id)
-        run = conn.execute("SELECT * FROM run WHERE id = %s", (run_id,)).fetchone()
+        run = _locked_newest(conn, run_id)
         if run is None:
             return False
-        newest = conn.execute("SELECT max(id) AS id FROM run").fetchone()
-        assert newest is not None  # an aggregate always answers
-        if newest["id"] != run_id:
-            raise ConflictError("This run has been replaced by a newer one")
         origin = run["origin"]
         members = {
             r["id"] for r in conn.execute("SELECT id FROM patient WHERE run_id = %s", (run_id,))
@@ -220,4 +231,13 @@ def add_batch(conn: Conn, run_id: int, body: Batch, clock: Callable[[], datetime
                 run_id,
             ),
         )
+    return True
+
+
+def set_view(conn: Conn, run_id: int, body: LiveView) -> bool:
+    """Replaces the run's live view. False when there is no such run."""
+    with transaction(conn):
+        if _locked_newest(conn, run_id) is None:
+            return False
+        set_live_view(conn, run_id, body.model_dump())
     return True

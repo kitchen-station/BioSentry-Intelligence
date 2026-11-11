@@ -251,6 +251,11 @@ def insert_run(
     return run_id
 
 
+def set_live_view(conn: Conn, run_id: int, view: dict[str, Any]) -> None:
+    """Replaces the run's live view (a JSON-ready dict)."""
+    conn.execute("UPDATE run SET live_view = %s WHERE id = %s", (Jsonb(view), run_id))
+
+
 class PostgresStore:
     """The active run, through this request's connection."""
 
@@ -469,6 +474,15 @@ class PostgresStore:
             }
             for r in rows
         ]
+
+    def live_view(self) -> dict[str, Any] | None:
+        """The view the sim last published for this run, unscoped. None: nothing published."""
+        row = self.conn.execute(
+            "SELECT live_view FROM run WHERE id = %s", (self.run_id,)
+        ).fetchone()
+        assert row is not None  # the run was read when this store was made
+        view: dict[str, Any] | None = row["live_view"]
+        return view
 
     # --- writing -------------------------------------------------------------------------------
 

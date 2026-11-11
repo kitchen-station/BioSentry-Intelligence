@@ -24,6 +24,7 @@ from biosentry.schemas import (
     UnscoredPatient,
     WardResponse,
 )
+from biosentry.schemas.ingest import LiveWard
 
 from .scoring import decide
 
@@ -162,6 +163,15 @@ class WardService:
         ids = self._store.assigned(clinician_id, including_left=True)
         self._audit.append(clinician_id, "view_stays", self._store.ward, "ok")
         return [PatientStay.model_validate(row) for row in self._store.stays(ids)]
+
+    def live(self, clinician_id: str) -> LiveWard:
+        """The sim's live view: `shared` as stored, and only this clinician's patients' entries."""
+        visible = self.visible(clinician_id)
+        view = self._store.live_view() or {"shared": None, "patients": []}
+        self._audit.append(clinician_id, "view_live", self._store.ward, "ok")
+        return LiveWard.model_validate(
+            {**view, "patients": [p for p in view["patients"] if p["id"] in visible]}
+        )
 
     def summaries(self, clinician_id: str) -> list[PatientSummary]:
         ranked, abstained = self.compute(self.visible(clinician_id))
