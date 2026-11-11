@@ -513,6 +513,24 @@ def test_a_batch_into_a_new_sim_hour_prunes_what_is_older_than_the_retention(api
     assert api.sql(kept, old_run, old_run) == [other]  # another run is never pruned
 
 
+def test_device_vitals_are_served_at_the_precision_news2_bands_at(api: Api) -> None:
+    run_id = start(api)
+    readings = {"heart_rate": 121.5, "respiratory_rate": 23.4, "spo2": 92.5, "temperature": 37.25}
+    observations = [obs("s-1", code, 5, num=num) for code, num in readings.items()]
+    body = batch(minute=5, observations=observations)
+    assert api.post(f"/sim/runs/{run_id}/batch", body).status_code == 204
+    vitals = api.ward("rn-delacruz")["ranked"][0]["vitals"]
+    served = {code: vitals[code]["data"]["value"] for code in readings}
+    assert served == {"heart_rate": 122, "respiratory_rate": 23, "spo2": 93, "temperature": 37.3}
+    stored = api.sql(
+        "SELECT code, num FROM observation WHERE run_id = %s AND patient_id = 's-1'"
+        " AND observed_at = (SELECT max(observed_at) FROM observation WHERE run_id = %s)",
+        run_id,
+        run_id,
+    )
+    assert {r["code"]: r["num"] for r in stored} == readings  # what the device sent is kept
+
+
 def test_the_run_decides_synthetic_not_the_client(api: Api) -> None:
     start(api)
     rows = api.sql("SELECT DISTINCT synthetic FROM observation WHERE run_id = 2")

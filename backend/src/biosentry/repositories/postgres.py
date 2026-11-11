@@ -27,6 +27,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from biosentry.core.config import DEV_DATABASE_PASSWORD, ConfigError, restricted
+from biosentry.domain.scoring.tier_a import round_half_up
 from biosentry.schemas import ClinicalNote, LabPanel, TierStatus, UnscoredPatient
 
 LIVE_WITHIN = timedelta(seconds=30)  # a sim run whose last batch is older is not "receiving data"
@@ -44,6 +45,12 @@ _VALUE: dict[str, Callable[[dict[str, Any]], Any]] = {
     "consciousness": lambda r: r["txt"],
     "supplemental_o2": lambda r: bool(r["num"]),
     "spo2_scale": lambda r: int(r["num"]),
+    # Served at the precision NEWS2 bands at, so a shown value always agrees with its points. The
+    # stored reading keeps what the device sent.
+    **{
+        v: (lambda r, places=int(v == "temperature"): float(round_half_up(r["num"], places)))
+        for v in DEVICE_VITALS
+    },
 }
 
 
