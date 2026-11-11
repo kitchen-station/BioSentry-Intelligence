@@ -1,12 +1,15 @@
 """Change from the patient's own baseline (Tier B), as the dashboard reads it. Display only:
 nothing here feeds the rank, the arbiter or storage.
 
-Stored values, served exactly: `latest`. Everything else is derived: `baseline_median`, `delta` and
+Stored values, served exactly: `latest`, which is the latest 15-minute MEDIAN bin the simulator
+stored, not a single reading. Everything else is derived: `baseline_median`, `delta` and
 `z` are rounded to one decimal; `since`, `latest_at` and `baseline_from` are bin times (served
 time, like the patient's history); `run_bins`, `significant`, `direction` come from the detector.
 The window is the first 24 valid bins from admission when it is known (`admission_known`), from
 the first stored bin when it is not, and from the oldest bin still kept once the server's 7-day
-prune or the 672-bin cap has dropped earlier ones: a long stay is baselined on mid-stay data."""
+prune or the 672-bin cap has dropped earlier ones: a long stay is baselined on mid-stay data.
+`anchored_at` says which, per vital. `latest_age_s` is measured on the server's clock (the one
+`last_update_s` uses) from the END of the latest bin, so the page never uses its own clock."""
 
 from typing import Annotated, Final, Literal
 
@@ -33,9 +36,13 @@ class BaselineComputed(Contract):
     vital: BaselineVital
     status: Literal["computed"]
     baseline_median: Num  # derived, 1 decimal
-    latest: Num  # the stored value, exactly
-    latest_at: AwareDatetime  # when `latest` was taken: it may be old
+    latest: Num  # the stored value, exactly: the latest 15-minute median bin
+    latest_at: AwareDatetime  # the START of that bin: it may be old
+    latest_age_s: NonNegInt  # server now minus the bin's end (latest_at + 15 min), never negative
     baseline_from: AwareDatetime  # the first bin of the window the baseline was formed from
+    # "admission": that bin starts within 30 minutes of the admission time. Otherwise the window
+    # starts at the earliest bin kept, which may be mid-stay.
+    anchored_at: Literal["admission", "first_kept_bin"]
     delta: Num  # derived, 1 decimal
     z: Num  # derived, 1 decimal
     run_bins: NonNegInt

@@ -95,12 +95,15 @@ export interface components {
         };
         /** BaselineComputed */
         readonly BaselineComputed: {
+            /** @enum {string} */
+            readonly anchored_at: "admission" | "first_kept_bin";
             /** Format: date-time */
             readonly baseline_from: string;
             readonly baseline_median: number;
             readonly delta: number;
             readonly direction: components["schemas"]["FindingDirection"] | null;
             readonly latest: number;
+            readonly latest_age_s: number;
             /** Format: date-time */
             readonly latest_at: string;
             readonly pathway: string | null;

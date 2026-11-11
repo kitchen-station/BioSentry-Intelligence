@@ -335,6 +335,13 @@
       "BaselineComputed": {
         "additionalProperties": false,
         "properties": {
+          "anchored_at": {
+            "enum": [
+              "admission",
+              "first_kept_bin"
+            ],
+            "type": "string"
+          },
           "baseline_from": {
             "format": "date-time",
             "type": "string"
@@ -357,6 +364,10 @@
           },
           "latest": {
             "type": "number"
+          },
+          "latest_age_s": {
+            "minimum": 0,
+            "type": "integer"
           },
           "latest_at": {
             "format": "date-time",
@@ -418,7 +429,9 @@
           "baseline_median",
           "latest",
           "latest_at",
+          "latest_age_s",
           "baseline_from",
+          "anchored_at",
           "delta",
           "z",
           "run_bins",

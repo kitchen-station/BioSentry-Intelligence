@@ -1,0 +1,91 @@
+/* ============================================================
+   Change from the patient's own baseline (Tier B, research).
+   Ember marks a finding, Scorch only a stale reading. Words carry
+   every meaning; no dots, gradients or shadows.
+   ============================================================ */
+
+.panel {
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border);
+}
+
+.heading {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--label);
+  margin-bottom: var(--sp-2);
+}
+
+.list {
+  list-style: none;
+}
+
+.item {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  padding: var(--sp-2) 0 var(--sp-2) var(--sp-2);
+  border-left: 3px solid transparent;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+
+.item:last-child {
+  border-bottom: none;
+}
+
+.item[data-significant] {
+  border-left-color: var(--accent);
+  font-weight: 500;
+}
+
+.name {
+  color: var(--ink);
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.flag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.secondary,
+.sub {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--label);
+}
+
+.sub {
+  display: block;
+}
+
+.sub[data-stale] {
+  color: var(--alert);
+  font-weight: 500;
+}
+
+.label,
+.quiet {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--label);
+}
+
+.label {
+  margin-bottom: var(--sp-2);
+  color: var(--ink);
+  font-weight: 500;
+}

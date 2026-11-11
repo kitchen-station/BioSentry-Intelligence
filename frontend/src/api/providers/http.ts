@@ -18,6 +18,7 @@ import type {
   AbstainedRow,
   Acknowledgement,
   AdmitPatientInput,
+  BaselineResponse,
   ClinicalNote,
   LabExtractionResult,
   LabPanel,
@@ -55,6 +56,14 @@ export const httpProvider: ApiProvider = {
       if (error instanceof ApiError && error.status === 404) return null;
       throw error;
     }
+  },
+
+  getBaseline(patientId: string): Promise<BaselineResponse> {
+    // No 404 mapping, unlike getPatient: the page shows "could not be loaded" for it, and null
+    // is kept for "this provider has no finding" (fixture mode). The id is encoded here (the
+    // other calls keep the existing raw convention): a `?` or `#` in it would otherwise send the
+    // request to the patient route, whose different answer is not a baseline.
+    return fetchJson<BaselineResponse>(`/patients/${encodeURIComponent(patientId)}/baseline`);
   },
 
   getNotes(patientId: string): Promise<ClinicalNote[]> {

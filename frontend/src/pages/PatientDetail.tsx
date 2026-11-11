@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import type { ClinicalNote, PatientDetail as PatientDetailType, Session, SessionRole, TierBFinding } from "../types";
 import { getPatient, getNotes, addNote } from "../api";
+import { BaselinePanel } from "../components/BaselinePanel";
+import { useBaseline } from "../components/useBaseline";
 import { CurrentVitals, VitalRow } from "../components/CurrentVitals";
 import { TrendChart } from "../components/TrendChart";
 import { band, response } from "../components/risk";
@@ -51,6 +53,7 @@ const ROLE_LABEL: Record<SessionRole, string> = { rn: "RN", charge_rn: "Charge R
 export function PatientDetail({ session }: { session: Session }) {
   const role = session.role;
   const { id } = useParams<{ id: string }>();
+  const baseline = useBaseline(id);
   const [patient, setPatient] = useState<PatientDetailType | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [now, setNow] = useState(() => new Date());
@@ -330,8 +333,9 @@ export function PatientDetail({ session }: { session: Session }) {
                 })()}
               </div>
             ) : (
-              <p className={styles.pending}>not yet implemented</p>
+              <p className={styles.pending}>Other mechanism findings: not yet implemented</p>
             )}
+            <BaselinePanel baseline={baseline} />
           </div>
 
         </div>

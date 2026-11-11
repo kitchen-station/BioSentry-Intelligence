@@ -10,7 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import synthetic from "../data/synthetic.json";
-import type { ClinicalNote, LabPanel, PatientDetail as Detail, Session, SessionRole } from "../types";
+import type { BaselineResponse, ClinicalNote, LabPanel, PatientDetail as Detail, Session, SessionRole } from "../types";
 import { PatientDetail } from "./PatientDetail";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -18,6 +18,7 @@ import { PatientDetail } from "./PatientDetail";
 const api = vi.hoisted(() => ({
   getPatient: vi.fn(),
   getNotes: vi.fn(),
+  getBaseline: vi.fn(),
   addNote: vi.fn(),
 }));
 vi.mock("../api", () => api);
@@ -52,6 +53,21 @@ const note = (id: string, content: string): ClinicalNote => ({
   synthetic: true,
 });
 
+const baseline: BaselineResponse = {
+  patient_id: "p-001",
+  synthetic: true,
+  admission_known: true,
+  label: "Research finding. Synthetic, not validated. Does not change the rank.",
+  params: { window_bins: 24, k: 2, p: 3 },
+  vitals: [
+    {
+      vital: "heart_rate", status: "computed", baseline_median: 70, latest: 90, latest_at: "2026-09-03T06:45:00Z",
+      latest_age_s: 60, anchored_at: "admission", baseline_from: "2026-09-03T00:45:00Z", delta: 20, z: 4.1, run_bins: 4, since: "2026-09-03T06:00:00Z",
+      significant: true, direction: "rising", pathway: "circulatory", unit: "bpm",
+    },
+  ],
+};
+
 const session = (role: SessionRole = "rn"): Session => ({ clinician_id: "rn-manalo", ward: "W4", role });
 const page = (role?: SessionRole, path = "/patient/p-001") =>
   render(
@@ -67,6 +83,7 @@ const loaded = () => screen.findByRole("heading", { level: 1 });
 beforeEach(() => {
   api.getPatient.mockResolvedValue(base);
   api.getNotes.mockResolvedValue([]);
+  api.getBaseline.mockResolvedValue(null); // fixture mode
 });
 afterEach(() => {
   cleanup();
@@ -139,12 +156,57 @@ describe("PatientDetail", () => {
     await loaded();
     expect(screen.getByText("Sorted on NEWS2 only")).toBeTruthy();
     expect(screen.queryByText("Next step")).toBeNull(); // band low: no response block
-    expect(screen.getByText("not yet implemented")).toBeTruthy();
+    expect(screen.getByText("Other mechanism findings: not yet implemented")).toBeTruthy(); // never an empty box
+    expect(screen.getByText("Own-baseline findings need the live API.")).toBeTruthy();
     expect(screen.getByText("No lab values recorded")).toBeTruthy();
     expect(screen.getByText(/^-- -- · Bed/)).toBeTruthy();
     expect(screen.queryByText(/since collection/)).toBeNull();
     expect(screen.getByText("Signal 80%")).toBeTruthy(); // the strip
     expect(screen.getByText("80%")).toBeTruthy(); // the summary block
+  });
+
+  it("shows the own-baseline panel below the Tier B findings, loaded once with the patient", async () => {
+    api.getBaseline.mockResolvedValue(baseline);
+    page();
+    await loaded();
+    const region = await screen.findByRole("region", { name: "Change from own baseline" });
+    expect(api.getBaseline).toHaveBeenCalledOnce();
+    expect(api.getBaseline).toHaveBeenCalledWith("p-001");
+    expect(within(region).getByText(/Heart rate/).closest("li")!.textContent).toContain("from own baseline");
+    const tierB = region.parentElement!;
+    expect(within(tierB).getByText("Device axes")).toBeTruthy(); // the stored findings stay
+    expect(tierB.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_CONTAINED_BY).toBeTruthy();
+    expect(screen.queryByText("Own-baseline findings need the live API.")).toBeNull();
+  });
+
+  it("shows the panel after the placeholder when there are no stored Tier B findings", async () => {
+    api.getPatient.mockResolvedValue({ ...base, tier_b: null } as Detail);
+    api.getBaseline.mockResolvedValue(baseline);
+    page();
+    expect(await screen.findByRole("region", { name: "Change from own baseline" })).toBeTruthy();
+    expect(screen.getByText("Other mechanism findings: not yet implemented")).toBeTruthy();
+  });
+
+  it("says it is loading the baseline, and never shows another patient's", async () => {
+    api.getBaseline.mockReturnValue(new Promise(() => undefined));
+    page();
+    await loaded();
+    expect(screen.getByText("Loading baseline…")).toBeTruthy();
+    cleanup();
+    api.getBaseline.mockResolvedValue({ ...baseline, patient_id: "p-002" });
+    page();
+    expect(await screen.findByText("Baseline could not be loaded.")).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Change from own baseline" })).toBeNull();
+  });
+
+  it("still renders the page, with one quiet line, when the baseline cannot be loaded", async () => {
+    api.getBaseline.mockRejectedValue(new Error("404"));
+    page();
+    expect((await loaded()).textContent).toBe(row.name);
+    expect(await screen.findByText("Baseline could not be loaded.")).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Change from own baseline" })).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull(); // quiet, not an alarm
+    expect(screen.getByText("Device axes")).toBeTruthy();
   });
 
   it("shows not found for a patient that is missing or not yours", async () => {
@@ -163,6 +225,7 @@ describe("PatientDetail", () => {
   it("asks for nothing without a patient id", () => {
     const { container } = page(undefined, "/elsewhere");
     expect(api.getPatient).not.toHaveBeenCalled();
+    expect(api.getBaseline).not.toHaveBeenCalled();
     expect(container.textContent).toBe("");
   });
 

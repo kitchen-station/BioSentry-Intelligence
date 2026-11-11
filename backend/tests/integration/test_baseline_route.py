@@ -89,8 +89,8 @@ def test_a_computed_baseline_that_has_not_moved_is_not_significant(api: Api) -> 
     hr = vitals(api)["heart_rate"]
     assert hr == {
         "vital": "heart_rate", "status": "computed", "baseline_median": 70.0, "latest": 72.0,
-        "latest_at": served(api, 26 * 15), "baseline_from": served(api, 0), "delta": 2.0,
-        "z": 0.3, "run_bins": 0, "since": None, "significant": False, "direction": "rising",
+        "latest_at": served(api, 26 * 15), "latest_age_s": 0, "baseline_from": served(api, 0),
+        "anchored_at": "first_kept_bin", "delta": 2.0, "z": 0.3, "run_bins": 0, "since": None, "significant": False, "direction": "rising",
         "pathway": "circulatory", "unit": "bpm",
     }  # fmt: skip
 
@@ -199,6 +199,7 @@ def test_bins_before_admission_are_not_the_baseline(api: Api) -> None:
     assert (hr["baseline_median"], hr["latest"]) == (70.0, 74.0)
     assert hr["baseline_from"] == served(api, minute)  # not the older bins before admission
     assert get(api, "s-2").json()["admission_known"] is True
+    assert hr["anchored_at"] == "admission"
 
 
 def test_without_an_admission_time_the_window_starts_at_the_first_stored_bin(api: Api) -> None:
@@ -247,6 +248,56 @@ def test_a_stale_latest_says_when_it_was_taken(api: Api) -> None:
     assert hr["latest_at"] == served(api, 27 * 15)
     lag = api.wall.now - datetime.fromisoformat(hr["latest_at"])
     assert lag == timedelta(minutes=two_days - 27 * 15)
+
+
+def test_the_age_is_the_servers_and_counts_from_the_end_of_the_latest_bin(api: Api) -> None:
+    last = 24 * 15  # the minute of the latest bin
+    run_id = start(api, patients=[patient(bins=rows("s-1", "heart_rate", [*BASE, 90.0]))])
+    batch_at = batch(minute=last, bins=[], observations=[], events=[], patients=[])
+    assert api.post(f"/sim/runs/{run_id}/batch", batch_at).status_code == 204
+    assert vitals(api)["heart_rate"]["latest_age_s"] == 0  # the bin has only just begun
+    api.wall.now += timedelta(minutes=20)  # a known shift: 5 minutes past the bin's end
+    assert vitals(api)["heart_rate"]["latest_age_s"] == 5 * 60
+    api.wall.now += timedelta(hours=6)  # inside the token's 12 hours
+    stale = vitals(api)["heart_rate"]
+    assert stale["latest_age_s"] == 5 * 60 + 6 * 3600
+    assert stale["latest_at"] == served(api, last)  # still the bin's start, not its end
+
+
+def test_the_age_is_never_negative_when_the_servers_clock_is_behind(api: Api) -> None:
+    run_id = start(api, patients=[patient(bins=rows("s-1", "heart_rate", [*BASE, 90.0]))])
+    assert api.post(f"/sim/runs/{run_id}/batch", batch(minute=24 * 15)).status_code == 204
+    api.wall.now -= timedelta(hours=3)
+    assert vitals(api)["heart_rate"]["latest_age_s"] == 0
+
+
+def test_a_window_that_starts_at_admission_says_so_within_thirty_minutes(api: Api) -> None:
+    run_id = start(api, patients=[patient()])
+    minute = 600
+    for pid, lead in [("s-2", 2), ("s-3", 3)]:  # two leading gap bins = 30 min; three = 45
+        values = [None] * lead + BASE
+        arrival = {**admission(pid), "minute": minute, "bins": rows(pid, "heart_rate", values, minute)}
+        assert api.post(f"/sim/runs/{run_id}/batch", batch(minute, admissions=[arrival])).status_code == 204
+    assert vitals(api, "s-2")["heart_rate"]["anchored_at"] == "admission"
+    assert vitals(api, "s-3")["heart_rate"]["anchored_at"] == "first_kept_bin"
+
+
+def test_a_window_cut_by_the_cap_after_admission_is_anchored_mid_stay(api: Api) -> None:
+    run_id = start(api, patients=[patient()])
+    minute = 600
+    values = [100.0] * 28 + BASE + [70.0] * (MAX_BINS - 24)  # 28 oldest bins fall off the cap
+    arrival = {**admission("s-2"), "minute": minute, "bins": rows("s-2", "heart_rate", values, minute)}
+    assert api.post(f"/sim/runs/{run_id}/batch", batch(minute, admissions=[arrival])).status_code == 204
+    response = get(api, "s-2").json()
+    hr = response["vitals"][0]
+    assert response["admission_known"] is True  # the admission is known, yet the window is not at it
+    assert hr["anchored_at"] == "first_kept_bin"
+    assert hr["baseline_from"] == served(api, minute + 28 * 15)
+
+
+def test_without_an_admission_time_the_anchor_is_the_first_kept_bin(api: Api) -> None:
+    with_bins(api, rows("s-1", "heart_rate", BASE))
+    assert vitals(api)["heart_rate"]["anchored_at"] == "first_kept_bin"
 
 
 def test_retention_above_seven_days_meets_the_cap_which_drops_stored_data(
@@ -387,9 +438,10 @@ def test_the_response_carries_no_name_and_no_stored_text(api: Api) -> None:
         "s-1", BASELINE_LABEL, "computed", "forming", "unavailable", "heart_rate",
         "respiratory_rate", "spo2", "temperature", "no_history", "latest_bin_missing",
         "bpm", "/min", "%", "°C", "rising", "falling", "stable", "circulatory", "respiratory",
+            "admission", "first_kept_bin",
     }  # fmt: skip
     assert {s for s in strings if s not in fixed and not TIMES.match(s)} <= {
-        "patient_id", "synthetic", "admission_known", "latest_at", "baseline_from", "label", "params", "vitals", "window_bins", "k", "p", "vital",
+        "patient_id", "synthetic", "admission_known", "latest_at", "baseline_from", "label", "params", "vitals", "window_bins", "k", "p", "vital", "latest_age_s", "anchored_at",
         "status", "baseline_median", "latest", "delta", "z", "run_bins", "since", "significant",
         "direction", "pathway", "unit", "bins_valid", "bins_needed", "reason",
     }  # fmt: skip

@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const fixture = vi.hoisted(() => {
   // Each method and how many arguments it takes (ApiProvider in contract.ts).
   const arity = {
-    getWard: 0, getPatient: 1, getNotes: 1, addNote: 4, deleteNote: 2, listAllPatients: 0, getStays: 0,
+    getWard: 0, getPatient: 1, getBaseline: 1, getNotes: 1, addNote: 4, deleteNote: 2, listAllPatients: 0, getStays: 0,
     admitPatient: 1, enterLabResults: 2, recordVitals: 2, getAcknowledgements: 0, acknowledge: 2,
     extractLabsFromFile: 1, extractPatientFromFile: 1,
   } as const;

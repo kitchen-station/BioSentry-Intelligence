@@ -7,7 +7,8 @@ call writes one `view_baseline` audit row, on both paths.
 The baseline window is the first 24 valid bins from admission when it is known, from the first
 stored bin when it is not (every patient present before the run), and from the oldest bin still
 kept once the server's 7-day prune or the 672-bin cap has dropped earlier ones: a long stay is
-baselined on mid-stay data. `baseline_from` and `admission_known` say which."""
+baselined on mid-stay data. `baseline_from`, `anchored_at` and `admission_known` say which. `latest`
+is the latest 15-minute median bin, not a single reading."""
 
 import math
 from collections.abc import Sequence
@@ -34,6 +35,7 @@ from .ward import WardService
 
 BIN = timedelta(minutes=15)
 MAX_BINS = 7 * 24 * 4  # 672: 7 days of 15-minute bins
+ADMISSION_SLACK = timedelta(minutes=30)  # a window starting this close to admission is "at admission"
 ORDER: tuple[BaselineVital, ...] = ("heart_rate", "respiratory_rate", "spo2", "temperature")
 # The same bounds the Tier A scorer applies (domain/scoring/tier_a/news2.py `_usable`, which is
 # private to that tier): a physically impossible value is a gap, never a reading. A heart rate or
@@ -100,6 +102,7 @@ class BaselineService:
             return None
         self._audit.append(clinician_id, "view_baseline", patient_id, "ok")
         (stay,) = self._store.stays(frozenset({patient_id}))
+        now = self._store.now()  # the clock `last_update_s` is measured on
         admitted_at = stay["admitted_at"]
         vitals: list[BaselineComputed | BaselineForming | BaselineUnavailable] = []
         for vital in ORDER:
@@ -130,14 +133,22 @@ class BaselineService:
             finding, dev = found
             assert start is not None  # a computed baseline has at least one bin
             window_start = next(i for i, x in enumerate(bins) if x is not None)
+            baseline_from = start + window_start * BIN
+            latest_at = start + (len(bins) - 1) * BIN
             vitals.append(
                 BaselineComputed(
                     vital=vital,
                     status="computed",
                     baseline_median=round(dev.baseline_median, 1),
                     latest=dev.value,
-                    latest_at=start + (len(bins) - 1) * BIN,
-                    baseline_from=start + window_start * BIN,
+                    latest_at=latest_at,
+                    latest_age_s=max(0, int((now - (latest_at + BIN)).total_seconds())),
+                    baseline_from=baseline_from,
+                    anchored_at=(
+                        "admission"
+                        if admitted_at is not None and baseline_from - admitted_at <= ADMISSION_SLACK
+                        else "first_kept_bin"
+                    ),
                     delta=round(dev.delta, 1),
                     z=round(dev.z, 1),
                     run_bins=dev.run_bins,

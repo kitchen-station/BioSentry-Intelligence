@@ -31,6 +31,7 @@ function lazyFixtureProvider(): ApiProvider {
   return {
     getWard: () => fixtures().then((m) => m.fixtureProvider.getWard()),
     getPatient: (id) => fixtures().then((m) => m.fixtureProvider.getPatient(id)),
+    getBaseline: (patientId) => fixtures().then((m) => m.fixtureProvider.getBaseline(patientId)),
     getNotes: (patientId) => fixtures().then((m) => m.fixtureProvider.getNotes(patientId)),
     addNote: (patientId, author, role, content) =>
       fixtures().then((m) => m.fixtureProvider.addNote(patientId, author, role, content)),
@@ -57,6 +58,7 @@ const provider: ApiProvider = USE_FIXTURES ? lazyFixtureProvider() : httpProvide
 
 export const getWard = provider.getWard;
 export const getPatient = provider.getPatient;
+export const getBaseline = provider.getBaseline;
 export const getNotes = provider.getNotes;
 export const addNote = provider.addNote;
 export const deleteNote = provider.deleteNote;
