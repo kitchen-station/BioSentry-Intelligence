@@ -13,7 +13,8 @@ are `Cache-Control: no-store`. The service serves nothing unauthenticated except
 POST /session: no docs or schema routes (the contract is frontend/contracts/openapi.json).
 The ward simulation writes through /sim/*, gated by the X-Ingest-Key header (503 if unset). One
 shared ward: a different client cannot start a run while the newest is live, and a batch for a run
-that is no longer the newest is refused (both 409, nothing written).
+that is no longer the newest is refused (both 409, nothing written). The sim reads what clinicians
+did (acknowledgements, vitals, notes without their text, admissions) from /sim/runs/{id}/actions.
 """
 
 import hashlib
@@ -23,7 +24,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -53,7 +54,7 @@ from biosentry.schemas import (
     VitalsRecorded,
     WardResponse,
 )
-from biosentry.schemas.ingest import Batch, LiveView, LiveWard, NewRun
+from biosentry.schemas.ingest import BIGINT_MAX, Actions, Batch, LiveView, LiveWard, NewRun
 from biosentry.services import ingest
 from biosentry.services.patients import PatientService, RejectedError
 from biosentry.services.ward import WardService
@@ -71,12 +72,14 @@ WRITE_ACTIONS = {
     ("POST", "/patients/{patient_id}/vitals"): "record_vitals",
     ("POST", "/patients/{patient_id}/acknowledgement"): "acknowledge",
 }
-# Body-bearing routes that are not behind a bearer token: sign-in, and the sim's ingest key.
+# Routes that are not behind a bearer token: sign-in, and the sim's ingest key. All but the sim's
+# one read carry a body.
 UNAUTHENTICATED_WRITES = {
     ("POST", "/session"),
     ("POST", "/sim/runs"),
     ("POST", "/sim/runs/{run_id}/batch"),
     ("POST", "/sim/runs/{run_id}/view"),
+    ("GET", "/sim/runs/{run_id}/actions"),
 }
 
 
@@ -404,5 +407,17 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
         if not ingest.set_view(ctx.conn, run_id, body):
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return Response(status_code=204)
+
+    @app.get("/sim/runs/{run_id}/actions", response_model=Actions)
+    def sim_actions(
+        run_id: int,
+        ctx: Ctx,
+        _: Annotated[None, Depends(ingest_gate)],
+        after: Annotated[int, Query(ge=0, le=BIGINT_MAX)] = 0,
+    ) -> Actions:
+        found = ingest.actions(ctx.store, run_id, after)
+        if found is None:
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return Actions.model_validate({"actions": found})
 
     return app

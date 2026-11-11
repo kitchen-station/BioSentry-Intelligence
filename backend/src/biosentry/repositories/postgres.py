@@ -571,3 +571,27 @@ class PostgresStore:
             " SET score = EXCLUDED.score, at = EXCLUDED.at",
             (self.run_id, patient_id, clinician_id, score, whole(self.run_now)),
         )
+
+    # --- the feed the ward sim reads -----------------------------------------------------------
+
+    def add_action(
+        self, kind: str, clinician_id: str, patient_id: str, data: dict[str, Any]
+    ) -> None:
+        """Append to the feed. Call it first in the transaction of the write it describes: it takes
+        the run's lock, so seq order is commit order and a reader's cursor never skips a row."""
+        lock_run(self.conn, self.run_id)
+        self.conn.execute(
+            "INSERT INTO clinician_action (run_id, kind, patient_id, clinician_id, at, data)"
+            " VALUES (%s, %s, %s, %s, %s, %s)",
+            (self.run_id, kind, patient_id, clinician_id, whole(self.run_now), Jsonb(data)),
+        )
+
+    def actions(self, run_id: int, after: int) -> list[dict[str, Any]]:
+        """The next 200 feed rows of a run after `after`, oldest first. The caller names the run
+        (the one it checked under the lock), which is not always the one this store was made on."""
+        rows = self.conn.execute(
+            "SELECT seq, kind, patient_id, clinician_id, data FROM clinician_action"
+            " WHERE run_id = %s AND seq > %s ORDER BY seq LIMIT 200",
+            (run_id, after),
+        )
+        return [{**r.pop("data"), **r} for r in rows]

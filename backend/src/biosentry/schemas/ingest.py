@@ -1,5 +1,6 @@
 """Bodies of the ward simulation's routes (POST /sim/runs, POST /sim/runs/{id}/batch, POST
-/sim/runs/{id}/view) and of the ward viewer's read of that view (GET /wards/{ward}/live).
+/sim/runs/{id}/view, GET /sim/runs/{id}/actions) and of the ward viewer's read of that view (GET
+/wards/{ward}/live).
 
 Not part of the dashboard contract. Lists are capped; a value is a number or text, or the
 reason there is none (I1). Times arrive as minutes from the run's origin.
@@ -212,3 +213,28 @@ class LiveWard(Contract):
 
     shared: View | None
     patients: list[PatientView]
+
+
+class Action(Contract):
+    """One successful clinician write, as the ward sim learns of it. A field that does not apply
+    to the kind is null. A note's text is never here."""
+
+    seq: int
+    kind: Literal["acknowledge", "record_vitals", "add_note", "admit_patient"]
+    patient_id: str
+    clinician_id: str
+    score: int | None = None  # acknowledge: the NEWS2 total acknowledged
+    systolic: int | None = None  # record_vitals, admit_patient: both or neither
+    diastolic: int | None = None
+    acvpu: Literal["A", "C", "V", "P", "U"] | None = None  # record_vitals, admit_patient
+    on_oxygen: bool | None = None  # record_vitals
+    spo2_scale: Literal[1, 2] | None = None  # record_vitals
+    name: str | None = None  # admit_patient, as are the rest
+    age: int | None = None
+    sex: str | None = None
+    bed: str | None = None
+    context: str | None = None
+
+
+class Actions(Contract):
+    actions: list[Action]  # at most 200, oldest first

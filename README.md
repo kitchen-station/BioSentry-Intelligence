@@ -73,6 +73,8 @@ with the variable unset the ingest routes answer 503). There is one shared ward:
 carries a `client_id` (one per sim page load), and while the newest run is live (not ended, last batch
 or creation within 30 seconds) a different `client_id` gets 409 and nothing is written; the same one may
 replace its own run. A batch for a run that is no longer the newest also gets 409.
+`GET /sim/runs/{id}/actions?after={seq}` (same key) tells the sim what clinicians did: one row per
+acknowledgement, vitals entry, note (never its text) or admission, at most 200 in `seq` order after the cursor.
 
 `make check` runs lint, types and tests for both halves; the API tests need the database, so run
 `make db-up` first (each test works in its own copy of a seeded database and drops it). `make db-reset`

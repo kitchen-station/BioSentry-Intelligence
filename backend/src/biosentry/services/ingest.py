@@ -1,5 +1,5 @@
 """The ward simulation's writes: start a run, append a batch, replace the live view. Each is one
-transaction.
+transaction. And its one read: the clinician actions it has not applied yet.
 
 The run, never the client, says whether data is synthetic. A body that is refused writes nothing.
 One shared ward: the newest run is the ward. A different client cannot start a run while the
@@ -15,6 +15,7 @@ from biosentry.db.migrate import SETUP_LOCK
 from biosentry.repositories.postgres import (
     Conn,
     Obs,
+    PostgresStore,
     assign,
     insert_observations,
     insert_patient,
@@ -257,3 +258,11 @@ def set_view(conn: Conn, run_id: int, body: LiveView) -> bool:
             return False
         set_live_view(conn, run_id, body.model_dump())
     return True
+
+
+def actions(store: PostgresStore, run_id: int, after: int) -> list[dict[str, Any]] | None:
+    """The run's clinician actions after `after`. None when there is no such run."""
+    with transaction(store.conn):  # under the run's lock: a write in flight commits first
+        if _locked_newest(store.conn, run_id) is None:
+            return None
+        return store.actions(run_id, after)
