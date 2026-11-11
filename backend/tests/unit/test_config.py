@@ -133,3 +133,19 @@ def test_the_key_setup_makes_passes() -> None:
 
 def test_a_blank_key_is_unset_in_local_too() -> None:
     assert Settings.from_env({"BIOSENTRY_INGEST_KEY": "   "}).ingest_key is None
+
+
+def test_retention_is_seven_days_unless_the_environment_says_otherwise() -> None:
+    assert Settings.from_env({}).retention_days == 7
+    assert Settings.from_env({"BIOSENTRY_RETENTION_DAYS": ""}).retention_days == 7
+    assert Settings.from_env({"BIOSENTRY_RETENTION_DAYS": " 30 "}).retention_days == 30
+
+
+@pytest.mark.parametrize("given", ["0", "-1", "1.5", "a week", "36501", "9" * 5000])
+def test_a_retention_that_is_not_a_whole_number_of_days_in_range_is_refused(given: str) -> None:
+    with pytest.raises(ConfigError) as error:
+        Settings.from_env({"BIOSENTRY_RETENTION_DAYS": given})
+    # The one message, whatever was given: it names the variable and never the value.
+    assert str(error.value) == "BIOSENTRY_RETENTION_DAYS must be a whole number from 1 to 36500"
+    with pytest.raises(ConfigError, match="BIOSENTRY_RETENTION_DAYS"):
+        Settings(retention_days=0)

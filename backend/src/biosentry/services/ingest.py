@@ -144,8 +144,11 @@ def _locked_newest(conn: Conn, run_id: int) -> dict[str, Any] | None:
     return run
 
 
-def add_batch(conn: Conn, run_id: int, body: Batch, clock: Callable[[], datetime]) -> bool:
-    """False when there is no such run. A patient outside the run is refused (RejectedError)."""
+def add_batch(
+    conn: Conn, run_id: int, body: Batch, clock: Callable[[], datetime], retention_days: int
+) -> bool:
+    """False when there is no such run. A patient outside the run is refused (RejectedError).
+    A batch that moves the run into a new sim hour prunes what is older than `retention_days`."""
     with transaction(conn):
         # A batch holds the run's lock from its first read to its commit: two batches on a run take
         # turns (the sim_event seq is max + 1, and the patient and run rows are updated in order).
@@ -218,11 +221,24 @@ def add_batch(conn: Conn, run_id: int, body: Batch, clock: Callable[[], datetime
                     for i, e in enumerate(body.events, 1)
                 ],
             )
+        as_of = whole(_at(origin, body.minute))
+        if as_of.replace(minute=0, second=0) != run["as_of"].replace(minute=0, second=0):
+            cutoff = as_of - timedelta(days=retention_days)
+            conn.execute("DELETE FROM vital_bin WHERE run_id = %s AND bin_at < %s", (run_id, cutoff))
+            # The read takes the newest row per patient and code, and the sim sends a value only
+            # when it changes: that row is the current value whatever its age, so it is kept.
+            conn.execute(
+                "DELETE FROM observation AS o WHERE o.run_id = %s AND o.observed_at < %s"
+                " AND EXISTS (SELECT 1 FROM observation AS n WHERE n.run_id = o.run_id"
+                " AND n.patient_id = o.patient_id AND n.code = o.code"
+                " AND (n.observed_at, n.id) > (o.observed_at, o.id))",
+                (run_id, cutoff),
+            )
         conn.execute(
             "UPDATE run SET as_of = %s, last_batch_at = %s, ended = %s, received = %s,"
             " rejected = %s, abstained = %s WHERE id = %s",
             (
-                whole(_at(origin, body.minute)),
+                as_of,
                 whole(clock()),
                 body.ended,
                 body.counts.received,

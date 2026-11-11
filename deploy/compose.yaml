@@ -44,6 +44,8 @@ services:
       BIOSENTRY_INGEST_KEY: ${BIOSENTRY_INGEST_KEY:?set BIOSENTRY_INGEST_KEY in deploy/.env}
       # Origins the dashboard is served from, comma-separated; empty keeps the local defaults.
       BIOSENTRY_CORS_ORIGINS: ${BIOSENTRY_CORS_ORIGINS:-}
+      # Days of sim time a run keeps its bins and superseded observations; empty keeps the default, 7.
+      BIOSENTRY_RETENTION_DAYS: ${BIOSENTRY_RETENTION_DAYS:-}
     ports:
       - "127.0.0.1:8000:8000"
     # `default` is what lets the published port work; `backend` (internal) is how it reaches the database.
