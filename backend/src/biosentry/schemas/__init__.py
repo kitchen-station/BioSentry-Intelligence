@@ -13,6 +13,13 @@ from .admission import (
     PatientExtractionResult,
     Sex,
 )
+from .baseline import (
+    BaselineComputed,
+    BaselineForming,
+    BaselineResponse,
+    BaselineUnavailable,
+    BaselineUsed,
+)
 from .clinical import LabPanel, PartialLabInput, VitalHistory, VitalHistoryFull, Vitals, VitalTrends
 from .common import (
     Acvpu,
@@ -117,6 +124,11 @@ CONTRACT_MODELS: tuple[type[BaseModel], ...] = (
     PartialAdmitPatientInput,
     LabExtractionResult,
     PatientExtractionResult,
+    BaselineResponse,
+    BaselineUsed,
+    BaselineComputed,
+    BaselineForming,
+    BaselineUnavailable,
 )
 
 # Inputs entered by a person: optional fields may be omitted and default to None.
@@ -134,6 +146,11 @@ __all__ = [
     "AdmissionCondition",
     "AdmissionRoute",
     "AdmitPatientInput",
+    "BaselineComputed",
+    "BaselineForming",
+    "BaselineResponse",
+    "BaselineUnavailable",
+    "BaselineUsed",
     "BloodPressure",
     "BloodPressureMeasurement",
     "CivilStatus",

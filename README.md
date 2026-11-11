@@ -77,6 +77,13 @@ replace its own run. A batch for a run that is no longer the newest also gets 40
 case) with 409 and writes nothing; a bed whose patient has left is free again.
 `GET /sim/runs/{id}/actions?after={seq}` (same key) tells the sim what clinicians did: one row per
 acknowledgement, vitals entry, note (never its text) or admission, at most 200 in `seq` order after the cursor.
+`GET /patients/{id}/baseline` (bearer token, same visibility, 404 and audit as the patient route, action `view_baseline`)
+serves a research finding of how far each device vital sits from the patient's own baseline: derived,
+synthetic, not validated, display only; it changes no rank and stores nothing. The baseline is the first 24
+valid bins (6 hours) from admission when it is known, from the first stored bin when it is not (every patient
+present before the run), and from the oldest bin still kept once the 7-day prune or the 672-bin cap has dropped
+earlier ones, so a long stay is baselined on mid-stay data; the response says when the latest reading was
+taken (`latest_at`), where the baseline starts (`baseline_from`) and whether admission is known.
 
 `make check` runs lint, types and tests for both halves; the API tests need the database, so run
 `make db-up` first (each test works in its own copy of a seeded database and drops it). `make db-reset`

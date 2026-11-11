@@ -297,6 +297,7 @@ def test_the_audit_trail_holds_no_patient_data(app_and_client: tuple[Any, TestCl
     [
         ("GET", "/patients/{}", "view_patient", None),
         ("GET", "/patients/{}/notes", "view_notes", None),
+        ("GET", "/patients/{}/baseline", "view_baseline", None),
         ("POST", "/patients/{}/notes", "add_note", {"author": "a", "role": "RN", "content": "c"}),
         ("DELETE", "/patients/{}/notes/n-001", "delete_note", None),
         ("POST", "/patients/{}/labs", "enter_labs", {"potassium": 4.0}),

@@ -332,6 +332,244 @@
         "title": "AdmitPatientInput",
         "type": "object"
       },
+      "BaselineComputed": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline_from": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "baseline_median": {
+            "type": "number"
+          },
+          "delta": {
+            "type": "number"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FindingDirection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latest": {
+            "type": "number"
+          },
+          "latest_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "pathway": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "run_bins": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "significant": {
+            "type": "boolean"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "const": "computed",
+            "type": "string"
+          },
+          "unit": {
+            "maxLength": 32,
+            "type": "string"
+          },
+          "vital": {
+            "enum": [
+              "heart_rate",
+              "respiratory_rate",
+              "spo2",
+              "temperature"
+            ],
+            "type": "string"
+          },
+          "z": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "vital",
+          "status",
+          "baseline_median",
+          "latest",
+          "latest_at",
+          "baseline_from",
+          "delta",
+          "z",
+          "run_bins",
+          "since",
+          "significant",
+          "direction",
+          "pathway",
+          "unit"
+        ],
+        "title": "BaselineComputed",
+        "type": "object"
+      },
+      "BaselineForming": {
+        "additionalProperties": false,
+        "properties": {
+          "bins_needed": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "bins_valid": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "status": {
+            "const": "forming",
+            "type": "string"
+          },
+          "vital": {
+            "enum": [
+              "heart_rate",
+              "respiratory_rate",
+              "spo2",
+              "temperature"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "vital",
+          "status",
+          "bins_valid",
+          "bins_needed"
+        ],
+        "title": "BaselineForming",
+        "type": "object"
+      },
+      "BaselineResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "admission_known": {
+            "type": "boolean"
+          },
+          "label": {
+            "const": "Research finding. Synthetic, not validated. Does not change the rank.",
+            "type": "string"
+          },
+          "params": {
+            "$ref": "#/components/schemas/BaselineUsed"
+          },
+          "patient_id": {
+            "maxLength": 64,
+            "type": "string"
+          },
+          "synthetic": {
+            "type": "boolean"
+          },
+          "vitals": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/BaselineComputed"
+                },
+                {
+                  "$ref": "#/components/schemas/BaselineForming"
+                },
+                {
+                  "$ref": "#/components/schemas/BaselineUnavailable"
+                }
+              ]
+            },
+            "maxItems": 4,
+            "type": "array"
+          }
+        },
+        "required": [
+          "patient_id",
+          "synthetic",
+          "admission_known",
+          "label",
+          "params",
+          "vitals"
+        ],
+        "title": "BaselineResponse",
+        "type": "object"
+      },
+      "BaselineUnavailable": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "enum": [
+              "no_history",
+              "latest_bin_missing"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "const": "unavailable",
+            "type": "string"
+          },
+          "vital": {
+            "enum": [
+              "heart_rate",
+              "respiratory_rate",
+              "spo2",
+              "temperature"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "vital",
+          "status",
+          "reason"
+        ],
+        "title": "BaselineUnavailable",
+        "type": "object"
+      },
+      "BaselineUsed": {
+        "additionalProperties": false,
+        "description": "The detector's own defaults, echoed. Nothing in a request can set them.",
+        "properties": {
+          "k": {
+            "type": "number"
+          },
+          "p": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "window_bins": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "window_bins",
+          "k",
+          "p"
+        ],
+        "title": "BaselineUsed",
+        "type": "object"
+      },
       "BloodPressure": {
         "additionalProperties": false,
         "description": "Structured on purpose: the \"SBP/DBP\" string is display only and is never parsed.",

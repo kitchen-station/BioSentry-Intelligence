@@ -40,6 +40,7 @@ from biosentry.schemas import (
     AbstainedRow,
     Acknowledgement,
     AdmitPatientInput,
+    BaselineResponse,
     ClinicalNote,
     LabPanel,
     NewAcknowledgement,
@@ -56,6 +57,7 @@ from biosentry.schemas import (
 )
 from biosentry.schemas.ingest import BIGINT_MAX, Actions, Batch, LiveView, LiveWard, NewRun
 from biosentry.services import ingest
+from biosentry.services.baseline import BaselineService
 from biosentry.services.patients import PatientService, RejectedError
 from biosentry.services.ward import WardService
 
@@ -92,6 +94,7 @@ class Context:
     audit: AuditLog
     wards: WardService
     patients: PatientService
+    baselines: BaselineService
 
     def close(self) -> None:
         self.conn.close()
@@ -168,7 +171,14 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
             store = PostgresStore(conn, clock)
             audit = AuditLog(conn, clock, store.role_of)
             wards = WardService(store, audit)
-            return Context(conn, store, audit, wards, PatientService(store, audit, wards))
+            return Context(
+                conn,
+                store,
+                audit,
+                wards,
+                PatientService(store, audit, wards),
+                BaselineService(store, audit, wards),
+            )
         except BaseException:
             conn.close()
             raise
@@ -306,6 +316,13 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
     @app.get("/patients/{patient_id}", response_model=PatientDetail)
     def get_patient(patient_id: str, ctx: Ctx, who: Who) -> PatientDetail:
         found = ctx.wards.patient(who, patient_id)
+        if found is None:
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return found
+
+    @app.get("/patients/{patient_id}/baseline", response_model=BaselineResponse)
+    def get_baseline(patient_id: str, ctx: Ctx, who: Who) -> BaselineResponse:
+        found = ctx.baselines.baseline(who, patient_id)
         if found is None:
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return found
