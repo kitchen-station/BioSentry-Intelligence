@@ -1,0 +1,17 @@
+[project]
+name = "biosentry-research"
+version = "0.1.0"
+description = "Offline research package: the distilled vitals student (synthetic data only)."
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "numpy==2.4.6",
+  "onnx==1.23.2",
+  "onnxruntime==1.31.1",
+  "scikit-learn==1.9.1",
+  # the same exact pins as backend/pyproject.toml: research imports the backend's NEWS2 and baseline
+  "pydantic==2.14.1",
+  "pytest==9.1.1",
+]
+
+[tool.uv]
+package = false

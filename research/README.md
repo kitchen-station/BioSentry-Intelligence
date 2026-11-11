@@ -105,6 +105,81 @@ The command writes nothing unless `--write-params <path>` is given. `evaluate` t
 rows for the chosen k and p, read from `models/tier_b/baseline/params.json` when it exists,
 otherwise the detector's DEFAULTS (it prints which).
 
+## The distilled vitals student (slice B5)
+
+Written before any training run. Code: `student.py` (features, labels, models, ONNX),
+`train_student.py` and `evaluate_student.py` (the commands). These three need numpy,
+scikit-learn, onnx and onnxruntime (`research/pyproject.toml`, `uv.lock`); nothing else in
+`research/` imports them, so the stdlib parts and RESEARCH-GATE run without them.
+Vulnerability check of the locked requirements (pip-audit, 2026-11-12): "No known
+vulnerabilities found".
+
+- Bins: one feature row per cohort row (a 15-minute bin), built from that bin and earlier bins
+  of the same stay only. A bin with no cohort row has no feature row. NOT RANKED bins are not
+  scored (abstention is an output): they get no probability, are not alerting, and are not
+  trained on. Their vitals still feed the baseline, as in the B4 policies.
+- Features (19), in this order, per vital (heart rate, respiratory rate, SpO2, temperature):
+  the value; a missing flag; z from the patient's own baseline (`baseline_finding` with the
+  detector's DEFAULTS window and floors, called on the bins up to this one, so it is the same
+  baseline as B4); a z-missing flag (set while the baseline is forming, fewer than 24 valid
+  bins, or when this bin's value is missing). Then the NEWS2 total, on oxygen (0/1) and
+  consciousness not A (0/1). Missing is missing: a missing input is the number 0 with its flag
+  set; no clinical value is ever filled in. On the ward-v1 trials a RANKED row always has all
+  four device vitals, so the value-missing flags are always 0 on scored bins; they are kept so a
+  future cohort with gaps cannot be silently imputed.
+- No-temperature features (15): the same without the four temperature features, and the NEWS2
+  total minus its temperature points (from the backend's own parameter scores). This removes
+  every temperature input.
+- Label per scored bin, from the generator's true episode only (`outcome`/higher care is never
+  a label): positive when `episode_start <= minute <= episode_start + ramp_minutes` (start to
+  fully in); bins after fully in until the stay ends are excluded (neither class); every other
+  bin is negative, including every bin of a patient with no episode. Starting patients (admit
+  minute 0) are left out of training and selection, as they are out of sensitivity: their true
+  arrival is unknown and one has a scripted worsening that is not an episode.
+- Split: teacher and students train on seeds 1 to 7; early stopping, the choice of student and
+  the threshold use seeds 8 to 10; seeds 11 to 30 are scored once by `evaluate_student`. The
+  training loader reads a folder's `manifest.json` first and skips a held-out seed before any
+  other file of it is opened.
+- Teacher: scikit-learn `HistGradientBoostingClassifier`, `random_state=0`, early stopping on
+  the loss of seeds 8 to 10 (`X_val`), at most 500 iterations, 20 without improvement.
+- Students, trained on the teacher's probabilities for seeds 1 to 7 (soft labels; no true label
+  is used to fit them): (a) logistic: a linear model of the teacher's log-odds (probabilities
+  clipped to 1e-4 and 1 - 1e-4) fitted by least squares with ridge alpha 1, then a sigmoid; (b)
+  MLP: one hidden layer of 16 ReLU units fitted to the same log-odds (scikit-learn
+  `MLPRegressor`, adam, alpha 1e-4, `random_state=0`). Inputs are standardised with the mean
+  and standard deviation of seeds 1 to 7 (a standard deviation of 0 becomes 1); those constants
+  are inside the ONNX graph. The student with the higher average precision against the true
+  labels of seeds 8 to 10 is kept; both are recorded.
+- Export: the student only, ONNX opset 13, IR version 7, float32, input `x` of shape
+  [1, n_features], output `p` of shape [1, 1]; ops Sub, Div, Gemm, Relu, Sigmoid; built with
+  `onnx.helper`. Parity: onnxruntime equals the numpy forward pass within 1e-5 on 1,000 rows
+  of seeds 1 to 7.
+- Threshold: on seeds 8 to 10, the alert rule above is run with "alerting when p >= t" for t in
+  0.001 to 0.009 and 0.01 to 0.99 (steps of 0.001 then 0.01). The smallest t whose alerts do not
+  exceed the NEWS2 chart trigger's alerts on the same seeds is chosen (matched burden, the
+  same patient-days). If none qualifies, nothing is chosen. The teacher gets its own threshold
+  by the same rule. "NEWS2 OR student" uses the student's threshold and so carries more alerts
+  than NEWS2 alone; its burden is printed.
+- Rule for any future selection (written after B5's held-out run; not applied to B5): a
+  threshold also qualifies only when its time in alert (alerting bins over bins) on the
+  validation seeds is at most the NEWS2 chart trigger's on the same seeds. Counting alerts alone
+  is not enough: one alert that stays open looks like a small burden. B5's no-temperature
+  models fail this rule (52.7% against 12.4% on seeds 8 to 10), so `evaluate_student` labels
+  their rows "no usable threshold: alert stuck open; not a working rule".
+- The same recipe is run twice: with all 19 features and with the 15 no-temperature features.
+- Held-out rows (`evaluate_student`): teacher, student, NEWS2 OR student, and the three
+  no-temperature versions, next to the NEWS2 and baseline rows, with the alert rule, windows,
+  chance control and bootstrap above. It retrains on seeds 1 to 10 (deterministic) and refuses
+  to run unless the retrained students' ONNX bytes have the sha256 in the model's metadata; the
+  student rows then run the committed ONNX file through onnxruntime.
+
+Run (inside `biosentry-research-venv`, see the gate below):
+
+    python -m research.train_student /data/trials/ward-v1/seed-* [--out <dir>]
+    python -m research.evaluate_student /data/trials/ward-v1/seed-*
+
+`--out` defaults to `models/tier_c/student_vitals/`.
+
 ## Limits
 
 - Temperature is flattered. The sim adds a fixed rise (`INJECT_TEMPERATURE = 0.6`) in every episode
@@ -133,3 +208,14 @@ otherwise the detector's DEFAULTS (it prints which).
 It must print "N passed" and `pytest-exit 0`. If `/venv/bin/python` is missing, run
 `uv sync --locked -q` in `/app/backend` first with `-e UV_PROJECT_ENVIRONMENT=/venv -e
 UV_PYTHON_DOWNLOADS=never`. The backend's coverage gate does not measure `research/`.
+
+## Gate (ML-GATE, slice B5)
+
+RESEARCH-GATE does not collect `research/tests_ml/` (its venv has no numpy). This gate runs both
+folders in the research venv, so the student tests are never skipped:
+
+    docker run --rm -v <repo>:/app -v ~/Desktop/Projects/biosentry-data:/data:ro -v biosentry-research-venv:/venv -w /app -e PYTHONPATH=/app/backend/src:/app -e PYTHONDONTWRITEBYTECODE=1 biosentry-api-build sh -c "/venv/bin/python -m pytest -q -p no:cacheprovider research/tests research/tests_ml; echo pytest-exit \$?"
+
+It must print "N passed" and `pytest-exit 0`. The venv's locked packages were checked with
+pip-audit on 2026-11-12: "No known vulnerabilities found". Set up the venv once with
+`docker run --rm -v <repo>:/app -v biosentry-research-venv:/venv -w /app/research -e UV_PROJECT_ENVIRONMENT=/venv -e UV_LINK_MODE=copy -e UV_PYTHON_DOWNLOADS=never biosentry-api-build uv sync --locked`.
