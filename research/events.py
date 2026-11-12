@@ -30,7 +30,7 @@ class Window:
         return self.end > self.stay_end
 
 
-def windows(trial: Trial) -> tuple[list[Window], dict[str, int]]:
+def windows(trial: Trial, tail: int = TAIL_MINUTES) -> tuple[list[Window], dict[str, int]]:
     """Evaluated episodes, and the dropped ones by reason."""
     trial_end = trial.days * 1440
     kept: list[Window] = []
@@ -49,7 +49,7 @@ def windows(trial: Trial) -> tuple[list[Window], dict[str, int]]:
         else:
             full_in = e.start + e.ramp_minutes
             kept.append(Window(e.patient, e.kind, e.admit_minute, e.start, full_in,
-                               full_in + TAIL_MINUTES, stay_end))
+                               full_in + tail, stay_end))
     return kept, dropped
 
 

@@ -29,7 +29,7 @@ def score_row(row: Row) -> News2Result:
             supplemental_o2=row.on_oxygen,
             systolic_bp=row.systolic,
             heart_rate=row.heart_rate,
-            consciousness=Acvpu(row.consciousness),
+            consciousness=None if row.consciousness is None else Acvpu(row.consciousness),
             temperature=row.temperature,
         )
     )

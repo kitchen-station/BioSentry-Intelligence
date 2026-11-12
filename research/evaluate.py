@@ -19,7 +19,7 @@ from biosentry.domain.scoring.tier_b.baseline import DEFAULTS, BaselineParams
 from . import bootstrap
 from .baseline_policy import NO_TEMP, baseline_policies, clear_cache
 from .alerts import POLICIES, REARM_BINS, Policy, scan
-from .events import control_windows, expected_bins, stay_days, windows
+from .events import TAIL_MINUTES, control_windows, expected_bins, stay_days, windows
 from .rescore import check_parity
 from .trials import BIN_MINUTES, KINDS, Trial, TrialError, load_trial
 
@@ -72,8 +72,8 @@ def _any(minutes: list[int], lo: float, hi: float) -> bool:
     return i < len(minutes) and minutes[i] <= hi
 
 
-def score_trial(trial: Trial, policies: tuple[Policy, ...], pool: Pool) -> None:
-    wins, dropped = windows(trial)
+def score_trial(trial: Trial, policies: tuple[Policy, ...], pool: Pool, tail: int = TAIL_MINUTES) -> None:
+    wins, dropped = windows(trial, tail)
     controls = control_windows(trial, wins)
     pool.trials += 1
     pool.patients += len(trial.episodes)
@@ -92,7 +92,7 @@ def score_trial(trial: Trial, policies: tuple[Policy, ...], pool: Pool) -> None:
         pool.uncut += not w.cut
         pool.ended_early += w.stay_end < w.full_in
         pool.no_rows += not rows
-        pool.kind_evaluated[w.kind] += 1
+        pool.kind_evaluated[w.kind] = pool.kind_evaluated.get(w.kind, 0) + 1
         if w.kind == "hypotensive":
             pool.hypotensive += 1
             pool.hypotensive_no_cuff += not any(
@@ -117,8 +117,9 @@ def score_trial(trial: Trial, policies: tuple[Policy, ...], pool: Pool) -> None:
                 t.anyb += anyb
                 t.uncut_new += new and not w.cut
                 t.uncut_any += anyb and not w.cut
-                t.kinds[w.kind][0] += new
-                t.kinds[w.kind][1] += anyb
+                kinds = t.kinds.setdefault(w.kind, [0, 0])  # real data brings its own kinds
+                kinds[0] += new
+                kinds[1] += anyb
                 if new:
                     t.leads.append(w.full_in - counting[0])  # the FIRST counting alert
                 m0 = int(-(-w.start // BIN_MINUTES) * BIN_MINUTES)  # the bin that holds the start

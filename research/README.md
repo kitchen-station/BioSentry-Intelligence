@@ -239,6 +239,71 @@ Run (either venv):
     python -m research.reward_loop --train /data/trials/ward-v1-train --validate /data/trials/ward-v1 --out models/tier_b/reward_policy [--no-temperature]
     python -m research.reward_loop --evaluate /data/trials/ward-v1 --out models/tier_b/reward_policy
 
+## Real data (eICU-CRD Demo 2.0.1)
+
+The first real dataset: an open ICU database (PhysioNet, ODbL, no account). It measures NEWS2 and the
+per-patient baseline rule on real records. No model is trained here. Card: `models/data/eicu-crd-demo/card.md`.
+Code: `research/realdata/` (standard library only; imports the backend's NEWS2 and baseline).
+
+Get it. Official source only: https://physionet.org/content/eicu-crd-demo/2.0.1/ (about 130 MB). Keep it
+outside the repo as `~/Desktop/Projects/biosentry-data/eicu-crd-demo/2.0.1/` with a `SOURCE.md` (URL, licence,
+every file's sha256, and whether it matched the official `SHA256SUMS.txt` from physionet.org). The loader
+hashes every file listed in `SOURCE.md` on each run and refuses a mismatch, a missing file or a row
+marked as not matching. Never commit the data or row-derived files (our privacy rule; any published derivative database would be ODbL share-alike).
+
+Run (inside either gate's venv; stdlib only, about 30 seconds):
+
+    python -m research.realdata.evaluate /data/eicu-crd-demo/2.0.1
+
+How the rows are made (`loader.py`, written before any analysis):
+- Test set: the 46 hospitals the generator fit (fit-generator.mjs) did not use; 38 of them were used by the circadian calibration fit (fit-eicu.mjs), so this is mostly, not fully, a different-site test (hospital ids sorted, every 4th, `scripts/fit-generator.mjs:71` in the sim repo; encoded as ids in `split.py`, re-derived from the data on every run). Only those hospitals are loaded. Nothing is tuned on them: the baseline uses `params.json` as it is.
+- Cohort: adult, first unit stay per patient (smallest stay id), unit stay of 12 hours or more, minus a vasopressor
+  before hour 6, minus deaths with "Comfort measures only" or "No CPR" charted over 12 hours before death.
+- Event: first vasopressor start (norepinephrine, vasopressin, epinephrine, phenylephrine, dopamine) from hour 6,
+  or death in the unit, whichever is first. Each bin asks "event within 12 hours?". Bins at or after the event are
+  not built, so an event stay ends at its event. A window that would start before admission is shortened to start at
+  admission (counted in the output). The 2-hour tail after "fully in" is 0 here, so event and chance windows
+  have the same length.
+- Rows: 15-minute bins from unit admission. Heart rate, respiratory rate, SpO2 = median of the values in the bin.
+  Systolic = latest cuff or arterial value within 60 minutes. Temperature, GCS (15 = A, else "not A") and oxygen
+  device (room air = no, a known device = yes, unclear = unknown): latest charted value within 4 hours, placed at
+  its entry time. Past the limit it is missing. SpO2 scale 1 for everyone. Bounds are the backend's own (NEWS2's
+  input guards and the API's systolic range 20 to 300), except temperature, held to 30 to 45 C (a Fahrenheit value
+  left in the Celsius column is dropped, not converted by guesswork). A value outside is dropped and counted
+  (printed), never clamped. Checked in the rows: heart rate has 17 bins at exactly 0 and no value above 183;
+  respiratory rate has 912 bins at exactly 0 (monitor or ventilator artefact, scored 3 by the backend rules)
+  and 20 above 80, up to 122; SpO2 goes down to 11; systolic 24 to 262. These are inside the backend's bounds and
+  were not filtered.
+- Missing is missing: no imputation, interpolation or default. NEWS2 with the backend scorer abstains (NOT RANKED)
+  unless all inputs are present; "full NEWS2 inputs available: N%" is printed next to it. A second row, "partial",
+  adds only the components that were measured: "measured-components sum (NOT NEWS2; lower bound)", the chart's
+  trigger applied to that sum. Not-alert consciousness (GCS under 15, sedated and ventilated patients) is present in 18,748
+  of the 43,052 bins where it fires and alone causes the firing in 10,767: in an ICU close to an outcome-linked input.
+- The alert rule, windows, chance control, excess over chance and patient bootstrap are `research.evaluate`'s.
+  AUROC and AUPRC are over bins (NEWS2 total against "event within 12 hours"), with the same patient-level
+  bootstrap (resampling per-stay score counts). The minimum detectable AUROC difference is Hanley and McNeil's
+  at AUROC 0.75, 80% power, with an assumed paired correlation of 0.5 (also printed unpaired).
+- The baseline rule's limits: its parameters (k 3.0, p 4) were tuned on simulated data, and its baseline is the
+  first 6 ICU hours, often the sickest; for events at 6 to 12 hours the baseline period overlaps the event window.
+- Excess over chance is printed with its ceiling (1 minus chance) and its share of the ceiling. Excess cannot be compared between rules with different chance rates; as a share of ceiling the order changes, and the intervals overlap.
+- Output hides any count under 5, and any count whose complement is under 5 (printed as ">19/24") ("<5") and prints no patient rows or ids.
+
+What the numbers mean and do not mean:
+- They say how NEWS2 and the baseline rule behave on ICU patients from other hospitals than the ones the
+  simulator was fitted on. They do not validate either rule for wards: ICU, US, 2014 to 2015, monitor-driven.
+- The event is a treatment decision (vasopressor) or death, not a ward transfer.
+- The test set is small (tens of events). Intervals are wide and a difference smaller than the minimum
+  detectable one cannot be told from noise.
+- Full NEWS2 inputs are rare because the oxygen device and GCS are charted sparsely. When NEWS2 abstains on most
+  bins, "NEWS2 chart trigger" alerts rarely; read it with its abstention row, never alone.
+- Required wording: "tested on eICU-CRD Demo, an open ICU dataset; not validated for ward use". Public use also
+  needs the ODbL notice in the card. The output ends with "real ICU data (eICU-CRD Demo), open access; small test
+  set; not validated for ward use".
+
+The output ends with: "With 24 events and full NEWS2 inputs in 5.5% of bins, this run cannot rank NEWS2, the measured-components sum or the baseline rule against each other; no conclusion can be drawn." followed by the provenance line.
+
+Tests: `tests/test_realdata.py` on a tiny made-up fixture shaped like the eICU tables (no real row anywhere).
+
 ## Limits
 
 - Temperature is flattered. The sim adds a fixed rise (`INJECT_TEMPERATURE = 0.6`) in every episode
