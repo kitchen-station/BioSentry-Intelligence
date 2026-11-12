@@ -1,6 +1,7 @@
 """Bodies of the ward simulation's routes (POST /sim/runs, POST /sim/runs/{id}/batch, POST
-/sim/runs/{id}/view, GET /sim/runs/{id}/actions) and of the ward viewer's read of that view (GET
-/wards/{ward}/live).
+/sim/runs/{id}/view, GET /sim/runs/{id}/actions, GET /sim/runs/{id}/commands), of the ward
+viewer's read of that view (GET /wards/{ward}/live) and of its commands (POST
+/wards/{ward}/sim/commands).
 
 Not part of the dashboard contract. Lists are capped; a value is a number or text, or the
 reason there is none (I1). Times arrive as minutes from the run's origin.
@@ -213,6 +214,7 @@ class LiveWard(Contract):
 
     shared: View | None
     patients: list[PatientView]
+    can_control: Flag  # whether this clinician's role may send the sim commands
 
 
 class Action(Contract):
@@ -238,3 +240,42 @@ class Action(Contract):
 
 class Actions(Contract):
     actions: list[Action]  # at most 200, oldest first
+
+
+class NewCommand(Contract):
+    """What a clinician asks of the simulation. A speed goes with `set_speed` and nothing else; a
+    patient goes with the four patient kinds and nothing else; `reset` takes neither."""
+
+    kind: Literal[
+        "set_speed",
+        "reset",
+        "inject_deterioration",
+        "start_arrhythmia",
+        "detach_patch",
+        "apply_patch",
+    ]
+    patient_id: Id | None = None
+    speed: Literal[0, 1, 10, 60] | None = None
+
+    @model_validator(mode="after")
+    def _the_fields_of_the_kind(self) -> Self:
+        patient = self.kind not in ("set_speed", "reset")
+        if (self.patient_id is not None) != patient or (self.speed is not None) != (
+            self.kind == "set_speed"
+        ):
+            raise ValueError("a command takes the patient or speed its kind names, and no other")
+        return self
+
+
+class Command(Contract):
+    """One accepted command, as the ward sim learns of it. A field that does not apply is null."""
+
+    seq: int
+    kind: str
+    patient_id: str | None
+    clinician_id: str
+    speed: int | None = None
+
+
+class Commands(Contract):
+    commands: list[Command]  # at most 200, oldest first

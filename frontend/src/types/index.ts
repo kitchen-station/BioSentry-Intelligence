@@ -43,6 +43,7 @@ export type {
   FindingDirection,
   LabExtractionResult,
   LabPanel,
+  LiveWard,
   NurseVitalsInput,
   PartialAdmitPatientInput,
   PartialLabInput,

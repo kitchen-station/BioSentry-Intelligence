@@ -783,6 +783,7 @@
         "title": "FlagPresent",
         "type": "object"
       },
+      "JsonValue": {},
       "LabExtractionResult": {
         "additionalProperties": false,
         "properties": {
@@ -1085,6 +1086,41 @@
           "freshness_hours"
         ],
         "title": "LabPanel",
+        "type": "object"
+      },
+      "LiveWard": {
+        "additionalProperties": false,
+        "description": "The stored LiveView as one clinician may see it. `shared` is null until a view is stored.",
+        "properties": {
+          "can_control": {
+            "type": "boolean"
+          },
+          "patients": {
+            "items": {
+              "$ref": "#/components/schemas/PatientView"
+            },
+            "type": "array"
+          },
+          "shared": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "shared",
+          "patients",
+          "can_control"
+        ],
+        "title": "LiveWard",
         "type": "object"
       },
       "MeasurementAbsent": {
@@ -1984,6 +2020,28 @@
           "ranked"
         ],
         "title": "PatientSummary",
+        "type": "object"
+      },
+      "PatientView": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "view": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "view"
+        ],
+        "title": "PatientView",
         "type": "object"
       },
       "Provenance": {

@@ -27,6 +27,7 @@ from biosentry.schemas import (
     FlagMeasurement,
     LabExtractionResult,
     LabPanel,
+    LiveWard,
     MeasurementAbsent,
     NewNote,
     NumberMeasurement,
@@ -372,6 +373,7 @@ _BUILDERS: dict[type[BaseModel], Any] = {
         "outcome": None,
         "synthetic": True,
     },
+    LiveWard: lambda: {"shared": {"clockS": 90}, "patients": [], "can_control": False},
     PatientSummary: lambda: {"id": "p-001", "name": "Santos, Maria", "bed": "4A", "ranked": True},
     NurseVitalsInput: lambda: {"systolic": 120, "diastolic": 80},
     VitalsRecorded: lambda: {

@@ -1,5 +1,6 @@
 """The ward simulation's writes: start a run, append a batch, replace the live view. Each is one
-transaction. And its one read: the clinician actions it has not applied yet.
+transaction. And its two reads: the clinician actions and the viewer's commands it has not
+applied yet.
 
 The run, never the client, says whether data is synthetic. A body that is refused writes nothing.
 One shared ward: the newest run is the ward. A different client cannot start a run while the
@@ -11,6 +12,7 @@ from collections.abc import Callable, Iterable
 from datetime import datetime, timedelta
 from typing import Any
 
+from biosentry.core.audit import AuditLog
 from biosentry.db.migrate import SETUP_LOCK
 from biosentry.repositories.postgres import (
     Conn,
@@ -27,7 +29,7 @@ from biosentry.repositories.postgres import (
     upsert_bins,
     whole,
 )
-from biosentry.schemas.ingest import Batch, Bin, LiveView, NewRun, NewRunPatient
+from biosentry.schemas.ingest import Batch, Bin, LiveView, NewCommand, NewRun, NewRunPatient
 from biosentry.schemas.ingest import Obs as IngestObs
 
 from .patients import ConflictError, RejectedError
@@ -262,3 +264,29 @@ def actions(store: PostgresStore, run_id: int, after: int) -> list[dict[str, Any
         if _locked_newest(store.conn, run_id) is None:
             return None
         return store.actions(run_id, after)
+
+
+def commands(store: PostgresStore, run_id: int, after: int) -> list[dict[str, Any]] | None:
+    """The run's viewer commands after `after`. None when there is no such run."""
+    with transaction(store.conn):  # under the run's lock, as `actions`
+        if _locked_newest(store.conn, run_id) is None:
+            return None
+        return store.commands(run_id, after)
+
+
+def add_command(store: PostgresStore, audit: AuditLog, who: str, body: NewCommand) -> bool:
+    """Queue a command for the sim. False when the patient is not the caller's. A ward that is not
+    receiving data from a live sim run (the fixture, or a run that stopped) is a ConflictError:
+    nothing would read the command."""
+    resource = body.patient_id or store.ward
+    if body.patient_id is not None and body.patient_id not in store.assigned(who):
+        audit.append(who, "sim_command", resource, "not_found")
+        return False
+    if not is_live(store.last_batch_at, store.ended, store.clock()):
+        audit.append(who, "sim_command", resource, "rejected")
+        raise ConflictError("The ward is not receiving data from a running simulation")
+    data = {} if body.speed is None else {"speed": body.speed}
+    with store.tx():
+        store.add_command(body.kind, who, body.patient_id, data)
+    audit.append(who, "sim_command", resource, "ok")
+    return True

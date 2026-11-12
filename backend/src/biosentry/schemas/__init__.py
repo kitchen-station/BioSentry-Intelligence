@@ -42,6 +42,7 @@ from .common import (
     Tier,
     Trend,
 )
+from .ingest import LiveWard
 from .records import (
     Acknowledgement,
     ClinicalNote,
@@ -129,6 +130,7 @@ CONTRACT_MODELS: tuple[type[BaseModel], ...] = (
     BaselineComputed,
     BaselineForming,
     BaselineUnavailable,
+    LiveWard,
 )
 
 # Inputs entered by a person: optional fields may be omitted and default to None.
@@ -161,6 +163,7 @@ __all__ = [
     "FlagMeasurement",
     "LabExtractionResult",
     "LabPanel",
+    "LiveWard",
     "MeasurementAbsent",
     "NewAcknowledgement",
     "NewNote",

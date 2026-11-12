@@ -217,6 +217,7 @@ export interface components {
             readonly present: true;
             readonly value: boolean;
         };
+        readonly JsonValue: unknown;
         /** LabExtractionResult */
         readonly LabExtractionResult: {
             readonly confidence: {
@@ -274,6 +275,17 @@ export interface components {
             readonly troponin: components["schemas"]["NumberMeasurement"] | null;
             /** @description x10^9/L */
             readonly wbc: components["schemas"]["NumberMeasurement"] | null;
+        };
+        /**
+         * LiveWard
+         * @description The stored LiveView as one clinician may see it. `shared` is null until a view is stored.
+         */
+        readonly LiveWard: {
+            readonly can_control: boolean;
+            readonly patients: readonly components["schemas"]["PatientView"][];
+            readonly shared: {
+                readonly [key: string]: components["schemas"]["JsonValue"];
+            } | null;
         };
         /**
          * MeasurementAbsent
@@ -481,6 +493,13 @@ export interface components {
             readonly id: string;
             readonly name: string;
             readonly ranked: boolean;
+        };
+        /** PatientView */
+        readonly PatientView: {
+            readonly id: string;
+            readonly view: {
+                readonly [key: string]: components["schemas"]["JsonValue"];
+            };
         };
         /**
          * Provenance
@@ -767,8 +786,10 @@ export type EscalationRule = components['schemas']['EscalationRule'];
 export type FindingDirection = components['schemas']['FindingDirection'];
 export type FlagMeasurement = components['schemas']['FlagMeasurement'];
 export type FlagPresent = components['schemas']['FlagPresent'];
+export type JsonValue = components['schemas']['JsonValue'];
 export type LabExtractionResult = components['schemas']['LabExtractionResult'];
 export type LabPanel = components['schemas']['LabPanel'];
+export type LiveWard = components['schemas']['LiveWard'];
 export type MeasurementAbsent = components['schemas']['MeasurementAbsent'];
 export type NewNote = components['schemas']['NewNote'];
 export type NumberMeasurement = components['schemas']['NumberMeasurement'];
@@ -780,6 +801,7 @@ export type PatientDetail = components['schemas']['PatientDetail'];
 export type PatientExtractionResult = components['schemas']['PatientExtractionResult'];
 export type PatientStay = components['schemas']['PatientStay'];
 export type PatientSummary = components['schemas']['PatientSummary'];
+export type PatientView = components['schemas']['PatientView'];
 export type Provenance = components['schemas']['Provenance'];
 export type ProvenanceSource = components['schemas']['ProvenanceSource'];
 export type QualityLevel = components['schemas']['QualityLevel'];
