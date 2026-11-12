@@ -74,8 +74,9 @@ services:
     environment:
       BIOSENTRY_API_URL: http://api:8000
       BIOSENTRY_INGEST_KEY: ${BIOSENTRY_INGEST_KEY:?set BIOSENTRY_INGEST_KEY in deploy/.env}
-      # The speed it starts at: 0 (paused), 1, 10 or 60 simulated seconds per second. A clinician
-      # who may (an md or the charge nurse) changes it from the viewer.
+      # The speed a new ward starts at, in simulated seconds per second: 1, 10 or 60. The runner exits
+      # on anything else. A ward it resumes from its saved state keeps the speed it was saved at; a
+      # clinician who may (an md or the charge nurse) changes it from the viewer afterwards.
       WARD_SPEED: ${WARD_SPEED:-1}
       # Where it keeps its state across restarts (the simstate volume).
       WARD_STATE_FILE: /state/ward-state.json

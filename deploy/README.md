@@ -14,9 +14,10 @@ the API over Tailscale; nothing listens on the public interface.
   publishes no port and is on the default network only, so it reaches the API at `http://api:8000` and
   not the database. It writes through `/sim/*` with the ingest key (the same `BIOSENTRY_INGEST_KEY` the
   API holds, which compose refuses to start without) and keeps its state in the named volume
-  `simstate`, mounted at `/state`. `WARD_SPEED` sets the speed it starts at: 0 (paused), 1, 10 or 60
-  simulated seconds per second, 1 unless set. A clinician who is an md or the charge nurse can change
-  the speed from the viewer.
+  `simstate`, mounted at `/state`. `WARD_SPEED` is the speed a new ward starts at, in simulated seconds per
+  second: 1, 10 or 60, 1 unless set (the runner exits on anything else). A ward resumed from its saved
+  state keeps its saved speed, and a clinician who is an md or the charge nurse changes it from the viewer
+  afterwards.
 - There is one ward. While the runner is live, a browser simulator started with the ingest key is
   **refused with 409** ("Another ward simulation is live"): use the ward on the server, not a second one.
   To run one from a browser anyway, stop the runner (`docker compose -f deploy/compose.yaml stop sim`);
@@ -54,7 +55,9 @@ the API over Tailscale; nothing listens on the public interface.
    until it is healthy. Re-running it is safe: it keeps the existing `.env`. Do not delete `deploy/.env`
    while the volume exists; the volume remembers its password. To keep the simulator checkout somewhere
    else, set `SIM_DIR` in the environment of the command (`SIM_DIR=/srv/ward-sim deploy/setup.sh`), not in
-   `.env`, and set it the same way for any `docker compose` command that builds. Likewise `WARD_SPEED`
+   `.env`, and set it the same way for any `docker compose` command that builds. The `biosentry-ward-sim`
+   repository's `main` branch must already contain the runner's `Dockerfile` before you run setup, or the
+   `sim` build fails. Likewise `WARD_SPEED`
    can be set in `deploy/.env` or the environment.
 6. **Publish to the tailnet**: `sudo tailscale serve --bg --https=443 http://127.0.0.1:8000`.
    The API is then at `https://<this-host>.<your-tailnet>.ts.net`; `tailscale serve status` shows it.
