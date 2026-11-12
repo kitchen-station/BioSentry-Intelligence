@@ -8,11 +8,11 @@
 | status | learned on synthetic trials, not validated. Not wired to the API, the rank or the arbiter |
 | intended use | research. Tier A (NEWS2) is never changed or learned |
 
-## Result on ward-v2 (temperature rise removed)
+## Result on ward-v2 (temperature rise removed, noise 0.1 C)
 
 The committed files are now learned on ward-v2 and ward-v2-train: the same trials made again by
-the fixed simulator (sim commit f7647c5, after PR #25 removed `INJECT_TEMPERATURE`). Same
-seeds, scenario, days and command; data card `models/data/ward-v2/card.md`. Same loop, reward,
+the fixed simulator (sim commit f7647c5, after PR #25 removed `INJECT_TEMPERATURE` and raised
+temperature noise from 0.02 to 0.1 C). Same seeds, scenario, days and command; data card `models/data/ward-v2/card.md`. Same loop, reward,
 lambda, seeds and harness. Nothing was tuned again. The B4 rows use the ward-v2 sweep choice
 (k = 4.0, p = 8); generation 0 is still fixed in code at k = 3.0, p = 4 (weights 1, theta 3).
 
@@ -47,9 +47,11 @@ What this shows:
   intervals overlapping) at about a third of the alerts (0.150 against 0.414, intervals apart),
   but later: median lead -11.2 min against +47.2. Its excess (+0.525) is above NEWS2's
   (+0.210), but excess is capped at 1 minus chance (0.880 against 0.527), so the two are not
-  comparable. This is the same quiet, late pattern as the no-temperature policy on ward-v1.
+  comparable. On new alerts it fires in more windows than NEWS2 (0.560 against 0.363,
+  intervals just overlapping), but mostly after the episode is fully in. This is the same
+  quiet, late pattern as the no-temperature policy on ward-v1.
 - On ward-v1 the final policy alone had any-bin 0.769 (0.676-0.852) and excess +0.700, and
-  NEWS2 OR final had 0.857 (0.779-0.922). Those gains came from the temperature rise.
+  NEWS2 OR final had 0.857 (0.779-0.922). The gains seen on ward-v1 went away on ward-v2. Two things changed (the temperature rise was removed and temperature noise went from 0.02 to 0.1 C), and this run cannot say which one caused it.
 
 What it cannot show: anything about patients, or that a fewer-alerts rule is safe. "Any-bin"
 counts alerting up to 2 h after fully in, so similar any-bin with a negative lead time is not

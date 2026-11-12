@@ -10,17 +10,17 @@
 
 ## What it is
 
-A tiny neural network (one hidden layer of 16 ReLU units, then a sigmoid) that gives, for each
-15-minute bin, a probability that the patient is in the onset of a deterioration episode. It is
-a small network fitted to the log-odds of a weak, overfitted teacher (gradient boosting). Call it
-distilled only with that caveat: the teacher is worse than a constant guess on validation, and
-the student beats it. Only the student is exported.
+A small model that gives, for each 15-minute bin, a probability that the patient is in the onset
+of a deterioration episode. On ward-v2 the shipped `model.onnx` is a logistic student (no hidden
+layer), fitted to the log-odds of an overfitted gradient-boosting teacher. The teacher has higher
+validation average precision (0.008 against 0.003); the student has lower log loss. Only the
+student is exported. (On ward-v1 it was an MLP with one hidden layer of 16 ReLU units.)
 
-## Result on ward-v2 (temperature rise removed)
+## Result on ward-v2 (temperature rise removed, noise 0.1 C)
 
 The committed files are now trained on ward-v2: ward-v1 made again by the fixed simulator (sim
-commit f7647c5, after PR #25 removed `INJECT_TEMPERATURE`). Same seeds, scenario, days and
-command; data card `models/data/ward-v2/card.md`. Same recipe, split, threshold rule and
+commit f7647c5, after PR #25 removed `INJECT_TEMPERATURE` and raised temperature noise from
+0.02 to 0.1 C). Same seeds, scenario, days and command; data card `models/data/ward-v2/card.md`. Same recipe, split, threshold rule and
 harness. Nothing was tuned again.
 
 - Validation average precision (seeds 8 to 10, prevalence 0.0015): teacher 0.008, logistic
@@ -49,7 +49,7 @@ What this shows:
   NEWS2's (+0.210), but excess is capped at 1 minus chance (0.942 against 0.527), so the two are
   not comparable.
 - On ward-v1 the student alone had any-bin 0.637 (0.527-0.731) over all episodes and excess
-  +0.539; that gain came from the temperature rise.
+  +0.539. The gains seen on ward-v1 went away on ward-v2. Two things changed (the temperature rise was removed and temperature noise went from 0.02 to 0.1 C), and this run cannot say which one caused it.
 
 What it cannot show: anything about patients, or whether a better teacher would help (the teacher
 is still worse than a constant guess on validation, log loss 0.021 against 0.011).
@@ -132,10 +132,7 @@ minutes before fully in, episodes with a new alert.
 
 The no-temperature rows have no new-alert excess on held-out (-0.009 to +0.004).
 
-The untrained baseline rule from B4 beats the student on held-out. It has more excess (+0.670
-against +0.539; without temperature +0.420 against +0.116) and fewer alerts (0.189 against
-0.226 per patient per 12 h). The student is better only on lead time (20.5 against -18.8 min).
-On this simulator the learned model is not better than the simple rule.
+On ward-v1 the B4 rule had fewer alerts than the student (0.189 against 0.226); their excess cannot be compared because their chance rates differ.
 
 95% intervals and per-kind rows are in the `research.evaluate_student` output.
 
@@ -143,7 +140,7 @@ On this simulator the learned model is not better than the simple rule.
 
 On ward-v1, every useful number depended on the simulator's uncited temperature rise. The simulator then added a fixed,
 uncited temperature rise to every episode (see the baseline card). With temperature, the student
-beats NEWS2 alone on excess (+0.539 against +0.237) at about half the alerts. Without
+had a higher excess than NEWS2 (+0.539 against +0.237), but at a much lower chance rate, so this does not rank them. Without
 temperature, the student is in alert 54% of the time on the held-out seeds (53% on seeds 8 to 10), so chance is 0.834 and the excess is
 +0.116, below NEWS2. Its alert count looks low only because one long alert stays open. On this
 simulator, the student adds nothing measurable over NEWS2 once temperature is removed.

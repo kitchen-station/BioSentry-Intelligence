@@ -126,7 +126,8 @@ vulnerabilities found".
   baseline as B4); a z-missing flag (set while the baseline is forming, fewer than 24 valid
   bins, or when this bin's value is missing). Then the NEWS2 total, on oxygen (0/1) and
   consciousness not A (0/1). Missing is missing: a missing input is the number 0 with its flag
-  set; no clinical value is ever filled in. On the ward-v1 trials a RANKED row always has all
+  set; no clinical value is ever filled in. On the ward-v1 trials, and on ward-v2 (checked from
+  the files: 992,988 RANKED rows, none missing a device vital), a RANKED row always has all
   four device vitals, so the value-missing flags are always 0 on scored bins; they are kept so a
   future cohort with gaps cannot be silently imputed.
 - No-temperature features (15): the same without the four temperature features, and the NEWS2
@@ -258,7 +259,7 @@ Run (inside either gate's venv; stdlib only, about 30 seconds):
     python -m research.realdata.evaluate /data/eicu-crd-demo/2.0.1
 
 How the rows are made (`loader.py`, written before any analysis):
-- Test set: the 46 hospitals the generator fit (fit-generator.mjs) did not use; 38 of them were used by the circadian calibration fit (fit-eicu.mjs), so this is mostly, not fully, a different-site test (hospital ids sorted, every 4th, `scripts/fit-generator.mjs:71` in the sim repo; encoded as ids in `split.py`, re-derived from the data on every run). Only those hospitals are loaded. Nothing is tuned on them: the baseline uses `params.json` as it is.
+- Test set: the 46 hospitals the generator fit (fit-generator.mjs) did not use; 38 of them were used by the circadian calibration fit (fit-eicu.mjs), so this is mostly, not fully, a different-site test (hospital ids sorted, every 4th, `scripts/fit-generator.mjs:71` in the sim repo; encoded as ids in `split.py`, re-derived from the data on every run). Only those hospitals are loaded. Nothing is tuned on them: the baseline uses `params.json` as it is. Note (ward-v2): the eICU results were produced with k = 3.0, p = 4, the ward-v1 sweep choice. `research/realdata/evaluate.py` reads `models/tier_b/baseline/params.json`, which now holds the ward-v2 choice (k = 4.0, p = 8), so a re-run would use k = 4.0, p = 8 and would not reproduce the published baseline numbers. It has not been re-run.
 - Cohort: adult, first unit stay per patient (smallest stay id), unit stay of 12 hours or more, minus a vasopressor
   before hour 6, minus deaths with "Comfort measures only" or "No CPR" charted over 12 hours before death.
 - Event: first vasopressor start (norepinephrine, vasopressin, epinephrine, phenylephrine, dopamine) from hour 6,
@@ -285,7 +286,7 @@ How the rows are made (`loader.py`, written before any analysis):
   AUROC and AUPRC are over bins (NEWS2 total against "event within 12 hours"), with the same patient-level
   bootstrap (resampling per-stay score counts). The minimum detectable AUROC difference is Hanley and McNeil's
   at AUROC 0.75, 80% power, with an assumed paired correlation of 0.5 (also printed unpaired).
-- The baseline rule's limits: its parameters (k 3.0, p 4) were tuned on simulated data, and its baseline is the
+- The baseline rule's limits: its parameters (k 3.0, p 4 for the published results; ward-v1 sweep) were tuned on simulated data, and its baseline is the
   first 6 ICU hours, often the sickest; for events at 6 to 12 hours the baseline period overlaps the event window.
 - Excess over chance is printed with its ceiling (1 minus chance) and its share of the ceiling. Excess cannot be compared between rules with different chance rates; as a share of ceiling the order changes, and the intervals overlap.
 - Output hides any count under 5, and any count whose complement is under 5 (printed as ">19/24") ("<5") and prints no patient rows or ids.

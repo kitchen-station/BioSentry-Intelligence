@@ -116,20 +116,20 @@ describe("Research page", () => {
     expect(rows[0].textContent).toContain("0.473 (2215/4678)");
     expect(rows[0].textContent).toContain("+0.210");
     expect(rows[2].textContent).toContain("0.278 (22/79)");
-    expect(rows[2].textContent).toContain("-82.5 (n=24)");
+    expect(rows[2].textContent).toContain("-82.5 (n=24 of 91 evaluated)");
     expect(rows[5].textContent).toContain("0.484 (2263/4678)");
   });
 
   it("states the findings, the provenance and that NEWS2 is unchanged", () => {
     show();
-    expect(screen.getByText(/That rise has been removed\. These numbers come from trials made again without it \(ward-v2\)/)).toBeTruthy();
-    expect(screen.getByText(/Without the rise, no rule here adds anything measurable to NEWS2\./)).toBeTruthy();
+    expect(screen.getByText(/That rise has been removed, and temperature noise went from 0\.02 to 0\.1 C\./)).toBeTruthy();
+    expect(screen.getByText(/On ward-v2, no rule here adds anything measurable to NEWS2\./)).toBeTruthy();
     expect(screen.getByText(/only 2 of 27 hypotensive episodes/)).toBeTruthy();
     expect(screen.getByText(/In 17 of 27, no cuff reading reached NEWS2 inside the window/)).toBeTruthy();
     expect(screen.getByText(/simulator commit f7647c5, scenario 95052d02/)).toBeTruthy();
     expect(screen.getByText(/Earlier run: ward-v1, simulator commit 3a15e01/)).toBeTruthy();
     expect(screen.getAllByRole("table")[0].querySelector("caption")!.textContent).toMatch(/^Synthetic simulator, not validated\./);
-    expect(screen.getByText(/commit a9a7c36, 2026-11-12/)).toBeTruthy();
+    expect(screen.getByText(/commit a9a7c36 plus the ward-v2 params and models \(branch lane-c\/ward-v2\), 2026-11-12/)).toBeTruthy();
     expect(screen.getByText(/NEWS2 itself is never changed/)).toBeTruthy();
     expect(screen.getByText(/k=4.0 p=8 were chosen on seeds 1 to 10/)).toBeTruthy();
   });
@@ -169,22 +169,23 @@ describe("Research page", () => {
     expect(screen.getByText(/Alone, the own baseline and the student catch fewer episodes than NEWS2, with far fewer alerts\./)).toBeTruthy();
     expect(screen.getByText(/reward-learned policy alone catches about as many as NEWS2 with about a third of the alerts, but\s+later: its median lead time is negative\./)).toBeTruthy();
     expect(screen.getByText(/Excess\s+cannot be more than 1 minus the chance rate, so it does not rank these rules\./)).toBeTruthy();
-    expect(screen.getByText("The gains seen before the fix (ward-v1) came from the temperature rise. The table above shows both runs.")).toBeTruthy();
+    expect(screen.getByText("The gains seen on ward-v1 went away on ward-v2. Two things changed (the temperature rise was removed and temperature noise went from 0.02 to 0.1 C), and this run cannot say which one caused it. The table above shows both runs.")).toBeTruthy();
     expect(screen.getByText(/What exists and works: features with no look-ahead, clean splits between training and held-out\s+trials, and a student model that exports as ONNX, the form Huawei's converter reads \(conversion\s+not yet done\)\./)).toBeTruthy();
     expect(screen.getByText(/nothing was tuned\s+to rescue a result\./)).toBeTruthy();
     expect(screen.queryByText(/not a bigger model/)).toBeNull();
     expect(screen.getByText("None of these learned rules is used by the ward list, the rank or any alert.")).toBeTruthy();
     expect(screen.getByText("Time in alert: the share of patient time with an alert open.")).toBeTruthy();
     expect(screen.getByText(/it cannot be\s+more than 1 minus the chance rate\./)).toBeTruthy();
-    expect(RESEARCH_PROVENANCE.studentCommit).toBe("a9a7c36");
-    expect(RESEARCH_PROVENANCE.rewardCommit).toBe("a9a7c36");
-    expect(screen.getByText(/Student model numbers: commit a9a7c36\. Reward-learned policy numbers: commit a9a7c36\./)).toBeTruthy();
+    expect(RESEARCH_PROVENANCE.studentCommit).toBe("a9a7c36 plus the ward-v2 params and models (branch lane-c/ward-v2)");
+    expect(RESEARCH_PROVENANCE.rewardCommit).toBe("a9a7c36 plus the ward-v2 params and models (branch lane-c/ward-v2)");
+    expect(screen.getByText(/Student model numbers: commit a9a7c36 plus the ward-v2 params and models \(branch lane-c\/ward-v2\)\. Reward-learned policy numbers: commit a9a7c36 plus/)).toBeTruthy();
   });
 
   it("compares ward-v1 and ward-v2 in a third captioned table", () => {
     show();
     const table = screen.getAllByRole("table")[2];
     expect(table.querySelector("caption")!.textContent).toMatch(/^Synthetic simulator, not validated\. Each rule on ward-v1/);
+    expect(within(table).getAllByRole("columnheader")[5].textContent).toBe("Excess over chance, 79 episodes not cut short (no interval), ward-v1");
     const rows = within(table).getAllByRole("row").slice(1);
     expect(rows.map((r) => within(r).getByRole("rowheader").textContent)).toEqual(RUN_COMPARISON.map((r) => r.name));
     const cells = (i: number) => within(rows[i]).getAllByRole("cell").map((c) => c.textContent);

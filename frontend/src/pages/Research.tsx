@@ -56,7 +56,7 @@ export function Research({ session, onSignOut }: Props) {
                     <td>{r.episodes.rate.toFixed(3)} <span className={styles.sub}>({r.episodes.n}/{r.episodes.d})</span></td>
                     <td>{r.chance.rate.toFixed(3)} <span className={styles.sub}>({r.chance.n}/{r.chance.d})</span></td>
                     <td>{signed(r.excess)}</td>
-                    <td>{r.leadMedianMin.toFixed(1)} <span className={styles.sub}>(n={r.leadN})</span></td>
+                    <td>{r.leadMedianMin.toFixed(1)} <span className={styles.sub}>(n={r.leadN} of 91 evaluated)</span></td>
                   </tr>
                 ))}
               </tbody>
@@ -103,10 +103,10 @@ export function Research({ session, onSignOut }: Props) {
         </section>
 
         <section className={styles.card} aria-labelledby="compare">
-          <h2 id="compare" className={styles.heading}>Before and after the temperature fix</h2>
+          <h2 id="compare" className={styles.heading}>Before and after the simulator&apos;s temperature change</h2>
           <div className={styles.scroll}>
             <table className={styles.table}>
-              <caption>Synthetic simulator, not validated. Each rule on ward-v1 (the simulator added a fixed temperature rise to every episode) and on ward-v2 (rise removed), held-out seeds 11 to 30.</caption>
+              <caption>Synthetic simulator, not validated. Each rule on ward-v1 and on ward-v2, held-out seeds 11 to 30. Between them the fixed temperature rise was removed and temperature noise went from 0.02 to 0.1 C.</caption>
               <thead>
                 <tr>
                   <th scope="col">Rule</th>
@@ -114,7 +114,7 @@ export function Research({ session, onSignOut }: Props) {
                   <th scope="col">Same, ward-v2</th>
                   <th scope="col">Episodes alerting in any bin, all 91 evaluated, with 95% interval, ward-v1</th>
                   <th scope="col">Same, ward-v2</th>
-                  <th scope="col">Excess over chance (no interval), ward-v1</th>
+                  <th scope="col">Excess over chance, 79 episodes not cut short (no interval), ward-v1</th>
                   <th scope="col">Same, ward-v2</th>
                 </tr>
               </thead>
@@ -153,11 +153,12 @@ export function Research({ session, onSignOut }: Props) {
           <h2 id="found" className={styles.heading}>What we found</h2>
           <p>
             The simulator used to add a fixed temperature rise, a value with no cited source, to every episode.
-            That rise has been removed. These numbers come from trials made again without it (ward-v2), with the
-            same seeds, the same evaluation and the same rules.
+            That rise has been removed, and temperature noise went from 0.02 to 0.1 C. These numbers come from
+            trials made again with that simulator (ward-v2), with the same seeds, the same evaluation and the
+            same rules.
           </p>
           <p>
-            Without the rise, no rule here adds anything measurable to NEWS2. Added to NEWS2, the own baseline,
+            On ward-v2, no rule here adds anything measurable to NEWS2. Added to NEWS2, the own baseline,
             the student and the reward-learned policy each catch a few more episodes, and every interval overlaps
             NEWS2&apos;s.
           </p>
@@ -175,7 +176,7 @@ export function Research({ session, onSignOut }: Props) {
             table&apos;s measure). In 17 of 27, no cuff reading reached NEWS2 inside the window, so it saw no
             new blood pressure.
           </p>
-          <p>The gains seen before the fix (ward-v1) came from the temperature rise. The table above shows both runs.</p>
+          <p>The gains seen on ward-v1 went away on ward-v2. Two things changed (the temperature rise was removed and temperature noise went from 0.02 to 0.1 C), and this run cannot say which one caused it. The table above shows both runs.</p>
           <p>
             What exists and works: features with no look-ahead, clean splits between training and held-out
             trials, and a student model that exports as ONNX, the form Huawei&apos;s converter reads (conversion

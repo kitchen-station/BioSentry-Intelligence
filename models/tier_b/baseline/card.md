@@ -65,10 +65,10 @@ respiratory rate 16, SpO2 97 ends near 85.5, 23 and 92.5. NEWS2 scores that 4 wi
 so it does not trigger; with the baseline spread at the fitted wander SD the z values are about
 2.5, 2.7 and 2.8, all past k = 2.0.
 
-## Sweep result on ward-v2 (temperature rise removed; synthetic, not validated)
+## Sweep result on ward-v2 (temperature rise removed, noise 0.1 C; synthetic, not validated)
 
 ward-v2 is ward-v1 made again by the fixed simulator (sim commit f7647c5, after PR #25 removed
-`INJECT_TEMPERATURE`). Same seeds, scenario, days and command. Same grid, rule, windows, chance
+`INJECT_TEMPERATURE` and raised temperature noise from 0.02 to 0.1 C). Same seeds, scenario, days and command. Same grid, rule, windows, chance
 control and bootstrap. Only the data changed. Data card: `models/data/ward-v2/card.md`.
 
 - Tuning seeds 1 to 10 (56 episodes, 51 not cut short, 3,072 control windows). NEWS2 chart
@@ -94,8 +94,7 @@ What this shows:
 - Baseline alone is now a quiet, late rule: about a tenth of NEWS2's alerts, 22 of 79 episodes,
   median 82 minutes after fully in. Its excess (+0.246) is above NEWS2's (+0.210), but excess is
   capped at 1 minus chance (0.968 against 0.527 here), so the two cannot be compared.
-- With and without temperature now give almost the same rows. The gap on ward-v1 was the
-  simulator's rise.
+- With and without temperature now give almost the same rows. The gains seen on ward-v1 went away on ward-v2. Two things changed (the temperature rise was removed and temperature noise went from 0.02 to 0.1 C), and this run cannot say which one caused it.
 - Across all 30 ward-v2 trials the median temperature change from the 2 h before an episode to
   the hour after it is fully in is -0.06 C (tachycardic), +0.06 C (hypotensive), +0.05 C
   (respiratory). On ward-v1 the same measure gave +0.52, +0.61 and +0.61 C.
@@ -161,10 +160,12 @@ and this selection rule, on this simulator.
 - Circular: tuned and judged on the same simulator that made the data.
 - Cohort rows hold whole-number values at the end of each 15-minute bin; the API uses 15-minute
   medians. The detector sees a coarser signal here than in the product.
-- The winner was decided by 9 of 3,066 control windows, not by episodes: k = 3.0, p = 4 and
-  k = 2.5, p = 6 both catch 46 of 51.
+- ward-v1: the winner was decided by 9 of 3,066 control windows, not by episodes: k = 3.0, p = 4
+  and k = 2.5, p = 6 both catch 46 of 51. ward-v2: 17 of the 19 settings within budget catch 41
+  of 51, so again the control windows decided.
 - Excess is capped at 1 minus chance, so it cannot be compared across policies with different
-  chance rates: the OR policy can reach at most +0.45, baseline alone at most +0.82.
+  chance rates. ward-v1: the OR policy could reach at most +0.45, baseline alone at most +0.82.
+  ward-v2: at most +0.51 and +0.97.
 - "Held-out run once" is by procedure; nothing in the code enforces it.
 - 51 tuning episodes: neighbouring settings differ by a few episodes, so the exact winner is not
   stable. Read the grid, not only the pick.

@@ -1,15 +1,15 @@
 // Transcribed by hand from the printed table of `python -m research.evaluate`. Not computed here.
-// Run on ward-v2 (the simulator after its fixed temperature rise was removed).
+// Run on ward-v2 (the simulator after its fixed temperature rise was removed and temperature noise raised to 0.1 C).
 export const RESEARCH_PROVENANCE = {
-  commit: "a9a7c36",
+  commit: "a9a7c36 plus the ward-v2 params and models (branch lane-c/ward-v2)",
   simCommit: "f7647c5",
   scenario: "95052d02", // first 8 characters of the scenario sha256
   date: "2026-11-12",
   trials: "ward-v2 simulator trials, held-out seeds 11 to 30, 1,873 patients, 91 episodes (79 not cut short)",
   tuning: "Detector settings k=4.0 p=8 were chosen on seeds 1 to 10.",
-  studentCommit: "a9a7c36",
-  rewardCommit: "a9a7c36",
-  previous: "ward-v1, simulator commit 3a15e01, which added a fixed temperature rise to every episode",
+  studentCommit: "a9a7c36 plus the ward-v2 params and models (branch lane-c/ward-v2)",
+  rewardCommit: "a9a7c36 plus the ward-v2 params and models (branch lane-c/ward-v2)",
+  previous: "ward-v1, simulator commit 3a15e01, which added a fixed temperature rise to every episode and used temperature noise 0.02 C",
 } as const;
 
 export interface Frac {
@@ -95,7 +95,7 @@ export interface RunSide {
 const side = (perShift: number, anyAll: number, lo: number, hi: number, excess: number): RunSide => ({ perShift, anyAll, lo, hi, excess });
 
 // Transcribed by hand from the `research.evaluate_student` and `reward_loop --evaluate` outputs on
-// ward-v1 (with the temperature rise) and ward-v2 (without it), held-out seeds 11 to 30.
+// ward-v1 (with the temperature rise, noise 0.02 C) and ward-v2 (no rise, noise 0.1 C), held-out seeds 11 to 30.
 export const RUN_COMPARISON: readonly { id: string; name: string; v1: RunSide; v2: RunSide }[] = [
   { id: "news2_chart_trigger", name: "NEWS2 chart trigger", v1: side(0.413, 0.648, 0.545, 0.745, 0.237), v2: side(0.414, 0.626, 0.522, 0.727, 0.21) },
   { id: "baseline_alone", name: "Own baseline alone", v1: side(0.189, 0.769, 0.677, 0.851, 0.67), v2: side(0.042, 0.264, 0.174, 0.36, 0.246) },
