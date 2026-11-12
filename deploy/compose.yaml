@@ -1,4 +1,4 @@
-# The team deployment on one VPS: PostgreSQL and the API. Run from this directory or with
+# The team deployment on one VPS: PostgreSQL, the API and the ward simulator. Run from this directory or with
 # `-f deploy/compose.yaml`; deploy/setup.sh does it. Secrets come from deploy/.env (git-ignored,
 # made by setup.sh): a missing one stops compose with an error, there are no defaults.
 #
@@ -56,9 +56,36 @@ services:
       timeout: 5s
       retries: 12
 
+  # The ward simulator, headless: it runs the ward all the time and writes it into the API with the
+  # ingest key (the one door the API gives it), and reads back what clinicians did. The code is the
+  # biosentry-ward-sim repository, a sibling checkout that deploy/setup.sh clones and updates (SIM_DIR
+  # moves it) and whose Dockerfile this builds. It publishes no port and has no route to the database:
+  # only the API is on its network. While it is live, a browser simulator started with the key is
+  # refused (409): there is one ward.
+  sim:
+    build:
+      context: ${SIM_DIR:-../../biosentry-ward-sim}
+      # The build only (npm ci), on the host's network, for the reason the api's build is.
+      network: host
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      BIOSENTRY_API_URL: http://api:8000
+      BIOSENTRY_INGEST_KEY: ${BIOSENTRY_INGEST_KEY:?set BIOSENTRY_INGEST_KEY in deploy/.env}
+      # The speed it starts at: 0 (paused), 1, 10 or 60 simulated seconds per second. A clinician
+      # who may (an md or the charge nurse) changes it from the viewer.
+      WARD_SPEED: ${WARD_SPEED:-1}
+      # Where it keeps its state across restarts (the simstate volume).
+      WARD_STATE_FILE: /state/ward-state.json
+    volumes:
+      - simstate:/state
+
 networks:
   backend:
     internal: true # no route out, and nothing outside reaches it
 
 volumes:
   pgdata:
+  simstate:

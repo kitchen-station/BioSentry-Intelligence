@@ -1,12 +1,26 @@
 # Deploy it: one VPS, the team only
 
-PostgreSQL and the API run from `deploy/compose.yaml` on a VPS. Teammates reach the API over
-Tailscale; nothing listens on the public interface.
+PostgreSQL, the API and the ward simulator run from `deploy/compose.yaml` on a VPS. Teammates reach
+the API over Tailscale; nothing listens on the public interface.
 
 - `postgres` publishes no port and sits on an internal Docker network. Its data is in the named volume
   `pgdata`.
 - `api` is published only as `127.0.0.1:8000:8000`. Uvicorn binds `0.0.0.0` inside the container, which
   is why that publish must stay on loopback.
+- `sim` is the ward simulator, running headless: **the ward now runs on the server, continuously**, and
+  the dashboard and the browser simulator page show it. It is the `biosentry-ward-sim` repository,
+  built from a sibling checkout that `setup.sh` clones (and, on a re-run, fast-forwards with
+  `git pull --ff-only`) into `SIM_DIR`, `../../biosentry-ward-sim` relative to `deploy/` by default. It
+  publishes no port and is on the default network only, so it reaches the API at `http://api:8000` and
+  not the database. It writes through `/sim/*` with the ingest key (the same `BIOSENTRY_INGEST_KEY` the
+  API holds, which compose refuses to start without) and keeps its state in the named volume
+  `simstate`, mounted at `/state`. `WARD_SPEED` sets the speed it starts at: 0 (paused), 1, 10 or 60
+  simulated seconds per second, 1 unless set. A clinician who is an md or the charge nurse can change
+  the speed from the viewer.
+- There is one ward. While the runner is live, a browser simulator started with the ingest key is
+  **refused with 409** ("Another ward simulation is live"): use the ward on the server, not a second one.
+  To run one from a browser anyway, stop the runner (`docker compose -f deploy/compose.yaml stop sim`);
+  its run goes stale after 30 seconds without a batch.
 - Tailscale is installed on the host, not in a container. `tailscale serve` gives teammates HTTPS on the
   tailnet and forwards to `127.0.0.1:8000`.
 - **Keep the VPS firewall closed to 5432 and 8000.** A port Docker publishes on `0.0.0.0` goes around
@@ -34,10 +48,14 @@ Tailscale; nothing listens on the public interface.
    In the Tailscale admin console, turn on MagicDNS and HTTPS certificates (DNS page); this is needed
    for `tailscale serve --https`. Share the node with the other two teammates (or add them to the tailnet).
 4. **Clone** the repository: `git clone <the repository URL> biosentry && cd biosentry`.
-5. **Run setup**: `deploy/setup.sh`. It checks Docker, compose, Tailscale and openssl are present, makes
-   `deploy/.env` (random Postgres password and ingest key, never printed) if it does not exist, builds
-   the image and starts the stack, waiting until it is healthy. Re-running it is safe: it keeps the
-   existing `.env`. Do not delete `deploy/.env` while the volume exists; the volume remembers its password.
+5. **Run setup**: `deploy/setup.sh`. It checks Docker, compose, git, Tailscale and openssl are present,
+   makes `deploy/.env` (random Postgres password and ingest key, never printed) if it does not exist,
+   clones the simulator into `SIM_DIR` (or updates it), builds the images and starts the stack, waiting
+   until it is healthy. Re-running it is safe: it keeps the existing `.env`. Do not delete `deploy/.env`
+   while the volume exists; the volume remembers its password. To keep the simulator checkout somewhere
+   else, set `SIM_DIR` in the environment of the command (`SIM_DIR=/srv/ward-sim deploy/setup.sh`), not in
+   `.env`, and set it the same way for any `docker compose` command that builds. Likewise `WARD_SPEED`
+   can be set in `deploy/.env` or the environment.
 6. **Publish to the tailnet**: `sudo tailscale serve --bg --https=443 http://127.0.0.1:8000`.
    The API is then at `https://<this-host>.<your-tailnet>.ts.net`; `tailscale serve status` shows it.
    (Only tailnet devices can reach it: this is `serve`, not `funnel`. Never run `tailscale funnel`.)
@@ -60,7 +78,8 @@ Tailscale; nothing listens on the public interface.
    If it is served from any origin other than `localhost:5173`, put that origin in
    `BIOSENTRY_CORS_ORIGINS` in `deploy/.env` (comma-separated) and run `deploy/setup.sh` again.
 
-Updating: `git pull && deploy/setup.sh`. Logs: `docker compose -f deploy/compose.yaml logs -f api`.
+Updating: `git pull && deploy/setup.sh` (it updates the simulator checkout too). Logs:
+`docker compose -f deploy/compose.yaml logs -f api` (or `sim`).
 
 ## Backups
 
