@@ -31,3 +31,37 @@ export function formatAge(seconds: number): string {
 export function formatClock(ms: number): string {
   return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
+
+/** What the ward simulator publishes in the live view's `shared`, for the status line. */
+export interface SimStatus {
+  readonly clockS: number;
+  readonly speed: 0 | 1 | 10 | 60;
+  readonly ended: boolean;
+  readonly counts: { readonly received: number; readonly rejected: number; readonly abstained: number };
+}
+
+const isCount = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0;
+const record = (v: unknown): Record<string, unknown> =>
+  typeof v === "object" && v !== null ? (v as Record<string, unknown>) : {};
+
+/**
+ * The simulator's status from the live view's `shared`, which the server stores and never reads:
+ * anything that is not the published shape is null, and the page shows no status line.
+ */
+export function simStatus(shared: unknown): SimStatus | null {
+  const { clockS, speed, ended, counts } = record(shared);
+  const { received, rejected, abstained } = record(counts);
+  if (!isCount(clockS) || typeof ended !== "boolean") return null;
+  if (speed !== 0 && speed !== 1 && speed !== 10 && speed !== 60) return null;
+  if (!isCount(received) || !isCount(rejected) || !isCount(abstained)) return null;
+  return { clockS, speed, ended, counts: { received, rejected, abstained } };
+}
+
+/** "day 3 06:20, 10x": the simulated time and speed, or "paused" or "ended" in place of the speed. */
+export function formatSimClock(sim: SimStatus): string {
+  const day = Math.floor(sim.clockS / 86_400) + 1;
+  const hh = String(Math.floor((sim.clockS % 86_400) / 3600)).padStart(2, "0");
+  const mm = String(Math.floor((sim.clockS % 3600) / 60)).padStart(2, "0");
+  const pace = sim.ended ? "ended" : sim.speed === 0 ? "paused" : `${sim.speed}x`;
+  return `day ${day} ${hh}:${mm}, ${pace}`;
+}

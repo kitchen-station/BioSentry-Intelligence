@@ -12,6 +12,7 @@ import type {
   ClinicalNote,
   LabExtractionResult,
   LabPanel,
+  LiveWard,
   NurseVitalsInput,
   PartialLabInput,
   PatientDetail,
@@ -42,6 +43,8 @@ export interface ApiProvider {
   >;
   /** Every stay the caller may see, on the ward now or already gone. */
   getStays(): Promise<PatientStay[]>;
+  /** What the ward simulator last published, for the caller. Null when there is no simulator (fixture mode). */
+  getLiveWard(): Promise<LiveWard | null>;
   admitPatient(input: AdmitPatientInput): Promise<AbstainedRow>;
   enterLabResults(
     patientId: string,

@@ -14,7 +14,8 @@ POST /session: no docs or schema routes (the contract is frontend/contracts/open
 The ward simulation writes through /sim/*, gated by the X-Ingest-Key header (503 if unset). One
 shared ward: a different client cannot start a run while the newest is live, and a batch for a run
 that is no longer the newest is refused (both 409, nothing written). The sim reads what clinicians
-did (acknowledgements, vitals, notes without their text, admissions) from /sim/runs/{id}/actions.
+did (acknowledgements, vitals, notes without their text, admissions) from /sim/runs/{id}/actions,
+and what a clinician who may (an md or the charge nurse) asked of it from /sim/runs/{id}/commands.
 """
 
 import hashlib
@@ -55,7 +56,16 @@ from biosentry.schemas import (
     VitalsRecorded,
     WardResponse,
 )
-from biosentry.schemas.ingest import BIGINT_MAX, Actions, Batch, LiveView, LiveWard, NewRun
+from biosentry.schemas.ingest import (
+    BIGINT_MAX,
+    Actions,
+    Batch,
+    Commands,
+    LiveView,
+    LiveWard,
+    NewCommand,
+    NewRun,
+)
 from biosentry.services import ingest
 from biosentry.services.baseline import BaselineService
 from biosentry.services.patients import PatientService, RejectedError
@@ -73,15 +83,17 @@ WRITE_ACTIONS = {
     ("POST", "/patients/{patient_id}/labs"): "enter_labs",
     ("POST", "/patients/{patient_id}/vitals"): "record_vitals",
     ("POST", "/patients/{patient_id}/acknowledgement"): "acknowledge",
+    ("POST", "/wards/{ward}/sim/commands"): "sim_command",
 }
 # Routes that are not behind a bearer token: sign-in, and the sim's ingest key. All but the sim's
-# one read carry a body.
+# two reads carry a body.
 UNAUTHENTICATED_WRITES = {
     ("POST", "/session"),
     ("POST", "/sim/runs"),
     ("POST", "/sim/runs/{run_id}/batch"),
     ("POST", "/sim/runs/{run_id}/view"),
     ("GET", "/sim/runs/{run_id}/actions"),
+    ("GET", "/sim/runs/{run_id}/commands"),
 }
 
 
@@ -309,6 +321,18 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return ctx.wards.live(who)
 
+    @app.post("/wards/{ward}/sim/commands", status_code=204)
+    def send_sim_command(ward: str, body: NewCommand, ctx: Ctx, who: Who) -> Response:
+        if ward != ctx.store.ward:
+            ctx.audit.append(who, "sim_command", ward, "not_found")
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        if not ctx.store.can_control(who):
+            ctx.audit.append(who, "sim_command", ward, "denied")
+            raise HTTPException(status_code=403, detail="Forbidden")
+        if not ingest.add_command(ctx.store, ctx.audit, who, body):
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return Response(status_code=204)
+
     @app.get("/patients", response_model=list[PatientSummary])
     def list_patients(ctx: Ctx, who: Who) -> list[PatientSummary]:
         return ctx.wards.summaries(who)
@@ -436,5 +460,17 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
         if found is None:
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return Actions.model_validate({"actions": found})
+
+    @app.get("/sim/runs/{run_id}/commands", response_model=Commands)
+    def sim_commands(
+        run_id: int,
+        ctx: Ctx,
+        _: Annotated[None, Depends(ingest_gate)],
+        after: Annotated[int, Query(ge=0, le=BIGINT_MAX)] = 0,
+    ) -> Commands:
+        found = ingest.commands(ctx.store, run_id, after)
+        if found is None:
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return Commands.model_validate({"commands": found})
 
     return app

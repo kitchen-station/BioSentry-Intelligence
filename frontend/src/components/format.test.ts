@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { formatAge, formatBloodPressure, formatOxygen, formatSpo2Scale } from "./format";
+import { formatAge, formatBloodPressure, formatOxygen, formatSimClock, formatSpo2Scale, simStatus } from "./format";
+import type { SimStatus } from "./format";
 
 describe("formatAge", () => {
   it("uses seconds, then minutes, then hours", () => {
@@ -31,5 +32,48 @@ describe("formatSpo2Scale", () => {
   it("names the scale", () => {
     expect(formatSpo2Scale(1)).toBe("Scale 1");
     expect(formatSpo2Scale(2)).toBe("Scale 2");
+  });
+});
+
+const SHARED = { clockS: 109_200, speed: 10, ended: false, counts: { received: 120, rejected: 3, abstained: 5 } };
+
+describe("simStatus", () => {
+  it("reads what the simulator publishes and ignores the rest of it", () => {
+    expect(simStatus({ ...SHARED, staff: [{ id: "rn-reyes" }] })).toEqual(SHARED);
+    expect(simStatus({ ...SHARED, speed: 0, ended: true })).toMatchObject({ speed: 0, ended: true });
+  });
+
+  it.each([
+    ["nothing", undefined],
+    ["null", null],
+    ["a string", "day 2"],
+    ["an empty object", {}],
+    ["a clock that is not a number", { ...SHARED, clockS: "soon" }],
+    ["a clock that is negative", { ...SHARED, clockS: -1 }],
+    ["a clock that is infinite", { ...SHARED, clockS: Infinity }],
+    ["a speed it does not offer", { ...SHARED, speed: 5 }],
+    ["no ended flag", { ...SHARED, ended: undefined }],
+    ["no counts", { ...SHARED, counts: undefined }],
+    ["counts that are not an object", { ...SHARED, counts: 3 }],
+    ["a count that is missing", { ...SHARED, counts: { received: 1, rejected: 2 } }],
+    ["a count that is not a number", { ...SHARED, counts: { ...SHARED.counts, abstained: "5" } }],
+  ])("is null for %s", (_, shared) => {
+    expect(simStatus(shared)).toBeNull();
+  });
+});
+
+describe("formatSimClock", () => {
+  const at = (clockS: number, over: Partial<SimStatus> = {}) =>
+    formatSimClock({ ...(simStatus(SHARED) as SimStatus), clockS, ...over });
+
+  it("says the day from 1, the time and the speed", () => {
+    expect(at(0)).toBe("day 1 00:00, 10x");
+    expect(at(109_200)).toBe("day 2 06:20, 10x");
+    expect(at(86_400 * 3 - 1, { speed: 60 })).toBe("day 3 23:59, 60x");
+  });
+
+  it("says paused at speed 0, and ended whatever the speed", () => {
+    expect(at(109_200, { speed: 0 })).toBe("day 2 06:20, paused");
+    expect(at(109_200, { ended: true })).toBe("day 2 06:20, ended");
   });
 });

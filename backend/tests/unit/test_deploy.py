@@ -1,5 +1,5 @@
 """The deployment files: what the VPS stack publishes (the API on the host's loopback, the database
-nothing), pinned images, secrets that have no defaults, and the two scripts, run here with a stand-in
+and the ward simulator nothing), pinned images, secrets that have no defaults, and the two scripts, run here with a stand-in
 for docker (the real stack was built, run, backed up and restored by hand; see deploy/README.md)."""
 
 import os
@@ -27,12 +27,18 @@ def _code(path: Path) -> list[str]:
 # --- deploy/compose.yaml -----------------------------------------------------------------------
 
 
+def _sim() -> list[str]:
+    """The code lines of the `sim` service: the last one, before the top-level networks."""
+    code = _code(DEPLOY / "compose.yaml")
+    return code[code.index("sim:") : code.index("networks:")]
+
+
 def test_the_database_publishes_nothing_and_the_api_only_the_hosts_loopback() -> None:
     code = _code(DEPLOY / "compose.yaml")
     assert code.count("ports:") == 1  # only the API publishes anything
     assert code[code.index("ports:") + 1] == '- "127.0.0.1:8000:8000"'
     assert "network_mode: host" not in code  # no service runs on the host's network
-    assert code[code.index("build:") :].count("network: host") == 1  # only the build does
+    assert code.count("network: host") == 2  # only the two builds (the API's and the simulator's) do
     assert code.index("network: host") < code.index("restart: unless-stopped", code.index("build:"))
     postgres = code[code.index("postgres:") : code.index("api:")]
     assert "networks: [backend]" in postgres and "ports:" not in postgres
@@ -41,9 +47,9 @@ def test_the_database_publishes_nothing_and_the_api_only_the_hosts_loopback() ->
 
 def test_the_stack_restarts_waits_for_a_healthy_database_and_keeps_the_data_in_a_volume() -> None:
     text = "\n".join(_code(DEPLOY / "compose.yaml"))
-    assert text.count("restart: unless-stopped") == 2
+    assert text.count("restart: unless-stopped") == 3
     assert "condition: service_healthy" in text
-    assert "pgdata:/var/lib/postgresql" in text and text.endswith("volumes:\npgdata:")
+    assert "pgdata:/var/lib/postgresql" in text and text.endswith("volumes:\npgdata:\nsimstate:")
     assert "BIOSENTRY_ENV: production" in text
 
 
@@ -53,6 +59,22 @@ def test_secrets_have_no_defaults_so_a_missing_one_stops_compose() -> None:
         uses = re.findall(rf"\$\{{{name}[^}}]*\}}", text)
         assert uses and all(use.startswith(f"${{{name}:?") for use in uses), name
     assert "biosentry-dev-only" not in text
+
+
+def test_the_ward_simulator_publishes_nothing_and_waits_for_a_healthy_api() -> None:
+    sim = _sim()
+    assert "ports:" not in sim and "expose:" not in sim and "network_mode: host" not in sim
+    assert not any(ln.startswith("networks:") for ln in sim)  # the default network only
+    assert "restart: unless-stopped" in sim
+    wait = sim[sim.index("depends_on:") :]
+    assert wait[:3] == ["depends_on:", "api:", "condition: service_healthy"]
+    assert "context: ${SIM_DIR:-../../biosentry-ward-sim}" in sim
+    assert "BIOSENTRY_API_URL: http://api:8000" in sim  # through the API, never the database
+    assert "BIOSENTRY_INGEST_KEY: ${BIOSENTRY_INGEST_KEY:?set BIOSENTRY_INGEST_KEY in deploy/.env}" in sim
+    assert "WARD_SPEED: ${WARD_SPEED:-1}" in sim
+    assert "WARD_STATE_FILE: /state/ward-state.json" in sim
+    assert sim[sim.index("volumes:") + 1] == "- simstate:/state"
+    assert not any("POSTGRES" in ln or "DATABASE" in ln for ln in sim)
 
 
 def test_the_database_image_is_the_one_the_dev_compose_uses() -> None:
@@ -114,6 +136,9 @@ def host(tmp_path: Path) -> dict[str, Path]:
         encoding="utf-8",
     )
     (bin_dir / "tailscale").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    (bin_dir / "git").write_text(  # a clone makes its directory, as the real one does
+        '#!/bin/sh\necho "git $*" >> "$LOG"\ncase "$1" in clone) mkdir -p "$3";; esac\n', encoding="utf-8"
+    )
     for tool in bin_dir.iterdir():
         tool.chmod(0o755)
     return {"deploy": deploy, "bin": bin_dir, "log": tmp_path / "calls.log", "home": tmp_path}
@@ -126,6 +151,7 @@ def _run(
         "PATH": path if path is not None else f"{host['bin']}:{SYSTEM_PATH}",
         "LOG": str(host["log"]),
         "HOME": str(host["home"]),
+        "SIM_DIR": str(host["home"] / "biosentry-ward-sim"),
         "DUMP": "PGDMP-not-empty",
         **env,
     }
@@ -169,13 +195,13 @@ def test_setup_is_safe_to_run_again_and_puts_the_mode_right(host: dict[str, Path
     assert _calls(host).count(UP) == 2
 
 
-@pytest.mark.parametrize("missing", ["docker", "tailscale", "openssl"])
+@pytest.mark.parametrize("missing", ["docker", "git", "tailscale", "openssl"])
 def test_setup_stops_before_making_secrets_or_starting_anything_when_a_tool_is_missing(
     host: dict[str, Path], missing: str
 ) -> None:
     only = host["home"] / "only"  # a PATH of just what setup.sh needs, less the missing tool
     only.mkdir()
-    needed = {"docker": host["bin"] / "docker", "tailscale": host["bin"] / "tailscale"}
+    needed = {tool: host["bin"] / tool for tool in ("docker", "git", "tailscale")}
     for tool in ("dirname", "chmod", "openssl"):
         needed[tool] = Path(shutil.which(tool) or "")
     for tool, source in needed.items():
@@ -185,6 +211,36 @@ def test_setup_stops_before_making_secrets_or_starting_anything_when_a_tool_is_m
     assert done.returncode == 1 and f"{missing} is not installed" in done.stderr
     assert not (host["deploy"] / ".env").exists()
     assert UP not in _calls(host)
+
+
+SIM_REPO = "https://github.com/kitchen-station/biosentry-ward-sim.git"
+
+
+def test_setup_clones_the_ward_simulator_then_only_updates_it_and_does_so_before_building(
+    host: dict[str, Path],
+) -> None:
+    sim = host["home"] / "biosentry-ward-sim"
+    assert _run(host, "setup.sh").returncode == 0
+    assert _calls(host) == ["docker compose version", f"git clone {SIM_REPO} {sim}", UP]
+    assert sim.is_dir()
+    assert _run(host, "setup.sh").returncode == 0  # there now: fast-forward only, never a second clone
+    again = _calls(host)[3:]
+    assert again == ["docker compose version", f"git -C {sim} pull --ff-only", UP]
+
+
+def test_setup_stops_before_building_when_the_simulator_cannot_be_fetched(
+    host: dict[str, Path],
+) -> None:
+    (host["bin"] / "git").write_text("#!/bin/sh\nexit 7\n", encoding="utf-8")
+    done = _run(host, "setup.sh")
+    assert done.returncode == 7
+    assert UP not in _calls(host)
+
+
+def test_the_simulator_checkout_defaults_to_the_one_compose_builds_from() -> None:
+    default = "${SIM_DIR:-../../biosentry-ward-sim}"
+    assert default in (DEPLOY / "setup.sh").read_text(encoding="utf-8")
+    assert f"context: {default}" in _code(DEPLOY / "compose.yaml")
 
 
 def test_a_missing_compose_plugin_is_refused(host: dict[str, Path]) -> None:

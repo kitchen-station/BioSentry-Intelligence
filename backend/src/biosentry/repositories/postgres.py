@@ -30,6 +30,7 @@ from biosentry.core.config import DEV_DATABASE_PASSWORD, ConfigError, restricted
 from biosentry.schemas import ClinicalNote, LabPanel, TierStatus, UnscoredPatient
 
 LIVE_WITHIN = timedelta(seconds=30)  # a sim run whose last batch is older is not "receiving data"
+CONTROL_ROLES = ("md", "charge_rn")  # the roles that may send commands to the ward simulation
 SESSION_TTL = timedelta(hours=12)
 TREND_BINS = 12
 DEVICE_VITALS = ("heart_rate", "respiratory_rate", "spo2", "temperature")
@@ -308,6 +309,10 @@ class PostgresStore:
             "SELECT role FROM clinician WHERE id = %s", (clinician_id,)
         ).fetchone()
         return row["role"] if row else None
+
+    def can_control(self, clinician_id: str) -> bool:
+        """Whether this clinician may send the sim commands: the one place that rule is written."""
+        return self.role_of(clinician_id) in CONTROL_ROLES
 
     def passphrase_hash(self, clinician_id: str) -> tuple[bool, str | None]:
         """Whether this clinician exists, and their stored hash (None: no passphrase is set)."""
@@ -601,6 +606,29 @@ class PostgresStore:
         (the one it checked under the lock), which is not always the one this store was made on."""
         rows = self.conn.execute(
             "SELECT seq, kind, patient_id, clinician_id, data FROM clinician_action"
+            " WHERE run_id = %s AND seq > %s ORDER BY seq LIMIT 200",
+            (run_id, after),
+        )
+        return [{**r.pop("data"), **r} for r in rows]
+
+    # --- the feed the ward sim reads for the viewer's commands ---------------------------------
+
+    def add_command(
+        self, kind: str, clinician_id: str, patient_id: str | None, data: dict[str, Any]
+    ) -> None:
+        """Append to the command feed. As `add_action`: it takes the run's lock, so seq order is
+        commit order."""
+        lock_run(self.conn, self.run_id)
+        self.conn.execute(
+            "INSERT INTO sim_command (run_id, kind, patient_id, clinician_id, at, data)"
+            " VALUES (%s, %s, %s, %s, %s, %s)",
+            (self.run_id, kind, patient_id, clinician_id, whole(self.run_now), Jsonb(data)),
+        )
+
+    def commands(self, run_id: int, after: int) -> list[dict[str, Any]]:
+        """The next 200 command rows of a run after `after`, oldest first (as `actions`)."""
+        rows = self.conn.execute(
+            "SELECT seq, kind, patient_id, clinician_id, data FROM sim_command"
             " WHERE run_id = %s AND seq > %s ORDER BY seq LIMIT 200",
             (run_id, after),
         )

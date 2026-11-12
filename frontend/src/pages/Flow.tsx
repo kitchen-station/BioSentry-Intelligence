@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { PatientStay } from "../types";
-import { getStays } from "../api";
+import { getStays, usesServer } from "../api";
 import { bedRows, dayTicks, FLOW_DAYS, flowStats, formatStay, recentMoves } from "./flowMath";
 import styles from "./Flow.module.css";
 
-const POLL_MS = 15_000;
 const RECENT = 12;
 const OUTCOME = { discharged: "Discharged", higher_care: "Higher care" } as const;
 
@@ -19,6 +18,7 @@ export function FlowSection() {
   const [stays, setStays] = useState<PatientStay[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const pollMs = usesServer ? 5_000 : 15_000; // the API changes as the simulator runs; the fixture never does
 
   useEffect(() => {
     const refresh = () =>
@@ -30,9 +30,9 @@ export function FlowSection() {
         })
         .catch(() => setFailed(true));
     void refresh();
-    const timer = setInterval(() => void refresh(), POLL_MS);
+    const timer = setInterval(() => void refresh(), pollMs);
     return () => clearInterval(timer);
-  }, []);
+  }, [pollMs]);
 
   const stats = stays && flowStats(stays, now);
   const recent = stays ? recentMoves(stays, RECENT) : [];

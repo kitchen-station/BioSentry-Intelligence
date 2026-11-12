@@ -608,6 +608,7 @@ RUN_TABLES = (
     "acknowledgement",
     "sim_event",
     "clinician_action",
+    "sim_command",
 )
 
 
@@ -621,6 +622,8 @@ def test_a_deleted_runs_id_is_never_reused_and_foreign_keys_always_cascade(api: 
         "/patients/orphan/notes", headers=h, json={"author": "a", "role": "RN", "content": "c"}
     )
     api.client.post("/patients/orphan/acknowledgement", headers=h, json={"score": 3})
+    for body in ({"kind": "reset"}, {"kind": "detach_patch", "patient_id": "orphan"}):
+        command(api, "rn-manalo", **body)  # one that names no patient, one that does
     for table in RUN_TABLES:  # the run has rows everywhere, so the cascade below is not vacuous
         assert api.sql(f"SELECT * FROM {table} WHERE run_id = %s", run_id), table
     with connect(api.url) as conn:  # a raw delete: there is no way to leave the run's rows behind
@@ -1223,6 +1226,7 @@ def live(api: Api, who: str) -> dict[str, Any]:
     response = api.client.get("/wards/W4/live", headers=api.as_(who))
     assert response.status_code == 200, response.text
     body: dict[str, Any] = response.json()
+    assert isinstance(body.pop("can_control"), bool)  # what it says is its own test, below
     return body
 
 
@@ -1462,3 +1466,224 @@ def test_the_feed_needs_the_ingest_key_and_the_newest_run(api: Api) -> None:
     assert (refused.status_code, refused.json()) == (409, {"detail": REPLACED})
     rows = api.sql("SELECT clinician_id, action, resource, outcome FROM audit_log")
     assert rows == [{"clinician_id": None, "action": "ingest", "resource": "-", "outcome": "denied"}] * 5
+
+
+# --- The commands the ward viewer sends and the sim reads ---------------------------------------
+
+SPEED = {"kind": "set_speed", "speed": 10}
+PATIENT_KINDS = ("inject_deterioration", "start_arrhythmia", "detach_patch", "apply_patch")
+NOT_RUNNING = "The ward is not receiving data from a running simulation"
+
+
+def command(api: Api, who: str, ward: str = "W4", **body: Any) -> Any:
+    return api.client.post(f"/wards/{ward}/sim/commands", headers=api.as_(who), json=body)
+
+
+def commands(api: Api, run_id: int, key: str | None = KEY, **params: Any) -> Any:
+    headers = {"X-Ingest-Key": key} if key is not None else {}
+    return api.client.get(f"/sim/runs/{run_id}/commands", params=params, headers=headers)
+
+
+def sent(api: Api, run_id: int, **params: Any) -> list[dict[str, Any]]:
+    response = commands(api, run_id, **params)
+    assert response.status_code == 200, response.text
+    rows: list[dict[str, Any]] = response.json()["commands"]
+    return rows
+
+
+def sim_audit(api: Api) -> list[tuple[str | None, str, str]]:
+    rows = api.sql(
+        "SELECT clinician_id, resource, outcome FROM audit_log WHERE action = 'sim_command'"
+        " ORDER BY seq"
+    )
+    return [(r["clinician_id"], r["resource"], r["outcome"]) for r in rows]
+
+
+def test_only_an_md_or_the_charge_nurse_is_told_they_can_control_the_sim(api: Api) -> None:
+    start(api)
+    for who, allowed in (
+        ("md-santos", True), ("md-aquino", True), ("rn-manalo", True),
+        ("rn-delacruz", False), ("rn-reyes", False),
+    ):  # fmt: skip
+        response = api.client.get("/wards/W4/live", headers=api.as_(who))
+        assert response.json()["can_control"] is allowed, who
+
+
+def test_a_command_goes_on_the_feed_in_order_with_what_it_says_and_who_sent_it(api: Api) -> None:
+    run_id = start(api)
+    assert sent(api, run_id) == []
+    assert command(api, "md-santos", **SPEED).status_code == 204
+    assert command(api, "rn-manalo", kind="reset").status_code == 204
+    for kind in PATIENT_KINDS:
+        assert command(api, "md-santos", kind=kind, patient_id="s-1").status_code == 204
+    assert command(api, "rn-manalo", kind="set_speed", speed=0).status_code == 204
+    rows = sent(api, run_id)
+    seqs = [r.pop("seq") for r in rows]
+    assert seqs == sorted(set(seqs)) and len(seqs) == 7
+    expected = [
+        ("set_speed", None, "md-santos", 10), ("reset", None, "rn-manalo", None),
+        *((kind, "s-1", "md-santos", None) for kind in PATIENT_KINDS),
+        ("set_speed", None, "rn-manalo", 0),
+    ]  # fmt: skip
+    assert rows == [
+        {"kind": k, "patient_id": p, "clinician_id": c, "speed": v} for k, p, c, v in expected
+    ]
+    later = sent(api, run_id, after=seqs[3])
+    assert [r["seq"] for r in later] == seqs[4:]
+    assert sim_audit(api) == [
+        ("md-santos", "W4", "ok"), ("rn-manalo", "W4", "ok"),
+        *(("md-santos", "s-1", "ok") for _ in PATIENT_KINDS),
+        ("rn-manalo", "W4", "ok"),
+    ]  # fmt: skip
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {},
+        {"kind": "explode"},
+        {"kind": "set_speed"},
+        {"kind": "set_speed", "speed": 5},
+        {"kind": "set_speed", "speed": "10"},
+        {"kind": "set_speed", "speed": True},
+        {"kind": "set_speed", "speed": 1.0},
+        {"kind": "set_speed", "speed": 10, "patient_id": "s-1"},
+        {"kind": "reset", "speed": 1},
+        {"kind": "reset", "patient_id": "s-1"},
+        {"kind": "detach_patch"},
+        {"kind": "detach_patch", "patient_id": ""},
+        {"kind": "detach_patch", "patient_id": "s-1", "speed": 1},
+        {"kind": "apply_patch", "patient_id": "s-1", "note": "x"},
+    ],
+)
+def test_a_command_that_does_not_fit_its_kind_is_422_and_leaves_no_row(
+    api: Api, body: dict[str, Any]
+) -> None:
+    run_id = start(api)
+    assert command(api, "md-santos", **body).status_code == 422
+    assert sent(api, run_id) == []
+    assert sim_audit(api) == [("md-santos", "-", "rejected")]
+
+
+def test_a_command_with_no_session_is_401_before_anything_is_said_of_its_body(api: Api) -> None:
+    start(api)
+    for body in ({"kind": "reset"}, {"kind": "explode"}):
+        assert api.client.post("/wards/W4/sim/commands", json=body).status_code == 401
+    assert sim_audit(api) == []
+
+
+def test_a_clinician_who_may_not_command_the_sim_gets_403_and_it_is_audited(api: Api) -> None:
+    run_id = start(api)
+    for who in ("rn-delacruz", "rn-reyes"):
+        assert command(api, who, **SPEED).status_code == 403
+        assert command(api, who, kind="detach_patch", patient_id="s-1").status_code == 403
+    assert sent(api, run_id) == []
+    assert sim_audit(api) == [
+        ("rn-delacruz", "W4", "denied"), ("rn-delacruz", "W4", "denied"),
+        ("rn-reyes", "W4", "denied"), ("rn-reyes", "W4", "denied"),
+    ]  # fmt: skip
+
+
+def test_a_command_for_another_ward_or_a_patient_that_is_not_yours_is_404(api: Api) -> None:
+    run_id = start(api)
+    assert command(api, "md-santos", ward="W9", **SPEED).status_code == 404
+    # md-aquino is a doctor of the fixture ward and has no patient in this run; "ghost" is nobody's
+    for patient in ("s-1", "ghost"):
+        refused = command(api, "md-aquino", kind="apply_patch", patient_id=patient)
+        assert (refused.status_code, refused.json()) == (404, {"detail": "Not found"})
+    assert command(api, "md-santos", kind="apply_patch", patient_id="s-1").status_code == 204
+    assert [r["patient_id"] for r in sent(api, run_id)] == ["s-1"]
+    assert sim_audit(api) == [
+        ("md-santos", "W9", "not_found"), ("md-aquino", "s-1", "not_found"),
+        ("md-aquino", "ghost", "not_found"), ("md-santos", "s-1", "ok"),
+    ]  # fmt: skip
+
+
+def test_a_patient_who_has_left_is_not_one_to_command(api: Api) -> None:
+    run_id = start(api)
+    gone = batch(minute=1, departures=[{"patient_id": "s-1", "minute": 1, "outcome": "discharged"}])
+    assert api.post(f"/sim/runs/{run_id}/batch", gone).status_code == 204
+    assert command(api, "md-santos", kind="detach_patch", patient_id="s-1").status_code == 404
+
+
+def test_nothing_is_queued_for_a_ward_that_is_not_running_a_sim(api: Api) -> None:
+    fixture = command(api, "rn-manalo", **SPEED)
+    assert (fixture.status_code, fixture.json()) == (409, {"detail": NOT_RUNNING})
+    run_id = start(api)
+    assert command(api, "rn-manalo", **SPEED).status_code == 204
+    api.wall.now += timedelta(seconds=31)  # stale
+    assert command(api, "rn-manalo", **SPEED).status_code == 409
+    api.wall.now -= timedelta(seconds=31)
+    assert api.post(f"/sim/runs/{run_id}/batch", batch(minute=1, ended=True)).status_code == 204
+    assert command(api, "rn-manalo", kind="reset").status_code == 409  # ended
+    assert len(sent(api, run_id)) == 1
+    assert [o for _, _, o in sim_audit(api)] == ["rejected", "ok", "rejected", "rejected"]
+
+
+def test_a_command_for_a_run_replaced_while_it_was_being_handled_is_refused_and_writes_nothing(
+    api: Api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from biosentry.repositories.postgres import PostgresStore
+
+    start(api, client_id="client-a")
+    api.as_("md-santos")
+    original = PostgresStore.can_control
+
+    def replaced_then_checked(self: PostgresStore, clinician_id: str) -> bool:
+        start(api, client_id="client-a")  # the same client replaces its own run, after this request began
+        return original(self, clinician_id)
+
+    monkeypatch.setattr(PostgresStore, "can_control", replaced_then_checked)
+    refused = command(api, "md-santos", **SPEED)
+    assert (refused.status_code, refused.json()) == (409, {"detail": REPLACED})
+    assert api.sql("SELECT * FROM sim_command") == []
+    assert sim_audit(api) == [("md-santos", "W4", "rejected")]
+
+
+def test_a_command_and_its_feed_row_are_one_transaction(
+    api: Api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from biosentry.repositories.postgres import PostgresStore
+
+    def fail(*args: Any, **kw: Any) -> None:
+        raise RuntimeError("the database went away")
+
+    run_id = start(api)
+    api.as_("md-santos")
+    monkeypatch.setattr(PostgresStore, "add_command", fail)
+    with pytest.raises(RuntimeError):
+        command(api, "md-santos", **SPEED)
+    assert sent(api, run_id) == [] and sim_audit(api) == []
+
+
+def test_the_command_feed_is_read_in_order_200_rows_at_a_time_after_a_cursor(api: Api) -> None:
+    run_id = start(api)
+    assert sent(api, run_id) == []  # nothing yet, and never another run's rows
+    seqs = [
+        r["seq"]
+        for r in api.sql(
+            "INSERT INTO sim_command (run_id, kind, patient_id, clinician_id, at, data)"
+            " SELECT %s, 'reset', NULL, 'md-santos', now(), '{}'::jsonb"
+            " FROM generate_series(1, 205) RETURNING seq",
+            run_id,
+        )
+    ]
+    first = [r["seq"] for r in sent(api, run_id)]
+    assert first == seqs[:200] == [r["seq"] for r in sent(api, run_id, after=0)]
+    assert [r["seq"] for r in sent(api, run_id, after=first[-1])] == seqs[200:]
+    assert sent(api, run_id, after=seqs[-1]) == sent(api, run_id, after=2**63 - 1) == []
+    for after in (-1, 2**63, "x", 1.5):
+        assert commands(api, run_id, after=after).status_code == 422, after
+
+
+def test_the_command_feed_needs_the_ingest_key_and_the_newest_run(api: Api) -> None:
+    old = start(api, client_id="client-a")
+    for key in (None, "wrong"):
+        assert commands(api, old, key=key).status_code == 403
+        assert commands(api, old, key=key, after=-1).status_code == 403  # the key comes first
+    assert commands(Api(api.url, ingest_key=None), old).status_code == 503
+    assert commands(api, 99).status_code == 404
+    api.wall.now += timedelta(seconds=31)
+    start(api, client_id="client-b")
+    refused = commands(api, old)
+    assert (refused.status_code, refused.json()) == (409, {"detail": REPLACED})

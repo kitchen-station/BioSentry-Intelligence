@@ -21,6 +21,7 @@ const api = vi.hoisted(() => ({
   extractPatientFromFile: vi.fn(),
   listAllPatients: vi.fn(),
   getStays: vi.fn(),
+  usesServer: false,
 }));
 vi.mock("../api", () => api);
 

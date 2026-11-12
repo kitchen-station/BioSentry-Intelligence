@@ -170,7 +170,11 @@ class WardService:
         view = self._store.live_view() or {"shared": None, "patients": []}
         self._audit.append(clinician_id, "view_live", self._store.ward, "ok")
         return LiveWard.model_validate(
-            {**view, "patients": [p for p in view["patients"] if p["id"] in visible]}
+            {
+                **view,
+                "patients": [p for p in view["patients"] if p["id"] in visible],
+                "can_control": self._store.can_control(clinician_id),
+            }
         )
 
     def summaries(self, clinician_id: str) -> list[PatientSummary]:

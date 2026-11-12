@@ -89,6 +89,14 @@ describe("httpProvider requests", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("/wards/W4/stays");
   });
 
+  it("reads the live ward the simulator published", async () => {
+    setAuthToken("rn-manalo");
+    const live = { shared: { clockS: 0 }, patients: [], can_control: true };
+    fetchMock.mockResolvedValue(reply(200, live));
+    await expect(httpProvider.getLiveWard()).resolves.toEqual(live);
+    expect(fetchMock.mock.calls[0][0]).toBe("/wards/W4/live");
+  });
+
   it("sends the bearer token the session set", async () => {
     setAuthToken("rn-manalo");
     fetchMock.mockResolvedValue(reply(200, { ranked: [], abstained: [] }));

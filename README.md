@@ -77,6 +77,11 @@ replace its own run. A batch for a run that is no longer the newest also gets 40
 case) with 409 and writes nothing; a bed whose patient has left is free again.
 `GET /sim/runs/{id}/actions?after={seq}` (same key) tells the sim what clinicians did: one row per
 acknowledgement, vitals entry, note (never its text) or admission, at most 200 in `seq` order after the cursor.
+`POST /wards/W4/sim/commands` (bearer token; an md or the charge nurse, else 403; `GET /wards/W4/live` says
+`can_control`) queues one of `set_speed` (with `speed` 0, 1, 10 or 60), `reset`, or `inject_deterioration`,
+`start_arrhythmia`, `detach_patch`, `apply_patch` (with the caller's `patient_id`, else 404) for the sim, and
+answers 409 when the ward is not receiving data from a live sim run. `GET /sim/runs/{id}/commands?after={seq}`
+(same key) hands them to the sim in the same way as the actions.
 `GET /patients/{id}/baseline` (bearer token, same visibility, 404 and audit as the patient route, action `view_baseline`)
 serves a research finding of how far each device vital sits from the patient's own baseline: derived,
 synthetic, not validated, display only; it changes no rank and stores nothing. The baseline is the first 24

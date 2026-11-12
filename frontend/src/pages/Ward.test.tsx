@@ -3,7 +3,7 @@
  * The Ward page: acknowledgements go to the API (and a failed save is shown, not swallowed).
  */
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,8 +17,17 @@ const api = vi.hoisted(() => ({
   getWard: vi.fn(),
   getAcknowledgements: vi.fn(),
   acknowledge: vi.fn(),
+  getLiveWard: vi.fn(),
+  build: { usesServer: false },
 }));
-vi.mock("../api", () => ({ ...api, canRecordVitals: false, recordVitals: vi.fn() }));
+vi.mock("../api", () => ({
+  ...api,
+  canRecordVitals: false,
+  recordVitals: vi.fn(),
+  get usesServer() {
+    return api.build.usesServer;
+  },
+}));
 
 // The committed ward, p-001 first: a NEWS2 9 patient, so an alert is open.
 const rows = synthetic.ranked as unknown as WardResponse["ranked"];
@@ -44,8 +53,13 @@ beforeEach(() => {
   api.getWard.mockReset().mockResolvedValue(ward());
   api.getAcknowledgements.mockReset().mockResolvedValue([]);
   api.acknowledge.mockReset().mockResolvedValue(undefined);
+  api.getLiveWard.mockReset().mockResolvedValue(null);
+  api.build.usesServer = false;
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 describe("acknowledging an alert", () => {
   // Timed out at the default 5s on a slow Cloudflare build.
@@ -91,5 +105,100 @@ describe("when the server fails", () => {
     expect(screen.getByRole("button", { name: "Acknowledge" })).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Dismiss" }));
     expect(screen.queryByText(/Could not load your acknowledgements/)).toBeNull();
+  });
+});
+
+// What the simulator publishes in `shared`: day 2, 06:20 on the simulated clock.
+const live = (shared: unknown) => ({ shared, patients: [], can_control: false });
+const published = (over: object = {}) =>
+  live({ clockS: 109_200, speed: 10, ended: false, counts: { received: 120, rejected: 3, abstained: 5 }, ...over });
+
+describe("the simulator status line", () => {
+  beforeEach(() => {
+    api.build.usesServer = true; // only the API has a simulator
+  });
+
+  it("says the simulated time, the speed and the counts", async () => {
+    api.getLiveWard.mockResolvedValue(published());
+    page();
+    expect(
+      await screen.findByText("Simulator: day 2 06:20, 10x · 120 received · 3 rejected · 5 abstained"),
+    ).toBeTruthy();
+  });
+
+  it("says paused at speed 0 and ended when the run is over", async () => {
+    api.getLiveWard.mockResolvedValue(published({ speed: 0 }));
+    page();
+    expect(await screen.findByText(/^Simulator: day 2 06:20, paused/)).toBeTruthy();
+    cleanup();
+    api.getLiveWard.mockResolvedValue(published({ ended: true }));
+    page();
+    expect(await screen.findByText(/^Simulator: day 2 06:20, ended/)).toBeTruthy();
+  });
+
+  it.each([
+    ["there is no simulator", null],
+    ["nothing is published yet", live(null)],
+    ["what is published is not the simulator's status", live({ clockS: "soon" })],
+  ])("shows no line when %s", async (_, view) => {
+    api.getLiveWard.mockResolvedValue(view);
+    page();
+    await screen.findByText(/Priority queue/);
+    await waitFor(() => expect(api.getLiveWard).toHaveBeenCalled());
+    expect(screen.queryByText(/Simulator:/)).toBeNull();
+  });
+
+  it("follows the simulator with the ward, in the same round, and drops the line when it cannot be read", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    api.getLiveWard
+      .mockResolvedValueOnce(published())
+      .mockResolvedValueOnce(published({ clockS: 109_260 }))
+      .mockRejectedValue(new Error("down"));
+    page();
+    await screen.findByText(/^Simulator: day 2 06:20/);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    await screen.findByText(/^Simulator: day 2 06:21/);
+    expect(api.getLiveWard).toHaveBeenCalledTimes(2);
+    expect(api.getWard).toHaveBeenCalledTimes(2); // one round: the rows and the status together
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    await waitFor(() => expect(screen.queryByText(/Simulator:/)).toBeNull());
+  });
+
+  it("is not asked for on the fixture: no call, now or later", async () => {
+    api.build.usesServer = false;
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    page();
+    await screen.findByText(/Priority queue/);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(api.getLiveWard).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Simulator:/)).toBeNull();
+  });
+});
+
+describe("how often the ward is asked for", () => {
+  it.each([
+    ["the fixture", 15_000, false],
+    ["the API", 5_000, true],
+  ])("%s: every %i ms, and the offline notice says so", async (_, ms, usesServer) => {
+    api.build.usesServer = usesServer;
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    page();
+    await screen.findByText(/Priority queue/);
+    api.getWard.mockClear().mockRejectedValue(new Error("down"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ms - 1_000);
+    });
+    expect(api.getWard).not.toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_000);
+    });
+    expect(api.getWard).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText(new RegExp(`Retrying every ${ms / 1000} seconds\\.`))).toBeTruthy();
   });
 });

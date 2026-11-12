@@ -170,6 +170,16 @@ describe.each(harnesses)("$name", ({ provider, signIn }) => {
     expect(baseline.vitals.map((v) => v.vital)).toEqual(["heart_rate", "respiratory_rate", "spo2", "temperature"]);
   });
 
+  it("the live view: null from the fixture provider, the caller's own with the right to control from the API (only with VITE_API_URL)", async () => {
+    signIn("rn-manalo");
+    const live = await provider.getLiveWard();
+    if (provider === fixtureProvider) return expect(live).toBeNull();
+    expect(live).not.toBeNull();
+    if (live === null) return;
+    expect(live.can_control).toBe(true); // the charge nurse
+    expect(Array.isArray(live.patients)).toBe(true);
+  });
+
   it("gaps are null in the history and never zero", async () => {
     signIn("rn-manalo");
     const detail = await provider.getPatient("p-006");
