@@ -26,13 +26,16 @@ const api = vi.hoisted(() => ({
   getWard: vi.fn(),
   getAcknowledgements: vi.fn(),
   acknowledge: vi.fn(),
+  getLiveWard: vi.fn(),
 }));
 vi.mock("../api", () => ({
   recordVitals: api.recordVitals,
   getWard: api.getWard,
   getAcknowledgements: api.getAcknowledgements,
   acknowledge: api.acknowledge,
+  getLiveWard: api.getLiveWard,
   canRecordVitals: true,
+  usesServer: true,
 }));
 
 const ranked = (rank: number, score: number): VitalsRecorded => ({
@@ -73,6 +76,7 @@ beforeEach(() => {
   api.recordVitals.mockReset();
   api.getWard.mockReset();
   api.getAcknowledgements.mockReset().mockResolvedValue([]);
+  api.getLiveWard.mockReset().mockResolvedValue(null);
 });
 afterEach(cleanup);
 

@@ -4,8 +4,16 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PatientStay } from "../types";
 
-const api = vi.hoisted(() => ({ getStays: vi.fn() }));
-vi.mock("../api", () => api);
+const api = vi.hoisted(() => ({
+  getStays: vi.fn(),
+  build: { usesServer: false },
+}));
+vi.mock("../api", () => ({
+  getStays: api.getStays,
+  get usesServer() {
+    return api.build.usesServer;
+  },
+}));
 
 import { FlowSection } from "./Flow";
 import { bedRows, dayTicks, flowStats, formatStay, recentMoves } from "./flowMath";
@@ -114,5 +122,26 @@ describe("Flow page", () => {
     show();
     await screen.findByRole("alert");
     expect(screen.queryByText("Loading...")).toBeNull();
+  });
+
+  it.each([
+    ["the API", 5_000, true],
+    ["the fixture", 15_000, false],
+  ])("refreshes against %s every %i ms", async (_, ms, usesServer) => {
+    api.build.usesServer = usesServer;
+    vi.useFakeTimers({ now: NOW, shouldAdvanceTime: true });
+    api.getStays.mockResolvedValue(STAYS);
+    show();
+    await screen.findByRole("heading", { name: "Recent movement" });
+    api.getStays.mockClear();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ms - 100);
+    });
+    expect(api.getStays).not.toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
+    expect(api.getStays).toHaveBeenCalledTimes(1);
+    api.build.usesServer = false;
   });
 });

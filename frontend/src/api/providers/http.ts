@@ -4,7 +4,7 @@
  * Invariants: I2 (provenance must arrive from server, not be fabricated here).
  *
  * Endpoints align with the contract defined in prompt 03:
- *   GET  /wards/{ward}/rows
+ *   GET  /wards/{ward}/rows, GET /wards/{ward}/live
  *   GET  /patients/{id}
  *   POST /session
  *   GET  /acknowledgements, POST /patients/{id}/acknowledgement
@@ -22,6 +22,7 @@ import type {
   ClinicalNote,
   LabExtractionResult,
   LabPanel,
+  LiveWard,
   NurseVitalsInput,
   PartialLabInput,
   PatientDetail,
@@ -45,6 +46,10 @@ export const httpProvider: ApiProvider = {
 
   getStays(): Promise<PatientStay[]> {
     return fetchJson<PatientStay[]>("/wards/W4/stays");
+  },
+
+  getLiveWard(): Promise<LiveWard> {
+    return fetchJson<LiveWard>("/wards/W4/live");
   },
 
   async getPatient(id: string): Promise<PatientDetail | null> {

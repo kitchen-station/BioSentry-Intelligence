@@ -19,6 +19,8 @@ export const fixtureProvider: ApiProvider = {
   deleteNote: fixtures.deleteNote,
   listAllPatients: fixtures.listAllPatients,
   getStays: fixtures.getStays,
+  // No simulator behind the fixture, so no live view.
+  getLiveWard: () => Promise.resolve(null),
   admitPatient: fixtures.admitPatient,
   enterLabResults: fixtures.enterLabResults,
   getAcknowledgements: fixtures.getAcknowledgements,

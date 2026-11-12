@@ -1,10 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { AbstainedRow as AbstainedRowType, Session, VitalsRecorded, WardResponse } from "../types";
-import { acknowledge as saveAcknowledgement, getAcknowledgements, getWard } from "../api";
+import {
+  acknowledge as saveAcknowledgement,
+  getAcknowledgements,
+  getLiveWard,
+  getWard,
+  usesServer,
+} from "../api";
 import { WardRow } from "../components/WardRow";
 import { band, obsDue, unacknowledged } from "../components/risk";
-import { formatClock } from "../components/format";
+import { formatClock, formatSimClock, simStatus } from "../components/format";
+import type { SimStatus } from "../components/format";
 import { SessionMenu } from "../components/SessionMenu";
 import { standing } from "../components/vitalsDraft";
 import { NotRankedSection } from "./NotRankedSection";
@@ -15,7 +22,7 @@ interface Props {
   onSignOut: () => void;
 }
 
-const POLL_MS = 15_000;
+const SIM_POLL_MS = 2_000;
 
 function beep(): void {
   try {
@@ -44,6 +51,10 @@ export function Ward({ session, onSignOut }: Props) {
   // null until the server's acknowledgements arrive, so an alert already acknowledged never sounds.
   const [acked, setAcked] = useState<ReadonlyMap<string, number> | null>(null);
   const alerted = useRef(new Set<string>());
+  // Null until the simulator's status arrives, and whenever there is none to show.
+  const [sim, setSim] = useState<SimStatus | null>(null);
+  // The API changes as the simulator runs: ask it more often than the fixture, which never changes.
+  const pollMs = usesServer ? 5_000 : 15_000;
 
   // Keeps the last good ward on screen when a fetch fails, and says since when.
   const refresh = useCallback(() => {
@@ -58,9 +69,21 @@ export function Ward({ session, onSignOut }: Props) {
 
   useEffect(() => {
     refresh();
-    const t = setInterval(refresh, POLL_MS);
+    const t = setInterval(refresh, pollMs);
     return () => clearInterval(t);
-  }, [refresh]);
+  }, [refresh, pollMs]);
+
+  // The simulator's status line: no line when the fetch fails or `shared` is not what it publishes.
+  useEffect(() => {
+    const poll = () =>
+      getLiveWard().then(
+        (live) => setSim(simStatus(live?.shared)),
+        () => setSim(null),
+      );
+    void poll();
+    const t = setInterval(poll, SIM_POLL_MS);
+    return () => clearInterval(t);
+  }, []);
 
   // A recorded value changes a patient's standing, which only the server can compute: say
   // what it said, then fetch the ward again so the ranking on screen is the server's.
@@ -111,7 +134,7 @@ export function Ward({ session, onSignOut }: Props) {
       <main className={styles.container}>
         <p role={failedSince ? "alert" : "status"}>
           {failedSince
-            ? "The ward server cannot be reached. Retrying every 15 seconds."
+            ? `The ward server cannot be reached. Retrying every ${pollMs / 1000} seconds.`
             : "Loading ward…"}
         </p>
       </main>
@@ -160,7 +183,7 @@ export function Ward({ session, onSignOut }: Props) {
       {failedSince && (
         <p className={styles.offline} role="status">
           Cannot reach the ward server since {formatClock(failedSince)}. Showing data from{" "}
-          {fetchedAt ? formatClock(fetchedAt) : "--"}; ages below keep counting. Retrying every 15 seconds.
+          {fetchedAt ? formatClock(fetchedAt) : "--"}; ages below keep counting. Retrying every {pollMs / 1000} seconds.
         </p>
       )}
 
@@ -221,6 +244,13 @@ export function Ward({ session, onSignOut }: Props) {
             <button type="button" className={styles.noticeClose} onClick={() => setNotice(null)}>
               Dismiss
             </button>
+          </p>
+        )}
+
+        {sim !== null && (
+          <p className={styles.notice} role="status">
+            Simulator: {formatSimClock(sim)} &middot; {sim.counts.received} received &middot;{" "}
+            {sim.counts.rejected} rejected &middot; {sim.counts.abstained} abstained
           </p>
         )}
 
