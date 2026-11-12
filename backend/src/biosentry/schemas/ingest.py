@@ -255,10 +255,12 @@ class NewCommand(Contract):
         "apply_patch",
     ]
     patient_id: Id | None = None
-    speed: Literal[0, 1, 10, 60] | None = None
+    speed: Annotated[int, Field(strict=True)] | None = None  # 0, 1, 10 or 60, checked below
 
     @model_validator(mode="after")
     def _the_fields_of_the_kind(self) -> Self:
+        if self.speed not in (None, 0, 1, 10, 60):
+            raise ValueError("speed is 0, 1, 10 or 60")
         patient = self.kind not in ("set_speed", "reset")
         if (self.patient_id is not None) != patient or (self.speed is not None) != (
             self.kind == "set_speed"

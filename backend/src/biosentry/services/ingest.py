@@ -277,16 +277,22 @@ def commands(store: PostgresStore, run_id: int, after: int) -> list[dict[str, An
 def add_command(store: PostgresStore, audit: AuditLog, who: str, body: NewCommand) -> bool:
     """Queue a command for the sim. False when the patient is not the caller's. A ward that is not
     receiving data from a live sim run (the fixture, or a run that stopped) is a ConflictError:
-    nothing would read the command."""
+    nothing would read the command. So is a run that a newer one has replaced since this request
+    began: the run is judged again under its lock, where the write is."""
     resource = body.patient_id or store.ward
     if body.patient_id is not None and body.patient_id not in store.assigned(who):
         audit.append(who, "sim_command", resource, "not_found")
         return False
-    if not is_live(store.last_batch_at, store.ended, store.clock()):
-        audit.append(who, "sim_command", resource, "rejected")
-        raise ConflictError("The ward is not receiving data from a running simulation")
     data = {} if body.speed is None else {"speed": body.speed}
-    with store.tx():
-        store.add_command(body.kind, who, body.patient_id, data)
+    try:
+        with store.tx():
+            run = _locked_newest(store.conn, store.run_id)
+            assert run is not None  # the store was made on it
+            if not is_live(run["last_batch_at"], run["ended"], store.clock()):
+                raise ConflictError("The ward is not receiving data from a running simulation")
+            store.add_command(body.kind, who, body.patient_id, data)
+    except ConflictError:  # audited after the rollback, or the row would go with it
+        audit.append(who, "sim_command", resource, "rejected")
+        raise
     audit.append(who, "sim_command", resource, "ok")
     return True

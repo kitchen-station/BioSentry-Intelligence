@@ -1545,6 +1545,8 @@ def test_a_command_goes_on_the_feed_in_order_with_what_it_says_and_who_sent_it(a
         {"kind": "set_speed"},
         {"kind": "set_speed", "speed": 5},
         {"kind": "set_speed", "speed": "10"},
+        {"kind": "set_speed", "speed": True},
+        {"kind": "set_speed", "speed": 1.0},
         {"kind": "set_speed", "speed": 10, "patient_id": "s-1"},
         {"kind": "reset", "speed": 1},
         {"kind": "reset", "patient_id": "s-1"},
@@ -1616,6 +1618,26 @@ def test_nothing_is_queued_for_a_ward_that_is_not_running_a_sim(api: Api) -> Non
     assert command(api, "rn-manalo", kind="reset").status_code == 409  # ended
     assert len(sent(api, run_id)) == 1
     assert [o for _, _, o in sim_audit(api)] == ["rejected", "ok", "rejected", "rejected"]
+
+
+def test_a_command_for_a_run_replaced_while_it_was_being_handled_is_refused_and_writes_nothing(
+    api: Api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from biosentry.repositories.postgres import PostgresStore
+
+    start(api, client_id="client-a")
+    api.as_("md-santos")
+    original = PostgresStore.can_control
+
+    def replaced_then_checked(self: PostgresStore, clinician_id: str) -> bool:
+        start(api, client_id="client-a")  # the same client replaces its own run, after this request began
+        return original(self, clinician_id)
+
+    monkeypatch.setattr(PostgresStore, "can_control", replaced_then_checked)
+    refused = command(api, "md-santos", **SPEED)
+    assert (refused.status_code, refused.json()) == (409, {"detail": REPLACED})
+    assert api.sql("SELECT * FROM sim_command") == []
+    assert sim_audit(api) == [("md-santos", "W4", "rejected")]
 
 
 def test_a_command_and_its_feed_row_are_one_transaction(
