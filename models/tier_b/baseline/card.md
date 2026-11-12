@@ -65,7 +65,45 @@ respiratory rate 16, SpO2 97 ends near 85.5, 23 and 92.5. NEWS2 scores that 4 wi
 so it does not trigger; with the baseline spread at the fitted wander SD the z values are about
 2.5, 2.7 and 2.8, all past k = 2.0.
 
-## Sweep result (slice B4, synthetic, not validated)
+## Sweep result on ward-v2 (temperature rise removed, noise 0.1 C; synthetic, not validated)
+
+ward-v2 is ward-v1 made again by the fixed simulator (sim commit f7647c5, after PR #25 removed
+`INJECT_TEMPERATURE` and raised temperature noise from 0.02 to 0.1 C). Same seeds, scenario, days and command. Same grid, rule, windows, chance
+control and bootstrap. Only the data changed. Data card: `models/data/ward-v2/card.md`.
+
+- Tuning seeds 1 to 10 (56 episodes, 51 not cut short, 3,072 control windows). NEWS2 chart
+  trigger alone: 0.405 alerts per patient per 12 h, any-bin 39/51, excess +0.327.
+- Chosen: **k = 4.0, p = 8** (was k = 3.0, p = 4 on ward-v1), the corner of the grid. Of the 19
+  settings within the alert budget, 17 catch exactly 41 of 51 for "NEWS2 OR baseline" and two
+  catch 42. The pick was decided by control windows, not by episodes.
+- Held-out seeds 11 to 30, run once after the choice (91 episodes, 79 not cut short, 4,678
+  chance windows). Any-bin = alerting in any bin, episodes not cut short. "All" = all 91
+  evaluated episodes, with the patient-level 95% interval. Chance and excess have no interval.
+
+| Policy | Alerts / patient / 12 h (95% CI) | Any-bin | Any-bin, all (95% CI) | Chance | Excess | New alert, hypotensive | Lead |
+|---|---|---|---|---|---|---|---|
+| NEWS2 chart trigger alone | 0.414 (0.395-0.434) | 0.684 (54/79) | 0.626 (0.522-0.727) | 0.473 | +0.210 | 0.074 (2/27) | 47.2 |
+| Baseline alone | 0.042 (0.035-0.049) | 0.278 (22/79) | 0.264 (0.174-0.360) | 0.032 | +0.246 | 0.037 (1/27) | -82.5 |
+| NEWS2 OR baseline | 0.426 (0.407-0.444) | 0.722 (57/79) | 0.659 (0.558-0.758) | 0.486 | +0.235 | 0.111 (3/27) | 39.6 |
+| Baseline alone, no temperature | 0.032 (0.026-0.038) | 0.266 (21/79) | 0.253 (0.165-0.343) | 0.025 | +0.241 | 0.000 (0/27) | -85.3 |
+| NEWS2 OR baseline, no temperature | 0.425 (0.405-0.442) | 0.709 (56/79) | 0.648 (0.550-0.745) | 0.484 | +0.225 | 0.074 (2/27) | 44.6 |
+
+What this shows:
+- The baseline adds nothing measurable to NEWS2. "NEWS2 OR baseline" catches 3 more of 79
+  episodes, and its interval over all episodes (0.558-0.758) overlaps NEWS2's (0.522-0.727).
+- Baseline alone is now a quiet, late rule: about a tenth of NEWS2's alerts, 22 of 79 episodes,
+  median 82 minutes after fully in. Its excess (+0.246) is above NEWS2's (+0.210), but excess is
+  capped at 1 minus chance (0.968 against 0.527 here), so the two cannot be compared.
+- With and without temperature now give almost the same rows. The gains seen on ward-v1 went away on ward-v2. Two things changed (the temperature rise was removed and temperature noise went from 0.02 to 0.1 C), and this run cannot say which one caused it.
+- Across all 30 ward-v2 trials the median temperature change from the 2 h before an episode to
+  the hour after it is fully in is -0.06 C (tachycardic), +0.06 C (hypotensive), +0.05 C
+  (respiratory). On ward-v1 the same measure gave +0.52, +0.61 and +0.61 C.
+
+What it cannot show: anything about patients. It is still one simulator judged on itself, with
+79 episodes. It does not say that no baseline rule could help: only this rule, with this grid
+and this selection rule, on this simulator.
+
+## Earlier result on ward-v1 (kept for comparison; the simulator then added a fixed temperature rise)
 
 - Swept: k in 1.5, 2.0, 2.5, 3.0, 3.5, 4.0 and p in 2, 3, 4, 6, 8 (window 24 and the floors stay
   as they are), on tuning seeds 1 to 10 of ward-v1 only (56 episodes, 51 not cut short).
@@ -73,7 +111,8 @@ so it does not trigger; with the baseline spread at the fitted wander SD the z v
   most 25% more alerts per patient per 12 h than the chart trigger alone, take the largest excess
   over chance of alerting in any bin on episodes not cut short; ties go to fewer alerts, then
   larger k, then larger p.
-- Chosen: **k = 3.0, p = 4** (in `params.json`, which also holds the whole grid). The detector's
+- Chosen then: k = 3.0, p = 4 (`params.json` now holds the ward-v2 choice and grid; the ward-v1
+  file is in git history before this change). The detector's
   DEFAULTS in code (k = 2.0, p = 3) are NOT changed by this slice; only the research command
   reads `params.json`. On the tuning seeds k = 2.0, p = 3 is over the alert budget.
 - Held-out seeds 11 to 30, run once after the choice (91 episodes, 79 not cut short, 4,678
@@ -121,10 +160,12 @@ so it does not trigger; with the baseline spread at the fitted wander SD the z v
 - Circular: tuned and judged on the same simulator that made the data.
 - Cohort rows hold whole-number values at the end of each 15-minute bin; the API uses 15-minute
   medians. The detector sees a coarser signal here than in the product.
-- The winner was decided by 9 of 3,066 control windows, not by episodes: k = 3.0, p = 4 and
-  k = 2.5, p = 6 both catch 46 of 51.
+- ward-v1: the winner was decided by 9 of 3,066 control windows, not by episodes: k = 3.0, p = 4
+  and k = 2.5, p = 6 both catch 46 of 51. ward-v2: 17 of the 19 settings within budget catch 41
+  of 51, so again the control windows decided.
 - Excess is capped at 1 minus chance, so it cannot be compared across policies with different
-  chance rates: the OR policy can reach at most +0.45, baseline alone at most +0.82.
+  chance rates. ward-v1: the OR policy could reach at most +0.45, baseline alone at most +0.82.
+  ward-v2: at most +0.51 and +0.97.
 - "Held-out run once" is by procedure; nothing in the code enforces it.
 - 51 tuning episodes: neighbouring settings differ by a few episodes, so the exact winner is not
   stable. Read the grid, not only the pick.
@@ -134,8 +175,9 @@ so it does not trigger; with the baseline spread at the fitted wander SD the z v
 
 - Circadian swing (heart rate amplitude 6.9 bpm in the simulator) is only partly inside a 6 h
   window, so time of day can look like deviation; the sweep picks k with that in it.
-- No baseline for cuff blood pressure or consciousness (intermittent nurse entries). Hypotensive
-  episodes are caught here only through the simulator's temperature rise (see the sweep result).
+- No baseline for cuff blood pressure or consciousness (intermittent nurse entries). On ward-v1,
+  hypotensive episodes were caught only through the simulator's temperature rise; on ward-v2
+  baseline alone catches 1 of 27 as a new alert.
 - A deterioration that starts inside the six-hour window widens the spread and moves the median,
   which lowers sensitivity.
 - Re-anchoring after a patch is re-applied is not implemented; the caller would have to slice

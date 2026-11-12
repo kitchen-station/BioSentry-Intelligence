@@ -10,15 +10,55 @@
 
 ## What it is
 
-A tiny neural network (one hidden layer of 16 ReLU units, then a sigmoid) that gives, for each
-15-minute bin, a probability that the patient is in the onset of a deterioration episode. It is
-a small network fitted to the log-odds of a weak, overfitted teacher (gradient boosting). Call it
-distilled only with that caveat: the teacher is worse than a constant guess on validation, and
-the student beats it. Only the student is exported.
+A small model that gives, for each 15-minute bin, a probability that the patient is in the onset
+of a deterioration episode. On ward-v2 the shipped `model.onnx` is a logistic student (no hidden
+layer), fitted to the log-odds of an overfitted gradient-boosting teacher. The teacher has higher
+validation average precision (0.008 against 0.003); the student has lower log loss. Only the
+student is exported. (On ward-v1 it was an MLP with one hidden layer of 16 ReLU units.)
+
+## Result on ward-v2 (temperature rise removed, noise 0.1 C)
+
+The committed files are now trained on ward-v2: ward-v1 made again by the fixed simulator (sim
+commit f7647c5, after PR #25 removed `INJECT_TEMPERATURE` and raised temperature noise from
+0.02 to 0.1 C). Same seeds, scenario, days and command; data card `models/data/ward-v2/card.md`. Same recipe, split, threshold rule and
+harness. Nothing was tuned again.
+
+- Validation average precision (seeds 8 to 10, prevalence 0.0015): teacher 0.008, logistic
+  0.0033, MLP 0.0030. So the logistic student is kept this time, by a margin that is noise. No
+  temperature: teacher 0.006, logistic 0.008, MLP 0.013 (MLP kept). The MLP fit stops at
+  scikit-learn's 100 iterations with a convergence warning (the recipe's setting, not changed).
+- Thresholds: student 0.002 (158 alerts on seeds 8 to 10 against NEWS2's 806). The teacher at
+  0.001 is in alert 43% of the time on seeds 8 to 10 and both no-temperature models 81%: no
+  usable threshold, not working rules.
+- Held-out seeds 11 to 30, scored once (91 episodes, 79 not cut short, 4,678 chance windows):
+
+| Policy | Alerts / patient / 12 h (95% CI) | Time in alert | Any-bin | Any-bin, all (95% CI) | Chance | Excess | New-alert excess | Lead |
+|---|---|---|---|---|---|---|---|---|
+| NEWS2 chart trigger | 0.414 (0.395-0.434) | 0.158 | 0.684 | 0.626 (0.522-0.727) | 0.473 | +0.210 | +0.179 | 47.2 |
+| Baseline alone (B4, k 4.0, p 8) | 0.042 (0.035-0.049) | 0.012 | 0.278 | 0.264 (0.174-0.360) | 0.032 | +0.246 | +0.253 | -82.5 |
+| NEWS2 OR baseline (B4) | 0.426 (0.407-0.444) | 0.165 | 0.722 | 0.659 (0.558-0.758) | 0.486 | +0.235 | +0.210 | 39.6 |
+| Student (logistic) | 0.088 (0.077-0.099) | 0.019 | 0.367 | 0.352 (0.250-0.452) | 0.058 | +0.309 | +0.312 | 5.2 |
+| NEWS2 OR student | 0.429 (0.410-0.448) | 0.165 | 0.709 | 0.648 (0.545-0.745) | 0.486 | +0.223 | +0.200 | 47.2 |
+| Teacher; all no-temperature rows | no usable threshold: alert stuck open (43% to 81% of time on seeds 8-10); not a working rule | | | | | | | |
+
+What this shows:
+- Added to NEWS2, the student gives nothing measurable: 56 of 79 against NEWS2's 54, with
+  overlapping intervals.
+- Alone, it catches about half as many episodes as NEWS2 (any-bin over all episodes 0.352 against
+  0.626, intervals do not overlap) at about a fifth of the alerts. Its excess (+0.309) is above
+  NEWS2's (+0.210), but excess is capped at 1 minus chance (0.942 against 0.527), so the two are
+  not comparable.
+- On ward-v1 the student alone had any-bin 0.637 (0.527-0.731) over all episodes and excess
+  +0.539. The gains seen on ward-v1 went away on ward-v2. Two things changed (the temperature rise was removed and temperature noise went from 0.02 to 0.1 C), and this run cannot say which one caused it.
+
+What it cannot show: anything about patients, or whether a better teacher would help (the teacher
+is still worse than a constant guess on validation, log loss 0.021 against 0.011).
 
 ## Data
 
-Synthetic only: ward-v1 simulator trials (sim commit 3a15e01), 30 simulated days each. Seeds 1
+Synthetic only: ward-v2 simulator trials (sim commit f7647c5), 30 simulated days each. The
+sections below, from "Features" to "What depends on temperature", describe the earlier ward-v1 run
+(sim commit 3a15e01, with the temperature rise) and are kept for comparison. Seeds 1
 to 7 train the teacher and the students. Seeds 8 to 10 pick the early stop, the student and the
 threshold. Seeds 11 to 30 were scored once, after everything was fixed. The training loader
 opens only `manifest.json` of a held-out folder and skips it; a test proves it.
@@ -72,7 +112,7 @@ label. Starting patients (admit minute 0) are left out. Training: 211,333 bins, 
   alert stays open, because the alert rule re-arms only after 4 h not alerting, so the alert
   count looks low while the patient is alerting half the time.
 
-## Held-out numbers (seeds 11 to 30)
+## Held-out numbers on ward-v1 (seeds 11 to 30; kept for comparison)
 
 91 episodes, 79 not cut short, 4,678 chance windows, 1,873 patients. Any-bin = alerting in any
 bin of the window, episodes not cut short. Excess = any-bin minus chance. Lead time = median
@@ -92,18 +132,15 @@ minutes before fully in, episodes with a new alert.
 
 The no-temperature rows have no new-alert excess on held-out (-0.009 to +0.004).
 
-The untrained baseline rule from B4 beats the student on held-out. It has more excess (+0.670
-against +0.539; without temperature +0.420 against +0.116) and fewer alerts (0.189 against
-0.226 per patient per 12 h). The student is better only on lead time (20.5 against -18.8 min).
-On this simulator the learned model is not better than the simple rule.
+On ward-v1 the B4 rule had fewer alerts than the student (0.189 against 0.226); their excess cannot be compared because their chance rates differ.
 
 95% intervals and per-kind rows are in the `research.evaluate_student` output.
 
-## What depends on temperature
+## What depends on temperature (ward-v1)
 
-Every useful number depends on the simulator's uncited temperature rise. The simulator adds a fixed,
+On ward-v1, every useful number depended on the simulator's uncited temperature rise. The simulator then added a fixed,
 uncited temperature rise to every episode (see the baseline card). With temperature, the student
-beats NEWS2 alone on excess (+0.539 against +0.237) at about half the alerts. Without
+had a higher excess than NEWS2 (+0.539 against +0.237), but at a much lower chance rate, so this does not rank them. Without
 temperature, the student is in alert 54% of the time on the held-out seeds (53% on seeds 8 to 10), so chance is 0.834 and the excess is
 +0.116, below NEWS2. Its alert count looks low only because one long alert stays open. On this
 simulator, the student adds nothing measurable over NEWS2 once temperature is removed.
@@ -125,23 +162,26 @@ collapses its average precision from 0.036 to about 0.003 (0.0015 to 0.0040).
 ## Huawei fit
 
 ONNX opset 13, IR version 7, float32, static input [1, n], output [1, 1]. Ops: Sub, Div, Gemm,
-Relu, Sigmoid. Built with `onnx.helper`; `onnx.checker` passes; onnxruntime matches the numpy
+Relu, Sigmoid (the ward-v2 `model.onnx` is the logistic student, so it has no Relu). Built with `onnx.helper`; `onnx.checker` passes; onnxruntime matches the numpy
 forward pass within 1e-5 on 1,000 training rows (`metadata.json`). Converting to MindSpore Lite
 (`converter_lite --fmk=ONNX`) is a Linux deployment step. It has not been done here.
 
 | File | Bytes | sha256 |
 |---|---|---|
-| `model.onnx` | 1,806 | `e7ec927c77c625465fcdc28d66736024e0a417ab88cd66f0c3e5c41fca85613d` |
-| `model_no_temp.onnx` | 1,518 | `a2ae213977e13d8eb864fe685bceeed83e8cdb89637f823a4a783fb92d153546` |
+| `model.onnx` (ward-v2) | 470 | `41deaa6c07c366aee5fe5bac47c6edc8282eb5bf1fe1dbfbc89e8af887dd1ecd` |
+| `model_no_temp.onnx` (ward-v2) | 1,518 | `af7453e1412b0f6bcb4cd22ef7b6246738929c255b77db61e9565ee1fdffcef5` |
+
+The ward-v1 files (`model.onnx` 1,806 bytes, sha256 `e7ec927c...`; `model_no_temp.onnx` `a2ae2139...`) are in git history before this change.
 
 ## Reproduce
 
 Inside `biosentry-research-venv` (see `research/README.md`, ML gate):
 
-    python -m research.train_student /data/trials/ward-v1/seed-*
-    python -m research.evaluate_student /data/trials/ward-v1/seed-*
+    python -m research.train_student /data/trials/ward-v2/seed-*
+    python -m research.evaluate_student /data/trials/ward-v2/seed-*
 
-Two full training runs wrote the same sha256s. About 2.5 minutes per training run.
+`evaluate_student` retrains and refuses unless the bytes match the committed sha256s; on ward-v2
+it ran and matched, so a second training gave the same bytes. About 2.5 minutes per training run.
 
 ## Packages (exact pins, `research/uv.lock`)
 

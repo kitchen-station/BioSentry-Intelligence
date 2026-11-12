@@ -1,7 +1,7 @@
 """Improve the alerting policy by reward over fresh simulator trials (slice B6).
 
-    python -m research.reward_loop --train <ward-v1-train> --validate <ward-v1> --out <dir> [--no-temperature]
-    python -m research.reward_loop --evaluate <ward-v1> --out <dir>
+    python -m research.reward_loop --train <ward-v2-train> --validate <ward-v2> --out <dir> [--no-temperature]
+    python -m research.reward_loop --evaluate <ward-v2> --out <dir>
 
 The rules are in research/README.md. Training reads only seeds 31 to 60 of --train and
 validation only seeds 8 to 10 of --validate; seeds 11 to 30 are refused before any file but the

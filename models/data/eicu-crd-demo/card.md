@@ -74,10 +74,13 @@ Command and definitions: `research/README.md`, "Real data". 632 stays in the 46 
 (14 vasopressor, 10 unit death); 102,428 fifteen-minute bins. Full NEWS2 inputs in 5.5% of bins (oxygen device
 present in 14.9%, GCS in 40.7%, temperature 68.8%, systolic BP 83.5%, SpO2 82.6%, respiratory rate 80.3%, heart rate
 92.3%). The numbers for NEWS2 and the baseline rule are in the command's output, not repeated here.
+
+Note (ward-v2): the eICU results were produced with k = 3.0, p = 4, the ward-v1 sweep choice. `research/realdata/evaluate.py` reads `models/tier_b/baseline/params.json`, which now holds the ward-v2 choice (k = 4.0, p = 8), so a re-run would use k = 4.0, p = 8 and would not reproduce the published baseline numbers. It has not been re-run.
+
 Out-of-range values dropped (not converted): SpO2 1,112, systolic 62, temperature 55, heart rate and respiratory
 rate under 5 each. Not-alert consciousness (sedated, ventilated patients) is present in 18,748 of the 43,052 bins
 where the "measured-components sum (NOT NEWS2; lower bound)" fires and alone causes the firing in 10,767: in an ICU close
-to an outcome-linked input. Baseline rule limits: its parameters were tuned on simulated data, and its baseline is
+to an outcome-linked input. Baseline rule limits: its parameters (k = 3.0, p = 4) were tuned on simulated data, and its baseline is
 the first 6 ICU hours, often the sickest; for events at 6 to 12 hours the baseline period overlaps the event window.
 Excess cannot be compared between rules with different chance rates; as a share of ceiling the order changes, and the intervals overlap.
 

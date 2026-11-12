@@ -19,8 +19,8 @@
     "alerts_per_patient_12h": 0.287036,
     "caught_early": 2,
     "episodes": 5,
-    "news2_time_in_alert": 0.148455,
-    "reward": -0.005396,
+    "news2_time_in_alert": 0.148053,
+    "reward": 0.001792,
     "seed": 8,
     "time_in_alert": 0.053052
    },
@@ -28,8 +28,8 @@
     "alerts_per_patient_12h": 0.312882,
     "caught_early": 2,
     "episodes": 2,
-    "news2_time_in_alert": 0.117307,
-    "reward": 1.293769,
+    "news2_time_in_alert": 0.116677,
+    "reward": 1.295858,
     "seed": 9,
     "time_in_alert": 0.063353
    },
@@ -37,14 +37,14 @@
     "alerts_per_patient_12h": 0.35402,
     "caught_early": 1,
     "episodes": 2,
-    "news2_time_in_alert": 0.100459,
-    "reward": -0.168421,
+    "news2_time_in_alert": 0.100392,
+    "reward": -0.174603,
     "seed": 10,
     "time_in_alert": 0.080287
    }
   ],
   "rejected_time_in_alert": false,
-  "reward": 0.373317,
+  "reward": 0.374349,
   "seeds": [
    8,
    9,

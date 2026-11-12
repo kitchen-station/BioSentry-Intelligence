@@ -2,16 +2,16 @@
  "accepted": true,
  "best_candidate": {
   "params": {
-   "p": 4,
-   "theta": 2.7147,
+   "p": 7,
+   "theta": 2.0539,
    "weights": {
-    "heart_rate": 0.0,
-    "respiratory_rate": 0.4507,
-    "spo2": 0.7394,
-    "temperature": 0.8359
+    "heart_rate": 0.0054,
+    "respiratory_rate": 0.59,
+    "spo2": 0.9367,
+    "temperature": 0.2935
    }
   },
-  "train_reward": 1.664267
+  "train_reward": 1.001225
  },
  "candidates": 30,
  "current_before": {
@@ -25,18 +25,18 @@
     "temperature": 0.4753
    }
   },
-  "train_reward": 0.991455
+  "train_reward": 0.363347
  },
  "generation": 3,
  "generator_seed": 20261115,
  "params": {
-  "p": 4,
-  "theta": 2.7147,
+  "p": 7,
+  "theta": 2.0539,
   "weights": {
-   "heart_rate": 0.0,
-   "respiratory_rate": 0.4507,
-   "spo2": 0.7394,
-   "temperature": 0.8359
+   "heart_rate": 0.0054,
+   "respiratory_rate": 0.59,
+   "spo2": 0.9367,
+   "temperature": 0.2935
   }
  },
  "rejected_time_in_alert": 1,
@@ -56,35 +56,35 @@
  "validation": {
   "per_seed": [
    {
-    "alerts_per_patient_12h": 0.181489,
+    "alerts_per_patient_12h": 0.04505,
     "caught_early": 0,
     "episodes": 5,
-    "news2_time_in_alert": 0.148455,
-    "reward": -1.267986,
+    "news2_time_in_alert": 0.148053,
+    "reward": -0.31362,
     "seed": 8,
-    "time_in_alert": 0.026231
+    "time_in_alert": 0.004721
    },
    {
-    "alerts_per_patient_12h": 0.185363,
-    "caught_early": 2,
-    "episodes": 2,
-    "news2_time_in_alert": 0.117307,
-    "reward": 1.581602,
-    "seed": 9,
-    "time_in_alert": 0.02784
-   },
-   {
-    "alerts_per_patient_12h": 0.169036,
+    "alerts_per_patient_12h": 0.060473,
     "caught_early": 1,
     "episodes": 2,
-    "news2_time_in_alert": 0.100459,
-    "reward": 0.442105,
+    "news2_time_in_alert": 0.116677,
+    "reward": 0.863905,
+    "seed": 9,
+    "time_in_alert": 0.004768
+   },
+   {
+    "alerts_per_patient_12h": 0.076545,
+    "caught_early": 0,
+    "episodes": 2,
+    "news2_time_in_alert": 0.100392,
+    "reward": -0.253968,
     "seed": 10,
-    "time_in_alert": 0.04905
+    "time_in_alert": 0.019108
    }
   ],
   "rejected_time_in_alert": false,
-  "reward": 0.251907,
+  "reward": 0.098772,
   "seeds": [
    8,
    9,

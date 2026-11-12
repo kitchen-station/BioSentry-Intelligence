@@ -8,7 +8,61 @@
 | status | learned on synthetic trials, not validated. Not wired to the API, the rank or the arbiter |
 | intended use | research. Tier A (NEWS2) is never changed or learned |
 
-## Summary
+## Result on ward-v2 (temperature rise removed, noise 0.1 C)
+
+The committed files are now learned on ward-v2 and ward-v2-train: the same trials made again by
+the fixed simulator (sim commit f7647c5, after PR #25 removed `INJECT_TEMPERATURE` and raised
+temperature noise from 0.02 to 0.1 C). Same seeds, scenario, days and command; data card `models/data/ward-v2/card.md`. Same loop, reward,
+lambda, seeds and harness. Nothing was tuned again. The B4 rows use the ward-v2 sweep choice
+(k = 4.0, p = 8); generation 0 is still fixed in code at k = 3.0, p = 4 (weights 1, theta 3).
+
+- Shipped, with temperature: generation 4 (validation reward 0.688). Weights: heart rate 0.35,
+  respiratory rate 0.78, SpO2 1.20, temperature 0.08. Theta 2.29, p 6. On ward-v1 the shipped
+  policy put its largest weight on temperature (0.70); here temperature is the smallest.
+- Shipped, no temperature: generation 9 again, with the same six numbers as on ward-v1 (only the
+  validation numbers moved, so its sha256 changed).
+- A candidate was again accepted in all 20 generations. Generation 0 with temperature was
+  rejected on validation again. Validation rests on 9 episodes, so the pick is a selection on
+  noise, as before.
+- Held-out seeds 11 to 30, scored once (91 episodes, 79 not cut short, 4,678 chance windows):
+
+| Policy | Alerts/pt/12 h (95% CI) | Time in alert | Any-bin | Any-bin, all (95% CI) | Chance | Excess | New-alert excess | Lead |
+|---|---|---|---|---|---|---|---|---|
+| NEWS2 chart trigger | 0.414 (0.395-0.434) | 0.158 | 0.684 | 0.626 (0.522-0.727) | 0.473 | +0.210 | +0.179 | 47.2 |
+| B4 baseline alone (k 4.0, p 8) | 0.042 (0.035-0.049) | 0.012 | 0.278 | 0.264 (0.174-0.360) | 0.032 | +0.246 | +0.253 | -82.5 |
+| NEWS2 OR B4 | 0.426 (0.407-0.444) | 0.165 | 0.722 | 0.659 (0.558-0.758) | 0.486 | +0.235 | +0.210 | 39.6 |
+| Reward gen 0 | 0.429 (0.414-0.443) | 0.123 | 0.785 | 0.725 (0.625-0.816) | 0.435 | +0.350 | +0.301 | 23.0 |
+| NEWS2 OR gen 0 | 0.535 (0.520-0.550) | 0.248 | 0.861 | 0.802 (0.716-0.885) | 0.666 | +0.195 | +0.084 | 67.9 |
+| Reward final (gen 4) | 0.150 (0.138-0.162) | 0.029 | 0.646 | 0.582 (0.464-0.678) | 0.120 | +0.525 | +0.534 | -11.2 |
+| NEWS2 OR final | 0.465 (0.446-0.482) | 0.173 | 0.772 | 0.703 (0.608-0.798) | 0.516 | +0.256 | +0.240 | 61.5 |
+| Reward gen 0, no temperature | 0.318 (0.302-0.334) | 0.072 | 0.722 | 0.648 (0.536-0.740) | 0.300 | +0.421 | +0.403 | 18.8 |
+| NEWS2 OR gen 0, no temperature | 0.518 (0.501-0.533) | 0.207 | 0.835 | 0.758 (0.667-0.843) | 0.600 | +0.235 | +0.187 | 50.5 |
+| Reward final (gen 9), no temperature | 0.061 (0.052-0.068) | 0.017 | 0.519 | 0.473 (0.370-0.576) | 0.050 | +0.469 | +0.478 | -38.7 |
+| NEWS2 OR final, no temperature | 0.434 (0.414-0.452) | 0.166 | 0.722 | 0.659 (0.560-0.753) | 0.492 | +0.229 | +0.204 | 60.9 |
+
+What this shows:
+- Added to NEWS2, the final policy gives no gain beyond noise: any-bin over all episodes 0.703
+  (0.608-0.798) against NEWS2's 0.626 (0.522-0.727), intervals overlapping, for 12% more alerts.
+- Alone, the final policy catches about as many episodes as NEWS2 (0.582 against 0.626,
+  intervals overlapping) at about a third of the alerts (0.150 against 0.414, intervals apart),
+  but later: median lead -11.2 min against +47.2. Its excess (+0.525) is above NEWS2's
+  (+0.210), but excess is capped at 1 minus chance (0.880 against 0.527), so the two are not
+  comparable. On new alerts it fires in more windows than NEWS2 (0.560 against 0.363,
+  intervals just overlapping), but mostly after the episode is fully in. This is the same
+  quiet, late pattern as the no-temperature policy on ward-v1.
+- On ward-v1 the final policy alone had any-bin 0.769 (0.676-0.852) and excess +0.700, and
+  NEWS2 OR final had 0.857 (0.779-0.922). The gains seen on ward-v1 went away on ward-v2. Two things changed (the temperature rise was removed and temperature noise went from 0.02 to 0.1 C), and this run cannot say which one caused it.
+
+What it cannot show: anything about patients, or that a fewer-alerts rule is safe. "Any-bin"
+counts alerting up to 2 h after fully in, so similar any-bin with a negative lead time is not
+early warning.
+
+## Earlier result on ward-v1 (kept for comparison; the simulator then added a fixed temperature rise)
+
+Everything from here to "Huawei note" describes the ward-v1 run (sim commit 3a15e01). Its
+`policy.json` and generation files are in git history before this change.
+
+## Summary (ward-v1)
 
 - It did not beat the untrained B4 rule.
 - With temperature, it ended within noise of B4.
@@ -195,13 +249,13 @@ in (`--train`, `--validate`) and a model folder out (`--out`). That has not been
 Run from the repo root, in either research venv (see `research/README.md`), with the data
 mounted at `/data`:
 
-    python -m research.reward_loop --train /data/trials/ward-v1-train --validate /data/trials/ward-v1 --out models/tier_b/reward_policy
-    python -m research.reward_loop --train /data/trials/ward-v1-train --validate /data/trials/ward-v1 --out models/tier_b/reward_policy --no-temperature
-    python -m research.reward_loop --evaluate /data/trials/ward-v1 --out models/tier_b/reward_policy
+    python -m research.reward_loop --train /data/trials/ward-v2-train --validate /data/trials/ward-v2 --out models/tier_b/reward_policy
+    python -m research.reward_loop --train /data/trials/ward-v2-train --validate /data/trials/ward-v2 --out models/tier_b/reward_policy --no-temperature
+    python -m research.reward_loop --evaluate /data/trials/ward-v2 --out models/tier_b/reward_policy
 
 The held-out command refuses a `policy.json` whose content does not match the sha256 stored in
-it. With temperature: `cb8eb5d990327d37b88fc5b421dcfec08790766f72c570b14b32e51f866cf246`.
-No temperature: `2a20d944d8fe7f9fecc875ff96078ffb7d039a4d74b9cdd5c1320c11be6587d9`.
+it (ward-v2). With temperature: `e2a74b78ad544d33ec3a59b13f0513754273ec83aac2ab9109875d61e8d991ac`.
+No temperature: `2dea2cd388efdbdb312d29f4486517c5633a21d9709afc4f69a6297d41df5a79`. (ward-v1: `cb8eb5d9...` and `2a20d944...`.)
 
 That sha256 is of the policy's content (the file without its own `sha256` field), so `shasum` on the
 file itself gives a different value.

@@ -11,7 +11,7 @@
     "temperature": 0.0
    }
   },
-  "train_reward": 1.578527
+  "train_reward": 1.580875
  },
  "candidates": 30,
  "current_before": {
@@ -25,7 +25,7 @@
     "temperature": 0.0
    }
   },
-  "train_reward": 1.257448
+  "train_reward": 1.258276
  },
  "generation": 2,
  "generator_seed": 20261114,
@@ -59,8 +59,8 @@
     "alerts_per_patient_12h": 0.177628,
     "caught_early": 1,
     "episodes": 5,
-    "news2_time_in_alert": 0.148455,
-    "reward": -0.241007,
+    "news2_time_in_alert": 0.148053,
+    "reward": -0.236559,
     "seed": 8,
     "time_in_alert": 0.025641
    },
@@ -68,8 +68,8 @@
     "alerts_per_patient_12h": 0.201138,
     "caught_early": 2,
     "episodes": 2,
-    "news2_time_in_alert": 0.117307,
-    "reward": 1.545994,
+    "news2_time_in_alert": 0.116677,
+    "reward": 1.547337,
     "seed": 9,
     "time_in_alert": 0.02995
    },
@@ -77,14 +77,14 @@
     "alerts_per_patient_12h": 0.232824,
     "caught_early": 1,
     "episodes": 2,
-    "news2_time_in_alert": 0.100459,
-    "reward": 0.231579,
+    "news2_time_in_alert": 0.100392,
+    "reward": 0.227513,
     "seed": 10,
     "time_in_alert": 0.041273
    }
   ],
   "rejected_time_in_alert": false,
-  "reward": 0.512189,
+  "reward": 0.512764,
   "seeds": [
    8,
    9,
