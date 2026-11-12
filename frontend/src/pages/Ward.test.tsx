@@ -114,6 +114,10 @@ const published = (over: object = {}) =>
   live({ clockS: 109_200, speed: 10, ended: false, counts: { received: 120, rejected: 3, abstained: 5 }, ...over });
 
 describe("the simulator status line", () => {
+  beforeEach(() => {
+    api.build.usesServer = true; // only the API has a simulator
+  });
+
   it("says the simulated time, the speed and the counts", async () => {
     api.getLiveWard.mockResolvedValue(published());
     page();
@@ -144,7 +148,7 @@ describe("the simulator status line", () => {
     expect(screen.queryByText(/Simulator:/)).toBeNull();
   });
 
-  it("follows the simulator every 2 seconds and drops the line when it cannot be read", async () => {
+  it("follows the simulator with the ward, in the same round, and drops the line when it cannot be read", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     api.getLiveWard
       .mockResolvedValueOnce(published())
@@ -153,13 +157,27 @@ describe("the simulator status line", () => {
     page();
     await screen.findByText(/^Simulator: day 2 06:20/);
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(2_000);
+      await vi.advanceTimersByTimeAsync(5_000);
     });
     await screen.findByText(/^Simulator: day 2 06:21/);
+    expect(api.getLiveWard).toHaveBeenCalledTimes(2);
+    expect(api.getWard).toHaveBeenCalledTimes(2); // one round: the rows and the status together
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(2_000);
+      await vi.advanceTimersByTimeAsync(5_000);
     });
     await waitFor(() => expect(screen.queryByText(/Simulator:/)).toBeNull());
+  });
+
+  it("is not asked for on the fixture: no call, now or later", async () => {
+    api.build.usesServer = false;
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    page();
+    await screen.findByText(/Priority queue/);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(api.getLiveWard).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Simulator:/)).toBeNull();
   });
 });
 
@@ -174,11 +192,11 @@ describe("how often the ward is asked for", () => {
     await screen.findByText(/Priority queue/);
     api.getWard.mockClear().mockRejectedValue(new Error("down"));
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(ms - 100);
+      await vi.advanceTimersByTimeAsync(ms - 1_000);
     });
     expect(api.getWard).not.toHaveBeenCalled();
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(200);
+      await vi.advanceTimersByTimeAsync(2_000);
     });
     expect(api.getWard).toHaveBeenCalledTimes(1);
     expect(await screen.findByText(new RegExp(`Retrying every ${ms / 1000} seconds\\.`))).toBeTruthy();

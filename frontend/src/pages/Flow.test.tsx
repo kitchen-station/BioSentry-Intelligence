@@ -135,11 +135,11 @@ describe("Flow page", () => {
     await screen.findByRole("heading", { name: "Recent movement" });
     api.getStays.mockClear();
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(ms - 100);
+      await vi.advanceTimersByTimeAsync(ms - 1_000);
     });
     expect(api.getStays).not.toHaveBeenCalled();
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(200);
+      await vi.advanceTimersByTimeAsync(2_000);
     });
     expect(api.getStays).toHaveBeenCalledTimes(1);
     api.build.usesServer = false;

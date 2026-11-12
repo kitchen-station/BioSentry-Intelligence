@@ -22,8 +22,6 @@ interface Props {
   onSignOut: () => void;
 }
 
-const SIM_POLL_MS = 2_000;
-
 function beep(): void {
   try {
     const ctx = new AudioContext();
@@ -56,8 +54,17 @@ export function Ward({ session, onSignOut }: Props) {
   // The API changes as the simulator runs: ask it more often than the fixture, which never changes.
   const pollMs = usesServer ? 5_000 : 15_000;
 
-  // Keeps the last good ward on screen when a fetch fails, and says since when.
+  // Keeps the last good ward on screen when a fetch fails, and says since when. With the API it
+  // also asks for the simulator's status in the same round, so the page has one poll: no status
+  // line when that fetch fails or `shared` is not what the simulator publishes. The fixture has no
+  // simulator and is not asked.
   const refresh = useCallback(() => {
+    if (usesServer) {
+      getLiveWard().then(
+        (live) => setSim(simStatus(live?.shared)),
+        () => setSim(null),
+      );
+    }
     getWard()
       .then((w) => {
         setData(w);
@@ -72,18 +79,6 @@ export function Ward({ session, onSignOut }: Props) {
     const t = setInterval(refresh, pollMs);
     return () => clearInterval(t);
   }, [refresh, pollMs]);
-
-  // The simulator's status line: no line when the fetch fails or `shared` is not what it publishes.
-  useEffect(() => {
-    const poll = () =>
-      getLiveWard().then(
-        (live) => setSim(simStatus(live?.shared)),
-        () => setSim(null),
-      );
-    void poll();
-    const t = setInterval(poll, SIM_POLL_MS);
-    return () => clearInterval(t);
-  }, []);
 
   // A recorded value changes a patient's standing, which only the server can compute: say
   // what it said, then fetch the ward again so the ranking on screen is the server's.
