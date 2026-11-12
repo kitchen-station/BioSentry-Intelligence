@@ -19,7 +19,9 @@ later model is compared with these numbers.
 ## Run
 
 Trial data lives outside the repository. The real trials for this slice are
-`~/Desktop/Projects/biosentry-data/trials/ward-v1/seed-01` to `seed-30` (30 simulated days each).
+`~/Desktop/Projects/biosentry-data/trials/ward-v2/seed-01` to `seed-30` (30 simulated days each;
+data card `models/data/ward-v2/card.md`). The earlier `ward-v1` set (sim commit 3a15e01, with the
+fixed temperature rise) is kept beside it for comparison; its results are in the model cards.
 
     python -m research.evaluate <trial folder>...
 
@@ -175,8 +177,8 @@ vulnerabilities found".
 
 Run (inside `biosentry-research-venv`, see the gate below):
 
-    python -m research.train_student /data/trials/ward-v1/seed-* [--out <dir>]
-    python -m research.evaluate_student /data/trials/ward-v1/seed-*
+    python -m research.train_student /data/trials/ward-v2/seed-* [--out <dir>]
+    python -m research.evaluate_student /data/trials/ward-v2/seed-*
 
 `--out` defaults to `models/tier_c/student_vitals/`.
 
@@ -210,7 +212,7 @@ Written before any run. Code: `reward_policy.py` (the policy and the reward) and
   candidate that breaks it on any trial of the set is rejected. `outcome`/higher care is never
   part of the reward. A set of trials is scored by the mean reward.
 - Loop: generation g (1 to 10) learns on three training seeds no other generation sees: 31-33,
-  34-36, ..., 58-60 of `ward-v1-train`. It samples 30 candidates around the current parameters
+  34-36, ..., 58-60 of `ward-v2-train` (`ward-v1-train` for the earlier run). It samples 30 candidates around the current parameters
   (weights and theta: plus a normal draw times sigma, weights floored at 0, theta at 0.1; p:
   plus a normal draw times sigma_p, rounded and clipped to 1-8; values rounded to 4 decimals),
   from a SplitMix64 generator (seed 20261112 + g, Box-Muller normals). sigma starts at 0.5 for
@@ -220,7 +222,7 @@ Written before any run. Code: `reward_policy.py` (the policy and the reward) and
   policy's on those seeds (ties: the first drawn). A (1+30) evolution step: black-box search
   with a reward, not deep or per-step reinforcement learning.
 - Validation and stop: after each generation (and at generation 0) the current policy is scored
-  on ward-v1 seeds 8 to 10. The shipped policy is the generation with the highest validation
+  on ward-v2 seeds 8 to 10. The shipped policy is the generation with the highest validation
   reward among those not rejected there (ties: the earlier generation). Seeds 1 to 7 are not used.
 - Files: `models/tier_b/reward_policy/generations/gen-NN.json` and `policy.json` (with its own
   sha256); the no-temperature run writes the same under `no_temperature/`. Same inputs give the
@@ -236,8 +238,8 @@ Written before any run. Code: `reward_policy.py` (the policy and the reward) and
 
 Run (either venv):
 
-    python -m research.reward_loop --train /data/trials/ward-v1-train --validate /data/trials/ward-v1 --out models/tier_b/reward_policy [--no-temperature]
-    python -m research.reward_loop --evaluate /data/trials/ward-v1 --out models/tier_b/reward_policy
+    python -m research.reward_loop --train /data/trials/ward-v2-train --validate /data/trials/ward-v2 --out models/tier_b/reward_policy [--no-temperature]
+    python -m research.reward_loop --evaluate /data/trials/ward-v2 --out models/tier_b/reward_policy
 
 ## Real data (eICU-CRD Demo 2.0.1)
 
@@ -306,9 +308,11 @@ Tests: `tests/test_realdata.py` on a tiny made-up fixture shaped like the eICU t
 
 ## Limits
 
-- Temperature is flattered. The sim adds a fixed rise (`INJECT_TEMPERATURE = 0.6`) in every episode
-  kind and uses a fixed noise of 0.02 (`src/sim/source.ts`, both `shortcut:`, uncited), so any
-  detector that reads temperature looks better than it should until those have a source.
+- Temperature. On ward-v1 the sim added a fixed rise (`INJECT_TEMPERATURE = 0.6`) in every
+  episode kind with a noise of 0.02, so any detector that read temperature looked better than it
+  should. Sim PR #25 removed the rise and set the noise to 0.1 C (a marked judgement); ward-v2 is
+  made with that fix. On ward-v2 the learned rules and the baseline add nothing measurable to
+  NEWS2 (see the model cards).
 - Circular. The data and the episodes come from the same simulator that the alerts are judged
   on, so this says how a rule behaves on this simulator, not on patients. A model trained on
   simulator trials and then scored on simulator trials is circular in the same way. Output ends

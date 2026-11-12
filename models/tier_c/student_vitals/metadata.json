@@ -1,5 +1,5 @@
 {
- "data": "ward-v1 simulator trials",
+ "data": "ward-v2 simulator trials",
  "held_out_seeds_skipped_unread": [
   11,
   12,
@@ -49,44 +49,43 @@
    "input": "x float32 [1, n_features]",
    "ir_version": 7,
    "n_features": 19,
-   "onnx_bytes": 1806,
+   "onnx_bytes": 470,
    "onnx_ops": [
     "Div",
     "Gemm",
-    "Relu",
     "Sigmoid",
     "Sub"
    ],
-   "onnx_sha256": "e7ec927c77c625465fcdc28d66736024e0a417ab88cd66f0c3e5c41fca85613d",
+   "onnx_sha256": "41deaa6c07c366aee5fe5bac47c6edc8282eb5bf1fe1dbfbc89e8af887dd1ecd",
    "opset": 13,
    "output": "p float32 [1, 1]",
-   "parity_max_abs_diff": 8.649658411741257e-08,
+   "parity_max_abs_diff": 1.0186340659856796e-07,
    "parity_rows": 1000,
    "parity_tolerance": 1e-05,
-   "student_kind": "mlp",
+   "student_kind": "logistic",
    "teacher_iterations": 20,
    "threshold_student": 0.002,
-   "threshold_teacher": 0.003,
+   "threshold_teacher": 0.001,
    "training_positive_rows": 597,
-   "training_rows": 211333,
-   "tuning_alerts_news2_chart_trigger": 805,
-   "tuning_alerts_student_at_threshold": 416,
-   "tuning_alerts_teacher_at_threshold": 761,
+   "training_rows": 211526,
+   "tuning_alerts_news2_chart_trigger": 806,
+   "tuning_alerts_student_at_threshold": 158,
+   "tuning_alerts_teacher_at_threshold": 787,
    "tuning_patient_days": 1082.33,
    "validation_positive_rows": 131,
    "validation_rows": 86819,
    "validation_seeds_8_10": {
     "logistic": {
-     "average_precision": 0.002061,
-     "log_loss": 0.011348
+     "average_precision": 0.003299,
+     "log_loss": 0.011182
     },
     "mlp": {
-     "average_precision": 0.036271,
-     "log_loss": 0.011145
+     "average_precision": 0.002974,
+     "log_loss": 0.01138
     },
     "teacher": {
-     "average_precision": 0.005496,
-     "log_loss": 0.034624
+     "average_precision": 0.007991,
+     "log_loss": 0.020753
     }
    }
   },
@@ -120,10 +119,10 @@
     "Sigmoid",
     "Sub"
    ],
-   "onnx_sha256": "a2ae213977e13d8eb864fe685bceeed83e8cdb89637f823a4a783fb92d153546",
+   "onnx_sha256": "af7453e1412b0f6bcb4cd22ef7b6246738929c255b77db61e9565ee1fdffcef5",
    "opset": 13,
    "output": "p float32 [1, 1]",
-   "parity_max_abs_diff": 9.278301149606705e-08,
+   "parity_max_abs_diff": 8.917413651943207e-08,
    "parity_rows": 1000,
    "parity_tolerance": 1e-05,
    "student_kind": "mlp",
@@ -131,25 +130,25 @@
    "threshold_student": 0.001,
    "threshold_teacher": 0.001,
    "training_positive_rows": 597,
-   "training_rows": 211333,
-   "tuning_alerts_news2_chart_trigger": 805,
-   "tuning_alerts_student_at_threshold": 725,
-   "tuning_alerts_teacher_at_threshold": 777,
+   "training_rows": 211526,
+   "tuning_alerts_news2_chart_trigger": 806,
+   "tuning_alerts_student_at_threshold": 327,
+   "tuning_alerts_teacher_at_threshold": 325,
    "tuning_patient_days": 1082.33,
    "validation_positive_rows": 131,
    "validation_rows": 86819,
    "validation_seeds_8_10": {
     "logistic": {
-     "average_precision": 0.001602,
-     "log_loss": 0.011412
+     "average_precision": 0.008413,
+     "log_loss": 0.011154
     },
     "mlp": {
-     "average_precision": 0.013255,
-     "log_loss": 0.011577
+     "average_precision": 0.013085,
+     "log_loss": 0.011307
     },
     "teacher": {
-     "average_precision": 0.028558,
-     "log_loss": 0.020822
+     "average_precision": 0.005928,
+     "log_loss": 0.024849
     }
    }
   }

@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import type { Session } from "../types";
 import { SessionMenu } from "../components/SessionMenu";
-import { LEARNED_RULES, RESEARCH_PROVENANCE as P, RESEARCH_RESULTS } from "../data/researchResults";
+import { LEARNED_RULES, RESEARCH_PROVENANCE as P, RESEARCH_RESULTS, RUN_COMPARISON } from "../data/researchResults";
 import styles from "./Research.module.css";
 
 interface Props {
@@ -98,8 +98,41 @@ export function Research({ session, onSignOut }: Props) {
           <p>None of these learned rules is used by the ward list, the rank or any alert.</p>
           <p>
             The student model without temperature, alone or with NEWS2, has no usable threshold: its alert
-            stays open about half the time, so it is not a working rule.
+            stays open about 80% of the time, so it is not a working rule.
           </p>
+        </section>
+
+        <section className={styles.card} aria-labelledby="compare">
+          <h2 id="compare" className={styles.heading}>Before and after the temperature fix</h2>
+          <div className={styles.scroll}>
+            <table className={styles.table}>
+              <caption>Synthetic simulator, not validated. Each rule on ward-v1 (the simulator added a fixed temperature rise to every episode) and on ward-v2 (rise removed), held-out seeds 11 to 30.</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Rule</th>
+                  <th scope="col">Alerts per patient per 12-hour shift, ward-v1</th>
+                  <th scope="col">Same, ward-v2</th>
+                  <th scope="col">Episodes alerting in any bin, all 91 evaluated, with 95% interval, ward-v1</th>
+                  <th scope="col">Same, ward-v2</th>
+                  <th scope="col">Excess over chance (no interval), ward-v1</th>
+                  <th scope="col">Same, ward-v2</th>
+                </tr>
+              </thead>
+              <tbody>
+                {RUN_COMPARISON.map((r) => (
+                  <tr key={r.id}>
+                    <th scope="row">{r.name}</th>
+                    <td>{r.v1.perShift.toFixed(3)}</td>
+                    <td>{r.v2.perShift.toFixed(3)}</td>
+                    <td>{r.v1.anyAll.toFixed(3)} <span className={styles.sub}>({r.v1.lo.toFixed(3)} to {r.v1.hi.toFixed(3)})</span></td>
+                    <td>{r.v2.anyAll.toFixed(3)} <span className={styles.sub}>({r.v2.lo.toFixed(3)} to {r.v2.hi.toFixed(3)})</span></td>
+                    <td>{signed(r.v1.excess)}</td>
+                    <td>{signed(r.v2.excess)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <section className={styles.card} aria-labelledby="read">
@@ -119,45 +152,40 @@ export function Research({ session, onSignOut }: Props) {
         <section className={styles.card} aria-labelledby="found">
           <h2 id="found" className={styles.heading}>What we found</h2>
           <p>
-            Much of the own-baseline rule&apos;s gain depends on a fixed temperature rise the simulator
-            adds to every episode, a value with no cited source.
+            The simulator used to add a fixed temperature rise, a value with no cited source, to every episode.
+            That rise has been removed. These numbers come from trials made again without it (ward-v2), with the
+            same seeds, the same evaluation and the same rules.
           </p>
           <p>
-            Without temperature, &quot;NEWS2 or own baseline&quot; has less excess (+0.213) than NEWS2 alone
-            (+0.237). So here, adding the baseline to NEWS2 gives no excess over NEWS2 alone (the excess has no
-            interval).
+            Without the rise, no rule here adds anything measurable to NEWS2. Added to NEWS2, the own baseline,
+            the student and the reward-learned policy each catch a few more episodes, and every interval overlaps
+            NEWS2&apos;s.
           </p>
           <p>
-            NEWS2 gave a new alert in only 3 of 27 hypotensive episodes (all evaluated episodes, not the
+            Alone, the own baseline and the student catch fewer episodes than NEWS2, with far fewer alerts. The
+            reward-learned policy alone catches about as many as NEWS2 with about a third of the alerts, but
+            later: its median lead time is negative.
+          </p>
+          <p>
+            Their excess over chance is higher than NEWS2&apos;s only alongside much lower chance rates. Excess
+            cannot be more than 1 minus the chance rate, so it does not rank these rules.
+          </p>
+          <p>
+            NEWS2 gave a new alert in only 2 of 27 hypotensive episodes (all evaluated episodes, not the
             table&apos;s measure). In 17 of 27, no cuff reading reached NEWS2 inside the window, so it saw no
             new blood pressure.
           </p>
-          <p>
-            With temperature, the small student model has more excess over chance than NEWS2 alone (+0.539
-            against +0.237). The simple own-baseline rule does better than the student; the student is ahead
-            only on lead time.
-          </p>
-          <p>
-            The reward-learned policy did not beat the untrained own-baseline rule. Its final numbers are within
-            noise of that rule. Generation 0 is the own-baseline rule rewritten as a weighted sum, the starting
-            point of learning; it alerts more than twice as often, so most of the later fall in alerts undoes
-            that translation. The path between generations is mostly noise.
-          </p>
-          <p>Without temperature, no learned rule adds anything measurable to NEWS2 on this simulator.</p>
-          <p>
-            Every gain so far depends on a fixed temperature rise the simulator adds to every episode, a value
-            with no cited source.
-          </p>
+          <p>The gains seen before the fix (ward-v1) came from the temperature rise. The table above shows both runs.</p>
           <p>
             What exists and works: features with no look-ahead, clean splits between training and held-out
             trials, and a student model that exports as ONNX, the form Huawei&apos;s converter reads (conversion
-            not yet done). The no-temperature runs show how much of each gain depends on the temperature
-            artefact.
+            not yet done). Every model was re-run on the new trials with the same harness, and nothing was tuned
+            to rescue a result.
           </p>
         </section>
 
         <p className={styles.small}>
-          Source: evaluation at commit {P.commit}, {P.date}, simulator commit {P.simCommit}, scenario {P.scenario}. {P.trials}. {P.tuning} Student model numbers: commit {P.studentCommit}. Reward-learned policy numbers: commit {P.rewardCommit}. NEWS2 itself is never
+          Source: evaluation at commit {P.commit}, {P.date}, simulator commit {P.simCommit}, scenario {P.scenario}. {P.trials}. {P.tuning} Student model numbers: commit {P.studentCommit}. Reward-learned policy numbers: commit {P.rewardCommit}. Earlier run: {P.previous}. NEWS2 itself is never
           changed by any of this.
         </p>
       </main>

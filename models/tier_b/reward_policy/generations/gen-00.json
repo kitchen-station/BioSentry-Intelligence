@@ -16,31 +16,31 @@
  "validation": {
   "per_seed": [
    {
-    "alerts_per_patient_12h": 0.395157,
+    "alerts_per_patient_12h": 0.383573,
     "caught_early": 2,
     "episodes": 5,
-    "news2_time_in_alert": 0.148455,
-    "reward": -0.760791,
+    "news2_time_in_alert": 0.148053,
+    "reward": -0.670251,
     "seed": 8,
-    "time_in_alert": 0.114419
+    "time_in_alert": 0.109564
    },
    {
-    "alerts_per_patient_12h": 0.446974,
+    "alerts_per_patient_12h": 0.450918,
     "caught_early": 2,
     "episodes": 2,
-    "news2_time_in_alert": 0.117307,
-    "reward": 0.991098,
+    "news2_time_in_alert": 0.116677,
+    "reward": 0.985207,
     "seed": 9,
-    "time_in_alert": 0.12065
+    "time_in_alert": 0.12076
    },
    {
-    "alerts_per_patient_12h": 0.456079,
+    "alerts_per_patient_12h": 0.470431,
     "caught_early": 1,
     "episodes": 2,
-    "news2_time_in_alert": 0.100459,
-    "reward": -0.505263,
+    "news2_time_in_alert": 0.100392,
+    "reward": -0.560847,
     "seed": 10,
-    "time_in_alert": 0.14336
+    "time_in_alert": 0.139306
    }
   ],
   "rejected_time_in_alert": true,

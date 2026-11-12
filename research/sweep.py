@@ -144,7 +144,7 @@ def main(argv: list[str]) -> int:
     if path and best is None:
         return 1  # nothing chosen: nothing written
     if path:
-        params = {"k": best.k, "p": best.p, "chosen_on": "ward-v1 seeds 1-10", "rule": RULE,
+        params = {"k": best.k, "p": best.p, "chosen_on": "ward-v2 seeds 1-10", "rule": RULE,
                   "grid": rows, "tuning": ref, "synthetic": True, "validated": False}
         tmp = f"{path}.tmp"
         try:

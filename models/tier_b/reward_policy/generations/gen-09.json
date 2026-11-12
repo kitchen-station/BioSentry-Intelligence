@@ -2,41 +2,41 @@
  "accepted": true,
  "best_candidate": {
   "params": {
-   "p": 2,
-   "theta": 3.2344,
+   "p": 6,
+   "theta": 1.8713,
    "weights": {
-    "heart_rate": 0.2692,
-    "respiratory_rate": 0.1008,
-    "spo2": 0.5893,
-    "temperature": 0.8826
+    "heart_rate": 0.2416,
+    "respiratory_rate": 0.9261,
+    "spo2": 0.5618,
+    "temperature": 0.2718
    }
   },
-  "train_reward": 2.984404
+  "train_reward": 2.55591
  },
  "candidates": 30,
  "current_before": {
   "params": {
-   "p": 2,
-   "theta": 2.9727,
+   "p": 7,
+   "theta": 1.8687,
    "weights": {
-    "heart_rate": 0.1114,
-    "respiratory_rate": 0.1965,
-    "spo2": 0.3152,
-    "temperature": 1.0633
+    "heart_rate": 0.0,
+    "respiratory_rate": 0.8818,
+    "spo2": 0.2936,
+    "temperature": 0.1927
    }
   },
-  "train_reward": 2.742394
+  "train_reward": 2.068761
  },
  "generation": 9,
  "generator_seed": 20261121,
  "params": {
-  "p": 2,
-  "theta": 3.2344,
+  "p": 6,
+  "theta": 1.8713,
   "weights": {
-   "heart_rate": 0.2692,
-   "respiratory_rate": 0.1008,
-   "spo2": 0.5893,
-   "temperature": 0.8826
+   "heart_rate": 0.2416,
+   "respiratory_rate": 0.9261,
+   "spo2": 0.5618,
+   "temperature": 0.2718
   }
  },
  "rejected_time_in_alert": 0,
@@ -56,35 +56,35 @@
  "validation": {
   "per_seed": [
    {
-    "alerts_per_patient_12h": 0.211094,
+    "alerts_per_patient_12h": 0.169905,
     "caught_early": 1,
     "episodes": 5,
-    "news2_time_in_alert": 0.148455,
-    "reward": -0.47482,
+    "news2_time_in_alert": 0.148053,
+    "reward": -0.182796,
     "seed": 8,
-    "time_in_alert": 0.028082
+    "time_in_alert": 0.032373
    },
    {
-    "alerts_per_patient_12h": 0.222173,
+    "alerts_per_patient_12h": 0.206397,
     "caught_early": 2,
     "episodes": 2,
-    "news2_time_in_alert": 0.117307,
-    "reward": 1.498516,
+    "news2_time_in_alert": 0.116677,
+    "reward": 1.535503,
     "seed": 9,
-    "time_in_alert": 0.037403
+    "time_in_alert": 0.028635
    },
    {
-    "alerts_per_patient_12h": 0.213687,
+    "alerts_per_patient_12h": 0.199335,
     "caught_early": 1,
     "episodes": 2,
-    "news2_time_in_alert": 0.100459,
-    "reward": 0.294737,
+    "news2_time_in_alert": 0.100392,
+    "reward": 0.338624,
     "seed": 10,
-    "time_in_alert": 0.057092
+    "time_in_alert": 0.047687
    }
   ],
   "rejected_time_in_alert": false,
-  "reward": 0.439478,
+  "reward": 0.563777,
   "seeds": [
    8,
    9,

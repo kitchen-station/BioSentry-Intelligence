@@ -22,7 +22,7 @@ FILES = {"all": "model.onnx", "no_temp": "model_no_temp.onnx"}
 def metadata(result: dict, skipped: list[int]) -> dict:
     return {
         "name": "tier_c/student_vitals", "synthetic": True, "validated": False,
-        "data": "ward-v1 simulator trials", "trained_on_seeds": "1-7", "selected_on_seeds": "8-10",
+        "data": "ward-v2 simulator trials", "trained_on_seeds": "1-7", "selected_on_seeds": "8-10",
         "held_out_seeds_skipped_unread": skipped,
         "models": {tag: {"file": FILES[tag], **r["meta"]} for tag, r in result.items()},
     }
