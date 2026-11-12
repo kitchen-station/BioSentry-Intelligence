@@ -12,6 +12,8 @@ export const setActiveClinician = fixtures.setActiveClinician;
 export const fixtureProvider: ApiProvider = {
   getWard: fixtures.getWard,
   getPatient: fixtures.getPatient,
+  // The frontend never computes a finding (D4), so fixture mode has none to show.
+  getBaseline: () => Promise.resolve(null),
   getNotes: fixtures.getNotes,
   addNote: fixtures.addNote,
   deleteNote: fixtures.deleteNote,

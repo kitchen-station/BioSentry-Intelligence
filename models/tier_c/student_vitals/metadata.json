@@ -1,0 +1,162 @@
+{
+ "data": "ward-v1 simulator trials",
+ "held_out_seeds_skipped_unread": [
+  11,
+  12,
+  13,
+  14,
+  15,
+  16,
+  17,
+  18,
+  19,
+  20,
+  21,
+  22,
+  23,
+  24,
+  25,
+  26,
+  27,
+  28,
+  29,
+  30
+ ],
+ "models": {
+  "all": {
+   "features": [
+    "heart_rate",
+    "heart_rate_missing",
+    "heart_rate_z",
+    "heart_rate_z_missing",
+    "respiratory_rate",
+    "respiratory_rate_missing",
+    "respiratory_rate_z",
+    "respiratory_rate_z_missing",
+    "spo2",
+    "spo2_missing",
+    "spo2_z",
+    "spo2_z_missing",
+    "temperature",
+    "temperature_missing",
+    "temperature_z",
+    "temperature_z_missing",
+    "news2_total",
+    "on_oxygen",
+    "consciousness_not_alert"
+   ],
+   "file": "model.onnx",
+   "input": "x float32 [1, n_features]",
+   "ir_version": 7,
+   "n_features": 19,
+   "onnx_bytes": 1806,
+   "onnx_ops": [
+    "Div",
+    "Gemm",
+    "Relu",
+    "Sigmoid",
+    "Sub"
+   ],
+   "onnx_sha256": "e7ec927c77c625465fcdc28d66736024e0a417ab88cd66f0c3e5c41fca85613d",
+   "opset": 13,
+   "output": "p float32 [1, 1]",
+   "parity_max_abs_diff": 8.649658411741257e-08,
+   "parity_rows": 1000,
+   "parity_tolerance": 1e-05,
+   "student_kind": "mlp",
+   "teacher_iterations": 20,
+   "threshold_student": 0.002,
+   "threshold_teacher": 0.003,
+   "training_positive_rows": 597,
+   "training_rows": 211333,
+   "tuning_alerts_news2_chart_trigger": 805,
+   "tuning_alerts_student_at_threshold": 416,
+   "tuning_alerts_teacher_at_threshold": 761,
+   "tuning_patient_days": 1082.33,
+   "validation_positive_rows": 131,
+   "validation_rows": 86819,
+   "validation_seeds_8_10": {
+    "logistic": {
+     "average_precision": 0.002061,
+     "log_loss": 0.011348
+    },
+    "mlp": {
+     "average_precision": 0.036271,
+     "log_loss": 0.011145
+    },
+    "teacher": {
+     "average_precision": 0.005496,
+     "log_loss": 0.034624
+    }
+   }
+  },
+  "no_temp": {
+   "features": [
+    "heart_rate",
+    "heart_rate_missing",
+    "heart_rate_z",
+    "heart_rate_z_missing",
+    "respiratory_rate",
+    "respiratory_rate_missing",
+    "respiratory_rate_z",
+    "respiratory_rate_z_missing",
+    "spo2",
+    "spo2_missing",
+    "spo2_z",
+    "spo2_z_missing",
+    "news2_total_minus_its_temperature_points",
+    "on_oxygen",
+    "consciousness_not_alert"
+   ],
+   "file": "model_no_temp.onnx",
+   "input": "x float32 [1, n_features]",
+   "ir_version": 7,
+   "n_features": 15,
+   "onnx_bytes": 1518,
+   "onnx_ops": [
+    "Div",
+    "Gemm",
+    "Relu",
+    "Sigmoid",
+    "Sub"
+   ],
+   "onnx_sha256": "a2ae213977e13d8eb864fe685bceeed83e8cdb89637f823a4a783fb92d153546",
+   "opset": 13,
+   "output": "p float32 [1, 1]",
+   "parity_max_abs_diff": 9.278301149606705e-08,
+   "parity_rows": 1000,
+   "parity_tolerance": 1e-05,
+   "student_kind": "mlp",
+   "teacher_iterations": 20,
+   "threshold_student": 0.001,
+   "threshold_teacher": 0.001,
+   "training_positive_rows": 597,
+   "training_rows": 211333,
+   "tuning_alerts_news2_chart_trigger": 805,
+   "tuning_alerts_student_at_threshold": 725,
+   "tuning_alerts_teacher_at_threshold": 777,
+   "tuning_patient_days": 1082.33,
+   "validation_positive_rows": 131,
+   "validation_rows": 86819,
+   "validation_seeds_8_10": {
+    "logistic": {
+     "average_precision": 0.001602,
+     "log_loss": 0.011412
+    },
+    "mlp": {
+     "average_precision": 0.013255,
+     "log_loss": 0.011577
+    },
+    "teacher": {
+     "average_precision": 0.028558,
+     "log_loss": 0.020822
+    }
+   }
+  }
+ },
+ "name": "tier_c/student_vitals",
+ "selected_on_seeds": "8-10",
+ "synthetic": true,
+ "trained_on_seeds": "1-7",
+ "validated": false
+}

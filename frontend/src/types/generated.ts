@@ -93,6 +93,67 @@ export interface components {
             /** @default null */
             readonly weightKg?: number | null;
         };
+        /** BaselineComputed */
+        readonly BaselineComputed: {
+            /** @enum {string} */
+            readonly anchored_at: "admission" | "first_kept_bin";
+            /** Format: date-time */
+            readonly baseline_from: string;
+            readonly baseline_median: number;
+            readonly delta: number;
+            readonly direction: components["schemas"]["FindingDirection"] | null;
+            readonly latest: number;
+            readonly latest_age_s: number;
+            /** Format: date-time */
+            readonly latest_at: string;
+            readonly pathway: string | null;
+            readonly run_bins: number;
+            readonly significant: boolean;
+            readonly since: string | null;
+            /** @constant */
+            readonly status: "computed";
+            readonly unit: string;
+            /** @enum {string} */
+            readonly vital: "heart_rate" | "respiratory_rate" | "spo2" | "temperature";
+            readonly z: number;
+        };
+        /** BaselineForming */
+        readonly BaselineForming: {
+            readonly bins_needed: number;
+            readonly bins_valid: number;
+            /** @constant */
+            readonly status: "forming";
+            /** @enum {string} */
+            readonly vital: "heart_rate" | "respiratory_rate" | "spo2" | "temperature";
+        };
+        /** BaselineResponse */
+        readonly BaselineResponse: {
+            readonly admission_known: boolean;
+            /** @constant */
+            readonly label: "Research finding. Synthetic, not validated. Does not change the rank.";
+            readonly params: components["schemas"]["BaselineUsed"];
+            readonly patient_id: string;
+            readonly synthetic: boolean;
+            readonly vitals: readonly (components["schemas"]["BaselineComputed"] | components["schemas"]["BaselineForming"] | components["schemas"]["BaselineUnavailable"])[];
+        };
+        /** BaselineUnavailable */
+        readonly BaselineUnavailable: {
+            /** @enum {string} */
+            readonly reason: "no_history" | "latest_bin_missing";
+            /** @constant */
+            readonly status: "unavailable";
+            /** @enum {string} */
+            readonly vital: "heart_rate" | "respiratory_rate" | "spo2" | "temperature";
+        };
+        /**
+         * BaselineUsed
+         * @description The detector's own defaults, echoed. Nothing in a request can set them.
+         */
+        readonly BaselineUsed: {
+            readonly k: number;
+            readonly p: number;
+            readonly window_bins: number;
+        };
         /**
          * BloodPressure
          * @description Structured on purpose: the "SBP/DBP" string is display only and is never parsed.
@@ -691,6 +752,11 @@ export type AcvpuPresent = components['schemas']['AcvpuPresent'];
 export type AdmissionCondition = components['schemas']['AdmissionCondition'];
 export type AdmissionRoute = components['schemas']['AdmissionRoute'];
 export type AdmitPatientInput = components['schemas']['AdmitPatientInput'];
+export type BaselineComputed = components['schemas']['BaselineComputed'];
+export type BaselineForming = components['schemas']['BaselineForming'];
+export type BaselineResponse = components['schemas']['BaselineResponse'];
+export type BaselineUnavailable = components['schemas']['BaselineUnavailable'];
+export type BaselineUsed = components['schemas']['BaselineUsed'];
 export type BloodPressure = components['schemas']['BloodPressure'];
 export type BloodPressureMeasurement = components['schemas']['BloodPressureMeasurement'];
 export type BloodPressurePresent = components['schemas']['BloodPressurePresent'];

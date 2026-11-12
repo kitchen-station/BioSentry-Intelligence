@@ -1,0 +1,1174 @@
+{
+ "k": 3.0,
+ "p": 4,
+ "chosen_on": "ward-v1 seeds 1-10",
+ "rule": "among settings where NEWS2 OR baseline raises at most 25% more alerts per patient per 12 h than the NEWS2 chart trigger alone, the largest excess over chance of ALERTING in any bin on episodes not cut short; ties: fewer alerts, then larger k, then larger p",
+ "grid": [
+  {
+   "k": 1.5,
+   "p": 2,
+   "news2_or_baseline": {
+    "alerts": 4180,
+    "alerts_per_patient_12h": 0.5546,
+    "new_all": [
+     20,
+     56
+    ],
+    "any_uncut": [
+     50,
+     51
+    ],
+    "chance_any": [
+     2360,
+     3066
+    ],
+    "excess_any_uncut": 0.2107
+   },
+   "baseline_alone": {
+    "alerts": 4522,
+    "alerts_per_patient_12h": 0.6,
+    "new_all": [
+     24,
+     56
+    ],
+    "any_uncut": [
+     50,
+     51
+    ],
+    "chance_any": [
+     1965,
+     3066
+    ],
+    "excess_any_uncut": 0.3395
+   }
+  },
+  {
+   "k": 1.5,
+   "p": 3,
+   "news2_or_baseline": {
+    "alerts": 4291,
+    "alerts_per_patient_12h": 0.5693,
+    "new_all": [
+     24,
+     56
+    ],
+    "any_uncut": [
+     49,
+     51
+    ],
+    "chance_any": [
+     2168,
+     3066
+    ],
+    "excess_any_uncut": 0.2537
+   },
+   "baseline_alone": {
+    "alerts": 4290,
+    "alerts_per_patient_12h": 0.5692,
+    "new_all": [
+     30,
+     56
+    ],
+    "any_uncut": [
+     48,
+     51
+    ],
+    "chance_any": [
+     1611,
+     3066
+    ],
+    "excess_any_uncut": 0.4157
+   }
+  },
+  {
+   "k": 1.5,
+   "p": 4,
+   "news2_or_baseline": {
+    "alerts": 4220,
+    "alerts_per_patient_12h": 0.5599,
+    "new_all": [
+     31,
+     56
+    ],
+    "any_uncut": [
+     49,
+     51
+    ],
+    "chance_any": [
+     2012,
+     3066
+    ],
+    "excess_any_uncut": 0.3046
+   },
+   "baseline_alone": {
+    "alerts": 3741,
+    "alerts_per_patient_12h": 0.4964,
+    "new_all": [
+     38,
+     56
+    ],
+    "any_uncut": [
+     48,
+     51
+    ],
+    "chance_any": [
+     1308,
+     3066
+    ],
+    "excess_any_uncut": 0.5146
+   }
+  },
+  {
+   "k": 1.5,
+   "p": 6,
+   "news2_or_baseline": {
+    "alerts": 3961,
+    "alerts_per_patient_12h": 0.5256,
+    "new_all": [
+     30,
+     56
+    ],
+    "any_uncut": [
+     47,
+     51
+    ],
+    "chance_any": [
+     1798,
+     3066
+    ],
+    "excess_any_uncut": 0.3351
+   },
+   "baseline_alone": {
+    "alerts": 2743,
+    "alerts_per_patient_12h": 0.3639,
+    "new_all": [
+     40,
+     56
+    ],
+    "any_uncut": [
+     44,
+     51
+    ],
+    "chance_any": [
+     879,
+     3066
+    ],
+    "excess_any_uncut": 0.5761
+   }
+  },
+  {
+   "k": 1.5,
+   "p": 8,
+   "news2_or_baseline": {
+    "alerts": 3773,
+    "alerts_per_patient_12h": 0.5006,
+    "new_all": [
+     31,
+     56
+    ],
+    "any_uncut": [
+     47,
+     51
+    ],
+    "chance_any": [
+     1686,
+     3066
+    ],
+    "excess_any_uncut": 0.3717
+   },
+   "baseline_alone": {
+    "alerts": 2023,
+    "alerts_per_patient_12h": 0.2684,
+    "new_all": [
+     39,
+     56
+    ],
+    "any_uncut": [
+     42,
+     51
+    ],
+    "chance_any": [
+     656,
+     3066
+    ],
+    "excess_any_uncut": 0.6096
+   }
+  },
+  {
+   "k": 2.0,
+   "p": 2,
+   "news2_or_baseline": {
+    "alerts": 4344,
+    "alerts_per_patient_12h": 0.5764,
+    "new_all": [
+     23,
+     56
+    ],
+    "any_uncut": [
+     50,
+     51
+    ],
+    "chance_any": [
+     2243,
+     3066
+    ],
+    "excess_any_uncut": 0.2488
+   },
+   "baseline_alone": {
+    "alerts": 4590,
+    "alerts_per_patient_12h": 0.609,
+    "new_all": [
+     27,
+     56
+    ],
+    "any_uncut": [
+     48,
+     51
+    ],
+    "chance_any": [
+     1762,
+     3066
+    ],
+    "excess_any_uncut": 0.3665
+   }
+  },
+  {
+   "k": 2.0,
+   "p": 3,
+   "news2_or_baseline": {
+    "alerts": 4279,
+    "alerts_per_patient_12h": 0.5677,
+    "new_all": [
+     27,
+     56
+    ],
+    "any_uncut": [
+     49,
+     51
+    ],
+    "chance_any": [
+     2052,
+     3066
+    ],
+    "excess_any_uncut": 0.2915
+   },
+   "baseline_alone": {
+    "alerts": 3997,
+    "alerts_per_patient_12h": 0.5303,
+    "new_all": [
+     35,
+     56
+    ],
+    "any_uncut": [
+     47,
+     51
+    ],
+    "chance_any": [
+     1394,
+     3066
+    ],
+    "excess_any_uncut": 0.4669
+   }
+  },
+  {
+   "k": 2.0,
+   "p": 4,
+   "news2_or_baseline": {
+    "alerts": 4130,
+    "alerts_per_patient_12h": 0.548,
+    "new_all": [
+     31,
+     56
+    ],
+    "any_uncut": [
+     48,
+     51
+    ],
+    "chance_any": [
+     1912,
+     3066
+    ],
+    "excess_any_uncut": 0.3176
+   },
+   "baseline_alone": {
+    "alerts": 3297,
+    "alerts_per_patient_12h": 0.4375,
+    "new_all": [
+     40,
+     56
+    ],
+    "any_uncut": [
+     46,
+     51
+    ],
+    "chance_any": [
+     1113,
+     3066
+    ],
+    "excess_any_uncut": 0.5389
+   }
+  },
+  {
+   "k": 2.0,
+   "p": 6,
+   "news2_or_baseline": {
+    "alerts": 3840,
+    "alerts_per_patient_12h": 0.5095,
+    "new_all": [
+     31,
+     56
+    ],
+    "any_uncut": [
+     47,
+     51
+    ],
+    "chance_any": [
+     1719,
+     3066
+    ],
+    "excess_any_uncut": 0.3609
+   },
+   "baseline_alone": {
+    "alerts": 2268,
+    "alerts_per_patient_12h": 0.3009,
+    "new_all": [
+     40,
+     56
+    ],
+    "any_uncut": [
+     44,
+     51
+    ],
+    "chance_any": [
+     723,
+     3066
+    ],
+    "excess_any_uncut": 0.6269
+   }
+  },
+  {
+   "k": 2.0,
+   "p": 8,
+   "news2_or_baseline": {
+    "alerts": 3649,
+    "alerts_per_patient_12h": 0.4842,
+    "new_all": [
+     32,
+     56
+    ],
+    "any_uncut": [
+     47,
+     51
+    ],
+    "chance_any": [
+     1621,
+     3066
+    ],
+    "excess_any_uncut": 0.3929
+   },
+   "baseline_alone": {
+    "alerts": 1643,
+    "alerts_per_patient_12h": 0.218,
+    "new_all": [
+     40,
+     56
+    ],
+    "any_uncut": [
+     42,
+     51
+    ],
+    "chance_any": [
+     526,
+     3066
+    ],
+    "excess_any_uncut": 0.652
+   }
+  },
+  {
+   "k": 2.5,
+   "p": 2,
+   "news2_or_baseline": {
+    "alerts": 4202,
+    "alerts_per_patient_12h": 0.5575,
+    "new_all": [
+     29,
+     56
+    ],
+    "any_uncut": [
+     49,
+     51
+    ],
+    "chance_any": [
+     1939,
+     3066
+    ],
+    "excess_any_uncut": 0.3284
+   },
+   "baseline_alone": {
+    "alerts": 3627,
+    "alerts_per_patient_12h": 0.4812,
+    "new_all": [
+     38,
+     56
+    ],
+    "any_uncut": [
+     47,
+     51
+    ],
+    "chance_any": [
+     1190,
+     3066
+    ],
+    "excess_any_uncut": 0.5334
+   }
+  },
+  {
+   "k": 2.5,
+   "p": 3,
+   "news2_or_baseline": {
+    "alerts": 4013,
+    "alerts_per_patient_12h": 0.5325,
+    "new_all": [
+     31,
+     56
+    ],
+    "any_uncut": [
+     47,
+     51
+    ],
+    "chance_any": [
+     1775,
+     3066
+    ],
+    "excess_any_uncut": 0.3426
+   },
+   "baseline_alone": {
+    "alerts": 2809,
+    "alerts_per_patient_12h": 0.3727,
+    "new_all": [
+     39,
+     56
+    ],
+    "any_uncut": [
+     44,
+     51
+    ],
+    "chance_any": [
+     881,
+     3066
+    ],
+    "excess_any_uncut": 0.5754
+   }
+  },
+  {
+   "k": 2.5,
+   "p": 4,
+   "news2_or_baseline": {
+    "alerts": 3790,
+    "alerts_per_patient_12h": 0.5029,
+    "new_all": [
+     31,
+     56
+    ],
+    "any_uncut": [
+     46,
+     51
+    ],
+    "chance_any": [
+     1668,
+     3066
+    ],
+    "excess_any_uncut": 0.3579
+   },
+   "baseline_alone": {
+    "alerts": 2174,
+    "alerts_per_patient_12h": 0.2885,
+    "new_all": [
+     38,
+     56
+    ],
+    "any_uncut": [
+     42,
+     51
+    ],
+    "chance_any": [
+     671,
+     3066
+    ],
+    "excess_any_uncut": 0.6047
+   }
+  },
+  {
+   "k": 2.5,
+   "p": 6,
+   "news2_or_baseline": {
+    "alerts": 3577,
+    "alerts_per_patient_12h": 0.4746,
+    "new_all": [
+     31,
+     56
+    ],
+    "any_uncut": [
+     46,
+     51
+    ],
+    "chance_any": [
+     1561,
+     3066
+    ],
+    "excess_any_uncut": 0.3928
+   },
+   "baseline_alone": {
+    "alerts": 1420,
+    "alerts_per_patient_12h": 0.1884,
+    "new_all": [
+     36,
+     56
+    ],
+    "any_uncut": [
+     38,
+     51
+    ],
+    "chance_any": [
+     436,
+     3066
+    ],
+    "excess_any_uncut": 0.6029
+   }
+  },
+  {
+   "k": 2.5,
+   "p": 8,
+   "news2_or_baseline": {
+    "alerts": 3434,
+    "alerts_per_patient_12h": 0.4556,
+    "new_all": [
+     31,
+     56
+    ],
+    "any_uncut": [
+     45,
+     51
+    ],
+    "chance_any": [
+     1509,
+     3066
+    ],
+    "excess_any_uncut": 0.3902
+   },
+   "baseline_alone": {
+    "alerts": 982,
+    "alerts_per_patient_12h": 0.1303,
+    "new_all": [
+     34,
+     56
+    ],
+    "any_uncut": [
+     36,
+     51
+    ],
+    "chance_any": [
+     294,
+     3066
+    ],
+    "excess_any_uncut": 0.61
+   }
+  },
+  {
+   "k": 3.0,
+   "p": 2,
+   "news2_or_baseline": {
+    "alerts": 3963,
+    "alerts_per_patient_12h": 0.5258,
+    "new_all": [
+     29,
+     56
+    ],
+    "any_uncut": [
+     46,
+     51
+    ],
+    "chance_any": [
+     1740,
+     3066
+    ],
+    "excess_any_uncut": 0.3344
+   },
+   "baseline_alone": {
+    "alerts": 2711,
+    "alerts_per_patient_12h": 0.3597,
+    "new_all": [
+     38,
+     56
+    ],
+    "any_uncut": [
+     44,
+     51
+    ],
+    "chance_any": [
+     838,
+     3066
+    ],
+    "excess_any_uncut": 0.5894
+   }
+  },
+  {
+   "k": 3.0,
+   "p": 3,
+   "news2_or_baseline": {
+    "alerts": 3727,
+    "alerts_per_patient_12h": 0.4945,
+    "new_all": [
+     31,
+     56
+    ],
+    "any_uncut": [
+     46,
+     51
+    ],
+    "chance_any": [
+     1617,
+     3066
+    ],
+    "excess_any_uncut": 0.3746
+   },
+   "baseline_alone": {
+    "alerts": 1965,
+    "alerts_per_patient_12h": 0.2607,
+    "new_all": [
+     39,
+     56
+    ],
+    "any_uncut": [
+     42,
+     51
+    ],
+    "chance_any": [
+     580,
+     3066
+    ],
+    "excess_any_uncut": 0.6344
+   }
+  },
+  {
+   "k": 3.0,
+   "p": 4,
+   "news2_or_baseline": {
+    "alerts": 3550,
+    "alerts_per_patient_12h": 0.471,
+    "new_all": [
+     31,
+     56
+    ],
+    "any_uncut": [
+     46,
+     51
+    ],
+    "chance_any": [
+     1552,
+     3066
+    ],
+    "excess_any_uncut": 0.3958
+   },
+   "baseline_alone": {
+    "alerts": 1444,
+    "alerts_per_patient_12h": 0.1916,
+    "new_all": [
+     38,
+     56
+    ],
+    "any_uncut": [
+     40,
+     51
+    ],
+    "chance_any": [
+     427,
+     3066
+    ],
+    "excess_any_uncut": 0.645
+   }
+  },
+  {
+   "k": 3.0,
+   "p": 6,
+   "news2_or_baseline": {
+    "alerts": 3376,
+    "alerts_per_patient_12h": 0.4479,
+    "new_all": [
+     30,
+     56
+    ],
+    "any_uncut": [
+     44,
+     51
+    ],
+    "chance_any": [
+     1490,
+     3066
+    ],
+    "excess_any_uncut": 0.3768
+   },
+   "baseline_alone": {
+    "alerts": 865,
+    "alerts_per_patient_12h": 0.1148,
+    "new_all": [
+     32,
+     56
+    ],
+    "any_uncut": [
+     33,
+     51
+    ],
+    "chance_any": [
+     267,
+     3066
+    ],
+    "excess_any_uncut": 0.56
+   }
+  },
+  {
+   "k": 3.0,
+   "p": 8,
+   "news2_or_baseline": {
+    "alerts": 3302,
+    "alerts_per_patient_12h": 0.4381,
+    "new_all": [
+     29,
+     56
+    ],
+    "any_uncut": [
+     42,
+     51
+    ],
+    "chance_any": [
+     1449,
+     3066
+    ],
+    "excess_any_uncut": 0.3509
+   },
+   "baseline_alone": {
+    "alerts": 614,
+    "alerts_per_patient_12h": 0.0815,
+    "new_all": [
+     28,
+     56
+    ],
+    "any_uncut": [
+     30,
+     51
+    ],
+    "chance_any": [
+     180,
+     3066
+    ],
+    "excess_any_uncut": 0.5295
+   }
+  },
+  {
+   "k": 3.5,
+   "p": 2,
+   "news2_or_baseline": {
+    "alerts": 3635,
+    "alerts_per_patient_12h": 0.4823,
+    "new_all": [
+     31,
+     56
+    ],
+    "any_uncut": [
+     45,
+     51
+    ],
+    "chance_any": [
+     1597,
+     3066
+    ],
+    "excess_any_uncut": 0.3615
+   },
+   "baseline_alone": {
+    "alerts": 1799,
+    "alerts_per_patient_12h": 0.2387,
+    "new_all": [
+     37,
+     56
+    ],
+    "any_uncut": [
+     39,
+     51
+    ],
+    "chance_any": [
+     520,
+     3066
+    ],
+    "excess_any_uncut": 0.5951
+   }
+  },
+  {
+   "k": 3.5,
+   "p": 3,
+   "news2_or_baseline": {
+    "alerts": 3505,
+    "alerts_per_patient_12h": 0.4651,
+    "new_all": [
+     31,
+     56
+    ],
+    "any_uncut": [
+     44,
+     51
+    ],
+    "chance_any": [
+     1520,
+     3066
+    ],
+    "excess_any_uncut": 0.367
+   },
+   "baseline_alone": {
+    "alerts": 1308,
+    "alerts_per_patient_12h": 0.1735,
+    "new_all": [
+     38,
+     56
+    ],
+    "any_uncut": [
+     38,
+     51
+    ],
+    "chance_any": [
+     365,
+     3066
+    ],
+    "excess_any_uncut": 0.6261
+   }
+  },
+  {
+   "k": 3.5,
+   "p": 4,
+   "news2_or_baseline": {
+    "alerts": 3387,
+    "alerts_per_patient_12h": 0.4494,
+    "new_all": [
+     30,
+     56
+    ],
+    "any_uncut": [
+     44,
+     51
+    ],
+    "chance_any": [
+     1484,
+     3066
+    ],
+    "excess_any_uncut": 0.3787
+   },
+   "baseline_alone": {
+    "alerts": 935,
+    "alerts_per_patient_12h": 0.1241,
+    "new_all": [
+     34,
+     56
+    ],
+    "any_uncut": [
+     35,
+     51
+    ],
+    "chance_any": [
+     269,
+     3066
+    ],
+    "excess_any_uncut": 0.5985
+   }
+  },
+  {
+   "k": 3.5,
+   "p": 6,
+   "news2_or_baseline": {
+    "alerts": 3282,
+    "alerts_per_patient_12h": 0.4355,
+    "new_all": [
+     29,
+     56
+    ],
+    "any_uncut": [
+     42,
+     51
+    ],
+    "chance_any": [
+     1448,
+     3066
+    ],
+    "excess_any_uncut": 0.3513
+   },
+   "baseline_alone": {
+    "alerts": 586,
+    "alerts_per_patient_12h": 0.0778,
+    "new_all": [
+     28,
+     56
+    ],
+    "any_uncut": [
+     30,
+     51
+    ],
+    "chance_any": [
+     169,
+     3066
+    ],
+    "excess_any_uncut": 0.5331
+   }
+  },
+  {
+   "k": 3.5,
+   "p": 8,
+   "news2_or_baseline": {
+    "alerts": 3218,
+    "alerts_per_patient_12h": 0.427,
+    "new_all": [
+     28,
+     56
+    ],
+    "any_uncut": [
+     41,
+     51
+    ],
+    "chance_any": [
+     1412,
+     3066
+    ],
+    "excess_any_uncut": 0.3434
+   },
+   "baseline_alone": {
+    "alerts": 414,
+    "alerts_per_patient_12h": 0.0549,
+    "new_all": [
+     24,
+     56
+    ],
+    "any_uncut": [
+     25,
+     51
+    ],
+    "chance_any": [
+     110,
+     3066
+    ],
+    "excess_any_uncut": 0.4543
+   }
+  },
+  {
+   "k": 4.0,
+   "p": 2,
+   "news2_or_baseline": {
+    "alerts": 3529,
+    "alerts_per_patient_12h": 0.4682,
+    "new_all": [
+     32,
+     56
+    ],
+    "any_uncut": [
+     45,
+     51
+    ],
+    "chance_any": [
+     1545,
+     3066
+    ],
+    "excess_any_uncut": 0.3784
+   },
+   "baseline_alone": {
+    "alerts": 1476,
+    "alerts_per_patient_12h": 0.1958,
+    "new_all": [
+     38,
+     56
+    ],
+    "any_uncut": [
+     39,
+     51
+    ],
+    "chance_any": [
+     422,
+     3066
+    ],
+    "excess_any_uncut": 0.6271
+   }
+  },
+  {
+   "k": 4.0,
+   "p": 3,
+   "news2_or_baseline": {
+    "alerts": 3402,
+    "alerts_per_patient_12h": 0.4514,
+    "new_all": [
+     30,
+     56
+    ],
+    "any_uncut": [
+     44,
+     51
+    ],
+    "chance_any": [
+     1486,
+     3066
+    ],
+    "excess_any_uncut": 0.3781
+   },
+   "baseline_alone": {
+    "alerts": 1000,
+    "alerts_per_patient_12h": 0.1327,
+    "new_all": [
+     36,
+     56
+    ],
+    "any_uncut": [
+     37,
+     51
+    ],
+    "chance_any": [
+     280,
+     3066
+    ],
+    "excess_any_uncut": 0.6342
+   }
+  },
+  {
+   "k": 4.0,
+   "p": 4,
+   "news2_or_baseline": {
+    "alerts": 3308,
+    "alerts_per_patient_12h": 0.4389,
+    "new_all": [
+     30,
+     56
+    ],
+    "any_uncut": [
+     44,
+     51
+    ],
+    "chance_any": [
+     1449,
+     3066
+    ],
+    "excess_any_uncut": 0.3901
+   },
+   "baseline_alone": {
+    "alerts": 710,
+    "alerts_per_patient_12h": 0.0942,
+    "new_all": [
+     33,
+     56
+    ],
+    "any_uncut": [
+     34,
+     51
+    ],
+    "chance_any": [
+     194,
+     3066
+    ],
+    "excess_any_uncut": 0.6034
+   }
+  },
+  {
+   "k": 4.0,
+   "p": 6,
+   "news2_or_baseline": {
+    "alerts": 3226,
+    "alerts_per_patient_12h": 0.428,
+    "new_all": [
+     29,
+     56
+    ],
+    "any_uncut": [
+     42,
+     51
+    ],
+    "chance_any": [
+     1419,
+     3066
+    ],
+    "excess_any_uncut": 0.3607
+   },
+   "baseline_alone": {
+    "alerts": 459,
+    "alerts_per_patient_12h": 0.0609,
+    "new_all": [
+     25,
+     56
+    ],
+    "any_uncut": [
+     27,
+     51
+    ],
+    "chance_any": [
+     121,
+     3066
+    ],
+    "excess_any_uncut": 0.4899
+   }
+  },
+  {
+   "k": 4.0,
+   "p": 8,
+   "news2_or_baseline": {
+    "alerts": 3173,
+    "alerts_per_patient_12h": 0.421,
+    "new_all": [
+     28,
+     56
+    ],
+    "any_uncut": [
+     41,
+     51
+    ],
+    "chance_any": [
+     1394,
+     3066
+    ],
+    "excess_any_uncut": 0.3493
+   },
+   "baseline_alone": {
+    "alerts": 331,
+    "alerts_per_patient_12h": 0.0439,
+    "new_all": [
+     22,
+     56
+    ],
+    "any_uncut": [
+     22,
+     51
+    ],
+    "chance_any": [
+     81,
+     3066
+    ],
+    "excess_any_uncut": 0.405
+   }
+  }
+ ],
+ "tuning": {
+  "trials": 10,
+  "episodes_evaluated": 56,
+  "not_cut_short": 51,
+  "control_windows": 3066,
+  "patient_days": 3768.4,
+  "news2_chart_trigger": {
+   "alerts": 3060,
+   "alerts_per_patient_12h": 0.406,
+   "new_all": [
+    28,
+    56
+   ],
+   "any_uncut": [
+    40,
+    51
+   ],
+   "chance_any": [
+    1343,
+    3066
+   ],
+   "excess_any_uncut": 0.3463
+  }
+ },
+ "synthetic": true,
+ "validated": false
+}

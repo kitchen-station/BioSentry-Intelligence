@@ -125,6 +125,33 @@ describe("httpProvider acknowledgements", () => {
   });
 });
 
+describe("httpProvider.getBaseline", () => {
+  it("reads the patient's baseline route with the bearer token and serves the body as sent", async () => {
+    setAuthToken("rn-manalo");
+    fetchMock.mockResolvedValue(reply(200, { patient_id: "p-001", vitals: [{ latest: 72.123456789 }] }));
+    await expect(httpProvider.getBaseline("p-001")).resolves.toEqual({
+      patient_id: "p-001",
+      vitals: [{ latest: 72.123456789 }],
+    });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/patients/p-001/baseline");
+    expect(new Headers(init.headers).get("Authorization")).toBe("Bearer rn-manalo");
+  });
+
+  it("encodes the id, so a `?` or `#` in it cannot reach the patient route", async () => {
+    fetchMock.mockResolvedValue(reply(200, {}));
+    await httpProvider.getBaseline("p-1?x=1#y/z");
+    expect(fetchMock.mock.calls[0][0]).toBe("/patients/p-1%3Fx%3D1%23y%2Fz/baseline");
+  });
+
+  it("rejects on 404 rather than answering null: null means fixture mode", async () => {
+    fetchMock.mockResolvedValue(reply(404, { detail: "Not found" }));
+    const failure = await httpProvider.getBaseline("p-999").catch((e: unknown) => e);
+    expect(failure).toBeInstanceOf(ApiError);
+    expect((failure as ApiError).status).toBe(404);
+  });
+});
+
 describe("httpProvider maps each call to its endpoint", () => {
   const sent = (call = 0) => {
     const [path, init = {}] = fetchMock.mock.calls[call] as [string, RequestInit?];
@@ -138,6 +165,7 @@ describe("httpProvider maps each call to its endpoint", () => {
   const file = new File(["x"], "labs.pdf", { type: "application/pdf" });
 
   it.each([
+    ["getBaseline", () => httpProvider.getBaseline("p-1"), "GET", "/patients/p-1/baseline", undefined],
     ["getNotes", () => httpProvider.getNotes("p-1"), "GET", "/patients/p-1/notes", undefined],
     ["addNote", () => httpProvider.addNote("p-1", "RN Cruz", "RN", "Restless"), "POST", "/patients/p-1/notes", { author: "RN Cruz", role: "RN", content: "Restless" }],
     ["listAllPatients", () => httpProvider.listAllPatients(), "GET", "/patients", undefined],

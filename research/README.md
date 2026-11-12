@@ -1,0 +1,280 @@
+# research: offline evaluation of alerting rules (synthetic data only)
+
+Standard-library Python plus an import of the backend's own `biosentry` package. No dependency, no
+`pyproject.toml`, nothing here is served by the API. This slice holds the yardstick: how NEWS2
+alone performs as an alerting rule against the simulator's true deterioration episodes. Every
+later model is compared with these numbers.
+
+- `trials.py` reads one trial folder (format version 1: `manifest.json`, `cohort.csv`,
+  `episodes.csv`, `summary.json`). It refuses an unknown format version, a missing file, a wrong
+  header, a manifest without `synthetic: true`, and rows that break the contract. It opens only
+  those four names, never follows a symlinked file, never evaluates content, and caps what it
+  reads: 64 KiB per JSON file, 64 MiB per CSV, 1,000 characters per line, 1,000,000 cohort rows,
+  100,000 episode rows.
+- `rescore.py` re-scores every cohort row with the backend's NEWS2 and requires it to equal the
+  sim's `ranked` and `news2` (a mismatch stops the run and names trial, patient and minute).
+- `alerts.py` holds the policies and the alert rule; `events.py` the episode windows;
+  `evaluate.py` the metrics and the command.
+
+## Run
+
+Trial data lives outside the repository. The real trials for this slice are
+`~/Desktop/Projects/biosentry-data/trials/ward-v1/seed-01` to `seed-30` (30 simulated days each).
+
+    python -m research.evaluate <trial folder>...
+
+It prints plain deterministic text (no clock, no paths) and exits 2 with one line on any refusal.
+Trials must share format version, days, speed and scenario hash.
+
+## The split
+
+Seeds 1 to 10 are "tuning", 11 to 30 "held out". Metrics use the held-out seeds only. Tuning seeds
+are loaded and parity-checked, then not scored here. `research.sweep` chooses the baseline's k and p on them. A seed outside
+1 to 30 is refused.
+
+## Definitions
+
+- Event: the generator's true deterioration episode. It starts at `episode_start`, is fully in at
+  `episode_start + ramp_minutes`, and its window runs from the start to fully-in + 120 minutes.
+  Lead time is fully-in minus the FIRST new alert in the window (positive: before fully in).
+- Three detection measures per policy, printed side by side and not interchangeable:
+  (a) NEW alert: an alert fires inside the window. (b) ALERTING in any bin: the policy is alerting
+  in at least one bin of the window. (c) the count with (b) but not (a): the alert was already open
+  before the window. (a) is not monotone in the policy: a policy that alerts earlier and more can
+  score fewer new alerts, because an alert opened before the window stays open and cannot fire again.
+- Dropped: episodes of the 12 starting patients (admit minute 0; true arrival unknown, and one
+  has a scripted worsening that is not an episode), episodes starting after the trial, and
+  episodes starting outside the patient's stay. Starting patients stay in the alert-burden counts.
+  Kept episodes whose window is cut short by the end of the stay or trial are counted; sensitivity
+  is printed for all evaluated episodes and for episodes not cut short, and the episodes whose stay
+  or trial ended before they were fully in are counted separately. A kept episode with no cohort
+  rows at all is counted on its own line and is not detected.
+- Chance control (no random draws): each evaluated episode's window (same offset from admission,
+  same length) is laid on every admitted, non-starting patient of the same trial whose stay covers
+  the whole window and in whose stay no episode begins (no episode, or one starting after the stay
+  or trial ended). The shares of control windows with a new alert and with an alerting bin are the
+  chance rates; "excess over chance" is sensitivity minus that. Control windows are never cut
+  short, so the like-for-like comparison is the "not cut short" sensitivity. The chance rates have
+  no interval.
+- Alert: one open alert per patient; it fires when the policy turns from not alerting to
+  alerting and re-arms after 16 bins (4 hours) not alerting (a judgement, the same for every
+  policy). A missing bin or a NOT RANKED row is not alerting.
+- Burden: alerts per patient per 12-hour shift and per 100 patient-days (patient-days from each
+  `summary.json`), and time in alert (cohort rows alerting / cohort rows).
+- Abstention: NOT RANKED rows over cohort rows; bins with no row over the bins expected in the
+  stays (every 15-minute boundary from admission to just before leaving); and the two together.
+  The episodes whose start fell in a NOT RANKED or missing bin (the bin ending at or after the start)
+  are counted.
+- Policies: `news2_chart_trigger` is the product's arbiter itself (`arbitrate(...).escalated`:
+  total 5 or more, or any single parameter at 3); `news2_total_ge_5` is total 5 or more only.
+  Add a policy by adding a `Policy` to `alerts.POLICIES`.
+- Intervals: patient-level bootstrap (each patient of the held-out trials, with replacement), 1,000
+  resamples, a SplitMix64 generator (`bootstrap.py`, fixed seed 20261112, no `random` module),
+  2.5th to 97.5th percentile, for the alert rate and for the two sensitivities. Exposure per
+  patient is the stay inside the trial.
+
+## Baseline policies and the sweep (slice B4)
+
+Two policies use each patient's own baseline (`baseline_policy.py`, which calls the backend's
+`baseline_finding` on the bins up to each bin, so a bin never sees the future): "baseline alone"
+(any of heart rate, respiratory rate, SpO2, temperature is significant) and "NEWS2 chart trigger
+OR baseline" (either one alerts). The alert rule, windows, chance control and bootstrap are the
+ones above.
+
+How a bin is treated, as decided by the detector itself and not by us: before a patient has 24
+valid bins there is no finding (baseline forming) and the bin is not alerting. A bin with no
+cohort row has no state and is not alerting. A row whose value for a vital is missing gives no
+finding for that vital (latest bin missing), and a gap ends a run; nothing is filled in. A NOT
+RANKED row (NEWS2 abstains) is still judged on the vitals it has. The "abstention" lines for the
+two new policies repeat NEWS2's NOT RANKED count; the detector has no abstention count of its own.
+
+Choosing k and p (`python -m research.sweep <trial folders>`). Written before the sweep was run:
+
+- Grid: k in 1.5, 2.0, 2.5, 3.0, 3.5, 4.0 and p in 2, 3, 4, 6, 8. Window and floors stay at the
+  detector's defaults.
+- Only tuning seeds 1 to 10 are scored. Held-out trials in the folder list are skipped and are
+  never part of any number.
+- Budget: a setting qualifies when "NEWS2 OR baseline" raises at most 25% more alerts per patient
+  per 12 hours than the NEWS2 chart trigger alone, on the tuning seeds.
+- Among qualifying settings, pick the largest excess over chance of ALERTING in any bin, on
+  episodes not cut short, for "NEWS2 OR baseline" (sensitivity minus the control-window rate).
+- Ties go to fewer alerts, then larger k, then larger p.
+- If no setting qualifies, nothing is chosen. That is a valid result.
+
+The command writes nothing unless `--write-params <path>` is given. `evaluate` then adds the two
+rows for the chosen k and p, read from `models/tier_b/baseline/params.json` when it exists,
+otherwise the detector's DEFAULTS (it prints which).
+
+## The distilled vitals student (slice B5)
+
+Written before any training run. Code: `student.py` (features, labels, models, ONNX),
+`train_student.py` and `evaluate_student.py` (the commands). These three need numpy,
+scikit-learn, onnx and onnxruntime (`research/pyproject.toml`, `uv.lock`); nothing else in
+`research/` imports them, so the stdlib parts and RESEARCH-GATE run without them.
+Vulnerability check of the locked requirements (pip-audit, 2026-11-12): "No known
+vulnerabilities found".
+
+- Bins: one feature row per cohort row (a 15-minute bin), built from that bin and earlier bins
+  of the same stay only. A bin with no cohort row has no feature row. NOT RANKED bins are not
+  scored (abstention is an output): they get no probability, are not alerting, and are not
+  trained on. Their vitals still feed the baseline, as in the B4 policies.
+- Features (19), in this order, per vital (heart rate, respiratory rate, SpO2, temperature):
+  the value; a missing flag; z from the patient's own baseline (`baseline_finding` with the
+  detector's DEFAULTS window and floors, called on the bins up to this one, so it is the same
+  baseline as B4); a z-missing flag (set while the baseline is forming, fewer than 24 valid
+  bins, or when this bin's value is missing). Then the NEWS2 total, on oxygen (0/1) and
+  consciousness not A (0/1). Missing is missing: a missing input is the number 0 with its flag
+  set; no clinical value is ever filled in. On the ward-v1 trials a RANKED row always has all
+  four device vitals, so the value-missing flags are always 0 on scored bins; they are kept so a
+  future cohort with gaps cannot be silently imputed.
+- No-temperature features (15): the same without the four temperature features, and the NEWS2
+  total minus its temperature points (from the backend's own parameter scores). This removes
+  every temperature input.
+- Label per scored bin, from the generator's true episode only (`outcome`/higher care is never
+  a label): positive when `episode_start <= minute <= episode_start + ramp_minutes` (start to
+  fully in); bins after fully in until the stay ends are excluded (neither class); every other
+  bin is negative, including every bin of a patient with no episode. Starting patients (admit
+  minute 0) are left out of training and selection, as they are out of sensitivity: their true
+  arrival is unknown and one has a scripted worsening that is not an episode.
+- Split: teacher and students train on seeds 1 to 7; early stopping, the choice of student and
+  the threshold use seeds 8 to 10; seeds 11 to 30 are scored once by `evaluate_student`. The
+  training loader reads a folder's `manifest.json` first and skips a held-out seed before any
+  other file of it is opened.
+- Teacher: scikit-learn `HistGradientBoostingClassifier`, `random_state=0`, early stopping on
+  the loss of seeds 8 to 10 (`X_val`), at most 500 iterations, 20 without improvement.
+- Students, trained on the teacher's probabilities for seeds 1 to 7 (soft labels; no true label
+  is used to fit them): (a) logistic: a linear model of the teacher's log-odds (probabilities
+  clipped to 1e-4 and 1 - 1e-4) fitted by least squares with ridge alpha 1, then a sigmoid; (b)
+  MLP: one hidden layer of 16 ReLU units fitted to the same log-odds (scikit-learn
+  `MLPRegressor`, adam, alpha 1e-4, `random_state=0`). Inputs are standardised with the mean
+  and standard deviation of seeds 1 to 7 (a standard deviation of 0 becomes 1); those constants
+  are inside the ONNX graph. The student with the higher average precision against the true
+  labels of seeds 8 to 10 is kept; both are recorded.
+- Export: the student only, ONNX opset 13, IR version 7, float32, input `x` of shape
+  [1, n_features], output `p` of shape [1, 1]; ops Sub, Div, Gemm, Relu, Sigmoid; built with
+  `onnx.helper`. Parity: onnxruntime equals the numpy forward pass within 1e-5 on 1,000 rows
+  of seeds 1 to 7.
+- Threshold: on seeds 8 to 10, the alert rule above is run with "alerting when p >= t" for t in
+  0.001 to 0.009 and 0.01 to 0.99 (steps of 0.001 then 0.01). The smallest t whose alerts do not
+  exceed the NEWS2 chart trigger's alerts on the same seeds is chosen (matched burden, the
+  same patient-days). If none qualifies, nothing is chosen. The teacher gets its own threshold
+  by the same rule. "NEWS2 OR student" uses the student's threshold and so carries more alerts
+  than NEWS2 alone; its burden is printed.
+- Rule for any future selection (written after B5's held-out run; not applied to B5): a
+  threshold also qualifies only when its time in alert (alerting bins over bins) on the
+  validation seeds is at most the NEWS2 chart trigger's on the same seeds. Counting alerts alone
+  is not enough: one alert that stays open looks like a small burden. B5's no-temperature
+  models fail this rule (52.7% against 12.4% on seeds 8 to 10), so `evaluate_student` labels
+  their rows "no usable threshold: alert stuck open; not a working rule".
+- The same recipe is run twice: with all 19 features and with the 15 no-temperature features.
+- Held-out rows (`evaluate_student`): teacher, student, NEWS2 OR student, and the three
+  no-temperature versions, next to the NEWS2 and baseline rows, with the alert rule, windows,
+  chance control and bootstrap above. It retrains on seeds 1 to 10 (deterministic) and refuses
+  to run unless the retrained students' ONNX bytes have the sha256 in the model's metadata; the
+  student rows then run the committed ONNX file through onnxruntime.
+
+Run (inside `biosentry-research-venv`, see the gate below):
+
+    python -m research.train_student /data/trials/ward-v1/seed-* [--out <dir>]
+    python -m research.evaluate_student /data/trials/ward-v1/seed-*
+
+`--out` defaults to `models/tier_c/student_vitals/`.
+
+## The reward-driven alerting policy (slice B6)
+
+Written before any run. Code: `reward_policy.py` (the policy and the reward) and `reward_loop.py`
+(the loop and the held-out command). Standard library only; the tests are in `tests/`.
+
+- Policy: six numbers, four non-negative weights (heart rate, respiratory rate, SpO2,
+  temperature), a threshold theta and a persistence p (integer 1 to 8). Per bin, for each vital,
+  z from the patient's own baseline (`baseline_finding` with the detector's DEFAULTS window and
+  floors, called on the bins up to this one, as in B4 and B5), clipped at 0 in the bad direction.
+  Score = the weighted sum. Alerting when the score is at least theta in p consecutive scored
+  bins. A NOT RANKED bin is not scored: it is not alerting and ends a run (abstention is an
+  output). A bin with no row ends a run. A vital whose value is missing, or whose baseline is
+  still forming, contributes nothing; nothing is filled in. Causal: a bin reads itself and
+  earlier bins only.
+- Generation 0 is the B4 rule's equivalent: weights 1, 1, 1, 1, theta 3.0, p 4. B4 alerts when
+  ONE vital has z at least 3 for 4 bins; the sum form cannot express "any one", so with equal
+  weights and theta = k it alerts whenever B4 does on RANKED bins, and also when several vitals
+  are moderately off together (a superset). Unlike B4 it never alerts on a NOT RANKED bin. The
+  weights and theta are only defined up to a common factor; the search does not use that.
+- Reward for one trial: C - lambda * S * a. C = evaluated episodes (the windows above) with the
+  policy alerting in a bin from `episode_start` to fully in (caught early). a = the policy's
+  alerts per patient per 12 h on the trial (alert rule above). S = E / a_news2: E evaluated
+  episodes of the trial over the NEWS2 chart trigger's alerts per patient per 12 h on the same
+  trial, so the penalty is lambda * E * (a / a_news2) and both terms are in episodes. lambda =
+  0.5: a policy with NEWS2's alert count must catch more than half the episodes early to score
+  above a silent one (judgement, fixed now, never tuned). Hard constraint: time in alert
+  (alerting bins over cohort rows) at most the NEWS2 chart trigger's on the same trial; a
+  candidate that breaks it on any trial of the set is rejected. `outcome`/higher care is never
+  part of the reward. A set of trials is scored by the mean reward.
+- Loop: generation g (1 to 10) learns on three training seeds no other generation sees: 31-33,
+  34-36, ..., 58-60 of `ward-v1-train`. It samples 30 candidates around the current parameters
+  (weights and theta: plus a normal draw times sigma, weights floored at 0, theta at 0.1; p:
+  plus a normal draw times sigma_p, rounded and clipped to 1-8; values rounded to 4 decimals),
+  from a SplitMix64 generator (seed 20261112 + g, Box-Muller normals). sigma starts at 0.5 for
+  weights and theta and 1.0 for p, and is multiplied by 0.9 after each generation. The current
+  policy and every candidate are scored on the generation's three seeds; the policy moves to
+  the best non-rejected candidate only if its mean reward is strictly higher than the current
+  policy's on those seeds (ties: the first drawn). A (1+30) evolution step: black-box search
+  with a reward, not deep or per-step reinforcement learning.
+- Validation and stop: after each generation (and at generation 0) the current policy is scored
+  on ward-v1 seeds 8 to 10. The shipped policy is the generation with the highest validation
+  reward among those not rejected there (ties: the earlier generation). Seeds 1 to 7 are not used.
+- Files: `models/tier_b/reward_policy/generations/gen-NN.json` and `policy.json` (with its own
+  sha256); the no-temperature run writes the same under `no_temperature/`. Same inputs give the
+  same bytes.
+- No-temperature run: the same loop with the temperature weight fixed at exactly 0 (never
+  sampled), generation 0 weights 1, 1, 1, 0.
+- The loaders open `<root>/seed-NN` only for the seeds named above, read `manifest.json` first,
+  and refuse a seed that differs from the folder name or is one of 11 to 30 before any other
+  file is opened. Held-out seeds 11 to 30 are scored once, by `--evaluate`, which refuses a
+  `policy.json` whose sha256 does not match its content. Rows: generation 0 and the shipped
+  policy, each alone and OR NEWS2 chart trigger, for both runs, next to NEWS2 and the B4 rows,
+  through `research.evaluate` (same windows, chance control, bootstrap).
+
+Run (either venv):
+
+    python -m research.reward_loop --train /data/trials/ward-v1-train --validate /data/trials/ward-v1 --out models/tier_b/reward_policy [--no-temperature]
+    python -m research.reward_loop --evaluate /data/trials/ward-v1 --out models/tier_b/reward_policy
+
+## Limits
+
+- Temperature is flattered. The sim adds a fixed rise (`INJECT_TEMPERATURE = 0.6`) in every episode
+  kind and uses a fixed noise of 0.02 (`src/sim/source.ts`, both `shortcut:`, uncited), so any
+  detector that reads temperature looks better than it should until those have a source.
+- Circular. The data and the episodes come from the same simulator that the alerts are judged
+  on, so this says how a rule behaves on this simulator, not on patients. A model trained on
+  simulator trials and then scored on simulator trials is circular in the same way. Output ends
+  with "synthetic, not validated".
+- "Higher care" (`outcome`) is decided by NEWS2 inside the sim, so it is never an event.
+- Read sensitivity next to its chance rate. With alerts this frequent, a window laid on a patient
+  with no episode often contains a new alert or an alerting bin by itself, so only the excess over
+  chance can be attributed to the episode.
+- Hypotensive episodes are visible only once a nurse takes a cuff pressure. The output prints how
+  many hypotensive windows have no cuff reading carried by a bin inside them (NEWS2 saw no new
+  blood pressure); the low
+  hypotensive sensitivity comes from that and from the new-alert rule (an alert already open at the
+  window start does not count), not from one cause alone.
+- The toy cohort in `tests/data/toy` has gaps on purpose (a few dozen rows, hand-computed
+  answers, `toy_expected.txt` is the exact expected output) and a hand-set `patient_days`.
+
+## Gate (RESEARCH-GATE)
+
+    docker run --rm -v <repo>:/app -v ~/Desktop/Projects/biosentry-data:/data:ro -v biosentry-test-venv:/venv -w /app -e PYTHONPATH=/app/backend/src:/app -e PYTHONDONTWRITEBYTECODE=1 biosentry-api-build sh -c "/venv/bin/python -m pytest -q -p no:cacheprovider research/tests; echo pytest-exit \$?"
+
+It must print "N passed" and `pytest-exit 0`. If `/venv/bin/python` is missing, run
+`uv sync --locked -q` in `/app/backend` first with `-e UV_PROJECT_ENVIRONMENT=/venv -e
+UV_PYTHON_DOWNLOADS=never`. The backend's coverage gate does not measure `research/`.
+
+## Gate (ML-GATE, slice B5)
+
+RESEARCH-GATE does not collect `research/tests_ml/` (its venv has no numpy). This gate runs both
+folders in the research venv, so the student tests are never skipped:
+
+    docker run --rm -v <repo>:/app -v ~/Desktop/Projects/biosentry-data:/data:ro -v biosentry-research-venv:/venv -w /app -e PYTHONPATH=/app/backend/src:/app -e PYTHONDONTWRITEBYTECODE=1 biosentry-api-build sh -c "/venv/bin/python -m pytest -q -p no:cacheprovider research/tests research/tests_ml; echo pytest-exit \$?"
+
+It must print "N passed" and `pytest-exit 0`. The venv's locked packages were checked with
+pip-audit on 2026-11-12: "No known vulnerabilities found". Set up the venv once with
+`docker run --rm -v <repo>:/app -v biosentry-research-venv:/venv -w /app/research -e UV_PROJECT_ENVIRONMENT=/venv -e UV_LINK_MODE=copy -e UV_PYTHON_DOWNLOADS=never biosentry-api-build uv sync --locked`.

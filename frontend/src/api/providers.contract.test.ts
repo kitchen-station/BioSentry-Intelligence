@@ -135,6 +135,9 @@ describe.each(harnesses)("$name", ({ provider, signIn }) => {
     signIn("md-aquino");
     expect(await provider.getPatient("p-001")).toBeNull();
     expect(await provider.getPatient("p-999")).toBeNull();
+    // The API rejects (404); the fixture provider has no finding to give and answers null.
+    const baseline = await attempt(() => provider.getBaseline("p-001"));
+    expect(baseline.ok && baseline.value !== null).toBe(false);
     expect((await attempt(() => provider.getNotes("p-001"))).ok).toBe(false);
     expect((await attempt(() => provider.addNote("p-001", "x", "RN", "x"))).ok).toBe(false);
     expect((await attempt(() => provider.deleteNote("p-001", "n-001"))).ok).toBe(false);
@@ -155,6 +158,16 @@ describe.each(harnesses)("$name", ({ provider, signIn }) => {
     if (listed.ok) expect(listed.value).toHaveLength(0);
     const detail = await attempt(() => provider.getPatient("p-001"));
     if (detail.ok) expect(detail.value).toBeNull();
+  });
+
+  it("your own patient's baseline: null from the fixture provider, four vitals in order from the API (only with VITE_API_URL)", async () => {
+    signIn("rn-manalo");
+    const baseline = await provider.getBaseline("p-003");
+    if (provider === fixtureProvider) return expect(baseline).toBeNull();
+    expect(baseline).not.toBeNull();
+    if (baseline === null) return;
+    expect(baseline.patient_id).toBe("p-003");
+    expect(baseline.vitals.map((v) => v.vital)).toEqual(["heart_rate", "respiratory_rate", "spo2", "temperature"]);
   });
 
   it("gaps are null in the history and never zero", async () => {

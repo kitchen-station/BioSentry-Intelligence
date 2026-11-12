@@ -8,6 +8,7 @@ import type {
   AbstainedRow,
   Acknowledgement,
   AdmitPatientInput,
+  BaselineResponse,
   ClinicalNote,
   LabExtractionResult,
   LabPanel,
@@ -23,6 +24,11 @@ import type {
 export interface ApiProvider {
   getWard(): Promise<WardResponse>;
   getPatient(id: string): Promise<PatientDetail | null>;
+  /**
+   * The patient's change-from-own-baseline finding (Tier B, research, never ranks). Null when the
+   * provider has none to give (fixture mode); a missing or not-yours patient rejects.
+   */
+  getBaseline(patientId: string): Promise<BaselineResponse | null>;
   getNotes(patientId: string): Promise<ClinicalNote[]>;
   addNote(
     patientId: string,

@@ -1,0 +1,5 @@
+patient,admit_minute,leave_minute,outcome,episode_kind,episode_start,ramp_minutes,af_start,af_end,persistent_af
+p-001,0,,,,,,,,0
+n-0001,60,900,discharged,respiratory,300,90,,,0
+n-0002,120,1000,discharged,tachycardic,600,60,,,0
+n-0003,30,1100,discharged,,,,,,0
