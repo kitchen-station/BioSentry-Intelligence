@@ -58,8 +58,8 @@ class Row:
     temperature: float | None
     systolic: float | None
     bp_minute: float | None
-    consciousness: str
-    on_oxygen: bool
+    consciousness: str | None  # None only on real data (research.realdata): never filled in
+    on_oxygen: bool | None
     spo2_scale: int
     ranked: bool
     news2: int | None
