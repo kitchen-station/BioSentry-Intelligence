@@ -92,6 +92,9 @@ def test_a_check_that_failed_is_tried_again_and_a_failed_reward_round_is_not():
     assert first(rnd("S-0001", "reward_round"), failed_check) == ("check_policy", "R2")
     assert first(rnd("S-0001", "reward_round"), failed_check, rnd("S-0005", "check_policy")) == (
         "reward_round_no_temperature", "R3")
+    # a check that fails twice is left, so it cannot block the rest of the list
+    assert first(rnd("S-0001", "reward_round"), failed_check, rnd("S-0005", "check_policy", ok=False)) == (
+        "reward_round_no_temperature", "R3")
     assert first(rnd("S-0001", "reward_round", ok=False, chosen_generation=None)) == ("reward_round_no_temperature", "R3")
 
 
@@ -275,13 +278,16 @@ def test_the_key_is_not_in_the_request_body_nor_in_the_ledger_even_when_the_mode
     cfg = model_cfg(tmp_path)
     for answer in (reply(f"my key is {KEY}"), reply(json.dumps({**SWEEP, "reason": f"key {KEY}"})),
                    # a refused argument is echoed capped at 40 characters: no part of the key may survive that
-                   reply(json.dumps({**SWEEP, "tool": "x" * 30 + KEY}))):
+                   reply(json.dumps({**SWEEP, "tool": "x" * 30 + KEY})),
+                   # escaped twice, so the raw bytes do not hold it; and only a part of it
+                   reply(json.dumps({**SWEEP, "reason": KEY}).replace("s", "\\u0073")),
+                   reply(json.dumps({**SWEEP, "reason": "the key ends in " + KEY[-9:]}))):
         seen = sent(monkeypatch, answer)
         plan = ModelPlanner(cfg).next(EMPTY)
         assert plan.fallback == "echoed_key" and plan.experiment == "reward_round"
         assert KEY.encode() not in seen[0][2]
     text = (cfg.home / "ledger.jsonl").read_text()
-    assert KEY not in text and KEY[:8] not in text and text.count("echoed_key") == 3
+    assert KEY not in text and KEY[:8] not in text and text.count("echoed_key") == 5
 
 
 def test_nothing_open_means_no_model_call(tmp_path, monkeypatch):

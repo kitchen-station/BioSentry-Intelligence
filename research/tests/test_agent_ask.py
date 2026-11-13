@@ -57,9 +57,21 @@ def test_the_set_holds_the_refusals_the_contract_names():
                                       "threshold of -5", "threshold of 5.5", "threshold of 5,5", "threshold of 05?",
                                       "threshold above 5", "a total of more than 5", "threshold of \u0665",
                                       "baseline over 3 days", "threshold of 5; rm -rf /", "threshold of 5 for John in room B",
-                                      "give fluids at a threshold of 5?", "threshold of 5 on last month's patients"])
+                                      "give fluids at a threshold of 5?", "threshold of 5 on last month's patients",
+                                      "threshold of +5", "threshold of 5x", "a total of less than 7", "threshold under 7",
+                                      "threshold below 7", "threshold of not 7", "threshold < 7", "threshold of 5%",
+                                      "threshold of 5 on actual hospital data", "threshold of 5 on the validation data",
+                                      "make a threshold of 5 the default", "threshold of 5 in production"])
+
 def test_odd_questions_are_refused(question):
     assert ask.match(question) == (None, None)
+
+
+@pytest.mark.parametrize("question, threshold", [
+    ("Would alerting at NEWS2 5 catch more deteriorations?", 5), ("What if we alerted when NEWS2 reaches 6?", 6),
+    ("What about a threshold of 20?", 20), ("NEWS2 >= 3?", 3)])
+def test_plain_threshold_phrasings_are_matched(question, threshold):
+    assert ask.match(question) == ("news2_threshold", threshold)
 
 
 # --- end to end, one test per template, on toy trials ------------------------------------------------------------------
@@ -67,8 +79,8 @@ def test_odd_questions_are_refused(question):
 def test_t1_threshold_answer_is_fixed_sentences_with_the_results_numbers(cfg):
     text = ask.ask(cfg, "What if we alerted at a NEWS2 total of 5 or more?")
     assert text.splitlines() == [
-        FIRST + "a rule that alerts at a NEWS2 total of 5 or more had an alert on for 20 of 20 episodes before the "
-                "deterioration was fully in. The current NEWS2 chart trigger had one on for 20 of 20." + COUNTS,
+        FIRST + "a rule that alerts at a NEWS2 total of 5 or more had an alert on for 20 of 20 episodes by the time "
+                "the deterioration was fully in. The current NEWS2 chart trigger had one on for 20 of 20." + COUNTS,
         "Chance control: the same time windows on patients with no episode held an alert in 10 of 20 windows at the new "
         "threshold and 20 of 20 windows for the chart trigger. Read the catches next to these.",
         "Alarms: 240.0 alerts per 100 patient-days at the new threshold, 280.0 for the chart trigger (a change of -40.0).",
@@ -83,8 +95,8 @@ def test_t1_threshold_answer_is_fixed_sentences_with_the_results_numbers(cfg):
 def test_t2_baseline_answer(cfg):
     text = ask.ask(cfg, "Is a patient's own baseline better than NEWS2 at catching deterioration early?")
     lines = text.splitlines()
-    assert lines[0] == (FIRST + "the NEWS2 chart trigger had an alert on for 20 of 20 episodes before the deterioration "
-                        "was fully in. The patient's own baseline alone had one on for 0 of 20, and NEWS2 or the baseline "
+    assert lines[0] == (FIRST + "the NEWS2 chart trigger had an alert on for 20 of 20 episodes by the time the "
+                        "deterioration was fully in. The patient's own baseline alone had one on for 0 of 20, and NEWS2 or the baseline "
                         "together for 20 of 20." + COUNTS)  # no toy patient has 24 valid bins: the baseline never alerts
     assert lines[1] == ("Chance control: the same time windows on patients with no episode held an alert in 20 of 20 "
                         "windows for the chart trigger, 0 of 20 for the baseline alone and 20 of 20 for NEWS2 or the "
@@ -96,8 +108,8 @@ def test_t2_baseline_answer(cfg):
 
 def test_t3_nurse_answer_says_how_the_number_is_made(cfg):
     lines = ask.ask(cfg, "How many alerts would each nurse get per shift?").splitlines()
-    assert lines[0] == FIRST + ("the current NEWS2 chart trigger had an alert on for 20 of 20 episodes before the "
-                                "deterioration was fully in.") + COUNTS
+    assert lines[0] == FIRST + ("the current NEWS2 chart trigger had an alert on for 20 of 20 episodes by the time "
+                                "the deterioration was fully in.") + COUNTS
     assert lines[1].startswith("Chance control:") and "20 of 20 windows" in lines[1]
     assert lines[2] == ("Alarms: 1.75 alerts per nurse per 12-hour shift. The nurse number is staff nurses per shift from "
                         "the trial's scenario (2), 12-hour shifts, alerts spread evenly across the nurses.")

@@ -106,6 +106,12 @@ def state_from(records: list[dict]) -> dict:
     return {"rounds": rounds}
 
 
+def _needs_check(run: str, checks: list[dict]) -> bool:
+    """Not checked yet. A check that failed is tried once more, then left: it must not block the rest."""
+    mine = [c for c in checks if c["checked"] == run]
+    return not any(c["ok"] for c in mine) and len(mine) < 2
+
+
 def open_experiments(state: dict) -> list[Plan]:
     """Every experiment from the list that is legal now, in list order."""
     rounds = state["rounds"]
@@ -115,8 +121,7 @@ def open_experiments(state: dict) -> list[Plan]:
         done = by(first)
         if not done:
             out.append(_plan(first))
-        elif done[-1].get("chosen_generation") is not None and done[-1]["id"] not in {
-                r["checked"] for r in by(check) if r["ok"]}:  # a check that failed is tried again
+        elif done[-1].get("chosen_generation") is not None and _needs_check(done[-1]["id"], by(check)):
             out.append(_plan(check, done[-1]["id"]))
     if not by(E5):
         out.append(_plan(E5))
@@ -162,17 +167,31 @@ class _Reject(Exception):
         self.code, self.shown = code, shown
 
 
-def _pick(raw: bytes, opens: list[Plan]) -> Plan:
+def _holds_key(key: str, text: str) -> bool:
+    """Any 8 characters of the key in a row (the whole key when it is shorter)."""
+    return any(key[i:i + 8] in text for i in range(max(1, len(key) - 7)))
+
+
+def _pick(raw: bytes, opens: list[Plan], key: str) -> Plan:
+    # The key is looked for at each level of decoding, so an escaped copy is caught too. An answer
+    # that holds any of it is dropped whole: nothing of it is stored.
+    text = raw.decode("utf-8", "replace")
+    if _holds_key(key, text):
+        raise _Reject("echoed_key")
     try:
-        content = json.loads(raw)["choices"][0]["message"]["content"]
+        content = json.loads(text)["choices"][0]["message"]["content"]
     except (ValueError, KeyError, IndexError, TypeError, RecursionError):
         raise _Reject("bad_envelope") from None
     if type(content) is not str:
         raise _Reject("bad_envelope")
+    if _holds_key(key, content):
+        raise _Reject("echoed_key")
     try:
         answer = json.loads(content)
     except (ValueError, TypeError, RecursionError):
         raise _Reject("not_json", content) from None
+    if _holds_key(key, json.dumps(answer, ensure_ascii=False)):
+        raise _Reject("echoed_key")
     if not isinstance(answer, dict) or set(answer) != {"tool", "args", "reason"} or type(answer["reason"]) is not str:
         raise _Reject("wrong_keys", content)
     try:
@@ -208,9 +227,7 @@ class ModelPlanner:
                 raw = post(cfg.model_url, headers, body, TIMEOUT)
             except (OSError, ValueError, http.client.HTTPException):  # a timeout is an OSError
                 raise _Reject("http_error") from None
-            if cfg.model_key.encode() in raw:  # never parsed, so no part of it can be stored
-                raise _Reject("echoed_key")
-            return replace(_pick(raw, opens), host=host)
+            return replace(_pick(raw, opens, cfg.model_key), host=host)
         except _Reject as e:
             ledger.add_fallback(cfg, e.code, host, e.shown.replace(cfg.model_key, "***"))
             return replace(opens[0], fallback=e.code)

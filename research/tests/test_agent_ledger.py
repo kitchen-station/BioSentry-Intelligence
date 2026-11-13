@@ -104,6 +104,15 @@ def test_untrusted_text_is_capped_and_cleaned_and_the_model_key_never_gets_in(tm
         ledger._append(cfg, "step", {"big": "x" * ledger.MAX_LINE})
 
 
+def test_a_chain_valid_record_that_lacks_what_its_readers_need_is_a_broken_ledger(cfg):
+    step(cfg)
+    ledger._append(cfg, "step", {"kind": "round", "plan": {}, "calls": []})  # no id
+    for use in (lambda: ledger.read(cfg), lambda: step(cfg), lambda: ledger.apply(cfg, "P-0001")):
+        with pytest.raises(LedgerError, match="broken at seq 3"):
+            use()
+    assert cli.main(["status"], env_for(cfg)) == 2
+
+
 def test_a_symlinked_ledger_is_refused(tmp_path, cfg):
     cfg.home.mkdir()
     (tmp_path / "other").write_text("")

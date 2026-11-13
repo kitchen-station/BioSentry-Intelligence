@@ -20,16 +20,18 @@ FIXED = ("NEWS2", "12-hour", "seeds 1 to 10", "per 100 patient-days", LAST_LINE)
 _NEVER = re.compile(
     r"\b(approve|apply|ignore|disregard|override|overwrite|delete|deploy|install|adopt|write|edit|modify|"
     r"ledger|proposal|prompt|instructions?|p-[0-9]{4})\b|\b(change|set|update)\b.*\b(policy|model|models|file|setting|settings|params)\b"
-    r"|held[- ]?out|hold-?out|real[- ]world|real (patients?|data)|actual patients?|\bseeds?\s*(1[1-9]|[23][0-9])\b"
+    r"|held[- ]?out|hold-?out|real[- ]world|real (patients?|data)|\bactual\b|\bproduction\b|\bdefault\b"
+    r"|\b(validation|test) (data|set|seeds?)\b|\bseeds?\s*(1[1-9]|[23][0-9])\b"
     r"|\b(this|that|my|our|one|single|named) patient\b|\bpatient\s+(number|no|id|named?|called)\b|\bpatient\s+[a-z]?-?[0-9]+\b"
     r"|\bbed\s+[0-9]+\b|\broom\b|\bward\s+[0-9]+\b|\b(mr|mrs|ms|dr|he|she|him|her|his|hers)\b"
     r"|\b(last (night|week|month|year)|yesterday|today|tonight)\b"
     r"|\b(dose|dosage|treat|treatment|treating|medication|drug|prescribe|antibiotics?|mg|oxygen|fluids?|icu|intubat\w*|transfer|discharge)\b"
     r"|@|https?:|\b(e-?mail|send|upload|download|execute|sudo|curl|rm)\b|[;|`$\\]")
-_THRESHOLD = re.compile(r"threshold|cut-?\s?off|score of|total of|\bat [0-9]|[0-9]+ or (more|higher|above)|>=|≥")
-# "above 5" could mean 5 or 6: refused, never guessed
-_STRICT = re.compile(r"(above|over|more than|greater than|higher than|exceeds?|exceeding|>(?!=))\s*-?[0-9]")
-_NUMBER = re.compile(r"-?[0-9]+(?:[.,][0-9]+)?")
+_THRESHOLD = re.compile(r"threshold|cut-?\s?off|score of|total of|\bat\s+[0-9]|reach(es)?\s+[0-9]|[0-9]+ or (more|higher|above)|>=|≥")
+# "above 5" could mean 5 or 6, and "under 7" is the opposite rule: refused, never guessed
+_STRICT = re.compile(r"(above|over|more than|greater than|higher than|exceeds?|exceeding|less than|fewer than|lower than|"
+                     r"under|below|not|>(?!=)|<)\s*[-+]?[0-9]")
+_NUMBER = re.compile(r"[-+]?[0-9]+(?:[.,][0-9]+)?[a-z%]*")  # a sign, a decimal or glued letters make it unusable
 _NURSE = re.compile(r"\bnurses?\b")
 _ALERT = re.compile(r"\b(alert(s|ed)?|alarms?)\b")
 _LOAD = re.compile(r"\b(shifts?|workload|burden|how many)\b")
@@ -105,7 +107,7 @@ def build(template: str, args: dict, r: dict) -> tuple[str, list[str]]:
     x, rule = r["rules"], args["rules"][-1]
     first = (f"On the simulated ward ({n(r['trials'])} trials, tuning seeds 1 to 10, {n(r['episodes_not_cut_short'])} "
              "deterioration episodes with a complete window), ")
-    before = "before the deterioration was fully in"
+    before = "by the time the deterioration was fully in"
     windows = "the same time windows on patients with no episode held an alert in "
     if template == "news2_threshold":
         a, b = x[1], x[0]

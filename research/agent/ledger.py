@@ -30,6 +30,12 @@ _POLICY = re.compile(r"runs/S-[0-9]{4}/reward_policy(/no_temperature)?/(policy\.
 _PARAMS = re.compile(r"runs/S-[0-9]{4}/params\.json")
 
 
+# The keys the readers of each record type rely on. A record without them is a broken ledger.
+_NEEDS = {"start": ("id", "kind", "plan"), "step": ("id", "kind", "plan", "calls"),
+          "proposal": ("id", "action", "step", "files"), "approval": ("proposal", "by"),
+          "applied": ("proposal", "files"), "apply_failed": ("proposal", "files")}
+
+
 class LedgerError(AgentError):
     pass
 
@@ -72,7 +78,9 @@ def _check(data: bytes) -> tuple[list[dict], str]:
             rec = None
         ok = (isinstance(rec, dict) and type(rec.get("seq")) is int and rec["seq"] == n
               and rec.get("prev") == prev and type(rec.get("type")) is str
-              and len(line) <= MAX_LINE and _dump(rec) == line)
+              and len(line) <= MAX_LINE and _dump(rec) == line
+              and all(k in rec for k in _NEEDS.get(rec["type"], ()))
+              and (rec["type"] not in ("start", "step", "proposal") or type(rec["id"]) is str))
         if not ok:
             raise LedgerError(f"ledger broken at seq {n}")
         records.append(rec)

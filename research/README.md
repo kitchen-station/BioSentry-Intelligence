@@ -401,13 +401,14 @@ NEWS2; alerts per nurse per 12-hour shift. The only thing taken from the text is
 from 1 to 20. The answer is fixed sentences filled with numbers from the tool result, always with
 the chance control, and it ends with "Simulated patients. Not validated. A person decides." Every
 number in the answer is checked: with the fixed phrases removed, the numbers in the text must be
-exactly the values taken from the tool result, in the same order. If not, or if the question fits
+exactly the values taken from the tool result and the arguments, in the same order. If not, or if the question fits
 no experiment, the answer is one fixed text that says what it can run. An episode counts when the
 rule had an alert on in any bin from the episode's start to fully in (no two-hour tail), on
 episodes not cut short ("with a complete window"). An alert already on when the episode began
-counts, which is why the chance control is always printed next to it. A question about one
-patient, a treatment, real or held-out data, or one that asks to change or approve anything, is
-refused; so is "above 5" (5 or 6?), a decimal, or a second number. `eval_questions.json` holds
+counts, which is why the chance control is always printed next to it. A keyword list refuses the
+common forms of a question about one patient, a treatment, real or held-out data, or a request to
+change or approve anything; it does not catch every form (a surname alone gets through). Also
+refused: "above 5" or "under 7" (which rule?), a decimal, a sign, or a second number. `eval_questions.json` holds
 the agent's own test questions (34, 18 of them refusals) and runs in the gate.
 
 Settings (environment variables; all optional):
@@ -457,8 +458,11 @@ Limits:
 - The proposal rules use point estimates on a few dozen episodes, with no interval. A proposal is
   a request for a person to look, not a finding.
 - Question matching is keyword based. A question in other words gets the fixed refusal, and the
-  refusal list is wide (any "her", "room", "oxygen", "email" is refused). A matched question only
-  ever runs one of the three experiments; words after it are ignored, never carried out.
+  refusal list is wide (any "her", "room", "oxygen", "email" is refused) yet not complete. What
+  makes this safe is not the list: a matched question only ever runs one of the three experiments
+  on simulated tuning trials, and any other words in it are ignored, never carried out.
+- A check that fails is tried once more in a later round, then left, so it cannot block the rest
+  of the list.
 - The grounding check reads digits. A number written in words would not be caught; the fixed
   sentences contain none.
 - The model call's 20-second timeout is per network operation, not for the whole call.
