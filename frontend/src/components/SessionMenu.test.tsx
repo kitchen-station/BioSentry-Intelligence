@@ -101,13 +101,31 @@ describe("SessionMenu", () => {
     expect(link.getAttribute("rel")).toBe("noopener noreferrer");
   });
 
-  it.each([undefined, "", "//evil.example", "/\\evil.example", "https://x.example/a", "javascript:alert(1)", "simulator/", "/a b"])(
+  it.each([
+    undefined, "", "//evil.example", "/\\evil.example", "https://x.example/a", "javascript:alert(1)", "simulator/", "/a b",
+    "/\t/evil.example", "/\n/evil.example", "/ok\n", " /x", "\uFEFF/x", "/a\\b",
+  ])(
     "hides Analytics for the value %j",
     (value) => {
       if (value === undefined) vi.unstubAllEnvs();
       else vi.stubEnv("VITE_ANALYTICS_URL", value);
       menu({ clinician_id: "md-santos", ward: "W4", role: "md" });
       expect(screen.queryByRole("link", { name: "Analytics" })).toBeNull();
+    },
+  );
+
+  it("shows Analytics for a path with a percent-escape: it stays on this site", () => {
+    vi.stubEnv("VITE_ANALYTICS_URL", "/%5Cevil.example");
+    menu({ clinician_id: "md-santos", ward: "W4", role: "md" });
+    expect(screen.getByRole("link", { name: "Analytics" }).getAttribute("href")).toBe("/%5Cevil.example");
+  });
+
+  it.each([["rn", "Staff Nurse"], ["charge_rn", "Charge Nurse"], ["md", "Attending Physician"], ["admin", "Administrator"]] as const)(
+    "names the role %s as %s in the dropdown",
+    async (role, label) => {
+      menu({ clinician_id: "x-1", ward: "W4", role });
+      await open("x-1");
+      expect(screen.getByText(label)).toBeTruthy();
     },
   );
 
