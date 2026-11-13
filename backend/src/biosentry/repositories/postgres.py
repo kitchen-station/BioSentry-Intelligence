@@ -622,6 +622,25 @@ class PostgresStore:
             rows.sort(key=lambda o: (o.observed_at, o.id))
         return dict(out)
 
+    def history_events(
+        self, patient_id: str, start: datetime, end: datetime, limit: int
+    ) -> list[dict[str, Any]]:
+        """What clinicians did for one patient from `start` to `end` (served time), in ONE statement:
+        acknowledgements and recorded vitals from the feed, and the notes not deleted. The newest
+        `limit` rows, oldest first, in served time. A note gives its id and role, never its text, and
+        no author: both are typed by the client."""
+        rows = self.conn.execute(
+            "SELECT * FROM (SELECT 'clinician_action' AS source, kind, clinician_id AS actor, at,"
+            " (data->>'score')::int AS score, NULL::text AS note_id, NULL::text AS role"
+            " FROM clinician_action WHERE run_id = %(run)s AND patient_id = %(p)s"
+            " AND kind IN ('acknowledge', 'record_vitals')"
+            " UNION ALL SELECT 'clinical_note', 'add_note', NULL, timestamp, NULL, id, role"
+            " FROM clinical_note WHERE run_id = %(run)s AND patient_id = %(p)s AND deleted_at IS NULL"
+            ") AS e WHERE at >= %(lo)s AND at <= %(hi)s ORDER BY at DESC, source DESC LIMIT %(n)s",
+            {"run": self.run_id, "p": patient_id, "lo": start - self.shift, "hi": end - self.shift, "n": limit},
+        ).fetchall()
+        return [{**r, "at": self._when(r["at"])} for r in reversed(rows)]
+
     def stays(self, ids: frozenset[str]) -> list[dict[str, Any]]:
         rows = self.conn.execute(
             "SELECT id, name, bed, admitted_at, left_at, outcome FROM patient"

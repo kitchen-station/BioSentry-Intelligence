@@ -219,6 +219,47 @@ export interface components {
             readonly present: true;
             readonly value: boolean;
         };
+        /** HistoryEvent */
+        readonly HistoryEvent: {
+            /** Format: date-time */
+            readonly at: string;
+            readonly by: string | null;
+            /** @enum {string} */
+            readonly kind: "admitted" | "acknowledged" | "vitals_recorded" | "note_added" | "bp_charted";
+            readonly note_id: string | null;
+            readonly role: ("rn" | "md" | "charge_rn") | null;
+            readonly score: number | null;
+            /** @enum {string} */
+            readonly source: "clinician_action" | "clinical_note" | "observation" | "patient";
+        };
+        /** HistoryProvenance */
+        readonly HistoryProvenance: {
+            /** Format: date-time */
+            readonly computed_at: string;
+            /** @constant */
+            readonly rule: "news2_as_of_bins";
+            /** @constant */
+            readonly source: "derived";
+            readonly synthetic: boolean;
+            /** @constant */
+            readonly tier: "A";
+        };
+        /** HistoryRun */
+        readonly HistoryRun: {
+            readonly bins: number;
+            /** Format: date-time */
+            readonly end: string;
+            readonly ongoing: boolean;
+            readonly peak_at: string | null;
+            readonly peak_level: ("single_3" | "medium" | "high") | null;
+            readonly peak_score: number | null;
+            readonly provenance: components["schemas"]["HistoryProvenance"];
+            readonly reasons: readonly string[];
+            /** Format: date-time */
+            readonly start: string;
+            /** @enum {string} */
+            readonly state: "alert" | "not_ranked" | "not_rebuilt" | "no_reading";
+        };
         readonly JsonValue: unknown;
         /** LabExtractionResult */
         readonly LabExtractionResult: {
@@ -595,6 +636,20 @@ export interface components {
             readonly synthetic: boolean;
             readonly values: components["schemas"]["PartialAdmitPatientInput"];
         };
+        /** PatientHistory */
+        readonly PatientHistory: {
+            readonly bins: number;
+            readonly events: readonly components["schemas"]["HistoryEvent"][];
+            readonly events_cut: boolean;
+            readonly grid_from: string | null;
+            readonly grid_to: string | null;
+            /** @constant */
+            readonly label: "Rebuilt from stored 15-minute bins. It can differ from the score shown at the time.";
+            readonly patient_id: string;
+            readonly runs: readonly components["schemas"]["HistoryRun"][];
+            readonly runs_cut: boolean;
+            readonly synthetic: boolean;
+        };
         /** PatientQuestionDetail */
         readonly PatientQuestionDetail: {
             readonly answer: string | null;
@@ -932,6 +987,9 @@ export type EscalationRule = components['schemas']['EscalationRule'];
 export type FindingDirection = components['schemas']['FindingDirection'];
 export type FlagMeasurement = components['schemas']['FlagMeasurement'];
 export type FlagPresent = components['schemas']['FlagPresent'];
+export type HistoryEvent = components['schemas']['HistoryEvent'];
+export type HistoryProvenance = components['schemas']['HistoryProvenance'];
+export type HistoryRun = components['schemas']['HistoryRun'];
 export type JsonValue = components['schemas']['JsonValue'];
 export type LabExtractionResult = components['schemas']['LabExtractionResult'];
 export type LabPanel = components['schemas']['LabPanel'];
@@ -955,6 +1013,7 @@ export type PartialAdmitPatientInput = components['schemas']['PartialAdmitPatien
 export type PartialLabInput = components['schemas']['PartialLabInput'];
 export type PatientDetail = components['schemas']['PatientDetail'];
 export type PatientExtractionResult = components['schemas']['PatientExtractionResult'];
+export type PatientHistory = components['schemas']['PatientHistory'];
 export type PatientQuestionDetail = components['schemas']['PatientQuestionDetail'];
 export type PatientQuestionItem = components['schemas']['PatientQuestionItem'];
 export type PatientStay = components['schemas']['PatientStay'];

@@ -91,3 +91,14 @@ def test_only_the_lab_files_read_a_question_and_no_audit_line_names_one() -> Non
 def test_only_the_patient_question_service_builds_the_context() -> None:
     users = [f.name for f in SRC.rglob("*.py") if re.search(r"PatientContext\b", f.read_text("utf-8"))]
     assert sorted(users) == ["lab.py", "patient_ask.py"]
+
+
+def test_nothing_that_ranks_or_scores_a_patient_reads_the_history() -> None:
+    names = ("ward.py", "scoring.py", "patients.py", "baseline.py", "as_of.py", "model_signals.py", "ingest.py", "models.py")
+    scoring = [SRC / "services" / n for n in names] + [SRC / "repositories" / "postgres.py"]
+    scoring += list((SRC / "domain").rglob("*.py"))
+    assert len(scoring) > 10
+    pattern = re.compile(r"biosentry\.(services|schemas)\.history|from \.history|import[^\n]*\bhistory\b|HistoryService|PatientHistory")
+    assert [str(f) for f in scoring if pattern.search(f.read_text("utf-8"))] == []
+    users = sorted(f.name for f in SRC.rglob("*.py") if re.search(r"biosentry\.services\.history", f.read_text("utf-8")))
+    assert users == ["app.py"]  # only the route reads it

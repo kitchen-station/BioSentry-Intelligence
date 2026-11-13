@@ -42,6 +42,7 @@ from .common import (
     Tier,
     Trend,
 )
+from .history import HistoryEvent, HistoryProvenance, HistoryRun, PatientHistory
 from .ingest import LiveWard
 from .lab import (
     LabRunDetail,
@@ -155,6 +156,10 @@ CONTRACT_MODELS: tuple[type[BaseModel], ...] = (
     NewPatientQuestion,
     PatientQuestionItem,
     PatientQuestionDetail,
+    HistoryProvenance,
+    HistoryRun,
+    HistoryEvent,
+    PatientHistory,
 )
 
 # Inputs entered by a person: optional fields may be omitted and default to None.
@@ -185,6 +190,9 @@ __all__ = [
     "EscalationRule",
     "FindingDirection",
     "FlagMeasurement",
+    "HistoryEvent",
+    "HistoryProvenance",
+    "HistoryRun",
     "LabExtractionResult",
     "LabPanel",
     "LabRunDetail",
@@ -207,6 +215,7 @@ __all__ = [
     "PartialAdmitPatientInput",
     "PartialLabInput",
     "PatientDetail",
+    "PatientHistory",
     "PatientExtractionResult",
     "PatientQuestionDetail",
     "PatientQuestionItem",

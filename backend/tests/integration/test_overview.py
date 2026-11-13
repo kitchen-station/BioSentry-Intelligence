@@ -365,13 +365,14 @@ def test_the_write_actions_are_still_the_body_bearing_routes_only(api: Api) -> N
 READS = [("GET", p) for p in (
     "/wards/{ward}/rows", "/wards/{ward}/stays", "/wards/{ward}/overview", "/wards/{ward}/live",
     "/wards/{ward}/lab/runs", "/wards/{ward}/lab/runs/{lab_run_id}", "/patients",
-    "/patients/{patient_id}", "/patients/{patient_id}/baseline", "/patients/{patient_id}/notes",
-    "/patients/{patient_id}/questions", "/patients/{patient_id}/questions/{question_id}",
+    "/patients/{patient_id}", "/patients/{patient_id}/baseline", "/patients/{patient_id}/history",
+    "/patients/{patient_id}/notes", "/patients/{patient_id}/questions", "/patients/{patient_id}/questions/{question_id}",
     "/acknowledgements", "/audit",
 )]
 PATIENT_READS = {
     "/patients/{patient_id}": "view_patient",
     "/patients/{patient_id}/baseline": "view_baseline",
+    "/patients/{patient_id}/history": "view_history",
     "/patients/{patient_id}/notes": "view_notes",
 }
 WARD_READS = {
@@ -544,13 +545,14 @@ def test_the_admins_view_rows_name_the_admin_and_there_is_one_row_per_call(api: 
     headers = add_admin(api)
     seq = _last_seq(api)
     for path in ("/wards/W4/rows", "/patients", "/patients/p-001", "/patients/p-001/baseline",
-                 "/patients/p-001/notes"):
+                 "/patients/p-001/history", "/patients/p-001/notes"):
         assert api.client.get(path, headers=headers).status_code == 200, path
     assert _rows_since(api, seq) == [
         (ADMIN, "admin", "view_ward", "W4", "ok"),
         (ADMIN, "admin", "list_patients", "-", "ok"),
         (ADMIN, "admin", "view_patient", "p-001", "ok"),
         (ADMIN, "admin", "view_baseline", "p-001", "ok"),
+        (ADMIN, "admin", "view_history", "p-001", "ok"),
         (ADMIN, "admin", "view_notes", "p-001", "ok"),
     ]
 
@@ -579,7 +581,7 @@ def test_every_write_gives_the_same_403_for_a_known_unknown_unranked_and_left_pa
 def test_reads_of_an_unknown_a_left_and_an_unranked_patient_are_the_same_404(api: Api) -> None:
     headers = add_admin(api)
     write(api, "UPDATE patient SET left_at = %s, outcome = 'discharged' WHERE id = 'p-002'", NOW)
-    for template in ("/patients/{patient_id}", "/patients/{patient_id}/baseline"):
+    for template in ("/patients/{patient_id}", "/patients/{patient_id}/baseline", "/patients/{patient_id}/history"):
         seen = set()
         for pid in ("p-zzz", "p-002", "p-004"):  # unknown, left, NOT RANKED (no detail page)
             seq = _last_seq(api)
@@ -787,10 +789,10 @@ def test_an_admin_never_reads_a_discharged_patient_and_stays_is_still_empty(api:
     assert api.client.get("/wards/W4/stays", headers=headers).json() == []
     rows = api.client.get("/wards/W4/rows", headers=headers).json()
     assert "p-001" not in {r["id"] for k in ("ranked", "abstained") for r in rows[k]}
-    for suffix in ("", "/notes", "/baseline"):
+    for suffix in ("", "/notes", "/baseline", "/history"):
         seq = _last_seq(api)
         assert api.client.get(f"/patients/p-001{suffix}", headers=headers).status_code == 404
-        action = {"": "view_patient", "/notes": "view_notes", "/baseline": "view_baseline"}[suffix]
+        action = {"": "view_patient", "/notes": "view_notes", "/baseline": "view_baseline", "/history": "view_history"}[suffix]
         assert [r[2:] for r in _rows_since(api, seq)] == [(action, "p-001", "not_found")]
 
 
@@ -851,7 +853,7 @@ def test_an_older_runs_patient_is_a_404_for_the_admin_and_rows_lists_only_the_ne
     assert response.status_code == 201, response.text
     rows = api.client.get("/wards/W4/rows", headers=headers).json()
     assert {r["id"] for k in ("ranked", "abstained") for r in rows[k]} == {"s-1"}
-    for suffix, action in (("", "view_patient"), ("/notes", "view_notes"), ("/baseline", "view_baseline")):
+    for suffix, action in (("", "view_patient"), ("/notes", "view_notes"), ("/baseline", "view_baseline"), ("/history", "view_history")):
         seq = _last_seq(api)
         assert api.client.get(f"/patients/p-001{suffix}", headers=headers).status_code == 404
         assert [r[2:] for r in _rows_since(api, seq)] == [(action, "p-001", "not_found")]
@@ -862,14 +864,14 @@ def test_an_older_runs_patient_is_a_404_for_the_admin_and_rows_lists_only_the_ne
     ["p-zzz", "p" * 300, "p-001%20", "P-001", "%00"],
     ids=["unknown", "300-chars", "trailing-space", "upper-case", "nul"],
 )
-@pytest.mark.parametrize("suffix", ["", "/notes", "/baseline"])
+@pytest.mark.parametrize("suffix", ["", "/notes", "/baseline", "/history"])
 def test_an_odd_patient_id_is_a_404_for_the_admin_with_one_row(api: Api, pid: str, suffix: str) -> None:
     headers = add_admin(api)
     seq = _last_seq(api)
     response = api.client.get(f"/patients/{pid}{suffix}", headers=headers)
     assert response.status_code == 404
     rows = _rows_since(api, seq)
-    action = {"": "view_patient", "/notes": "view_notes", "/baseline": "view_baseline"}[suffix]
+    action = {"": "view_patient", "/notes": "view_notes", "/baseline": "view_baseline", "/history": "view_history"}[suffix]
     if pid == "%00":  # refused as a `request` before the handler: the id is never an id
         assert [(r[0], r[2], r[4]) for r in rows] == [(ADMIN, "request", "not_found")]
     else:  # the handler writes the row, naming the id as sent (decoded)

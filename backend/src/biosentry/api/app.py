@@ -20,6 +20,7 @@ The Simulation lab stores a clinician's request for a simulated compare run and 
 worker claims and reports through /sim/lab/* (ingest key). A clinician who may see a patient can
 also ask one question about that patient: the API freezes an allow-listed copy of the patient's
 data with the question, a worker answers from that copy only, and the clinician reads the answer.
+A patient's stay can be read as a short history, rebuilt on read from stored bins: nothing is stored.
 The API never runs anything.
 """
 
@@ -59,6 +60,7 @@ from biosentry.schemas import (
     NurseVitalsInput,
     PartialLabInput,
     PatientDetail,
+    PatientHistory,
     PatientQuestionDetail,
     PatientQuestionItem,
     PatientStay,
@@ -83,6 +85,7 @@ from biosentry.schemas.ingest import (
 from biosentry.schemas.lab import LabJob, LabReport, PatientQuestionJob
 from biosentry.services import ingest, lab
 from biosentry.services.baseline import BaselineService
+from biosentry.services.history import HistoryService
 from biosentry.services.overview import OverviewService
 from biosentry.services.patient_ask import PatientAskService
 from biosentry.services.patients import PatientService, RejectedError
@@ -146,6 +149,7 @@ class Context:
     wards: WardService
     patients: PatientService
     baselines: BaselineService
+    history: HistoryService
     overview: OverviewService
     questions: PatientAskService
 
@@ -258,6 +262,7 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
                 wards,
                 PatientService(store, audit, wards),
                 baselines,
+                HistoryService(store, audit, wards),
                 OverviewService(store, audit, wards),
                 PatientAskService(store, audit, wards, baselines),
             )
@@ -496,6 +501,13 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
     @app.get("/patients/{patient_id}/baseline", response_model=BaselineResponse)
     def get_baseline(patient_id: str, ctx: Ctx, who: Who) -> BaselineResponse:
         found = ctx.baselines.baseline(who, patient_id)
+        if found is None:
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return found
+
+    @app.get("/patients/{patient_id}/history", response_model=PatientHistory)
+    def get_history(patient_id: str, ctx: Ctx, who: Who) -> PatientHistory:
+        found = ctx.history.history(who, patient_id)
         if found is None:
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return found

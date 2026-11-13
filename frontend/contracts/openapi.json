@@ -804,6 +804,220 @@
         "title": "FlagPresent",
         "type": "object"
       },
+      "HistoryEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "by": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "enum": [
+              "admitted",
+              "acknowledged",
+              "vitals_recorded",
+              "note_added",
+              "bp_charted"
+            ],
+            "type": "string"
+          },
+          "note_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "role": {
+            "anyOf": [
+              {
+                "enum": [
+                  "rn",
+                  "md",
+                  "charge_rn"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maximum": 20,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "enum": [
+              "clinician_action",
+              "clinical_note",
+              "observation",
+              "patient"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "at",
+          "by",
+          "role",
+          "score",
+          "note_id",
+          "source"
+        ],
+        "title": "HistoryEvent",
+        "type": "object"
+      },
+      "HistoryProvenance": {
+        "additionalProperties": false,
+        "properties": {
+          "computed_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "rule": {
+            "const": "news2_as_of_bins",
+            "type": "string"
+          },
+          "source": {
+            "const": "derived",
+            "type": "string"
+          },
+          "synthetic": {
+            "type": "boolean"
+          },
+          "tier": {
+            "const": "A",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "tier",
+          "rule",
+          "computed_at",
+          "synthetic"
+        ],
+        "title": "HistoryProvenance",
+        "type": "object"
+      },
+      "HistoryRun": {
+        "additionalProperties": false,
+        "properties": {
+          "bins": {
+            "maximum": 672,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "end": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "ongoing": {
+            "type": "boolean"
+          },
+          "peak_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "peak_level": {
+            "anyOf": [
+              {
+                "enum": [
+                  "single_3",
+                  "medium",
+                  "high"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "peak_score": {
+            "anyOf": [
+              {
+                "maximum": 20,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/HistoryProvenance"
+          },
+          "reasons": {
+            "items": {
+              "maxLength": 300,
+              "type": "string"
+            },
+            "maxItems": 4,
+            "type": "array"
+          },
+          "start": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "alert",
+              "not_ranked",
+              "not_rebuilt",
+              "no_reading"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "start",
+          "end",
+          "ongoing",
+          "bins",
+          "peak_score",
+          "peak_level",
+          "peak_at",
+          "reasons",
+          "provenance"
+        ],
+        "title": "HistoryRun",
+        "type": "object"
+      },
       "JsonValue": {},
       "LabExtractionResult": {
         "additionalProperties": false,
@@ -2494,6 +2708,83 @@
           "model_id"
         ],
         "title": "PatientExtractionResult",
+        "type": "object"
+      },
+      "PatientHistory": {
+        "additionalProperties": false,
+        "properties": {
+          "bins": {
+            "maximum": 672,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryEvent"
+            },
+            "maxItems": 300,
+            "type": "array"
+          },
+          "events_cut": {
+            "type": "boolean"
+          },
+          "grid_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "grid_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "label": {
+            "const": "Rebuilt from stored 15-minute bins. It can differ from the score shown at the time.",
+            "type": "string"
+          },
+          "patient_id": {
+            "maxLength": 64,
+            "type": "string"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryRun"
+            },
+            "maxItems": 200,
+            "type": "array"
+          },
+          "runs_cut": {
+            "type": "boolean"
+          },
+          "synthetic": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "patient_id",
+          "synthetic",
+          "label",
+          "grid_from",
+          "grid_to",
+          "bins",
+          "runs",
+          "runs_cut",
+          "events",
+          "events_cut"
+        ],
+        "title": "PatientHistory",
         "type": "object"
       },
       "PatientQuestionDetail": {

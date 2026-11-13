@@ -25,6 +25,9 @@ from biosentry.schemas import (
     ClinicalNote,
     EscalationReason,
     FlagMeasurement,
+    HistoryEvent,
+    HistoryProvenance,
+    HistoryRun,
     LabExtractionResult,
     LabPanel,
     LabRunDetail,
@@ -45,6 +48,7 @@ from biosentry.schemas import (
     PartialLabInput,
     PatientDetail,
     PatientExtractionResult,
+    PatientHistory,
     PatientQuestionDetail,
     PatientQuestionItem,
     PatientStay,
@@ -411,6 +415,25 @@ _BUILDERS: dict[type[BaseModel], Any] = {
         "reason": None,
     },
     PatientQuestionDetail: lambda: {**_BUILDERS[PatientQuestionItem](), "answer": None, "report": None},
+    HistoryProvenance: lambda: {
+        "source": "derived", "tier": "A", "rule": "news2_as_of_bins", "computed_at": NOW, "synthetic": True,
+    },
+    HistoryRun: lambda: {
+        "state": "alert", "start": "2026-09-03T05:00:00Z", "end": "2026-09-03T06:00:00Z", "ongoing": False,
+        "bins": 4, "peak_score": 7, "peak_level": "high", "peak_at": "2026-09-03T05:30:00Z",
+        "reasons": ["Total 7 (≥7): high"], "provenance": _BUILDERS[HistoryProvenance](),
+    },
+    HistoryEvent: lambda: {
+        "kind": "acknowledged", "at": "2026-09-03T05:40:00Z", "by": "rn-delacruz", "role": None,
+        "score": 7, "note_id": None, "source": "clinician_action",
+    },
+    PatientHistory: lambda: {
+        "patient_id": "p-001", "synthetic": True,
+        "label": "Rebuilt from stored 15-minute bins. It can differ from the score shown at the time.",
+        "grid_from": "2026-09-03T00:00:00Z", "grid_to": "2026-09-03T06:00:00Z", "bins": 24,
+        "runs": [_BUILDERS[HistoryRun]()], "runs_cut": False,
+        "events": [_BUILDERS[HistoryEvent]()], "events_cut": False,
+    },
     LiveWard: lambda: {"shared": {"clockS": 90}, "patients": [], "can_control": False},
     OverviewPatient: lambda: {
         "bed": "4A",
