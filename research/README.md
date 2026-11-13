@@ -426,6 +426,20 @@ The model API is off unless all three of these are set:
 - `BIOSENTRY_AGENT_MODEL_KEY`: the key. It is sent only in the `Authorization` header, and is
   never printed or written to the ledger.
 
+The intended target is an open-weight model on Huawei Cloud's model service (ModelArts Studio,
+MaaS). Checked in its documentation on 2026-11-13: the international site serves its
+OpenAI-compatible API from CN-Hong Kong only and lists `deepseek-v4-flash` (DeepSeek-V4-Flash,
+weights published under the MIT licence). Example values, not defaults; nothing is set in code:
+
+    BIOSENTRY_AGENT_MODEL_URL=https://api-ap-southeast-1.modelarts-maas.com/openai/v1/chat/completions
+    BIOSENTRY_AGENT_MODEL_NAME=deepseek-v4-flash
+    BIOSENTRY_AGENT_MODEL_KEY=<a MaaS API key, from the environment only>
+
+Both stay settings because a second documentation page shows the path `/v2/chat/completions`, and
+the service retires models within months. Sources:
+https://support.huaweicloud.com/intl/en-us/model-call-maas/model-call-021.html and
+https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash .
+
 With it on, the model is shown the tool list and a digest of the ledger (ids, experiment names
 and numbers only) and must answer with one tool call as JSON. The call is used only if it parses,
 passes the tool's schema, and equals one of the experiments that are open at that point. Anything
