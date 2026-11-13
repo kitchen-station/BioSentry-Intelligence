@@ -573,7 +573,8 @@ when the target is met most supported alerts are still false. One-sided only, ag
 "quiet" means only that the student rule did not fire, and no confident-quiet claim is made (a two-sided
 Mondrian version was considered and rejected).
 
-Data and split. Calibration uses ward-v2-ext seeds 301-340 only, all 40. Seeds 61-300 (student training and
+Data and split. Calibration uses ward-v2-ext seeds 301-340 only, all 40: `calibrate` refuses unless exactly those seeds are
+given, and `evaluate` refuses a calibration file whose seed list is not exactly them. Seeds 61-300 (student training and
 validation) and ward-v2 seeds 11-30 (held out) are never read at calibration: the loader reads `manifest.json`
 first and refuses any other seed before it opens any other file, and a seed given twice. Held out is ward-v2
 seeds 11-30 through `research.evaluate`, run once. Calibration and held-out must share days, speed and
@@ -583,9 +584,11 @@ Method (all constants are in the code: `ALPHA = "0.01"`, `DRAW_SEED = 20261113`)
 - Model: M1's ONNX and M1's threshold t, unchanged; their sha256 and t are copied into the calibration file.
   A variant with no exported student or no usable t is "not applicable": no file, no rows, said in the output.
 - Score: s = the student's p on a scored (RANKED) bin. Unit: one negative bin (label 0, M1's label rule) per
-  non-starting stay that has one, drawn uniformly with SplitMix64 (`bootstrap.py`) in sorted (seed, stay) order,
-  index `next() % bins`. One draw per stay gives exchangeable draws whatever the dependence between bins of a stay
-  (Dunn, Wasserman and Ramdas, "subsampling once").
+  non-starting stay that has one, drawn uniformly with SplitMix64 (`bootstrap.py`), index `next() % bins`. The draw
+  visits stays by seed in sorted order and, within a trial, in `episodes.csv` order (not sorted by patient). The
+  guarantee does not depend on that order: any order fixed before the scores are seen gives one uniform draw per
+  stay. One draw per stay gives exchangeable draws whatever the dependence between bins of a stay (Dunn, Wasserman
+  and Ramdas, "subsampling once").
 - Quantile: with n drawn scores, j = floor(alpha (n + 1)) in exact `Fraction` arithmetic, k = n + 1 - j, q = the
   k-th smallest score; j = 0 gives q = +inf (stored as null), so nothing is supported. A bin is supported iff
   p > q (strict, so ties are conservative). Checked rule: alert iff p >= t and p > q; "not sure" iff p >= t and
@@ -602,7 +605,9 @@ split an alert, so "removed" can be negative); (4) episodes the student detects 
 counted both as alerting in any bin of the window and as a new alert before fully in, for all evaluated episodes and
 for those not cut short; (5) n, k, q, t, alpha and the file's sha256. The text is also written to `heldout.txt`
 beside the calibration; a second held-out run is refused while that file exists (delete it only for a counting
-bug, and then show both outputs).
+bug, and then show both outputs); the command also prints the output text's sha256 for the card. If the
+`research.evaluate` sanity guard (a policy with sensitivity 1.0 and no alerts outside the episode windows) ever
+refuses the real held-out run, nothing is written and the slice is parked.
 
 MET or NOT MET (fixed now). d = 2 sqrt(alpha (1 - alpha) / n) from the calibration n. MET iff the lower end of the
 95% interval in item 1 is <= alpha + d; otherwise NOT MET (the guarantee failed on held-out), which is a finding,
@@ -617,12 +622,16 @@ Commands (the `--model` folder defaults to `models/tier_c/student_vitals`, `--ou
 feature cache of `research.student`. `--run_log` writes one small JSON (alpha, draw seed, seeds, n, j, k, q, t,
 binding, the ONNX sha256, package versions, at most 200 quantiles of the drawn scores; all wall-clock numbers under
 `time`; no path). `evaluate` refuses unless the file's sha256, ALPHA, the ONNX sha256 (against the file and
-`metadata.json`), t and the scenario hash all match. Exit 2 with one line on any refusal. Tests:
+`metadata.json`), t and the scenario hash all match. Both commands first run `evaluate_student`'s check of
+`metadata.json` against `exports.json` and of each ONNX file against `metadata.json`, so an edited threshold is
+refused; an unexpected metadata shape is one refusal line, never a traceback. Exit 2 with one line on any refusal. Tests:
 `tests/test_confidence.py` (standard library) and `tests_ml/test_confidence_ml.py`.
 
 Limits. Exchangeability holds only inside the simulator, and stays in one trial are dependent, so this is not a
 clinical guarantee ("synthetic, not validated"). The guarantee is marginal: over the calibration draw, the new stay
-and the bin within it; it is not per patient or per shift. It bounds false alerts, not precision. Mathematically
+and the bin within it; it is not per patient or per shift. It is weighted by stay, not by bin: the "pooled over
+bins" context figure counts long stays more and can sit above alpha while the guarantee holds. It bounds false
+alerts, not precision. Mathematically
 the check is a second threshold, max(t, q); its only addition is that q has a stated finite-sample meaning. One
 random draw per stay: another DRAW_SEED gives a slightly different q.
 
@@ -630,6 +639,28 @@ References: Vovk, Gammerman, Shafer (2005), Algorithmic Learning in a Random Wor
 https://link.springer.com/book/10.1007/b106715. Angelopoulos, Bates (2021), A Gentle Introduction to Conformal
 Prediction, https://arxiv.org/abs/2107.07511. Dunn, Wasserman, Ramdas (2022), Distribution-free prediction sets for
 two-layer hierarchical models, JASA, https://arxiv.org/abs/1809.07441.
+
+## Plain export of the student (slice M5)
+
+A hand-off so the API can run the student later without numpy, onnxruntime or MindSpore. Nothing is wired in
+by this slice.
+
+`python -m research.export_plain [--model <dir>]` (default `models/tier_c/student_vitals`) reads `metadata.json`,
+checks each ONNX file against its sha256 and its graph against the exact graph `to_onnx` writes, and writes
+`model.json` (and `model_no_temp.json`) next to it. Exit 2 with one line on any refusal. The bytes are
+deterministic. The reader and the forward pass are `research/plain_student.py`, standard library only.
+
+The file (format `biosentry-plain-mlp-1`) holds the input names in order, `mean`, `std`, two layers, the
+threshold (null when the variant has none), the source ONNX file and sha256, and `synthetic: true`,
+`validated: false`. `weights[unit][input]`: the outer index is the output unit, the inner index is the input
+(the ONNX initialiser is `[input][unit]`, so it is transposed). Every number is the float32 value written with
+Python's `repr`, so it reads back exactly. The caller passes the feature vector exactly as defined above, with
+its missing flags; a wrong length or a non-finite value is refused, never filled.
+
+Tolerance: on a fixed batch of 1,000 rows the plain forward pass (double precision, the ONNX graph's order) is
+within 1e-6 of onnxruntime and within 1e-5 of MindSpore and MindIR. The test that compares the committed
+`model.json` with the committed models is skipped until the exporter has been run on the real model.
+Tests: `tests/test_plain_student.py` and `tests_ml/test_export_plain.py`.
 
 ## Real data (eICU-CRD Demo 2.0.1)
 
