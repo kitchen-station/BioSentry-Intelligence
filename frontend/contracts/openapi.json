@@ -1749,6 +1749,22 @@
         "title": "NewPatientQuestion",
         "type": "object"
       },
+      "NewQuestion": {
+        "additionalProperties": false,
+        "description": "A general question about the simulated trials (contract-ask 4): one line, stored as typed.",
+        "properties": {
+          "question": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "title": "NewQuestion",
+        "type": "object"
+      },
       "NumberMeasurement": {
         "additionalProperties": false,
         "properties": {
@@ -3460,6 +3476,168 @@
         ],
         "title": "QualityLevel",
         "type": "string"
+      },
+      "QuestionDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "claimed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "type": "integer"
+          },
+          "question": {
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "report": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requested_at": {
+            "type": "string"
+          },
+          "requested_by": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "queued",
+              "running",
+              "done",
+              "failed",
+              "refused"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "requested_by",
+          "requested_at",
+          "question",
+          "state",
+          "claimed_at",
+          "finished_at",
+          "reason",
+          "answer",
+          "report"
+        ],
+        "title": "QuestionDetail",
+        "type": "object"
+      },
+      "QuestionItem": {
+        "additionalProperties": false,
+        "description": "A general question as the ward's physicians and charge nurses read it.",
+        "properties": {
+          "claimed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "type": "integer"
+          },
+          "question": {
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requested_at": {
+            "type": "string"
+          },
+          "requested_by": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "queued",
+              "running",
+              "done",
+              "failed",
+              "refused"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "requested_by",
+          "requested_at",
+          "question",
+          "state",
+          "claimed_at",
+          "finished_at",
+          "reason"
+        ],
+        "title": "QuestionItem",
+        "type": "object"
       },
       "RowModels": {
         "additionalProperties": false,

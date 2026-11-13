@@ -324,7 +324,7 @@ def _expected_resource(template: str) -> str:
 
 def _assert_every_write_refused(api: Api, headers: dict[str, str]) -> None:
     writes = _writes(api)
-    assert len(writes) == 11 and set(writes) == set(REFUSED_ACTIONS)
+    assert len(writes) == 12 and set(writes) == set(REFUSED_ACTIONS)
     before = snapshot(api)
     seq = _last_seq(api)
     for method, template in writes:
@@ -364,7 +364,8 @@ def test_the_write_actions_are_still_the_body_bearing_routes_only(api: Api) -> N
 
 READS = [("GET", p) for p in (
     "/wards/{ward}/rows", "/wards/{ward}/stays", "/wards/{ward}/overview", "/wards/{ward}/live",
-    "/wards/{ward}/lab/runs", "/wards/{ward}/lab/runs/{lab_run_id}", "/patients",
+    "/wards/{ward}/lab/runs", "/wards/{ward}/lab/runs/{lab_run_id}", "/wards/{ward}/lab/questions",
+    "/wards/{ward}/lab/questions/{lab_run_id}", "/patients",
     "/patients/{patient_id}", "/patients/{patient_id}/baseline", "/patients/{patient_id}/history",
     "/patients/{patient_id}/notes", "/patients/{patient_id}/questions", "/patients/{patient_id}/questions/{question_id}",
     "/acknowledgements", "/audit",
@@ -384,6 +385,8 @@ CLOSED_TO_ADMIN = {
     "/wards/{ward}/live": "view_live",
     "/wards/{ward}/lab/runs": "view_lab_runs",
     "/wards/{ward}/lab/runs/{lab_run_id}": "view_lab_run",
+    "/wards/{ward}/lab/questions": "view_lab_questions",
+    "/wards/{ward}/lab/questions/{lab_run_id}": "view_lab_question",
 }
 
 

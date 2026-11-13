@@ -1071,6 +1071,7 @@ def test_a_bad_body_is_answered_the_same_for_not_yours_and_nonexistent(
         ("POST", "/patients/p-001/labs", "enter_labs", {"potassium": "high"}),
         ("POST", "/patients/p-004/vitals", "record_vitals", {}),
         ("POST", "/wards/W4/lab/runs", "lab_request", {}),
+        ("POST", "/wards/W4/lab/questions", "lab_question", {}),
         ("POST", "/patients/p-001/questions", "ask_patient", {}),
     ],
 )
@@ -1110,6 +1111,7 @@ VALID_BODIES: dict[tuple[str, str], dict[str, Any]] = {
     ("POST", "/patients/{patient_id}/labs"): {"potassium": 4.0},
     ("POST", "/patients/{patient_id}/vitals"): {"systolic": 120, "diastolic": 80},
     ("POST", "/patients/{patient_id}/questions"): {"question": "What changed?"},
+    ("POST", "/wards/{ward}/lab/questions"): {"question": "What if we alerted at 7?"},
     ("POST", "/wards/{ward}/lab/runs"): {
         "kind": "compare",
         "mode": "w4",

@@ -89,7 +89,8 @@ class LabFailed(Contract):
 
 
 class LabAnswer(Contract):
-    """A patient question's `done` (contract-patient-ask 6.1)."""
+    """A `done` with a record: a patient question's (contract-patient-ask 6.1) or a general
+    question's (contract-ask 6.1). The service checks the record against the row's kind."""
 
     state: Literal["done"]
     record_json: Annotated[str, Field(max_length=131072)]
@@ -197,5 +198,26 @@ class PatientQuestionItem(Contract):
 
 
 class PatientQuestionDetail(PatientQuestionItem):
+    answer: str | None
+    report: dict[str, Any] | None
+
+
+class NewQuestion(Contract):
+    """A general question about the simulated trials (contract-ask 4): one line, stored as typed."""
+
+    question: Question
+
+
+class QuestionJob(Contract):
+    id: int
+    kind: Literal["question"]
+    question: str
+
+
+class QuestionItem(PatientQuestionItem):
+    """A general question as the ward's physicians and charge nurses read it."""
+
+
+class QuestionDetail(QuestionItem):
     answer: str | None
     report: dict[str, Any] | None

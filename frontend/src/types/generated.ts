@@ -420,6 +420,13 @@ export interface components {
         readonly NewPatientQuestion: {
             readonly question: string;
         };
+        /**
+         * NewQuestion
+         * @description A general question about the simulated trials (contract-ask 4): one line, stored as typed.
+         */
+        readonly NewQuestion: {
+            readonly question: string;
+        };
         /** NumberMeasurement */
         readonly NumberMeasurement: {
             readonly data: components["schemas"]["NumberPresent"] | components["schemas"]["MeasurementAbsent"];
@@ -806,6 +813,37 @@ export interface components {
          * @enum {string}
          */
         readonly QualityLevel: "ok" | "degraded" | "missing";
+        /** QuestionDetail */
+        readonly QuestionDetail: {
+            readonly answer: string | null;
+            readonly claimed_at: string | null;
+            readonly finished_at: string | null;
+            readonly id: number;
+            readonly question: string;
+            readonly reason: string | null;
+            readonly report: {
+                readonly [key: string]: unknown;
+            } | null;
+            readonly requested_at: string;
+            readonly requested_by: string;
+            /** @enum {string} */
+            readonly state: "queued" | "running" | "done" | "failed" | "refused";
+        };
+        /**
+         * QuestionItem
+         * @description A general question as the ward's physicians and charge nurses read it.
+         */
+        readonly QuestionItem: {
+            readonly claimed_at: string | null;
+            readonly finished_at: string | null;
+            readonly id: number;
+            readonly question: string;
+            readonly reason: string | null;
+            readonly requested_at: string;
+            readonly requested_by: string;
+            /** @enum {string} */
+            readonly state: "queued" | "running" | "done" | "failed" | "refused";
+        };
         /** RowModels */
         readonly RowModels: {
             readonly alert_policy: components["schemas"]["ModelSignal"];
@@ -1077,6 +1115,7 @@ export type ModelSignal = components['schemas']['ModelSignal'];
 export type NewLabRun = components['schemas']['NewLabRun'];
 export type NewNote = components['schemas']['NewNote'];
 export type NewPatientQuestion = components['schemas']['NewPatientQuestion'];
+export type NewQuestion = components['schemas']['NewQuestion'];
 export type NumberMeasurement = components['schemas']['NumberMeasurement'];
 export type NumberPresent = components['schemas']['NumberPresent'];
 export type NurseVitalsInput = components['schemas']['NurseVitalsInput'];
@@ -1103,6 +1142,8 @@ export type PatientView = components['schemas']['PatientView'];
 export type Provenance = components['schemas']['Provenance'];
 export type ProvenanceSource = components['schemas']['ProvenanceSource'];
 export type QualityLevel = components['schemas']['QualityLevel'];
+export type QuestionDetail = components['schemas']['QuestionDetail'];
+export type QuestionItem = components['schemas']['QuestionItem'];
 export type RowModels = components['schemas']['RowModels'];
 export type ScoreRow = components['schemas']['ScoreRow'];
 export type Session = components['schemas']['Session'];

@@ -61,6 +61,7 @@ from biosentry.schemas import (
     NewLabRun,
     NewNote,
     NewPatientQuestion,
+    NewQuestion,
     NurseVitalsInput,
     OpenWard,
     PartialLabInput,
@@ -70,6 +71,8 @@ from biosentry.schemas import (
     PatientQuestionItem,
     PatientStay,
     PatientSummary,
+    QuestionDetail,
+    QuestionItem,
     SessionRequest,
     SessionRole,
     SessionToken,
@@ -88,7 +91,7 @@ from biosentry.schemas.ingest import (
     NewCommand,
     NewRun,
 )
-from biosentry.schemas.lab import LabJob, LabReport, PatientQuestionJob
+from biosentry.schemas.lab import LabJob, LabReport, PatientQuestionJob, QuestionJob
 from biosentry.services import episodes, ingest, lab
 from biosentry.services.baseline import BaselineService
 from biosentry.services.history import HistoryService
@@ -121,6 +124,7 @@ WRITE_ACTIONS = {
     ("POST", "/patients/{patient_id}/acknowledgement"): "acknowledge",
     ("POST", "/wards/{ward}/sim/commands"): "sim_command",
     ("POST", "/wards/{ward}/lab/runs"): "lab_request",
+    ("POST", "/wards/{ward}/lab/questions"): "lab_question",
     ("POST", "/patients/{patient_id}/questions"): "ask_patient",
 }
 # Every write route that has no body or is not in WRITE_ACTIONS, so an admin is refused on it too.
@@ -478,15 +482,27 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return Response(status_code=204)
 
-    @app.post("/wards/{ward}/lab/runs", response_model=LabRunItem, status_code=201)
-    def request_lab_run(ward: str, body: NewLabRun, ctx: Ctx, who: Writer) -> LabRunItem:
+    def lab_asker(ctx: Context, who: str, action: str, ward: str) -> None:
+        """Who may ask the lab: an md or a charge nurse, on their own ward."""
         if ward != ctx.store.ward:
-            ctx.audit.append(who, "lab_request", ward, "not_found")
+            ctx.audit.append(who, action, ward, "not_found")
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         if not ctx.store.can_control(who):
-            ctx.audit.append(who, "lab_request", ward, "denied")
+            ctx.audit.append(who, action, ward, "denied")
             raise HTTPException(status_code=403, detail="Forbidden")
+
+    @app.post("/wards/{ward}/lab/runs", response_model=LabRunItem, status_code=201)
+    def request_lab_run(ward: str, body: NewLabRun, ctx: Ctx, who: Writer) -> LabRunItem:
+        lab_asker(ctx, who, "lab_request", ward)
         made = lab.create(ctx.store, ctx.audit, who, body)
+        if made is None:
+            raise HTTPException(status_code=429, detail="Lab run limit reached")
+        return made
+
+    @app.post("/wards/{ward}/lab/questions", response_model=QuestionItem, status_code=201)
+    def ask_lab_question(ward: str, body: NewQuestion, ctx: Ctx, who: Writer) -> QuestionItem:
+        lab_asker(ctx, who, "lab_question", ward)
+        made = lab.ask(ctx.store, ctx.audit, who, body)
         if made is None:
             raise HTTPException(status_code=429, detail="Lab run limit reached")
         return made
@@ -516,6 +532,24 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
             ctx.audit.append(who, "view_lab_run", ward, "not_found")
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         ctx.audit.append(who, "view_lab_run", f"lab_run:{lab_run_id}", "ok")
+        return found
+
+    @app.get("/wards/{ward}/lab/questions", response_model=list[QuestionItem])
+    def lab_questions(ward: str, ctx: Ctx, who: Who) -> list[QuestionItem]:
+        lab_reader(ctx, who, "view_lab_questions", ward)
+        ctx.audit.append(who, "view_lab_questions", ward, "ok")
+        return lab.list_questions(ctx.store)
+
+    @app.get("/wards/{ward}/lab/questions/{lab_run_id}", response_model=QuestionDetail)
+    def lab_question(ward: str, lab_run_id: str, ctx: Ctx, who: Who) -> QuestionDetail:
+        lab_reader(ctx, who, "view_lab_question", ward)
+        found = None
+        if (run_id := row_id(lab_run_id)) is not None:
+            found = lab.get_question(ctx.store, run_id)
+        if found is None:  # malformed and unknown are one answer, and audited
+            ctx.audit.append(who, "view_lab_question", ward, "not_found")
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        ctx.audit.append(who, "view_lab_question", f"lab_run:{lab_run_id}", "ok")
         return found
 
     @app.get("/patients", response_model=list[PatientSummary])
@@ -715,12 +749,12 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return Commands.model_validate({"commands": found})
 
-    @app.post("/sim/lab/claim", response_model=LabJob | PatientQuestionJob)
+    @app.post("/sim/lab/claim", response_model=LabJob | PatientQuestionJob | QuestionJob)
     def claim_lab_run(
         ctx: Ctx,
         _: Annotated[None, Depends(ingest_gate)],
         kind: Annotated[lab.Kind, Depends(lab_kind)],
-    ) -> LabJob | PatientQuestionJob | Response:
+    ) -> LabJob | PatientQuestionJob | QuestionJob | Response:
         job = lab.claim(ctx.conn, clock(), kind)
         if job is None:  # an empty poll writes no audit row: it records nothing
             return Response(status_code=204)
