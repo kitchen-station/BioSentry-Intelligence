@@ -11,11 +11,16 @@ NEW = [
     SRC / "domain" / "scoring" / "tier_c" / "confidence.py",
     SRC / "domain" / "scoring" / "tier_b" / "reward_policy.py",
     SRC / "services" / "models.py",
+    SRC / "domain" / "scoring" / "tier_c" / "features.py",
+    SRC / "services" / "as_of.py",
+    SRC / "services" / "model_signals.py",
 ]
 NEW_MODULES = {
     "biosentry.domain.scoring.tier_c",
     "biosentry.domain.scoring.tier_b.reward_policy",
     "biosentry.services.models",
+    "biosentry.services.as_of",
+    "biosentry.services.model_signals",
 }
 
 
