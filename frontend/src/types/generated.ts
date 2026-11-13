@@ -462,6 +462,64 @@ export interface components {
             readonly temperature?: number | null;
         };
         /**
+         * OpenBed
+         * @description One occupied bed: its place in the ward's order and its NEWS2 band, when ranked.
+         */
+        readonly OpenBed: {
+            readonly bed: string;
+            readonly rank: number | null;
+            readonly risk: ("low" | "low_medium" | "medium" | "high") | null;
+            /** @enum {string} */
+            readonly state: "ranked" | "not_ranked";
+        };
+        /** OpenMove */
+        readonly OpenMove: {
+            readonly bed: string;
+            /** @enum {string} */
+            readonly kind: "in" | "out";
+            readonly seq: number;
+        };
+        /** OpenSim */
+        readonly OpenSim: {
+            readonly clockS: number;
+            readonly ended: boolean;
+            readonly moves: readonly components["schemas"]["OpenMove"][];
+            /** @enum {integer} */
+            readonly speed: 0 | 1 | 10 | 60;
+            readonly staff: readonly components["schemas"]["OpenStaff"][];
+        };
+        /**
+         * OpenStaff
+         * @description A figure on the ward, with no name, id, task or path. `key` is its place in the runner's list.
+         */
+        readonly OpenStaff: {
+            /** @enum {string} */
+            readonly facing: "front" | "back";
+            readonly key: number;
+            readonly moved: number;
+            /** @enum {string} */
+            readonly role: "rn" | "charge_rn" | "md";
+            /** @enum {string} */
+            readonly stage: "home" | "message" | "walk" | "work" | "wait_md" | "done" | "walk_home";
+            readonly timer: number;
+            readonly walking: boolean;
+            readonly x: number;
+            readonly y: number;
+        };
+        /**
+         * OpenWard
+         * @description What anyone may watch with no sign-in (GET /wards/{ward}/open-view).
+         */
+        readonly OpenWard: {
+            readonly beds: readonly components["schemas"]["OpenBed"][];
+            /** @constant */
+            readonly can_control: false;
+            readonly sim: components["schemas"]["OpenSim"] | null;
+            /** @constant */
+            readonly synthetic: true;
+            readonly ward: string;
+        };
+        /**
          * OverviewActivity
          * @description How many times a clinician did one action with one outcome in the last day. Counts, not
          *     rows: a row would show which patient a named clinician opened and when. Oversight needs
@@ -1022,6 +1080,11 @@ export type NewPatientQuestion = components['schemas']['NewPatientQuestion'];
 export type NumberMeasurement = components['schemas']['NumberMeasurement'];
 export type NumberPresent = components['schemas']['NumberPresent'];
 export type NurseVitalsInput = components['schemas']['NurseVitalsInput'];
+export type OpenBed = components['schemas']['OpenBed'];
+export type OpenMove = components['schemas']['OpenMove'];
+export type OpenSim = components['schemas']['OpenSim'];
+export type OpenStaff = components['schemas']['OpenStaff'];
+export type OpenWard = components['schemas']['OpenWard'];
 export type OverviewActivity = components['schemas']['OverviewActivity'];
 export type OverviewClinician = components['schemas']['OverviewClinician'];
 export type OverviewPatient = components['schemas']['OverviewPatient'];

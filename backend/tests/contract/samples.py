@@ -33,6 +33,7 @@ from biosentry.schemas import (
     LabRunDetail,
     LabRunItem,
     LiveWard,
+    OpenWard,
     OverviewActivity,
     OverviewClinician,
     OverviewPatient,
@@ -456,6 +457,21 @@ _BUILDERS: dict[type[BaseModel], Any] = {
         "count": 2,
     },
     OverviewSimCounts: lambda: {"received": 5, "rejected": 1, "abstained": 2},
+    OpenWard: lambda: {
+        "ward": "W4",
+        "synthetic": True,
+        "can_control": False,
+        "sim": {
+            "clockS": 90,
+            "speed": 10,
+            "ended": False,
+            "staff": [
+                {"key": 0, "role": "rn", "x": 4.5, "y": 7, "facing": "front", "walking": False, "moved": 0, "stage": "home", "timer": 0}
+            ],
+            "moves": [{"seq": 1, "bed": "4A", "kind": "in"}],
+        },
+        "beds": [{"bed": "4A", "state": "ranked", "rank": 1, "risk": "high"}],
+    },
     OverviewSimStatus: lambda: {
         "clockS": 90,
         "speed": 10,

@@ -11,6 +11,9 @@ record, including reads that find nothing.
 """
 
 import logging
+from typing import Any
+
+from pydantic import ValidationError
 
 from biosentry.core.audit import AuditLog
 from biosentry.domain.arbiter import NotRanked, PolicySignal, Ranked, TierCSignal, rank_ward
@@ -33,7 +36,7 @@ from biosentry.schemas import (
     UnscoredPatient,
     WardResponse,
 )
-from biosentry.schemas.ingest import LiveWard
+from biosentry.schemas.ingest import OPEN_BEDS_MAX, LiveWard, OpenBed, OpenSim, OpenWard
 
 from .model_signals import POLICY_ID, STUDENT_ID, ModelSignals, ward_model_signals
 from .models import LoadedModels
@@ -169,6 +172,35 @@ def abstained_row(state: UnscoredPatient, decision: NotRanked) -> AbstainedRow:
     )
 
 
+_OPEN_KIND = {"in": "in", "discharged": "out", "higher_care": "out"}  # where a patient went is not shown
+
+
+def open_sim(view: dict[str, Any] | None) -> OpenSim | None:
+    """The runner's view as the open answer draws it: each field picked by name, nothing copied
+    whole. Any field that fails its check, or too many entries, gives None (never a partial sim)."""
+    shared = view.get("shared") if view else None
+    try:
+        return OpenSim.model_validate(
+            {
+                **{k: shared[k] for k in ("clockS", "speed", "ended")},
+                "staff": [
+                    {
+                        "key": i,
+                        **{k: s[k] for k in ("role", "x", "y", "facing", "moved", "stage", "timer")},
+                        "walking": len(s["path"]) > 0 if isinstance(s["path"], list) else None,
+                    }
+                    for i, s in enumerate(shared["staff"])
+                ],
+                "moves": [
+                    {"seq": m["seq"], "bed": m["bed"], "kind": _OPEN_KIND.get(m["kind"])}
+                    for m in shared["moves"]
+                ],
+            }
+        )
+    except (KeyError, TypeError, ValidationError):  # shared is missing, not an object, or not as read
+        return None
+
+
 class WardService:
     def __init__(self, store: PostgresStore, audit: AuditLog, models: LoadedModels) -> None:
         self._store = store
@@ -273,6 +305,35 @@ class WardService:
                 "patients": [p for p in view["patients"] if p["id"] in visible],
                 "can_control": self._store.can_control(clinician_id),
             }
+        )
+
+    def open_ward(self) -> OpenWard | None:
+        """The ward for a caller nobody identified: bed, rank and NEWS2 band only, from the ward's
+        own scoring, and the simulator's figures. None when the ward holds too many patients.
+        No model runs, so no model state can reach it; the ranking does not depend on one. Writes
+        no audit row: the route does."""
+        ids = self._store.on_ward()
+        if len(ids) > OPEN_BEDS_MAX:
+            return None
+        states = [s for s in (self._store.read(pid) for pid in sorted(ids)) if s is not None]
+        ranking = rank_ward(decide(s) for s in states)
+        bed = {s.id: s.bed for s in states}
+        beds = [
+            *(("ranked", rank, d.patient_id, d.news2.risk.value) for rank, d in ranking.ranked),
+            *(("not_ranked", None, d.patient_id, None) for d in ranking.not_ranked),
+        ]
+        shown = []
+        for state, rank, pid, risk in beds:
+            try:
+                shown.append(OpenBed(bed=bed[pid], state=state, rank=rank, risk=risk))
+            except ValidationError:  # a label that breaks the rule is left out
+                continue
+        return OpenWard(
+            ward=self._store.ward,
+            synthetic=True,
+            can_control=False,
+            sim=open_sim(self._store.live_view()),
+            beds=sorted(shown, key=lambda b: (b.bed, b.rank or 0)),
         )
 
     def summaries(self, clinician_id: str) -> list[PatientSummary]:

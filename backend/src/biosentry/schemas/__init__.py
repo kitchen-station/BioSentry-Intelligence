@@ -43,7 +43,7 @@ from .common import (
     Trend,
 )
 from .history import HistoryEvent, HistoryProvenance, HistoryRun, PatientHistory, SimulatedEpisode
-from .ingest import LiveWard
+from .ingest import LiveWard, OpenBed, OpenMove, OpenSim, OpenStaff, OpenWard
 from .lab import (
     LabRunDetail,
     LabRunItem,
@@ -144,6 +144,7 @@ CONTRACT_MODELS: tuple[type[BaseModel], ...] = (
     BaselineForming,
     BaselineUnavailable,
     LiveWard,
+    OpenWard,
     OverviewPatient,
     OverviewClinician,
     OverviewActivity,
@@ -207,6 +208,11 @@ __all__ = [
     "NewNote",
     "NewPatientQuestion",
     "NumberMeasurement",
+    "OpenBed",
+    "OpenMove",
+    "OpenSim",
+    "OpenStaff",
+    "OpenWard",
     "NurseVitalsInput",
     "OverviewActivity",
     "OverviewClinician",

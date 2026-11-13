@@ -21,10 +21,14 @@ worker claims and reports through /sim/lab/* (ingest key). A clinician who may s
 also ask one question about that patient: the API freezes an allow-listed copy of the patient's
 data with the question, a worker answers from that copy only, and the clinician reads the answer.
 A patient's stay can be read as a short history, rebuilt on read from stored bins: nothing is stored.
+With BIOSENTRY_OPEN_WARD_VIEW on (owner decision S-3), and only then, GET /wards/{ward}/open-view shows a
+watcher nobody identified a drawing of the ward: bed, rank and NEWS2 band, and the simulator's figures,
+with no name or id. It reads no credential and its views leave at most one audit row a minute.
 The API never runs anything.
 """
 
 import hashlib
+import logging
 import re
 import secrets
 from collections.abc import Iterator
@@ -58,6 +62,7 @@ from biosentry.schemas import (
     NewNote,
     NewPatientQuestion,
     NurseVitalsInput,
+    OpenWard,
     PartialLabInput,
     PatientDetail,
     PatientHistory,
@@ -100,6 +105,11 @@ SIGN_IN_WINDOW = timedelta(minutes=15)
 # of each per minute (per id for a locked sign-in), so a flood cannot fill the disk. Every request
 # is still refused; only the row is limited.
 ANONYMOUS_ROW_EVERY = timedelta(minutes=1)
+OPEN_VIEW_ACTION = "view_open_ward"
+OPEN_VIEW_WARNING = (
+    "BIOSENTRY_OPEN_WARD_VIEW is on: GET /wards/{ward}/open-view shows the ward to anyone who can"
+    " reach this API, without sign-in. Never use it on a public address."
+)
 
 # The body-bearing write routes and the action their audit rows carry. A body that fails
 # validation never reaches the handler, so its audit row is written by the validation handler.
@@ -299,6 +309,8 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
         openapi_url=None,
     )
     app.state.open_ctx = open_ctx
+    if settings.open_ward_view:
+        logging.getLogger(__name__).warning(OPEN_VIEW_WARNING)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_origins),
@@ -399,6 +411,23 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
         role = ctx.store.role_of(body.clinician_id)
         assert role is not None  # a token exists only for a known clinician
         return SessionToken(token=token, role=SessionRole(role))
+
+    if settings.open_ward_view:  # off: the route does not exist, so the framework's own 404 answers
+
+        @app.get("/wards/{ward}/open-view", response_model=OpenWard)
+        def open_view(ward: str, ctx: Ctx) -> OpenWard:
+            """No credential is read here: the answer is the same for every caller."""
+            found = ctx.wards.open_ward() if ward == ctx.store.ward and ctx.store.synthetic else None
+            outcome: Outcome = "ok" if found else "not_found"
+            resource = ward if found else "-"  # the caller's path text is never stored
+            since = ctx.store.clock() - ANONYMOUS_ROW_EVERY
+            # shortcut: two calls in one instant can both write a row, bounded by the callers at
+            # that instant; upgrade: an advisory lock as in sign_in, if that ever matters.
+            if not ctx.audit.count(OPEN_VIEW_ACTION, resource, outcome, since):
+                ctx.audit.append(None, OPEN_VIEW_ACTION, resource, outcome)
+            if found is None:
+                raise HTTPException(status_code=404)  # no detail: the same bytes as an unknown path
+            return found
 
     @app.get("/wards/{ward}/rows", response_model=WardResponse)
     def ward_rows(ward: str, ctx: Ctx, who: Who) -> WardResponse:
