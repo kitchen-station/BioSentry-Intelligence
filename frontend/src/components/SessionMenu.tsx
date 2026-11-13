@@ -5,7 +5,7 @@ import styles from "./SessionMenu.module.css";
 
 interface Props {
   session: Session;
-  onSignOut: () => void;
+  onSignOut: (explicit?: boolean) => void;
 }
 
 const ANALYTICS_PATH = /^\/(?![/\\])[^\s\\]*$/; // same-origin path only: "//x" and "/\x" leave the site
@@ -72,7 +72,7 @@ export function SessionMenu({ session, onSignOut }: Props) {
               className={styles.menuItem}
               onClick={() => {
                 setOpen(false);
-                onSignOut();
+                onSignOut(true);
                 navigate("/");
               }}
             >

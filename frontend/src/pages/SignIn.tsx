@@ -94,7 +94,8 @@ function refusal(error: unknown): string {
 export function SignIn({ onSignIn }: Props) {
   const navigate = useNavigate();
   // Set when a signed-out link (e.g. a patient page) sent the clinician here: return them to it.
-  const from: unknown = (useLocation().state as { from?: unknown } | null)?.from;
+  // `who` is the clinician whose session ended by itself: only that clinician returns to it.
+  const { from, who } = (useLocation().state ?? {}) as { from?: unknown; who?: unknown };
   const [department, setDepartment] = useState<Department | null>(null);
   const [selected, setSelected] = useState<Profile | null>(null);
   const [adminId, setAdminId] = useState("");
@@ -110,7 +111,10 @@ export function SignIn({ onSignIn }: Props) {
       ward: profile.ward,
       role: profile.sessionRole,
     });
-    navigate(typeof from === "string" && from.startsWith("/") && from !== "/" ? from : path);
+    const back =
+      typeof from === "string" && from.startsWith("/") && from !== "/" && !from.startsWith("//") && !from.includes("\\") &&
+      (who === undefined || who === profile.id);
+    navigate(back ? from : path);
   };
 
   const handlePickDepartment = (dept: Department) => {

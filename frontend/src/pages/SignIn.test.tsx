@@ -30,10 +30,10 @@ function Where() {
   return <p>at {useLocation().pathname}</p>;
 }
 
-const page = (from?: unknown) => {
+const page = (from?: unknown, who?: unknown) => {
   const onSignIn = vi.fn();
   render(
-    <MemoryRouter initialEntries={[{ pathname: "/", state: from === undefined ? null : { from } }]}>
+    <MemoryRouter initialEntries={[{ pathname: "/", state: from === undefined ? null : { from, who } }]}>
       <Routes>
         <Route path="/" element={<SignIn onSignIn={onSignIn} />} />
         <Route path="*" element={<Where />} />
@@ -114,6 +114,33 @@ describe("SignIn", () => {
     await click("Continue");
     await click(/Ward Monitor/);
     expect(screen.getByText("at /patient/p-001")).toBeTruthy();
+  });
+
+  it("returns the same clinician whose session ended to the page it ended on", async () => {
+    page("/patient/p-001", "rn-reyes");
+    await click(/Nurse/);
+    await click(/Nurse Reyes/);
+    await click("Continue");
+    await click(/Ward Monitor/);
+    expect(screen.getByText("at /patient/p-001")).toBeTruthy();
+  });
+
+  it("does not send another clinician to the page a session ended on", async () => {
+    page("/patient/p-001", "md-santos");
+    await click(/Nurse/);
+    await click(/Nurse Reyes/);
+    await click("Continue");
+    await click(/Ward Monitor/);
+    expect(screen.getByText("at /ward")).toBeTruthy();
+  });
+
+  it.each([["//evil.example"], ["/\\evil.example"]])("ignores a return target that could leave the site (%s)", async (from) => {
+    page(from);
+    await click(/Nurse/);
+    await click(/Nurse Reyes/);
+    await click("Continue");
+    await click(/Ward Monitor/);
+    expect(screen.getByText("at /ward")).toBeTruthy();
   });
 
   it.each([["/"], ["https://evil.example"], [42]])(

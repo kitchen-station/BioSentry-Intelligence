@@ -43,10 +43,15 @@ function saveSession(s: Session | null): void {
   }
 }
 
-/** Sends a signed-out visitor to sign-in, remembering where they were going. */
-function ToSignIn() {
+/**
+ * Sends a signed-out visitor to sign-in, remembering where they were going. `gone` says why they are
+ * signed out: undefined = no session in this tab yet (a deep link: any person may return to the page),
+ * null = they signed out themselves (no return page), an id = that clinician's session ended by itself
+ * (only the same clinician returns to the page).
+ */
+function ToSignIn({ gone }: { gone: string | null | undefined }) {
   const location = useLocation();
-  return <Navigate to="/" replace state={{ from: location.pathname }} />;
+  return <Navigate to="/" replace state={gone === null ? null : { from: location.pathname, who: gone }} />;
 }
 
 export function App() {
@@ -59,13 +64,18 @@ export function App() {
     return s;
   });
 
+  const [gone, setGone] = useState<string | null | undefined>(undefined);
+
   // SignIn has already signed in with the API (the passphrase step); this only records who.
   const handleSignIn = (s: Session) => {
     saveSession(s);
+    setGone(undefined);
     setSession(s);
   };
 
-  const signOut = () => {
+  // The menu passes true for a sign-out the person chose; a page that gets a 401 calls it with nothing.
+  const signOut = (explicit?: boolean) => {
+    setGone(explicit === true ? null : session?.clinician_id);
     clearSession();
     saveSession(null);
     setSession(null);
@@ -79,40 +89,40 @@ export function App() {
       />
       <Route
         path="/ward"
-        element={session ? <Ward session={session} onSignOut={signOut} /> : <ToSignIn />}
+        element={session ? <Ward session={session} onSignOut={signOut} /> : <ToSignIn gone={gone} />}
       />
       <Route
         path="/patient/:id"
-        element={session ? <PatientDetail session={session} onSignOut={signOut} /> : <ToSignIn />}
+        element={session ? <PatientDetail session={session} onSignOut={signOut} /> : <ToSignIn gone={gone} />}
       />
       <Route
         path="/station"
         element={
           session && (session.role === "md" || session.role === "charge_rn")
             ? <Station session={session} onSignOut={signOut} />
-            : session ? <Navigate to={session.role === "admin" ? "/overview" : "/ward"} replace /> : <ToSignIn />
+            : session ? <Navigate to={session.role === "admin" ? "/overview" : "/ward"} replace /> : <ToSignIn gone={gone} />
         }
       />
       <Route
         path="/overview"
         element={
-          session ? <Overview session={session} onSignOut={signOut} /> : <ToSignIn />
+          session ? <Overview session={session} onSignOut={signOut} /> : <ToSignIn gone={gone} />
         }
       />
       <Route
         path="/lab"
-        element={session ? <Lab session={session} onSignOut={signOut} /> : <ToSignIn />}
+        element={session ? <Lab session={session} onSignOut={signOut} /> : <ToSignIn gone={gone} />}
       />
       <Route
         path="/lab/research"
-        element={session ? <Research session={session} onSignOut={signOut} /> : <ToSignIn />}
+        element={session ? <Research session={session} onSignOut={signOut} /> : <ToSignIn gone={gone} />}
       />
       <Route
         path="/lab/pipeline"
-        element={session ? <Pipeline session={session} onSignOut={signOut} /> : <ToSignIn />}
+        element={session ? <Pipeline session={session} onSignOut={signOut} /> : <ToSignIn gone={gone} />}
       />
-      <Route path="/research" element={session ? <Navigate to="/lab/research" replace /> : <ToSignIn />} />
-      <Route path="/pipeline" element={session ? <Navigate to="/lab/pipeline" replace /> : <ToSignIn />} />
+      <Route path="/research" element={session ? <Navigate to="/lab/research" replace /> : <ToSignIn gone={gone} />} />
+      <Route path="/pipeline" element={session ? <Navigate to="/lab/pipeline" replace /> : <ToSignIn gone={gone} />} />
     </Routes>
   );
 }

@@ -154,7 +154,7 @@ schemas. Every target is in the [Makefile](Makefile).
   A physician or the charge nurse can ask for a simulated run: the simulator's compare runs two arms from one seed that differ in one change (partly paired in hospital mode), apart from the ward that is running. A lab worker beside the ward runner runs it; the
   API only stores the request and the result. Results are synthetic and not validated, and nothing in them changes a
   rank. Each clinician has one at a time and 10 in 24 hours; the ward has 5 waiting at most. No lab worker is deployed yet,
-  so a request fails after an hour until one is.
+  so a request fails after an hour until one is. The list reads again every 5 seconds while a run is queued or running, and stops when none is.
 
 ## What the database stores
 

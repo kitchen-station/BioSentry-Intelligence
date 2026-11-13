@@ -15,6 +15,8 @@ const HOSPITAL: Record<string, string[]> = {
 };
 const DAYS = [1, 3, 7, 14, 30];
 const SEED_MAX = 2147483647;
+// The same as the ward page's poll with the API (Ward.tsx). Not imported: the lab pages may not reach the ward page.
+const POLL_MS = 5_000;
 
 const when = (iso: unknown) => `${String(iso).slice(0, 16).replace("T", " ")} UTC`;
 const request = (r: LabRunItem) =>
@@ -56,7 +58,7 @@ function header(report: unknown): [string, string[]][] {
 
 /**
  * Simulated runs: a physician or the charge nurse asks, everyone on the ward reads. It reads on load, on Refresh and after a
- * request, never on a timer: every read writes a row to the audit log.
+ * request, and on a timer only while a run is queued or running: every read writes a row to the audit log.
  */
 export function LabRuns({ role, onSignOut }: { role: SessionRole; onSignOut: () => void }) {
   const clinician = role !== "admin";
@@ -93,7 +95,9 @@ export function LabRuns({ role, onSignOut }: { role: SessionRole; onSignOut: () 
     [onSignOut],
   );
 
+  const reading = useRef(false);
   const load = useCallback((fallback: string) => {
+    reading.current = true;
     return getLabRuns()
       .then((rows) => {
         if (!Array.isArray(rows)) throw new Error("not a list");
@@ -103,12 +107,25 @@ export function LabRuns({ role, onSignOut }: { role: SessionRole; onSignOut: () 
       .catch((failure: unknown) => {
         setRuns(null); // nothing stale stays on screen after a failed read
         fail(failure, fallback);
+      })
+      .finally(() => {
+        reading.current = false;
       });
   }, [fail]);
 
   useEffect(() => {
     if (hasLabRuns && clinician) void load("The runs could not be read. Try Refresh.");
   }, [load, clinician]);
+
+  // Poll while a run is open. A failed read clears the list, so the timer stops until Refresh reads again.
+  const pending = runs?.some((r) => r.state === "queued" || r.state === "running") ?? false;
+  useEffect(() => {
+    if (!pending) return;
+    const t = setInterval(() => {
+      if (!reading.current) void load("The runs could not be read. Try Refresh.");
+    }, POLL_MS);
+    return () => clearInterval(t);
+  }, [pending, load]);
 
   const send = (e: React.FormEvent) => {
     e.preventDefault();
