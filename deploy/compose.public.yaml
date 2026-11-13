@@ -1,0 +1,26 @@
+# Public mode (deploy/README.md, "Public mode"): what changes in the stack when the team's address is
+# opened to the internet. deploy/setup.sh adds this file to compose.yaml only when PUBLIC_HOST is set
+# in deploy/.env; without it the stack is exactly the private one.
+#
+# This file publishes nothing. The public door is `tailscale funnel` on the host, to the same loopback
+# port (127.0.0.1:8080) the private door uses, so the database, the API, the ward runner and the lab
+# worker stay where they were.
+services:
+  api:
+    environment:
+      # The two public sites that may call this API from a browser, and no other origin.
+      BIOSENTRY_CORS_ORIGINS: https://biosentry-dashboard.pages.dev,https://biosentry-ward-sim.pages.dev
+      # Watching the ward without a sign-in is never on while the address is public, whatever .env says.
+      BIOSENTRY_OPEN_WARD_VIEW: "false"
+    # The API writes one line for each request: capped, so a flood of requests cannot fill the disk.
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+  web:
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"

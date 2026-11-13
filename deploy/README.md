@@ -3,7 +3,8 @@
 PostgreSQL, the API, the ward simulator and the two browser apps run from `deploy/compose.yaml` on one
 Linux server (a Huawei Cloud Flexus L or ECS, see "On Huawei Cloud" below, or any VPS). Teammates open
 **one address** over Tailscale; none of the stack's ports listen on the public interface, and a stranger
-on the internet can reach no page and no data.
+on the internet can reach no page and no data. (The owner can open that address to the internet: see
+"Public mode". It is off unless set.)
 
 | The team opens | and gets |
 | --- | --- |
@@ -13,7 +14,8 @@ on the internet can reach no page and no data.
 
 The public demos on Cloudflare Pages (`biosentry-dashboard.pages.dev`, `biosentry-ward-sim.pages.dev`) are
 not part of this and do not change: they hold sample data only and no API address. Do not point them at
-this server (and see "A page served from somewhere else" for why a public page cannot call it anyway).
+this server while it is private (see "A page served from somewhere else" for why a public page cannot
+call it anyway). "Public mode" is the one supported way to let them use this API.
 
 - `postgres` publishes no port and sits on an internal Docker network. Its data is in the named volume
   `pgdata`.
@@ -99,7 +101,8 @@ this server (and see "A page served from somewhere else" for why a public page c
    `.../simulator/`; `tailscale serve status` shows the address, and should list this one line only (if it
    also lists an older one for port 8000, clear it first with `sudo tailscale serve reset`). `--bg` keeps
    it on across reboots.
-   (Only tailnet devices can reach it: this is `serve`, not `funnel`. Never run `tailscale funnel`.)
+   (Only tailnet devices can reach it: this is `serve`, not `funnel`. Never run `tailscale funnel` on
+   its own: that makes the address public. "Public mode" below has the steps that must come first.)
    Each teammate installs Tailscale on their own laptop or phone and joins the tailnet; nothing else.
 7. **Set each clinician's passphrase** inside the api container (at least 12 characters; it prompts
    twice and the passphrase is never shown or logged). The seed gives a production database no
@@ -166,6 +169,85 @@ docker compose -f deploy/compose.yaml exec postgres psql -U biosentry -d biosent
 
 When you are done with it: `... exec -T postgres dropdb -U biosentry biosentry_restored`.
 
+## Public mode: the address on the internet
+
+Off unless you turn it on. Turn it on only when the owner and the owner of the tailnet both agree.
+
+Public mode lets the two Cloudflare Pages sites, and anyone who has the address, reach this server's
+pages and its API. It opens no port on the server and Docker publishes nothing new. The public door is
+`tailscale funnel` on the host, to the same `127.0.0.1:8080` the private door uses. Tailscale holds the
+HTTPS certificate.
+
+Why Funnel, and not a port on the server with a free name such as `<address>.sslip.io`:
+
+- Funnel opens no port and uses the certificate the tailnet name already has. One command closes it.
+- A port on the server means 80 and 443 open to every scanner, a web server that must get and keep its
+  own certificate, and a name on a domain (`sslip.io`) that is not on the Public Suffix List, so all its
+  users share one Let's Encrypt limit.
+- The cost of Funnel: the tailnet's owner must allow it once, Tailscale limits its bandwidth (it
+  publishes no figure), and devices on the tailnet get a browser prompt (below).
+
+**What the tailnet's owner must do, once:** allow Funnel for this server. Either open the link that
+`tailscale funnel` prints the first time and approve it, or in the Tailscale admin console, under Access
+controls, give this server the `funnel` node attribute. HTTPS and MagicDNS are already on.
+
+In order:
+
+1. **Set long random passphrases first** (step 7 of "The order") for every clinician and admin. The ids
+   are in this public repository, so the passphrase is the only secret.
+2. **Back up:** `deploy/backup.sh`.
+3. **Add one line to `deploy/.env`:** `PUBLIC_HOST=<this-host>.<your-tailnet>.ts.net` (the name
+   `tailscale serve status` shows, lower case, no `https://`). `BIOSENTRY_OPEN_WARD_VIEW` must not be
+   `true` in that file: `setup.sh` stops if both are set.
+4. **Run `deploy/setup.sh`.** With `PUBLIC_HOST` set it adds `compose.public.yaml`: the API accepts
+   browser calls from exactly `https://biosentry-dashboard.pages.dev` and
+   `https://biosentry-ward-sim.pages.dev`, watching the ward without a sign-in is forced off, and the
+   API's and the web server's logs are capped. It opens nothing itself. It prints the next command.
+5. **Open the door:** `sudo tailscale funnel --bg --https=443 http://127.0.0.1:8080`. Then
+   `tailscale funnel status` must list this one address and no longer say `(tailnet only)`.
+6. **Check from a device that is not on the tailnet** (a phone on mobile data):
+   `curl -s -o /dev/null -w '%{http_code}\n' https://$PUBLIC_HOST/api/healthz` answers `200`, and
+   `curl -s -o /dev/null -w '%{http_code}\n' -X POST https://$PUBLIC_HOST/api/sim/runs` answers `404`.
+7. **Point the two sites at it.** Each site's build needs one setting, and `setup.sh` prints both:
+   `VITE_API_URL=https://$PUBLIC_HOST/api` for the dashboard and
+   `VITE_VIEW_API_URL=https://$PUBLIC_HOST/api` for the simulator. Never put the ingest key in a build.
+
+**Back to private, one command:**
+`sudo tailscale funnel reset && sudo tailscale serve --bg --https=443 http://127.0.0.1:8080`. The first
+half closes the public door at once; `tailscale funnel status` then says `(tailnet only)`. Afterwards
+remove the `PUBLIC_HOST` line from `deploy/.env` and run `deploy/setup.sh`.
+
+While public mode is on, start the stack with `deploy/setup.sh` only. A plain `docker compose up` leaves
+out `compose.public.yaml`.
+
+### What changes for an attacker
+
+On the internet when public mode is on: the sign-in page, the two pages, and every route under `/api`.
+Anyone can try to sign in.
+
+What protects it:
+
+- A passphrase of 12 or more characters for each clinician. No passphrase, no data.
+- Five wrong tries for a clinician lock that clinician's sign-in for 15 minutes. Every try is recorded.
+- A clinician sees only their own patients. An admin reads the ward overview and writes nothing.
+- The ingest door (`/api/sim/*`) answers 404 from outside: nobody can write ward data or take a lab job.
+- The database, the API's own port, the ward runner and the lab worker are not reachable from outside.
+- A request body over 1 MB is refused, and a client that sends too slowly is dropped.
+- The data is synthetic. There is no real patient in it.
+
+What does not:
+
+- A weak, reused or shared passphrase. Nothing else stands between the internet and that clinician's view.
+- A flood of requests. This is one small server with no rate limit of its own. The ward can slow or stop.
+- A lock-out on purpose: anyone can lock a clinician out for 15 minutes with five wrong tries.
+
+Also true:
+
+- A device that is on the tailnet and opens a `pages.dev` site gets Chrome's local-network prompt,
+  because the name resolves to the tailnet address there. Allow it, or use the team address itself.
+- Not checked: Funnel has not been run from this repository's tests. The stack's side of public mode
+  was run on one machine on loopback.
+
 ## A page served from somewhere else
 
 You do not need this: the `web` service serves both pages. If you ever build a page yourself and serve it
@@ -175,7 +257,8 @@ in public JavaScript) and list that page's exact origin in `BIOSENTRY_CORS_ORIGI
 (comma-separated), then run `deploy/setup.sh` again. An origin that is not listed gets no CORS header and
 the browser refuses the answer.
 
-Do not do this from a public site such as `*.pages.dev`. The page itself would be public, and Chrome
+Do not do this by hand from a public site such as `*.pages.dev`: use "Public mode" above, which sets the
+two origins for you. While the server is private, the page itself would be public, and Chrome
 (142 and later) treats a call from a public page to a tailnet address as a local-network request: every
 user gets a permission prompt, and the call fails if they decline.
 

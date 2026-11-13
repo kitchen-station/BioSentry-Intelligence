@@ -190,9 +190,39 @@ def test_the_web_server_hides_the_ingest_door_and_passes_requests_only_to_the_ap
     assert ":8080 {" in code and not any(ln.startswith(("tls", "bind")) for ln in code)
     api = code[code.index("handle_path /api/* {") :]
     # Refused before anything is passed on: `respond` runs ahead of `reverse_proxy` in one block.
-    assert api[1:4] == ["@ingest path /sim /sim/*", "respond @ingest 404", "reverse_proxy api:8000"]
+    assert api[1:7] == [
+        "@ingest path /sim /sim/*",
+        "respond @ingest 404",
+        "request_body {",  # a body over the limit is refused here (413) and never reaches the API
+        "max_size 1MB",
+        "}",
+        "reverse_proxy api:8000",
+    ]
     assert [ln for ln in code if "reverse_proxy" in ln] == ["reverse_proxy api:8000"]
     assert "browse" not in " ".join(code)  # no directory listing
+    # For the day the address is public: HTTPS only from then on, and a slow client is dropped.
+    assert "Strict-Transport-Security max-age=31536000" in code
+    assert code[code.index("timeouts {") + 1 :][:3] == ["read_header 10s", "read_body 30s", "idle 2m"]
+    assert not any(ln.startswith("log") for ln in code)  # no access log: nothing to leak a token into
+
+
+# --- deploy/compose.public.yaml ----------------------------------------------------------------
+
+
+def test_public_mode_publishes_nothing_and_pins_the_origins_and_the_open_view_off() -> None:
+    # The whole file, line for line: public mode adds no port, no network, no volume and no service.
+    capped = ["logging:", "driver: json-file", "options:", "max-size: 10m", 'max-file: "3"']
+    assert _code(DEPLOY / "compose.public.yaml") == [
+        "services:",
+        "api:",
+        "environment:",
+        # The two public sites, exact origins: no wildcard, no third one.
+        "BIOSENTRY_CORS_ORIGINS: https://biosentry-dashboard.pages.dev,https://biosentry-ward-sim.pages.dev",
+        'BIOSENTRY_OPEN_WARD_VIEW: "false"',  # never watched without a sign-in while public
+        *capped,  # a flood of requests cannot fill the disk with log lines
+        "web:",
+        *capped,
+    ]
 
 
 def test_the_database_image_is_the_one_the_dev_compose_uses() -> None:
@@ -253,7 +283,7 @@ def host(tmp_path: Path) -> dict[str, Path]:
         '#!/bin/sh\necho "docker $*" >> "$LOG"\ncase "$*" in *pg_dump*) printf %s "$DUMP";; esac\n',
         encoding="utf-8",
     )
-    (bin_dir / "tailscale").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    (bin_dir / "tailscale").write_text('#!/bin/sh\necho "tailscale $*" >> "$LOG"\n', encoding="utf-8")
     (bin_dir / "git").write_text(  # a clone makes its directory, as the real one does
         '#!/bin/sh\necho "git $*" >> "$LOG"\ncase "$1" in clone) mkdir -p "$3";; esac\n', encoding="utf-8"
     )
@@ -300,6 +330,77 @@ def test_setup_makes_a_private_env_file_without_printing_the_secrets_then_starts
         assert secret not in done.stdout + done.stderr
         assert secret not in "\n".join(_calls(host))
     assert _calls(host)[-1] == UP
+
+
+PUBLIC_UP = "docker compose -f compose.yaml -f compose.public.yaml up -d --build --wait"
+
+
+def _set(host: dict[str, Path], *lines: str) -> None:
+    """Add lines to the deploy/.env that a first run of setup.sh made."""
+    assert _run(host, "setup.sh").returncode == 0
+    with (host["deploy"] / ".env").open("a", encoding="utf-8") as env_file:
+        env_file.write("".join(f"{ln}\n" for ln in lines))
+    host["log"].unlink()
+
+
+def test_setup_stays_private_unless_a_public_host_is_set(host: dict[str, Path]) -> None:
+    _set(host, "PUBLIC_HOST=")
+    done = _run(host, "setup.sh")
+    assert done.returncode == 0 and _calls(host)[-1] == UP
+    assert "funnel" not in done.stdout and "tailscale serve" in done.stdout
+
+
+def test_setup_adds_the_public_file_for_a_tailnet_name_and_opens_nothing_itself(
+    host: dict[str, Path],
+) -> None:
+    _set(host, "PUBLIC_HOST=biosentry-api.tail8490cd.ts.net")
+    done = _run(host, "setup.sh")
+    assert done.returncode == 0, done.stderr
+    assert _calls(host)[-1] == PUBLIC_UP and UP not in _calls(host)
+    assert not any(call.startswith("tailscale") for call in _calls(host))  # it prints the command only
+    assert "sudo tailscale funnel --bg --https=443 http://127.0.0.1:8080" in done.stdout
+    assert "sudo tailscale funnel reset && sudo tailscale serve --bg --https=443" in done.stdout
+    assert "VITE_API_URL=https://biosentry-api.tail8490cd.ts.net/api" in done.stdout
+    assert "VITE_VIEW_API_URL=https://biosentry-api.tail8490cd.ts.net/api" in done.stdout
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "5-230-201-23.sslip.io",  # not the tailnet: this stack opens no port of its own
+        "https://server.tail1234.ts.net",
+        "server.tail1234.ts.net/api",
+        "Server.Tail1234.ts.net",
+        '"server.tail1234.ts.net"',
+        "server.tail1234.ts.net; curl example.com",
+        "evil.example/.ts.net",
+        ".ts.net",
+        "a..ts.net",
+        "server.tail1234.ts.net.example.com",
+    ],
+)
+def test_setup_refuses_a_public_host_that_is_not_a_plain_tailnet_name(
+    host: dict[str, Path], value: str
+) -> None:
+    _set(host, f"PUBLIC_HOST={value}")
+    done = _run(host, "setup.sh")
+    assert done.returncode == 1 and "PUBLIC_HOST" in done.stderr
+    assert not any("up -d" in call for call in _calls(host))  # nothing was started
+    assert "funnel" not in done.stdout
+
+
+@pytest.mark.parametrize("on", ["true", "TRUE", " True ", '"true"'])
+def test_setup_refuses_public_mode_with_the_open_ward_view_on(host: dict[str, Path], on: str) -> None:
+    _set(host, "PUBLIC_HOST=server.tail1234.ts.net", f"BIOSENTRY_OPEN_WARD_VIEW={on}")
+    done = _run(host, "setup.sh")
+    assert done.returncode == 1 and "BIOSENTRY_OPEN_WARD_VIEW" in done.stderr
+    assert not any("up -d" in call for call in _calls(host))
+
+
+def test_setup_allows_public_mode_with_the_open_ward_view_off(host: dict[str, Path]) -> None:
+    _set(host, "BIOSENTRY_OPEN_WARD_VIEW=false", "PUBLIC_HOST=server.tail1234.ts.net")
+    assert _run(host, "setup.sh").returncode == 0
+    assert _calls(host)[-1] == PUBLIC_UP
 
 
 def test_setup_is_safe_to_run_again_and_puts_the_mode_right(host: dict[str, Path]) -> None:
