@@ -1,9 +1,9 @@
 # Deploy it: one server, the team only
 
 PostgreSQL, the API, the ward simulator and the two browser apps run from `deploy/compose.yaml` on one
-Linux server (any VPS, or a Huawei Cloud ECS: see "On Huawei Cloud" below). Teammates open **one address**
-over Tailscale; nothing listens on the public interface, and a stranger on the internet can reach no page
-and no data.
+Linux server (a Huawei Cloud Flexus L or ECS, see "On Huawei Cloud" below, or any VPS). Teammates open
+**one address** over Tailscale; none of the stack's ports listen on the public interface, and a stranger
+on the internet can reach no page and no data.
 
 | The team opens | and gets |
 | --- | --- |
@@ -45,8 +45,8 @@ this server (and see "A page served from somewhere else" for why a public page c
   tailnet and forwards to `127.0.0.1:8080`.
 - **Keep the server's firewall closed to 5432, 8000 and 8080.** A port Docker publishes on `0.0.0.0` goes
   around `ufw`'s rules, so the safety here is that two ports are bound to loopback and the third is not
-  published at all. Do not edit `compose.yaml` to publish any of them, and open nothing but SSH (and what
-  Tailscale needs) in the provider's firewall.
+  published at all. Do not edit `compose.yaml` to publish any of them, and open nothing but SSH in the
+  provider's firewall (Tailscale needs no inbound port).
 - A clinician still signs in with their own passphrase, on both pages. The API answers each one only for
   their own patients and writes an audit row for every view. Tailscale decides who can reach the address;
   the passphrase decides whose patients they see.
@@ -167,15 +167,42 @@ user gets a permission prompt, and the call fails if they decline.
 
 ## On Huawei Cloud
 
-The same order works on one Huawei Cloud ECS (for example `s6.medium.2`, 1 vCPU and 2 GiB, in
-CN-Hong Kong, with a 40 GB disk). Three things differ from a plain VPS:
+The same order works on one Huawei Cloud server. The cheapest fit is a **Flexus L** instance in
+**AP-Manila** or CN-Hong Kong, with a plain Ubuntu or Debian image: its disk, its public address and up to
+3 TB of traffic a month are in one monthly price (USD 9 for 2 vCPUs and 2 GiB, USD 19 for 4 GiB, checked
+2026-11-13). The server builds the API image and the two pages itself, which has not been tried on 2 GiB;
+pick 4 GiB at purchase if you would rather not find out, since upgrading a running Flexus L is not checked
+here. A classic ECS (for example `s6.medium.2`) works the same way but is billed piece by piece. What
+differs from a plain VPS:
 
-- The ECS needs an EIP (a public address) to reach the internet at all: Docker's image downloads and
-  Tailscale both go outward. Bill it by traffic.
-- In the security group, keep one inbound rule: SSH (22) from your own IP address (`x.x.x.x/32`). Add
-  nothing for 8000, 8080 or 5432: nothing here needs an inbound port, because Tailscale connects
-  outward. Leave the default outbound rule (allow all).
-- Once Tailscale is up you can SSH over the tailnet and remove the SSH rule too.
+- The server needs its public address (EIP) only to reach **out**: Docker's image downloads and Tailscale
+  both connect outward. Flexus L comes with one. An ECS without one is expected to have no internet access
+  (not checked here; a NAT gateway is the costlier alternative), so add an EIP billed by traffic. A
+  pay-per-use EIP keeps billing while the server is stopped, until you release it.
+- In the security group, first add (or edit) one inbound rule: SSH (22) from your own IP address
+  (`x.x.x.x/32`), and check that you can still SSH in. Then delete any other inbound rule you find there
+  (the console may add rules for 80, 443 or ping), unless another server on the same account needs it: on
+  Flexus L, all of an account's instances in one region share one security group. Add nothing for 8000,
+  8080 or 5432: nothing here needs an inbound port, and Tailscale needs none either. Leave the default
+  outbound rule (allow all). If your home IP changes, SSH stops working until you edit the rule (or use
+  the tailnet, below).
+- Once Tailscale is up you can SSH over the tailnet instead, and then remove the SSH rule. Do it in this
+  order: first check that `ssh <you>@<this-host>` works from your laptop over the tailnet; then set a
+  login password for the server in the console (reset password) and check that the console's remote login
+  (VNC) lets you in; only then delete the rule. Huawei documents VNC login for ECS as needing no public
+  address; it is not checked here for Flexus L. If either check fails, keep the SSH rule.
+- Use Tailscale on this server only to reach this server. Do not make it an exit node or a subnet router:
+  Huawei's ECS service statement forbids using a server for "cross-border VPN" or "traffic transit", and
+  either could look like that (our reading, not a Huawei ruling).
+- Buy by the month with auto-renew off, and renew by hand before the month ends; set a budget alert in
+  Cost Center too (it only warns; Huawei documents no spending cap). An expired Flexus L is frozen and
+  later deleted with its data, which cannot be restored: before it lapses, run `deploy/backup.sh` and copy
+  the dump off the server.
+- Huawei's managed database (RDS for PostgreSQL, which offers version 18) is not needed: PostgreSQL runs
+  in this stack. The API reads its database address from `BIOSENTRY_DATABASE_URL`, set in
+  `deploy/compose.yaml`; moving to RDS would mean changing that line and has not been done or tested here
+  (RDS is reached over a private network from a server in the same VPC, and whether a Flexus L can be is
+  not checked).
 
 ## Trying the stack on another machine
 
