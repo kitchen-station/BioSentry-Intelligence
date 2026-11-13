@@ -458,8 +458,8 @@ describe("the simulated episode", () => {
       `Simulated deterioration (respiratory): began ${clk(EP.start)}, fully in ${clock(EP.full)}`,
       `${rng(T("10:45"), T("11:00"))} \u00b7 ${high} \u00b7 Total 9 (\u22657): high`,
       `${rng(T("10:00"), T("10:30"))} \u00b7 ${high} \u00b7 Total 9 (\u22657): high`,
-      `${rng(T("09:00"), T("09:30"))} \u00b7 ${high} \u00b7 began outside the simulated episode \u00b7 Total 9 (\u22657): high`,
-      `${rng(T("08:00"), T("08:30"))} \u00b7 ${high} \u00b7 began inside a simulated episode \u00b7 Total 9 (\u22657): high`,
+      `${rng(T("09:00"), T("09:30"))} \u00b7 ${high} \u00b7 began outside the simulated episode's time \u00b7 Total 9 (\u22657): high`,
+      `${rng(T("08:00"), T("08:30"))} \u00b7 ${high} \u00b7 began inside the simulated episode's time \u00b7 Total 9 (\u22657): high`,
     ]);
   });
 
@@ -476,7 +476,7 @@ describe("the simulated episode", () => {
         `Blood pressure charted at ${clk(T("11:00"))}`,
       ]);
       expect(screen.getByText("No alert level in the stored sets.")).toBeTruthy(); // an episode with no alert run
-      expect(screen.getByText("Known only because this is a simulation. A real ward has no such line.")).toBeTruthy();
+      expect(screen.getByText("Known only because this is a simulation. A real ward has no such information.")).toBeTruthy();
     },
   );
 
@@ -512,12 +512,21 @@ describe("the simulated episode", () => {
     expect(document.querySelector("rect[data-episode]")).toBeNull();
   });
 
-  it.each([["a string", "x"], ["an unknown kind", { ...EP, kind: "septic" }], ["a bad time", { ...EP, start: "x" }], ["a bad full time", { ...EP, full: 5 }]])(
+  it.each([
+    ["a string", "x"],
+    ["an unknown kind", { ...EP, kind: "septic" }],
+    ["a kind that is a built-in name", { ...EP, kind: "toString" }],
+    ["a bad time", { ...EP, start: "x" }],
+    ["a bad full time", { ...EP, full: 5 }],
+    ["fully in before it began", { ...EP, start: EP.full, full: EP.start }],
+    ["no mark that it is simulation truth", { ...EP, source: "chart" }],
+  ])(
     "an odd episode (%s) gives no line and no span, and says some entries could not be shown",
     async (_name, simulated_episode) => {
-      api.getPatientHistory.mockResolvedValue(odd({ simulated_episode, runs: [run({})] }));
+      // The stretch carries a label, but a label points at the episode: with none to show, none is shown.
+      api.getPatientHistory.mockResolvedValue(odd({ simulated_episode, runs: [run({ in_episode: "inside" })] }));
       await open();
-      expect(document.body.textContent).not.toMatch(/Simulated|simulation/);
+      expect(document.body.textContent).not.toMatch(/Simulated|simulation|simulated/);
       expect(document.querySelector("rect[data-episode]")).toBeNull();
       expect(screen.getByText("Some entries could not be shown.")).toBeTruthy();
     },

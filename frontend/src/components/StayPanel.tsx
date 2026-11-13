@@ -22,7 +22,7 @@ const FIXED = "Rebuilt from stored 15-minute sets. It can differ from the score 
 const WINDOW_MS = 30 * 60_000; // an acknowledgement just after a run ended still belongs to it
 const EPISODE_KINDS: Record<string, string> = { respiratory: "respiratory", tachycardic: "heart rate", hypotensive: "blood pressure" };
 const EPISODE_TAIL_MS = 2 * 3_600_000; // the API counts an alert as inside until two hours after the episode is fully in
-const EPISODE_LABELS: Record<string, string> = { inside: "began inside a simulated episode", outside: "began outside the simulated episode" };
+const EPISODE_LABELS: Record<string, string> = { inside: "began inside the simulated episode's time", outside: "began outside the simulated episode's time" };
 const LEVELS: Record<string, string> = { high: "high", medium: "medium", single_3: "one value at 3" };
 const ROLES: Record<string, string> = { rn: "RN", md: "MD", charge_rn: "Charge RN" };
 const UNAVAILABLE: Record<string, string> = {
@@ -59,9 +59,9 @@ function clean(raw: PatientHistory): Stay {
     }
     // An alert whose score or level is unusable is kept: it is shown without them.
     const level = str(o.peak_level);
-    const ok = typeof o.peak_score === "number" && level !== null && level in LEVELS;
+    const ok = typeof o.peak_score === "number" && level !== null && Object.hasOwn(LEVELS, level);
     const reasons = Array.isArray(o.reasons) ? o.reasons.filter((x): x is string => typeof x === "string") : [];
-    runs.push({ state: state as RunState, start, end, ongoing: o.ongoing === true, score: ok ? (o.peak_score as number) : null, level: ok ? (level as Level) : null, reasons, episode: state === "alert" && typeof o.in_episode === "string" && o.in_episode in EPISODE_LABELS ? EPISODE_LABELS[o.in_episode] : null });
+    runs.push({ state: state as RunState, start, end, ongoing: o.ongoing === true, score: ok ? (o.peak_score as number) : null, level: ok ? (level as Level) : null, reasons, episode: state === "alert" && typeof o.in_episode === "string" && Object.hasOwn(EPISODE_LABELS, o.in_episode) ? EPISODE_LABELS[o.in_episode] : null });
   }
   const events: Ev[] = [];
   for (const e of Array.isArray(h.events) ? h.events : []) {
@@ -73,7 +73,7 @@ function clean(raw: PatientHistory): Stay {
       continue;
     }
     const role = str(o.role);
-    events.push({ kind: kind as Kind, at, by: str(o.by), role: role !== null && role in ROLES ? role : null, score: typeof o.score === "number" ? o.score : null });
+    events.push({ kind: kind as Kind, at, by: str(o.by), role: role !== null && Object.hasOwn(ROLES, role) ? role : null, score: typeof o.score === "number" ? o.score : null });
   }
   let episode: Episode | null = null;
   if (h.simulated_episode !== null && h.simulated_episode !== undefined) {
@@ -81,9 +81,13 @@ function clean(raw: PatientHistory): Stay {
     const kind = str(o.kind);
     const start = time(o.start);
     const full = time(o.full);
-    if (kind !== null && kind in EPISODE_KINDS && start !== null && full !== null) episode = { kind: EPISODE_KINDS[kind], start, full };
+    // Shown only with the server's own mark that it is simulation truth, and only when its two times are in order.
+    const ok = o.source === "simulation" && kind !== null && Object.hasOwn(EPISODE_KINDS, kind) && start !== null && full !== null && full >= start;
+    if (ok) episode = { kind: EPISODE_KINDS[kind], start, full };
     else dropped = true;
   }
+  // A label points at the episode: with no episode to show, no stretch carries one.
+  if (episode === null) for (const r of runs) r.episode = null;
   const all = [...(episode ? [episode.start, episode.full + EPISODE_TAIL_MS] : []), ...runs.flatMap((r) => [r.start, r.end]), ...events.map((e) => e.at)];
   const gf = time(h.grid_from);
   const gt = time(h.grid_to);
@@ -289,7 +293,7 @@ export function StayPanel({ patientId, onSignOut }: { patientId: string; onSignO
             {!stay.broken && !stay.dropped && stay.runs.length === 0 && <p className={styles.quiet}>No alert level in the stored sets.</p>}
             <Entries stay={stay} />
             {(stay.episode || stay.runs.some((r) => r.episode)) && (
-              <p className={styles.quiet}>Known only because this is a simulation. A real ward has no such line.</p>
+              <p className={styles.quiet}>Known only because this is a simulation. A real ward has no such information.</p>
             )}
             {stay.dropped && <p className={styles.quiet}>Some entries could not be shown.</p>}
             {stay.cut && <p className={styles.quiet}>Older entries are not shown.</p>}
