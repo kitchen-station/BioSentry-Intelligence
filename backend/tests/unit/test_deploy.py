@@ -1,7 +1,8 @@
 """The deployment files: what the server's stack publishes (the API and the web server on the host's
-loopback, the database and the ward simulator nothing), pinned images, secrets that have no defaults, the
-web server that hides the ingest door, and the two scripts, run here with a stand-in for docker (the real
-stack was built, run, backed up and restored by hand; see deploy/README.md)."""
+loopback, the database, the ward simulator and the lab worker nothing), pinned images, secrets that
+have no defaults, the web server that hides the ingest door, and the two scripts, run here with a
+stand-in for docker (the real stack was built, run, backed up and restored by hand; see
+deploy/README.md)."""
 
 import os
 import re
@@ -29,9 +30,15 @@ def _code(path: Path) -> list[str]:
 
 
 def _sim() -> list[str]:
-    """The code lines of the `sim` service: up to the `web` service that follows it."""
+    """The code lines of the `sim` service: up to the `lab` service that follows it."""
     code = _code(DEPLOY / "compose.yaml")
-    return code[code.index("sim:") : code.index("web:")]
+    return code[code.index("sim:") : code.index("lab:")]
+
+
+def _lab() -> list[str]:
+    """The code lines of the `lab` service: up to the `web` service that follows it."""
+    code = _code(DEPLOY / "compose.yaml")
+    return code[code.index("lab:") : code.index("web:")]
 
 
 def _web() -> list[str]:
@@ -54,19 +61,28 @@ def test_the_database_publishes_nothing_and_the_api_only_the_hosts_loopback() ->
     assert [ln for ln in code if re.search(mapping, ln)] == published
     assert "0.0.0.0" not in "\n".join(code)
     assert "network_mode: host" not in code  # no service runs on the host's network
-    assert code.count("network: host") == 3  # only the three builds (the API, the simulator, the web) do
+    # Only the four builds (the API, the simulator, the lab worker, the web) do.
+    assert code.count("network: host") == 4
     assert code.index("network: host") < code.index("restart: unless-stopped", code.index("build:"))
     postgres = code[code.index("postgres:") : code.index("api:")]
     assert "networks: [backend]" in postgres and "ports:" not in postgres
-    assert any(ln.startswith("internal: true") for ln in code)  # the database's network
     # Only the top-level block is spelt `networks:` alone: a service names its networks as `[..]`,
-    # so the _sim and _web slices end where they should and cannot hide one.
+    # so the _sim, _lab and _web slices end where they should and cannot hide one.
     assert code.count("networks:") == 1
+    # The two networks the file makes are both internal: the database's, and the lab worker's.
+    made = code[code.index("networks:") + 1 : code.index("volumes:", code.index("networks:"))]
+    assert [ln.split(" #")[0] for ln in made] == ["backend:", "internal: true", "labnet:", "internal: true"]
+    # Who is on which: the database alone with the API, the lab worker alone with the API.
+    assert [ln for ln in code if ln.startswith("networks: [")] == [
+        "networks: [backend]",
+        "networks: [default, backend, labnet]",
+        "networks: [labnet]",
+    ]
 
 
 def test_the_stack_restarts_waits_for_a_healthy_database_and_keeps_the_data_in_a_volume() -> None:
     text = "\n".join(_code(DEPLOY / "compose.yaml"))
-    assert text.count("restart: unless-stopped") == 4
+    assert text.count("restart: unless-stopped") == 5
     assert "condition: service_healthy" in text
     assert "pgdata:/var/lib/postgresql" in text and text.endswith("volumes:\npgdata:\nsimstate:")
     assert "BIOSENTRY_ENV: production" in text
@@ -94,6 +110,30 @@ def test_the_ward_simulator_publishes_nothing_and_waits_for_a_healthy_api() -> N
     assert "WARD_STATE_FILE: /state/ward-state.json" in sim
     assert sim[sim.index("volumes:") + 1] == "- simstate:/state"
     assert not any("POSTGRES" in ln or "DATABASE" in ln for ln in sim)
+
+
+def test_the_lab_worker_publishes_nothing_reaches_only_the_api_and_can_write_only_in_memory() -> None:
+    lab = _lab()
+    assert "ports:" not in lab and "expose:" not in lab and "network_mode: host" not in lab
+    # One internal network, shared with the API alone: no route out, none to the database.
+    assert [ln for ln in lab if ln.startswith("networks:")] == ["networks: [labnet]"]
+    assert "context: ${SIM_DIR:-../../biosentry-ward-sim}" in lab  # the image the runner is built from
+    assert 'command: ["node", "dist/lab/lab-worker.js"]' in lab
+    assert "restart: unless-stopped" in lab
+    wait = lab[lab.index("depends_on:") :]
+    assert wait[:3] == ["depends_on:", "api:", "condition: service_healthy"]
+    # Its whole environment: the API's address inside compose and the ingest key, which has no default.
+    # No proxy variable (the worker refuses to start with one), nothing about the database.
+    assert lab[lab.index("environment:") + 1 : lab.index("networks: [labnet]")] == [
+        "BIOSENTRY_API_URL: http://api:8000",
+        "BIOSENTRY_INGEST_KEY: ${BIOSENTRY_INGEST_KEY:?set BIOSENTRY_INGEST_KEY in deploy/.env}",
+    ]
+    banned = ("POSTGRES", "DATABASE", "PROXY", "ENV_FILE")
+    assert not any(word in ln.upper() for ln in lab for word in banned)
+    assert "read_only: true" in lab and "cap_drop: [ALL]" in lab
+    assert 'security_opt: ["no-new-privileges:true"]' in lab
+    assert 'tmpfs: ["/tmp:size=64m"]' in lab  # the one place it writes, in memory and capped
+    assert "volumes:" not in lab and "privileged: true" not in lab and "cap_add:" not in lab
 
 
 def test_the_web_server_publishes_only_the_hosts_loopback_and_holds_no_secret() -> None:

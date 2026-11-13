@@ -1,5 +1,5 @@
-# The team deployment on one server: PostgreSQL, the API, the ward simulator and the web server that
-# carries the two browser apps. Run from this directory or with
+# The team deployment on one server: PostgreSQL, the API, the ward simulator, the lab worker and the
+# web server that carries the two browser apps. Run from this directory or with
 # `-f deploy/compose.yaml`; deploy/setup.sh does it. Secrets come from deploy/.env (git-ignored,
 # made by setup.sh): a missing one stops compose with an error, there are no defaults.
 #
@@ -50,8 +50,9 @@ services:
     ports:
       # Loopback only. API_PORT moves the host side when 8000 is taken (a second stack on one machine).
       - "127.0.0.1:${API_PORT:-8000}:8000"
-    # `default` is what lets the published port work; `backend` (internal) is how it reaches the database.
-    networks: [default, backend]
+    # `default` is what lets the published port work; `backend` (internal) is how it reaches the
+    # database; `labnet` (internal) is where the lab worker finds it.
+    networks: [default, backend, labnet]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
       interval: 5s
@@ -84,6 +85,32 @@ services:
       WARD_STATE_FILE: /state/ward-state.json
     volumes:
       - simstate:/state
+
+  # The lab worker: it runs the simulated compare runs a clinician asks for on the dashboard's
+  # Simulation lab page. It claims a request from the API with the ingest key, runs the simulator's own
+  # compare, and posts the result back (docs/lab-worker.md in the simulator's repository). The same
+  # image as `sim`, with another command. It publishes no port and sits on an internal network with
+  # the API alone: no route out, none to the database. Nothing is kept: it writes only under /tmp,
+  # which is in memory. It refuses to start if a proxy variable is set, so give it none.
+  lab:
+    build:
+      context: ${SIM_DIR:-../../biosentry-ward-sim}
+      # The build only (npm ci), on the host's network, for the reason the api's build is.
+      network: host
+    command: ["node", "dist/lab/lab-worker.js"]
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      BIOSENTRY_API_URL: http://api:8000
+      BIOSENTRY_INGEST_KEY: ${BIOSENTRY_INGEST_KEY:?set BIOSENTRY_INGEST_KEY in deploy/.env}
+    networks: [labnet]
+    read_only: true
+    # The one place it may write (one compare run's two files at a time), in memory and capped.
+    tmpfs: ["/tmp:size=64m"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
 
   # The address the team opens: the dashboard at /, the full ward simulator at /simulator/ and the API at /api,
   # from one small web server (web.Dockerfile, Caddyfile). The pages call the API on their own address,
@@ -123,6 +150,8 @@ services:
 networks:
   backend:
     internal: true # no route out, and nothing outside reaches it
+  labnet:
+    internal: true # the API and the lab worker only
 
 volumes:
   pgdata:

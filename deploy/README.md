@@ -37,6 +37,14 @@ this server (and see "A page served from somewhere else" for why a public page c
   second: 1, 10 or 60, 1 unless set (the runner exits on anything else). A ward resumed from its saved
   state keeps its saved speed, and a clinician who is an md or the charge nurse changes it from the viewer
   afterwards.
+- `lab` is the lab worker: it runs the simulated compare runs a physician or the charge nurse asks for
+  on the dashboard's Simulation lab page (without it a request waits, then fails). It is the same image
+  as `sim` with another command (`node dist/lab/lab-worker.js`). It claims a request from the API with
+  the ingest key, runs the simulator's compare, and posts the result back. It publishes no port and
+  sits on an internal network (`labnet`) with the API alone: no route out and none to the database. Its
+  filesystem is read-only apart from an in-memory `/tmp`, all capabilities are dropped, and it keeps
+  nothing. One run at a time; a run may use one CPU for up to 15 minutes. It refuses to start if a proxy
+  variable (`HTTP_PROXY` and the like) is set, so do not give the stack one.
 - There is one ward. While the runner is live, a browser simulator started with the ingest key is
   **refused with 409** ("Another ward simulation is live"): use the ward on the server, not a second one.
   To run one from a browser anyway, stop the runner (`docker compose -f deploy/compose.yaml stop sim`);
@@ -101,14 +109,15 @@ this server (and see "A page served from somewhere else" for why a public page c
    (Piped input works too, for a script: `printf '%s\n' "$PASSPHRASE" | docker compose -f
    deploy/compose.yaml exec -T api python -m biosentry.db.passphrase rn-manalo`.)
 8. **Keep the ingest key on the server.** Nobody on the team needs it: the ward runs in the `sim`
-   container, which gets the key from `deploy/.env`, and the two pages never use it. It is not in any page
+   container and the lab worker in `lab`, which get the key from `deploy/.env`, and the two pages never
+   use it. It is not in any page
    or build. To rotate it, edit `deploy/.env` and run `deploy/setup.sh` again. (Only someone running a
    second ward from their own machine would need it, and while the runner is live that is refused with
    409 anyway.)
 9. **Open the address** from a teammate's device that is on the tailnet, and sign in.
 
 Updating: `git pull && deploy/setup.sh` (it updates the simulator checkout too). Logs:
-`docker compose -f deploy/compose.yaml logs -f api` (or `sim`, or `web`). A change to the dashboard or the
+`docker compose -f deploy/compose.yaml logs -f api` (or `sim`, `lab`, or `web`). A change to the dashboard or the
 simulator reaches the team the same way: that command rebuilds the pages on the server.
 
 ## Backups
