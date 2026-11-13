@@ -5,6 +5,7 @@
     ask "<question>"              a doctor's question, answered on simulated trials
     approve <id> [--by NAME]      a person signs off a proposal (writes only the ledger)
     apply <id>                    copy an approved proposal into the models folder
+    export <file.json>            the questions, rounds and proposals as one JSON file (read only)
 
 Exit 0 on success, 2 with one `refused: ...` line on any refusal.
 """
@@ -75,7 +76,13 @@ def ask(cfg: Config, args: list[str]) -> str:
     return asking.ask(cfg, _one_id(args, 'ask "<question>"'))
 
 
-COMMANDS = {"status": status, "run": run, "ask": ask, "approve": approve, "apply": apply}
+def export(cfg: Config, args: list[str]) -> str:
+    data = ledger.write_export(cfg, _one_id(args, "export <file.json>"))
+    return (f"exported {len(data['questions'])} questions, {len(data['rounds'])} rounds, "
+            f"{len(data['proposals'])} proposals")
+
+
+COMMANDS = {"status": status, "run": run, "ask": ask, "approve": approve, "apply": apply, "export": export}
 
 
 def main(argv: list[str], env=None) -> int:
