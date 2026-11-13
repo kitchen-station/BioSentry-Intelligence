@@ -2,196 +2,243 @@
 
 | | |
 |---|---|
-| id | `tier_c/student_vitals` |
-| files | `model.onnx` (19 features), `model_no_temp.onnx` (15 features), `metadata.json` |
-| code | `research/student.py`, `research/train_student.py`, `research/evaluate_student.py` |
-| status | trained, synthetic, not validated. Not wired to the API, the rank or the arbiter |
+| id | `tier_c/student_vitals` (variants `all` and `no_temp`) |
+| files | `model.onnx` (5,334 bytes), `model_no_temp.onnx` (2,382), `model.mindir` (11,539), `model_no_temp.mindir` (8,706), `model.ms` (6,688), `model_no_temp.ms` (3,744), `model.json` (34,949), `model_no_temp.json` (14,903), `metadata.json`, `exports.json`, `timing.json`, `lite.txt`, `convert_lite.sh` |
+| code | `research/student.py`, `research/train_student.py`, `research/evaluate_student.py`, `research/export_plain.py`, `research/plain_student.py` |
+| status | trained on synthetic trials, validation numbers only, held-out not yet scored, not validated, not wired to the API, the rank or the arbiter |
+| framework | MindSpore 2.11.0 (CPU, GRAPH_MODE, one thread) |
 | intended use | research. Tier A (NEWS2) is never changed or learned |
 
-## What it is
+Held-out not yet scored. Every number in this card is from training or validation seeds. No held-out number of this
+model exists. The old scikit-learn student (B5) and its numbers are in git history.
 
-A small model that gives, for each 15-minute bin, a probability that the patient is in the onset
-of a deterioration episode. On ward-v2 the shipped `model.onnx` is a logistic student (no hidden
-layer), fitted to the log-odds of an overfitted gradient-boosting teacher. The teacher has higher
-validation average precision (0.008 against 0.003); the student has lower log loss. Only the
-student is exported. (On ward-v1 it was an MLP with one hidden layer of 16 ReLU units.)
+## What the pitch line says and what is true now
 
-## Result on ward-v2 (temperature rise removed, noise 0.1 C)
+- "A small neural network": true. One hidden ReLU layer. `all`: 35 inputs, width 32, 1,185 parameters (plus 70
+  standardisation constants), `model.onnx` 5,334 bytes. `no_temp`: 27 inputs, width 16, 465 parameters (plus 54),
+  2,382 bytes.
+- "Trained inside the simulation": true. Simulator trials only: ward-v2-ext seeds 61-160 (100 trials) train, seeds
+  261-300 (40 trials) validate. No real patient data.
+- "Distilled from a much bigger model": true as a procedure, not as a gain. The student is fitted to the teacher's
+  logits and never sees a label. The teacher is a 256x256 MindSpore network with 79,873 parameters, 67 times the
+  student's (76,801 and 165 times for `no_temp`). It passed its pre-registered gate. BUT the distilled student's
+  validation log loss (0.018969) is not better than the same small network fitted on the true labels (0.018925). The
+  recorded difference, student minus best hard-label network, is +4.4e-05 (95% bootstrap -9.3e-05 to 0.000193);
+  `no_temp` +4.6e-05 (-7.2e-05 to 0.000169). So distillation bought nothing measurable here. The rules ship the
+  distilled student because the teacher gate passed, not because it won.
+- "Every fifteen minutes it gives the probability that a patient is starting to deteriorate": true, with a definition.
+  One probability per scored 15-minute bin. The label is positive from the true episode start to fully in. NOT RANKED
+  bins get no probability.
+- "Small enough to run on the ward hub, so it works without internet": partly shown. The files are small (above). One
+  ONNX call with one row takes a median of 8.58 us (p99 26.63 us); `no_temp` 8.37 us (p99 29.75 us), onnxruntime
+  1.31.1, one thread, on this Apple Silicon Docker host (aarch64). The MindSpore Lite `.ms` conversion was done and
+  checked (below). A ward needs one call per patient per 15 minutes: about 13 calls (the validation trials average
+  about 12.7 patients at a time). It was NOT run on a small ARM board or a ward hub. The per-patient feature
+  computation is separate and was not timed.
 
-The committed files are now trained on ward-v2: ward-v1 made again by the fixed simulator (sim
-commit f7647c5, after PR #25 removed `INJECT_TEMPERATURE` and raised temperature noise from
-0.02 to 0.1 C). Same seeds, scenario, days and command; data card `models/data/ward-v2/card.md`. Same recipe, split, threshold rule and
-harness. Nothing was tuned again.
+## Result so far (validation only, seeds 261-300)
 
-- Validation average precision (seeds 8 to 10, prevalence 0.0015): teacher 0.008, logistic
-  0.0033, MLP 0.0030. So the logistic student is kept this time, by a margin that is noise. No
-  temperature: teacher 0.006, logistic 0.008, MLP 0.013 (MLP kept). The MLP fit stops at
-  scikit-learn's 100 iterations with a convergence warning (the recipe's setting, not changed).
-- Thresholds: student 0.002 (158 alerts on seeds 8 to 10 against NEWS2's 806). The teacher at
-  0.001 is in alert 43% of the time on seeds 8 to 10 and both no-temperature models 81%: no
-  usable threshold, not working rules.
-- Held-out seeds 11 to 30, scored once (91 episodes, 79 not cut short, 4,678 chance windows):
+Held-out not yet scored. Whether the student adds anything to NEWS2 is NOT known yet. The previous model (B5,
+scikit-learn, logistic) added nothing measurable on held-out, and nothing here shows the new one will.
 
-| Policy | Alerts / patient / 12 h (95% CI) | Time in alert | Any-bin | Any-bin, all (95% CI) | Chance | Excess | New-alert excess | Lead |
-|---|---|---|---|---|---|---|---|---|
-| NEWS2 chart trigger | 0.414 (0.395-0.434) | 0.158 | 0.684 | 0.626 (0.522-0.727) | 0.473 | +0.210 | +0.179 | 47.2 |
-| Baseline alone (B4, k 4.0, p 8) | 0.042 (0.035-0.049) | 0.012 | 0.278 | 0.264 (0.174-0.360) | 0.032 | +0.246 | +0.253 | -82.5 |
-| NEWS2 OR baseline (B4) | 0.426 (0.407-0.444) | 0.165 | 0.722 | 0.659 (0.558-0.758) | 0.486 | +0.235 | +0.210 | 39.6 |
-| Student (logistic) | 0.088 (0.077-0.099) | 0.019 | 0.367 | 0.352 (0.250-0.452) | 0.058 | +0.309 | +0.312 | 5.2 |
-| NEWS2 OR student | 0.429 (0.410-0.448) | 0.165 | 0.709 | 0.648 (0.545-0.745) | 0.486 | +0.223 | +0.200 | 47.2 |
-| Teacher; all no-temperature rows | no usable threshold: alert stuck open (43% to 81% of time on seeds 8-10); not a working rule | | | | | | | |
+Validation log loss (lower is better) and average precision (AP, recorded where the run measured it; never used to
+choose). Validation prevalence 0.0031 (3,795 positive of 1,207,464 rows).
 
-What this shows:
-- Added to NEWS2, the student gives nothing measurable: 56 of 79 against NEWS2's 54, with
-  overlapping intervals.
-- Alone, it catches about half as many episodes as NEWS2 (any-bin over all episodes 0.352 against
-  0.626, intervals do not overlap) at about a fifth of the alerts. Its excess (+0.309) is above
-  NEWS2's (+0.210), but excess is capped at 1 minus chance (0.942 against 0.527), so the two are
-  not comparable.
-- On ward-v1 the student alone had any-bin 0.637 (0.527-0.731) over all episodes and excess
-  +0.539. The gains seen on ward-v1 went away on ward-v2. Two things changed (the temperature rise was removed and temperature noise went from 0.02 to 0.1 C), and this run cannot say which one caused it.
+| Model | `all` log loss | `all` AP | `all` parameters | `no_temp` log loss | `no_temp` AP | `no_temp` parameters |
+|---|---|---|---|---|---|---|
+| Teacher (256x256, decay 1e-4) | 0.018699 | 0.118078 | 79,873 | 0.018889 | 0.107075 | 76,801 |
+| Distilled student (shipped) | 0.018969 | 0.096846 | 1,185 | 0.019154 | 0.087059 | 465 |
+| Best hard-label student (trend, width 8) | 0.018925 | 0.09227 | 297 | 0.019108 | 0.086833 | 233 |
+| Constant (training prevalence) | 0.021279 | not recorded | - | 0.021279 | not recorded | - |
+| Old gradient-boosting recipe (b) | 0.021839 | not recorded | - | 0.021944 | not recorded | - |
+| Regularised gradient boosting (d), recorded only | 0.018931 | not recorded | - | 0.019104 | not recorded | - |
 
-What it cannot show: anything about patients, or whether a better teacher would help (the teacher
-is still worse than a constant guess on validation, log loss 0.021 against 0.011).
+Teacher gate (teacher minus reference, patient-level bootstrap, 1,000 resamples, seed 20261112; "below" means the
+upper bound is under 0). Passed for both variants.
 
-## Data
+| Reference | `all` difference (95%) | `no_temp` difference (95%) |
+|---|---|---|
+| (a) constant | -0.00258 (-0.003547 to -0.001749) | -0.002389 (-0.0034 to -0.001527) |
+| (b) old recipe | -0.003141 (-0.003874 to -0.002459) | -0.003054 (-0.00393 to -0.002279) |
+| (c) best hard-label student | -0.000227 (-0.000451 to -3.4e-05) | -0.000219 (-0.000471 to -7e-06) |
 
-Synthetic only: ward-v2 simulator trials (sim commit f7647c5), 30 simulated days each. The
-sections below, from "Features" to "What depends on temperature", describe the earlier ward-v1 run
-(sim commit 3a15e01, with the temperature rise) and are kept for comparison. Seeds 1
-to 7 train the teacher and the students. Seeds 8 to 10 pick the early stop, the student and the
-threshold. Seeds 11 to 30 were scored once, after everything was fixed. The training loader
-opens only `manifest.json` of a held-out folder and skips it; a test proves it.
+The student also beats the constant: -0.002309 (-0.003131 to -0.001633); `no_temp` -0.002125 (-0.002907 to -0.001405).
+The teacher is better than (d). The student is not: (d) is 0.018931 against the student's 0.018969.
 
-## Features (per bin, causal)
+The size of the gain, in plain words: the teacher's log loss is about 12% below the constant's, the student's about
+11%. The student's AP is about 0.097 against a prevalence of 0.003. That is a real but weak signal: most bins above
+any useful threshold are still negative.
 
-Per device vital (heart rate, respiratory rate, SpO2, temperature): the value, a missing flag,
-z from the patient's own baseline (the backend's `baseline_finding`, on bins up to this one),
-and a z-missing flag (baseline still forming, or value missing). Then the NEWS2 total, on
-oxygen, and consciousness not A. A missing input is 0 with its flag set. Nothing is filled in.
-On these trials a scored bin always has all four device vitals, so the value-missing flags are
-always 0. NOT RANKED bins are not scored: no probability, not alerting (abstention is an output).
+## Data and split
 
-The no-temperature model drops the four temperature features and uses the NEWS2 total minus its
-temperature points. It has no temperature input at all (tested).
+- ward-v2-ext simulator trials (data card `models/data/ward-v2-ext/card.md`), 30 days each, scenario sha256
+  `95052d02...98a8`. Synthetic only.
+- Seeds 61-160 train the teacher, the students and the standardisation constants: 3,044,556 rows, 8,327 positive
+  (0.2735%). Seeds 261-300 validate (early stopping, every model choice, the threshold): 1,207,464 rows, 3,795
+  positive (0.3143%).
+- Seeds 301-340 (the confidence check) and ward-v2 folders (seeds 1-60) are not read: the loader opens only their
+  `manifest.json`. Held out: ward-v2 seeds 11-30, through `evaluate_student`, not run yet.
 
-The four `*_z_missing` flags are set for the first 6 h of a stay and carry the largest
-first-layer weights. Simulator episodes rarely start in the first 6 h (on seeds 8 to 10, 0% of
-positive bins and 5.8% of negative bins have a flag set), so the model partly learns "not in the
-first 6 hours". That is a simulator artefact.
+## Features, label
 
-## Label
+- Causal: bin t reads only bins up to t of the same stay. Never an input: time since admission, patient id, seed,
+  anything from `episodes.csv`, `outcome`. Missing is the number 0 and a set flag; nothing is imputed.
+- Base (19; 15 without temperature): per vital (heart rate, respiratory rate, SpO2, temperature) the value, a missing
+  flag, z from the patient's own baseline, a z-missing flag; then the NEWS2 total, on oxygen, consciousness not A.
+  `no_temp` drops the four temperature inputs and uses the NEWS2 total minus its temperature points.
+- Trend (16 more; 12 without temperature): per vital the change over 1 h and over 4 h, each with a missing flag. Both
+  shipped students use base plus trend: 35 inputs (`all`), 27 (`no_temp`).
+- Teacher (53; 41): base and trend, then per vital the 4-hour mean and slope with flags, and the change of the NEWS2
+  total over 1 h with a flag.
+- Label: positive from `episode_start` to fully in (start plus ramp). Bins after fully in are left out. Starting
+  patients (admit minute 0) are left out. `outcome` is never a label.
 
-Positive from the generator's true `episode_start` to fully in (start + ramp). Bins after fully
-in are left out of training. All other bins are negative. `outcome`/higher care is never a
-label. Starting patients (admit minute 0) are left out. Training: 211,333 bins, 597 positive
-(0.28%). Validation: 86,819 bins, 131 positive.
+## Recipe (pre-registered in `research/README.md`, slice M1)
 
-## Recipe
+- Teacher: n-256-256-1 ReLU MLP, BCE on the true labels, Adam 1e-3, batch 1024, at most 15 epochs, patience 3 on
+  validation log loss. Decay 1e-4 was chosen (best epoch 9 of 12 for `all`, 8 of 11 for `no_temp`).
+- Distilled students: one hidden layer, width {8, 16, 32} x inputs {base, trend}, MSE on the teacher's logits clipped
+  to +-9.2102, Adam 1e-3, decay 1e-5, batch 4096, at most 8 epochs, patience 2. Hard-label students (reference c): the
+  same 6 networks with BCE on the true labels.
+- Selection: validation log loss against the true labels. Values within 1e-6 tie; then fewer parameters, then base
+  over trend, then the larger decay.
+- Threshold: the smallest t in the grid (0.001 to 0.009, then 0.01 to 0.99) whose alerts AND time in alert on seeds
+  261-300 are both at most NEWS2's. Chosen: student 0.006 (both variants); teacher 0.006 (`all`) and 0.005
+  (`no_temp`).
 
-- Teacher: `HistGradientBoostingClassifier`, `random_state=0`, early stopping on the loss of
-  seeds 8 to 10. It stopped after 20 iterations: its validation loss never improved after the
-  first. scikit-learn keeps all 20, so the teacher is overfitted. On seeds 8 to 10 it is worse
-  than a constant guess: log loss 0.035 (0.039 unclipped) against 0.012 for the training
-  prevalence, average precision 0.005. The student scores 0.036. A better-regularised teacher
-  was not tried.
-- Students, fitted to the teacher's log-odds on seeds 1 to 7 (soft labels): logistic (ridge) and
-  MLP (16 units). Picked by average precision on seeds 8 to 10. Standardisation constants are in
-  the graph.
-- Validation average precision (seeds 8 to 10, prevalence 0.0015):
-
-| | teacher | logistic | MLP (kept) |
+| Rule (seeds 261-300, 1,458,487 cohort bins) | Alerts | Alerting bins | Time in alert |
 |---|---|---|---|
-| all features | 0.005 | 0.002 | 0.036 |
-| no temperature | 0.029 | 0.002 | 0.013 |
+| NEWS2 chart trigger | 12,852 | 249,871 | 17.1% |
+| Student `all`, t 0.006 | 12,633 | 96,951 | 6.6% |
+| Student `no_temp`, t 0.006 | 12,565 | 97,863 | 6.7% |
+| Teacher `all`, t 0.006 | 11,667 | 106,842 | 7.3% |
+| Teacher `no_temp`, t 0.005 | 12,851 | 129,697 | 8.9% |
 
-- Threshold: the smallest of 0.001 to 0.99 whose alerts on seeds 8 to 10 do not exceed the NEWS2
-  chart trigger's (805). Student 0.002 (416 alerts), teacher 0.003 (761). No temperature: both
-  0.001 (725 and 777), the bottom of the grid. There is no usable threshold for them: at 0.001
-  the no-temperature student is in alert 52.7% of the time on seeds 8 to 10 (NEWS2: 12.4%). One
-  alert stays open, because the alert rule re-arms only after 4 h not alerting, so the alert
-  count looks low while the patient is alerting half the time.
+The full grid (validation log loss / AP, parameters):
 
-## Held-out numbers on ward-v1 (seeds 11 to 30; kept for comparison)
+| Fit | `all` | `all` parameters | `no_temp` | `no_temp` parameters |
+|---|---|---|---|---|
+| teacher, decay 1e-4 | 0.018699 / 0.118078 | 79,873 | 0.018889 / 0.107075 | 76,801 |
+| teacher, decay 1e-5 | 0.019006 / 0.109363 | 79,873 | 0.019024 / 0.106881 | 76,801 |
+| distilled, base, 8 | 0.019492 / 0.060298 | 169 | 0.019596 / 0.052905 | 137 |
+| distilled, base, 16 | 0.019464 / 0.064944 | 337 | 0.019586 / 0.058942 | 273 |
+| distilled, base, 32 | 0.019453 / 0.06725 | 673 | 0.019568 / 0.062148 | 545 |
+| distilled, trend, 8 | 0.019076 / 0.08398 | 297 | 0.019226 / 0.075691 | 233 |
+| distilled, trend, 16 | 0.019011 / 0.091279 | 593 | 0.019154 / 0.087059 | 465 |
+| distilled, trend, 32 | 0.018969 / 0.096846 | 1,185 | 0.019156 / 0.088939 | 929 |
+| hard-label, base, 8 | 0.019302 / 0.062523 | 169 | 0.019533 / 0.054988 | 137 |
+| hard-label, base, 16 | 0.019294 / 0.06596 | 337 | 0.019497 / 0.058773 | 273 |
+| hard-label, base, 32 | 0.019314 / 0.068037 | 673 | 0.019498 / 0.064852 | 545 |
+| hard-label, trend, 8 | 0.018925 / 0.09227 | 297 | 0.019108 / 0.086833 | 233 |
+| hard-label, trend, 16 | 0.01893 / 0.097204 | 593 | 0.01915 / 0.090046 | 465 |
+| hard-label, trend, 32 | 0.018971 / 0.099735 | 1,185 | 0.019159 / 0.092559 | 929 |
 
-91 episodes, 79 not cut short, 4,678 chance windows, 1,873 patients. Any-bin = alerting in any
-bin of the window, episodes not cut short. Excess = any-bin minus chance. Lead time = median
-minutes before fully in, episodes with a new alert.
+Per-epoch losses and wall times: `training/runs/student_vitals/m1-20261113-3d634f3.json`.
 
-| Policy | Alerts / patient / 12 h | Time in alert | Any-bin | Chance | Excess | New alert | Lead time |
-|---|---|---|---|---|---|---|---|
-| NEWS2 chart trigger | 0.413 | 0.159 | 0.709 | 0.472 | +0.237 | 0.418 | 45.9 |
-| Baseline alone (B4) | 0.189 | 0.047 | 0.848 | 0.178 | +0.670 | 0.785 | -18.8 |
-| NEWS2 OR baseline (B4) | 0.473 | 0.189 | 0.924 | 0.550 | +0.374 | 0.570 | 20.5 |
-| Teacher | 0.381 | 0.029 | 0.696 | 0.240 | +0.456 | 0.620 | 11.0 |
-| Student | 0.226 | 0.036 | 0.696 | 0.157 | +0.539 | 0.633 | 20.5 |
-| NEWS2 OR student | 0.457 | 0.173 | 0.810 | 0.509 | +0.301 | 0.494 | 44.6 |
-| Teacher, no temperature | no usable threshold: alert stuck open (about 50% of time on seeds 8-10); not a working rule | | | | | | |
-| Student, no temperature | no usable threshold: alert stuck open (about 53% of time on seeds 8-10); not a working rule | | | | | | |
-| NEWS2 OR student, no temperature | no usable threshold: alert stuck open (about 53% of time on seeds 8-10); not a working rule | | | | | | |
+## Exports, and which tool wrote which file
 
-The no-temperature rows have no new-alert excess on held-out (-0.009 to +0.004).
-
-On ward-v1 the B4 rule had fewer alerts than the student (0.189 against 0.226); their excess cannot be compared because their chance rates differ.
-
-95% intervals and per-kind rows are in the `research.evaluate_student` output.
-
-## What depends on temperature (ward-v1)
-
-On ward-v1, every useful number depended on the simulator's uncited temperature rise. The simulator then added a fixed,
-uncited temperature rise to every episode (see the baseline card). With temperature, the student
-had a higher excess than NEWS2 (+0.539 against +0.237), but at a much lower chance rate, so this does not rank them. Without
-temperature, the student is in alert 54% of the time on the held-out seeds (53% on seeds 8 to 10), so chance is 0.834 and the excess is
-+0.116, below NEWS2. Its alert count looks low only because one long alert stays open. On this
-simulator, the student adds nothing measurable over NEWS2 once temperature is removed.
-
-The model is a fragile combination. Shuffling any one of the four vitals on seeds 8 to 10
-collapses its average precision from 0.036 to about 0.003 (0.0015 to 0.0040).
-
-## Limits
-
-- Circular: trained and judged on the same simulator. An upper bound, not a performance claim.
-- Synthetic, not validated. No claim about real patients.
-- Excess is capped at 1 minus chance, so compare it only between rows with similar chance.
-- Alerts per 12 h ignores how long an alert stays open. Read it with time in alert.
-- 597 positive training bins. Small differences between rows are a few episodes.
-- The no-temperature models have no usable threshold (alert stuck open, see above).
-- "Scored once" is by procedure; the code does not stop a second run.
-- Not wired to the API, the rank or the arbiter.
-
-## Huawei fit
-
-ONNX opset 13, IR version 7, float32, static input [1, n], output [1, 1]. Ops: Sub, Div, Gemm,
-Relu, Sigmoid (the ward-v2 `model.onnx` is the logistic student, so it has no Relu). Built with `onnx.helper`; `onnx.checker` passes; onnxruntime matches the numpy
-forward pass within 1e-5 on 1,000 training rows (`metadata.json`). Converting to MindSpore Lite
-(`converter_lite --fmk=ONNX`) is a Linux deployment step. It has not been done here.
+- `*.mindir`: MindSpore 2.11.0 `mindspore.export` from the trained network.
+- `*.onnx`: `onnx.helper` from the same MindSpore-trained weights. Opset 13, IR 7, ops Sub, Div, Gemm, Relu, Gemm,
+  Sigmoid, input `x` [1, 35] or [1, 27], output `p` [1, 1]. MindSpore's own ONNX export gave opset 11 / IR 4 in a
+  probe, and the project fixes opset 13 / IR 7.
+- `*.ms`: MindSpore Lite 2.11.0 `converter_lite` from the `.mindir`, by hand with `convert_lite.sh` in the project's
+  Docker image (linux aarch64), with the official linux-aarch64 package (tarball sha256
+  `886186849c3291933b7265ebaa0d51df2bb175e7cbb32b488795ea19a96b2d6c`, measured on the downloaded file, not compared
+  with a published checksum). Research Python starts no external program, so this is a separate script. Raw output:
+  `lite.txt`.
+- `*.json`: `python -m research.export_plain` from the ONNX (format `biosentry-plain-mlp-1`).
 
 | File | Bytes | sha256 |
 |---|---|---|
-| `model.onnx` (ward-v2) | 470 | `41deaa6c07c366aee5fe5bac47c6edc8282eb5bf1fe1dbfbc89e8af887dd1ecd` |
-| `model_no_temp.onnx` (ward-v2) | 1,518 | `af7453e1412b0f6bcb4cd22ef7b6246738929c255b77db61e9565ee1fdffcef5` |
+| `model.onnx` | 5,334 | `d1ae4e881732922024b08c6cf9c37adbd8b01c48bc8390ee22b28ab802ddfdbc` |
+| `model_no_temp.onnx` | 2,382 | `e6b6ae44c11aa38fc38a961eebaf3e3bd51b1b5812b9e200d31d8c04101869ee` |
+| `model.mindir` | 11,539 | `cbc9c82ae041e5bc01adf7781d81c79339bf26820c646748cfa6ab795ca309b1` |
+| `model_no_temp.mindir` | 8,706 | `6ac94a6b5bee43689187d739b171f91858f96d10e4b11b652ac9c3812e3faa6d` |
+| `model.ms` | 6,688 | `4ca0d0deb3a20835dacd1bc50c3981bae65111051ecc8817265d9e9f4fc06509` |
+| `model_no_temp.ms` | 3,744 | `fb023119cb8038dfdd174df10d3097e26413a0711b6f76af6ee15f975e445e5a` |
+| `model.json` | 34,949 | `d05d75ee0ad8da0db138a74f3a9796c98de6b8af5dfea513789d5521f1768af6` |
+| `model_no_temp.json` | 14,903 | `d041b6584edc7d67c54dcdb03e81f0c1a58f51282a3cf02fbc3e869ff53cb2fc` |
 
-The ward-v1 files (`model.onnx` 1,806 bytes, sha256 `e7ec927c...`; `model_no_temp.onnx` `a2ae2139...`) are in git history before this change.
+Parity (largest absolute p difference, tolerance 1e-5):
+- Training run, 1,000 fixed training rows: MindSpore against ONNX 9.4e-08, MindSpore against MindIR 1.5e-08, MindIR
+  against ONNX 9.4e-08; `no_temp` 9e-08, 4.5e-08, 9e-08.
+- Checked by a second agent, 1,000 real validation rows: MindIR loaded back against ONNX 2.4e-07 (`all`) and 1.2e-07
+  (`no_temp`); plain JSON forward against ONNX 9.2e-08 and 9.7e-08.
+- Lite: both conversions `CONVERT RESULT SUCCESS:0`; 20 of 20 rows within 1e-5 of MindSpore for both. Lite benchmark
+  average run time 0.001 ms and 0.002 ms (one thread, this Apple Silicon Docker host).
+
+Checked by a second agent from the committed ONNX files only, with its own code: the log losses, the constant, the row
+and positive counts, AP 0.0968 and 0.0871, mean p 0.00256 against prevalence 0.00314 (`all`), the threshold (at 0.005:
+14,682 alerts, above NEWS2), parameter counts and ratios (67.4, 165.2), opset, IR, ops, shapes, and the standardisation
+constants (largest mean difference from the training-row moments 1.4e-06). Its own refit of the teacher gate was NOT
+finished: the gate numbers are the training run's own, reproduced only by the second training run below.
+
+## Reproducibility
+
+- Promised (on linux aarch64, one thread): two full runs give identical weights, ONNX and `metadata.json` bytes.
+  MindIR bytes are not promised (a timestamp inside).
+- Shown: run m1-20261113-3d634f3 took 85 minutes (5,090 s; projected 10,354 s, under the 10,800 s budget, so no cut).
+  A second full run on the same machine gave byte-identical `model.onnx` and `model_no_temp.onnx`, identical Lite rows
+  (20) and identical run logs outside `time`. Its `metadata.json` differed in one thing only: on a busier machine the
+  projection went over budget, so it applied pre-registered cut 1 (it dropped reference (d)). So `budget_cuts` and the
+  two `regularised_gradient_boosting` records differ. The model bytes are reproducible; `metadata.json` is
+  reproducible only when the budget rule takes the same branch, because that rule reads wall time. MindIR bytes
+  differed between the runs, as pre-registered.
+
+## Running this on Huawei Cloud
+
+- `train_student` takes `--data_url <dir>` and `--train_url <dir>`, the names ModelArts uses (verified:
+  https://support.huaweicloud.com/intl/en-us/develop-modelarts/develop-modelarts-0008.html and
+  https://support.huaweicloud.com/intl/en-us/modelarts_faq/modelarts_05_0265.html). CPU, no local path in the code, no
+  network call.
+- On ModelArts: put the ward-v2-ext trial folders in an OBS bucket and make a custom training job with input
+  `data_url` and output `train_url` on OBS folders. ModelArts copies the input into the container and uploads the
+  output folder (verified, page 0008 above). The exact local folders (`/home/ma-user/modelarts/inputs/data_url_0/`)
+  are unverified (https://support.huaweicloud.com/intl/en-us/docker-modelarts/develop-modelarts-0080.html returned
+  404). Whether a preset image has MindSpore 2.11.0 is unverified; a custom image with the locked requirements and
+  `libgomp1` would be needed.
+- Free tier: new international accounts get free packages (verified, but old: page dated 2022-09-29,
+  https://support.huaweicloud.com/intl/en-us/faq-billing/coupon_faq_00000032.html). The 12-month list for 2025-2026
+  registrations and whether ModelArts is in it are unverified
+  (https://activity.huaweicloud.com/intl/en-us/free_packages/index.html). No free ModelArts quota was found.
+- MindSpore Lite 2.11.0 has a linux-aarch64 package with `converter_lite` and `benchmark` (verified:
+  https://www.mindspore.cn/lite/docs/en/master/use/downloads.html).
+- Nothing was run in the cloud. No account was made. Nothing was uploaded.
+
+## Limits
+
+- Circular and synthetic: the same simulator makes the data and the labels. Not validated. No claim about real
+  patients.
+- Seeds 261-300 both early-stop and select, so the validation numbers are optimistic.
+- Held-out not yet scored.
+- Missing-flag artefact: the chosen inputs include z-missing flags (set while the baseline forms) and 1-hour and
+  4-hour change flags. These also mark the first hours of a stay.
+- The soft targets are the teacher's logits on its own training rows (in-sample; teacher training loss 0.015943
+  against validation 0.018699).
+- `shortcut`: the image has no system libgomp; the venv links the copy shipped in the scikit-learn wheel. On a normal
+  machine install `libgomp1`. The new lock was not re-audited with pip-audit.
+- Not run on a small ARM board or a ward hub. Not wired to the API, the rank or the arbiter.
 
 ## Reproduce
 
-Inside `biosentry-research-venv` (see `research/README.md`, ML gate):
+Inside the research venv (`research/README.md`, ML-GATE; with `LD_LIBRARY_PATH=/venv/lib`), in a shell with brace
+expansion:
 
-    python -m research.train_student /data/trials/ward-v2/seed-*
-    python -m research.evaluate_student /data/trials/ward-v2/seed-*
+    python -m research.train_student /data/trials/ward-v2-ext/seed-{61..160} /data/trials/ward-v2-ext/seed-{261..300} --lite_rows <dir> --run_log training/runs/student_vitals/<run_id>.json --commit <sha> --run_id <run_id>
+    sh models/tier_c/student_vitals/convert_lite.sh <unpacked MindSpore Lite 2.11.0 dir> <model dir> <rows dir> | tee lite.txt
+    python -m research.export_plain
+    python -m research.evaluate_student <ward-v2 seed-11..30 folders> <ward-v2-ext seed-61..160 folders>   # not run yet
 
-`evaluate_student` retrains and refuses unless the bytes match the committed sha256s; on ward-v2
-it ran and matched, so a second training gave the same bytes. About 2.5 minutes per training run.
+Packages (exact, from `metadata.json`): Python 3.11.18, mindspore 2.11.0, numpy 2.4.6, onnx 1.23.2, onnxruntime
+1.31.1, protobuf 7.36.2, pydantic 2.14.1, scikit-learn 1.9.1, scipy 1.17.1, threadpoolctl 3.8.0.
 
-## Packages (exact pins, `research/uv.lock`)
+## References
 
-Direct: numpy 2.4.6 (BSD-3-Clause and others), scikit-learn 1.9.1 (BSD-3-Clause), onnx 1.23.2
-(Apache-2.0), onnxruntime 1.31.1 (MIT). The backend's own pins, needed to import its NEWS2 and
-run the tests: pydantic 2.14.1 (MIT), pytest 9.1.1 (MIT). Pulled in: scipy 1.17.1 (BSD), joblib
-1.6.0 (BSD-3-Clause), threadpoolctl 3.8.0 (BSD-3-Clause), protobuf 7.36.2 (BSD-3-Clause),
-flatbuffers 25.12.19 (Apache-2.0), ml-dtypes 0.6.0 (Apache-2.0), narwhals 2.28.0 (MIT),
-cloudpickle 3.1.2 (BSD-3-Clause), packaging 26.3 (Apache-2.0 or BSD-2-Clause), typing-extensions
-4.16.0 (PSF-2.0), pydantic-core 2.50.1, annotated-types 0.8.0, typing-inspection 0.4.5,
-iniconfig 2.3.1, pluggy 1.7.0 (all MIT), Pygments 2.21.0 (BSD-2-Clause).
-Vulnerability check (pip-audit on the locked requirements, 2026-11-12): "No known
-vulnerabilities found".
+- Hinton, Vinyals, Dean 2015. Distilling the Knowledge in a Neural Network. https://arxiv.org/abs/1503.02531
+- Fakoor, Mueller, Erickson, Chaudhari, Smola 2020. Fast, Accurate, and Simple Models for Tabular Data via Augmented
+  Distillation. NeurIPS. https://arxiv.org/abs/2006.14284 (hence reference c)
+- van den Goorbergh, van Smeden, Timmerman, Van Calster 2022. The harm of class imbalance corrections for risk
+  prediction models. JAMIA 29(9):1525-34. https://pmc.ncbi.nlm.nih.gov/articles/PMC9382395
+- MindSpore 2.11.0 `mindspore.export`:
+  https://www.mindspore.cn/docs/en/master/api_python/mindspore/mindspore.export.html; MindSpore Lite converter:
+  https://www.mindspore.cn/lite/docs/en/master/converter/converter_tool.html (read 2026-11-13).

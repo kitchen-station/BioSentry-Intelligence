@@ -1,0 +1,28 @@
+{
+ "all": {
+  "execution_mode": "sequential",
+  "inter_op_num_threads": 1,
+  "intra_op_num_threads": 1,
+  "median_us": 8.58,
+  "onnxruntime": "1.31.1",
+  "p99_us": 26.63,
+  "platform_machine": "aarch64",
+  "timed_calls": 10000,
+  "warmup_calls": 1000
+ },
+ "no_temp": {
+  "execution_mode": "sequential",
+  "inter_op_num_threads": 1,
+  "intra_op_num_threads": 1,
+  "median_us": 8.37,
+  "onnxruntime": "1.31.1",
+  "p99_us": 29.75,
+  "platform_machine": "aarch64",
+  "timed_calls": 10000,
+  "warmup_calls": 1000
+ },
+ "run": {
+  "build_s": 5090.0,
+  "projected_total_s": 10354.36183020036
+ }
+}

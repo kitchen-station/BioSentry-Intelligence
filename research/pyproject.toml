@@ -1,7 +1,7 @@
 [project]
 name = "biosentry-research"
 version = "0.1.0"
-description = "Offline research package: the distilled vitals student (synthetic data only)."
+description = "Offline research package: the distilled vitals student, two MindSpore networks (synthetic data only)."
 requires-python = ">=3.11,<3.12"
 dependencies = [
   "numpy==2.4.6",
@@ -11,6 +11,10 @@ dependencies = [
   # the same exact pins as backend/pyproject.toml: research imports the backend's NEWS2 and baseline
   "pydantic==2.14.1",
   "pytest==9.1.1",
+  "mindspore==2.11.0",
+  "nbclient==0.11.0",
+  "ipykernel==7.4.0",
+  "matplotlib==3.11.2",
 ]
 
 [tool.uv]

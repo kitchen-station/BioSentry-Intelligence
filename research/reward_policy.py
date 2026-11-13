@@ -78,9 +78,15 @@ def z_series(rows: Mapping[int, Row]) -> Series:
     return out
 
 
-def states(params: Params, zs: Series) -> dict[int, bool]:
+FORMS = ("sum", "max")  # the search configuration's `form` key (README, slice M2)
+
+
+def states(params: Params, zs: Series, form: str = "sum") -> dict[int, bool]:
     """Alerting when the score is at least theta in p consecutive scored bins; a gap or a NOT
-    RANKED bin ends a run and is not alerting."""
+    RANKED bin ends a run and is not alerting. Score: the weighted sum, or (form "max") the
+    largest single weighted z, which can say "any one vital"."""
+    if form not in FORMS:
+        raise ValueError(f"form must be one of {FORMS}")
     w, theta, p = params.weights, params.theta, params.p
     out: dict[int, bool] = {}
     run, previous = 0, None
@@ -92,8 +98,11 @@ def states(params: Params, zs: Series) -> dict[int, bool]:
             run = 0
             out[minute] = False
             continue
-        score = w[0] * z[0] + w[1] * z[1] + w[2] * z[2] + w[3] * z[3]
-        run = run + 1 if score >= theta else 0
+        if form == "sum":
+            s = w[0] * z[0] + w[1] * z[1] + w[2] * z[2] + w[3] * z[3]
+        else:
+            s = max(w[0] * z[0], w[1] * z[1], w[2] * z[2], w[3] * z[3])
+        run = run + 1 if s >= theta else 0
         out[minute] = run >= p
     return out
 
@@ -113,10 +122,10 @@ def _cached(rows: Mapping[int, Row]) -> Series:
     return zs
 
 
-def policies(name: str, params: Params) -> tuple[Policy, Policy]:
+def policies(name: str, params: Params, form: str = "sum") -> tuple[Policy, Policy]:
     """The policy alone and "NEWS2 chart trigger OR policy", for `research.evaluate`."""
     def alone(rows: Mapping[int, Row]) -> Mapping[int, bool]:
-        return states(params, _cached(rows))
+        return states(params, _cached(rows), form)
 
     def either(rows: Mapping[int, Row]) -> Mapping[int, bool]:
         return {m: s or CHART.alerting(rows[m]) for m, s in alone(rows).items()}
@@ -155,8 +164,9 @@ def prepare(trial: Trial) -> Prepared:
         fired, alerting = scan(CHART, r)
         alerts += len(fired)
         on += len(alerting)
-    if not wins or shifts <= 0 or alerts == 0:
-        raise TrialError(f"{trial.name}: needs evaluated episodes, patient-days and NEWS2 alerts for the reward")
+    # No evaluated episode is allowed: E = 0 makes the reward 0 for every policy (the time-in-alert rule still applies).
+    if shifts <= 0 or alerts == 0:
+        raise TrialError(f"{trial.name}: needs patient-days and NEWS2 alerts for the reward")
     return Prepared(trial.seed, rows, {p: z_series(r) for p, r in rows.items()},
                     {w.patient: (w.start, w.full_in) for w in wins}, len(wins), len(trial.rows),
                     shifts, alerts / shifts, on)
@@ -171,10 +181,10 @@ class Score:
     rejected: bool  # time in alert above the NEWS2 chart trigger's on this trial
 
 
-def score(params: Params, t: Prepared) -> Score:
+def score(params: Params, t: Prepared, form: str = "sum") -> Score:
     caught = alerts = on = 0
     for patient, r in t.rows.items():
-        st = states(params, t.zs[patient])
+        st = states(params, t.zs[patient], form)
         fired, alerting = scan(Policy("", bool, bool, lambda _: st), r)
         alerts += len(fired)
         on += len(alerting)
@@ -186,9 +196,9 @@ def score(params: Params, t: Prepared) -> Score:
     return Score(reward, caught, rate, on / t.cohort_rows, on > t.news2_on)
 
 
-def mean_reward(params: Params, trials: list[Prepared]) -> tuple[float | None, list[Score]]:
+def mean_reward(params: Params, trials: list[Prepared], form: str = "sum") -> tuple[float | None, list[Score]]:
     """Mean reward over the set, or None when the candidate is rejected on any trial."""
-    scores = [score(params, t) for t in trials]
+    scores = [score(params, t, form) for t in trials]
     if any(s.rejected for s in scores):
         return None, scores
     return sum(s.reward for s in scores) / len(scores), scores

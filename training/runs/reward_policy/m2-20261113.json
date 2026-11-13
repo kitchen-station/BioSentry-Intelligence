@@ -1,0 +1,896 @@
+{
+ "commit": "6c5814f",
+ "framework": "none (six numbers, plain arithmetic)",
+ "framework_version": null,
+ "model": "tier_b/reward_policy",
+ "run_id": "m2-20261113",
+ "runs": [
+  {
+   "config": {
+    "fix_theta": false,
+    "form": "sum",
+    "frozen_vital": "none",
+    "selection_trials": 8,
+    "shrink": 0.85,
+    "sigma0": 0.5
+   },
+   "generations": [
+    {
+     "accepted": null,
+     "best_generation": null,
+     "best_validation": null,
+     "confirmation": null,
+     "confirmation_seeds": null,
+     "generation": 0,
+     "params": {
+      "p": 4,
+      "theta": 3.0,
+      "weights": {
+       "heart_rate": 1.0,
+       "respiratory_rate": 1.0,
+       "spo2": 1.0,
+       "temperature": 1.0
+      }
+     },
+     "patience": 0,
+     "reason": null,
+     "selection": null,
+     "selection_seeds": null,
+     "sigma_next": {
+      "p": 1.0,
+      "theta": 0.5,
+      "w": 0.5
+     },
+     "sigma_used": null,
+     "stopped": null,
+     "validation_rejected": true,
+     "validation_reward": null
+    },
+    {
+     "accepted": false,
+     "best_generation": null,
+     "best_validation": null,
+     "confirmation": {
+      "mean_d": 0.319833,
+      "n": 12,
+      "stdev_d": 1.187824,
+      "threshold": 0.61584,
+      "winner_rejected": false
+     },
+     "confirmation_seeds": {
+      "first": 409,
+      "last": 420
+     },
+     "generation": 1,
+     "params": {
+      "p": 4,
+      "theta": 3.0,
+      "weights": {
+       "heart_rate": 1.0,
+       "respiratory_rate": 1.0,
+       "spo2": 1.0,
+       "temperature": 1.0
+      }
+     },
+     "patience": 1,
+     "reason": "mean(d) not above the threshold",
+     "selection": {
+      "candidates": 30,
+      "candidates_rejected": 14,
+      "current_mean": -0.488616,
+      "current_rejected": false,
+      "winner_mean": 0.830055
+     },
+     "selection_seeds": {
+      "first": 401,
+      "last": 408
+     },
+     "sigma_next": {
+      "p": 0.85,
+      "theta": 0.425,
+      "w": 0.425
+     },
+     "sigma_used": {
+      "p": 1.0,
+      "theta": 0.5,
+      "w": 0.5
+     },
+     "stopped": null,
+     "validation_rejected": true,
+     "validation_reward": null
+    },
+    {
+     "accepted": true,
+     "best_generation": 2,
+     "best_validation": 0.992414,
+     "confirmation": {
+      "mean_d": 0.830741,
+      "n": 12,
+      "stdev_d": 0.592253,
+      "threshold": 0.30706,
+      "winner_rejected": false
+     },
+     "confirmation_seeds": {
+      "first": 429,
+      "last": 440
+     },
+     "generation": 2,
+     "params": {
+      "p": 5,
+      "theta": 2.9776,
+      "weights": {
+       "heart_rate": 0.614,
+       "respiratory_rate": 0.5247,
+       "spo2": 1.0638,
+       "temperature": 0.3149
+      }
+     },
+     "patience": 0,
+     "reason": null,
+     "selection": {
+      "candidates": 30,
+      "candidates_rejected": 16,
+      "current_mean": -0.461311,
+      "current_rejected": true,
+      "winner_mean": 0.291459
+     },
+     "selection_seeds": {
+      "first": 421,
+      "last": 428
+     },
+     "sigma_next": {
+      "p": 0.85,
+      "theta": 0.425,
+      "w": 0.425
+     },
+     "sigma_used": {
+      "p": 0.85,
+      "theta": 0.425,
+      "w": 0.425
+     },
+     "stopped": null,
+     "validation_rejected": false,
+     "validation_reward": 0.992414
+    },
+    {
+     "accepted": false,
+     "best_generation": 2,
+     "best_validation": 0.992414,
+     "confirmation": {
+      "mean_d": -0.010871,
+      "n": 12,
+      "stdev_d": 0.552706,
+      "threshold": 0.286556,
+      "winner_rejected": false
+     },
+     "confirmation_seeds": {
+      "first": 449,
+      "last": 460
+     },
+     "generation": 3,
+     "params": {
+      "p": 5,
+      "theta": 2.9776,
+      "weights": {
+       "heart_rate": 0.614,
+       "respiratory_rate": 0.5247,
+       "spo2": 1.0638,
+       "temperature": 0.3149
+      }
+     },
+     "patience": 1,
+     "reason": "mean(d) not above the threshold",
+     "selection": {
+      "candidates": 30,
+      "candidates_rejected": 0,
+      "current_mean": 1.149715,
+      "current_rejected": false,
+      "winner_mean": 1.3606
+     },
+     "selection_seeds": {
+      "first": 441,
+      "last": 448
+     },
+     "sigma_next": {
+      "p": 0.7225,
+      "theta": 0.36125,
+      "w": 0.36125
+     },
+     "sigma_used": {
+      "p": 0.85,
+      "theta": 0.425,
+      "w": 0.425
+     },
+     "stopped": null,
+     "validation_rejected": false,
+     "validation_reward": 0.992414
+    },
+    {
+     "accepted": false,
+     "best_generation": 2,
+     "best_validation": 0.992414,
+     "confirmation": {
+      "mean_d": -0.334968,
+      "n": 12,
+      "stdev_d": 1.126274,
+      "threshold": 0.583929,
+      "winner_rejected": false
+     },
+     "confirmation_seeds": {
+      "first": 469,
+      "last": 480
+     },
+     "generation": 4,
+     "params": {
+      "p": 5,
+      "theta": 2.9776,
+      "weights": {
+       "heart_rate": 0.614,
+       "respiratory_rate": 0.5247,
+       "spo2": 1.0638,
+       "temperature": 0.3149
+      }
+     },
+     "patience": 2,
+     "reason": "mean(d) not above the threshold",
+     "selection": {
+      "candidates": 30,
+      "candidates_rejected": 0,
+      "current_mean": 0.628914,
+      "current_rejected": false,
+      "winner_mean": 1.004686
+     },
+     "selection_seeds": {
+      "first": 461,
+      "last": 468
+     },
+     "sigma_next": {
+      "p": 0.614125,
+      "theta": 0.3070625,
+      "w": 0.3070625
+     },
+     "sigma_used": {
+      "p": 0.7225,
+      "theta": 0.36125,
+      "w": 0.36125
+     },
+     "stopped": null,
+     "validation_rejected": false,
+     "validation_reward": 0.992414
+    },
+    {
+     "accepted": false,
+     "best_generation": 2,
+     "best_validation": 0.992414,
+     "confirmation": null,
+     "confirmation_seeds": {
+      "first": 489,
+      "last": 500
+     },
+     "generation": 5,
+     "params": {
+      "p": 5,
+      "theta": 2.9776,
+      "weights": {
+       "heart_rate": 0.614,
+       "respiratory_rate": 0.5247,
+       "spo2": 1.0638,
+       "temperature": 0.3149
+      }
+     },
+     "patience": 3,
+     "reason": "winner not above the current policy on the selection seeds",
+     "selection": {
+      "candidates": 30,
+      "candidates_rejected": 1,
+      "current_mean": 1.07831,
+      "current_rejected": false,
+      "winner_mean": 0.999067
+     },
+     "selection_seeds": {
+      "first": 481,
+      "last": 488
+     },
+     "sigma_next": {
+      "p": 0.52200625,
+      "theta": 0.261003125,
+      "w": 0.261003125
+     },
+     "sigma_used": {
+      "p": 0.614125,
+      "theta": 0.3070625,
+      "w": 0.3070625
+     },
+     "stopped": "patience",
+     "validation_rejected": false,
+     "validation_reward": 0.992414
+    }
+   ],
+   "ledger": {
+    "change": null,
+    "config_sha256": "db1c43805f5ee575d6d52fc3ab5a4c331b218721a591ea4c9b37166abe7e717e",
+    "decision": "baseline",
+    "generations": 5,
+    "prev_line_sha256": "none",
+    "round": 1,
+    "seeds": {
+     "first": 401,
+     "last": 500
+    },
+    "shipped": {
+     "generation": 2,
+     "params": {
+      "p": 5,
+      "theta": 2.9776,
+      "weights": {
+       "heart_rate": 0.614,
+       "respiratory_rate": 0.5247,
+       "spo2": 1.0638,
+       "temperature": 0.3149
+      }
+     },
+     "policy_sha256": "21cf038e4ab699906eeab87d56ddbd39965915a8ec085e75f56ca99501114775",
+     "validation_reward": 0.992414
+    },
+    "started_from": null,
+    "stop_reason": "patience",
+    "vs_incumbent": null,
+    "why": "baseline: the default configuration"
+   },
+   "name": "round 1",
+   "temperature": true
+  },
+  {
+   "config": {
+    "fix_theta": false,
+    "form": "sum",
+    "frozen_vital": "none",
+    "selection_trials": 16,
+    "shrink": 0.85,
+    "sigma0": 0.5
+   },
+   "generations": [
+    {
+     "accepted": null,
+     "best_generation": 0,
+     "best_validation": 0.992414,
+     "confirmation": null,
+     "confirmation_seeds": null,
+     "generation": 0,
+     "params": {
+      "p": 5,
+      "theta": 2.9776,
+      "weights": {
+       "heart_rate": 0.614,
+       "respiratory_rate": 0.5247,
+       "spo2": 1.0638,
+       "temperature": 0.3149
+      }
+     },
+     "patience": 0,
+     "reason": null,
+     "selection": null,
+     "selection_seeds": null,
+     "sigma_next": {
+      "p": 1.0,
+      "theta": 0.5,
+      "w": 0.5
+     },
+     "sigma_used": null,
+     "stopped": null,
+     "validation_rejected": false,
+     "validation_reward": 0.992414
+    },
+    {
+     "accepted": false,
+     "best_generation": 0,
+     "best_validation": 0.992414,
+     "confirmation": {
+      "mean_d": 0.196165,
+      "n": 12,
+      "stdev_d": 0.612199,
+      "threshold": 0.317401,
+      "winner_rejected": false
+     },
+     "confirmation_seeds": {
+      "first": 517,
+      "last": 528
+     },
+     "generation": 1,
+     "params": {
+      "p": 5,
+      "theta": 2.9776,
+      "weights": {
+       "heart_rate": 0.614,
+       "respiratory_rate": 0.5247,
+       "spo2": 1.0638,
+       "temperature": 0.3149
+      }
+     },
+     "patience": 1,
+     "reason": "mean(d) not above the threshold",
+     "selection": {
+      "candidates": 30,
+      "candidates_rejected": 1,
+      "current_mean": 0.732357,
+      "current_rejected": false,
+      "winner_mean": 0.970815
+     },
+     "selection_seeds": {
+      "first": 501,
+      "last": 516
+     },
+     "sigma_next": {
+      "p": 0.85,
+      "theta": 0.425,
+      "w": 0.425
+     },
+     "sigma_used": {
+      "p": 1.0,
+      "theta": 0.5,
+      "w": 0.5
+     },
+     "stopped": null,
+     "validation_rejected": false,
+     "validation_reward": 0.992414
+    },
+    {
+     "accepted": false,
+     "best_generation": 0,
+     "best_validation": 0.992414,
+     "confirmation": {
+      "mean_d": 0.327919,
+      "n": 12,
+      "stdev_d": 0.654072,
+      "threshold": 0.339111,
+      "winner_rejected": false
+     },
+     "confirmation_seeds": {
+      "first": 545,
+      "last": 556
+     },
+     "generation": 2,
+     "params": {
+      "p": 5,
+      "theta": 2.9776,
+      "weights": {
+       "heart_rate": 0.614,
+       "respiratory_rate": 0.5247,
+       "spo2": 1.0638,
+       "temperature": 0.3149
+      }
+     },
+     "patience": 2,
+     "reason": "mean(d) not above the threshold",
+     "selection": {
+      "candidates": 30,
+      "candidates_rejected": 0,
+      "current_mean": 0.649859,
+      "current_rejected": false,
+      "winner_mean": 0.893381
+     },
+     "selection_seeds": {
+      "first": 529,
+      "last": 544
+     },
+     "sigma_next": {
+      "p": 0.7225,
+      "theta": 0.36125,
+      "w": 0.36125
+     },
+     "sigma_used": {
+      "p": 0.85,
+      "theta": 0.425,
+      "w": 0.425
+     },
+     "stopped": null,
+     "validation_rejected": false,
+     "validation_reward": 0.992414
+    },
+    {
+     "accepted": false,
+     "best_generation": 0,
+     "best_validation": 0.992414,
+     "confirmation": {
+      "mean_d": 0.123924,
+      "n": 12,
+      "stdev_d": 0.436764,
+      "threshold": 0.226445,
+      "winner_rejected": false
+     },
+     "confirmation_seeds": {
+      "first": 573,
+      "last": 584
+     },
+     "generation": 3,
+     "params": {
+      "p": 5,
+      "theta": 2.9776,
+      "weights": {
+       "heart_rate": 0.614,
+       "respiratory_rate": 0.5247,
+       "spo2": 1.0638,
+       "temperature": 0.3149
+      }
+     },
+     "patience": 3,
+     "reason": "mean(d) not above the threshold",
+     "selection": {
+      "candidates": 30,
+      "candidates_rejected": 2,
+      "current_mean": 0.680123,
+      "current_rejected": false,
+      "winner_mean": 0.717717
+     },
+     "selection_seeds": {
+      "first": 557,
+      "last": 572
+     },
+     "sigma_next": {
+      "p": 0.614125,
+      "theta": 0.3070625,
+      "w": 0.3070625
+     },
+     "sigma_used": {
+      "p": 0.7225,
+      "theta": 0.36125,
+      "w": 0.36125
+     },
+     "stopped": "patience",
+     "validation_rejected": false,
+     "validation_reward": 0.992414
+    }
+   ],
+   "ledger": {
+    "change": {
+     "from": 8,
+     "key": "selection_trials",
+     "to": 16
+    },
+    "config_sha256": "27c7137b9e85ffec64c58ddb045b8b2552a974d839a9edea41792de089965c92",
+    "decision": "dropped",
+    "generations": 3,
+    "prev_line_sha256": "723ff2edda581af4f43d68483c733d1b0c804bad1ec5ece860c6c61765c39b83",
+    "round": 2,
+    "seeds": {
+     "first": 501,
+     "last": 584
+    },
+    "shipped": {
+     "generation": 0,
+     "params": {
+      "p": 5,
+      "theta": 2.9776,
+      "weights": {
+       "heart_rate": 0.614,
+       "respiratory_rate": 0.5247,
+       "spo2": 1.0638,
+       "temperature": 0.3149
+      }
+     },
+     "policy_sha256": "6a07e8939c7556c41e58620eb203507f2d52c355823c773b97c01d2bcdde7de4",
+     "validation_reward": 0.992414
+    },
+    "started_from": {
+     "policy_sha256": "21cf038e4ab699906eeab87d56ddbd39965915a8ec085e75f56ca99501114775",
+     "round": 1,
+     "validation_reward": 0.992414
+    },
+    "stop_reason": "patience",
+    "vs_incumbent": {
+     "margin": 0.0,
+     "mean": 0.0,
+     "stdev": 0.0
+    },
+    "why": "In round-1 gen-01, gen-03 and gen-04 the selection winner led the current policy on the 8 selection trials (+1.32, +0.21, +0.38) and its lead vanished on the 12 confirmation trials (mean d +0.32, -0.01, -0.33). This is the winner's-curse pattern; step size, a dead vital, the form and theta drift are not clearly supported by these records. 16 selection trials halve the selection variance so the winner sent to confirmation is more often truly better."
+   },
+   "name": "round 2",
+   "temperature": true
+  },
+  {
+   "config": {
+    "fix_theta": false,
+    "form": "sum",
+    "frozen_vital": "none",
+    "selection_trials": 8,
+    "shrink": 0.85,
+    "sigma0": 0.5
+   },
+   "generations": [
+    {
+     "accepted": null,
+     "best_generation": 0,
+     "best_validation": 0.785617,
+     "confirmation": null,
+     "confirmation_seeds": null,
+     "generation": 0,
+     "params": {
+      "p": 4,
+      "theta": 3.0,
+      "weights": {
+       "heart_rate": 1.0,
+       "respiratory_rate": 1.0,
+       "spo2": 1.0,
+       "temperature": 0.0
+      }
+     },
+     "patience": 0,
+     "reason": null,
+     "selection": null,
+     "selection_seeds": null,
+     "sigma_next": {
+      "p": 1.0,
+      "theta": 0.5,
+      "w": 0.5
+     },
+     "sigma_used": null,
+     "stopped": null,
+     "validation_rejected": false,
+     "validation_reward": 0.785617
+    },
+    {
+     "accepted": true,
+     "best_generation": 1,
+     "best_validation": 1.343958,
+     "confirmation": {
+      "mean_d": 0.943192,
+      "n": 12,
+      "stdev_d": 1.028013,
+      "threshold": 0.532984,
+      "winner_rejected": false
+     },
+     "confirmation_seeds": {
+      "first": 409,
+      "last": 420
+     },
+     "generation": 1,
+     "params": {
+      "p": 3,
+      "theta": 3.3703,
+      "weights": {
+       "heart_rate": 0.3372,
+       "respiratory_rate": 0.5534,
+       "spo2": 1.2459,
+       "temperature": 0.0
+      }
+     },
+     "patience": 0,
+     "reason": null,
+     "selection": {
+      "candidates": 30,
+      "candidates_rejected": 6,
+      "current_mean": 0.08083,
+      "current_rejected": false,
+      "winner_mean": 0.999889
+     },
+     "selection_seeds": {
+      "first": 401,
+      "last": 408
+     },
+     "sigma_next": {
+      "p": 1.0,
+      "theta": 0.5,
+      "w": 0.5
+     },
+     "sigma_used": {
+      "p": 1.0,
+      "theta": 0.5,
+      "w": 0.5
+     },
+     "stopped": null,
+     "validation_rejected": false,
+     "validation_reward": 1.343958
+    },
+    {
+     "accepted": false,
+     "best_generation": 1,
+     "best_validation": 1.343958,
+     "confirmation": {
+      "mean_d": -0.021926,
+      "n": 12,
+      "stdev_d": 0.935766,
+      "threshold": 0.485158,
+      "winner_rejected": false
+     },
+     "confirmation_seeds": {
+      "first": 429,
+      "last": 440
+     },
+     "generation": 2,
+     "params": {
+      "p": 3,
+      "theta": 3.3703,
+      "weights": {
+       "heart_rate": 0.3372,
+       "respiratory_rate": 0.5534,
+       "spo2": 1.2459,
+       "temperature": 0.0
+      }
+     },
+     "patience": 1,
+     "reason": "mean(d) not above the threshold",
+     "selection": {
+      "candidates": 30,
+      "candidates_rejected": 1,
+      "current_mean": 0.237418,
+      "current_rejected": false,
+      "winner_mean": 0.712292
+     },
+     "selection_seeds": {
+      "first": 421,
+      "last": 428
+     },
+     "sigma_next": {
+      "p": 0.85,
+      "theta": 0.425,
+      "w": 0.425
+     },
+     "sigma_used": {
+      "p": 1.0,
+      "theta": 0.5,
+      "w": 0.5
+     },
+     "stopped": null,
+     "validation_rejected": false,
+     "validation_reward": 1.343958
+    },
+    {
+     "accepted": false,
+     "best_generation": 1,
+     "best_validation": 1.343958,
+     "confirmation": {
+      "mean_d": -0.086718,
+      "n": 12,
+      "stdev_d": 0.72782,
+      "threshold": 0.377346,
+      "winner_rejected": false
+     },
+     "confirmation_seeds": {
+      "first": 449,
+      "last": 460
+     },
+     "generation": 3,
+     "params": {
+      "p": 3,
+      "theta": 3.3703,
+      "weights": {
+       "heart_rate": 0.3372,
+       "respiratory_rate": 0.5534,
+       "spo2": 1.2459,
+       "temperature": 0.0
+      }
+     },
+     "patience": 2,
+     "reason": "mean(d) not above the threshold",
+     "selection": {
+      "candidates": 30,
+      "candidates_rejected": 0,
+      "current_mean": 1.229555,
+      "current_rejected": false,
+      "winner_mean": 1.432399
+     },
+     "selection_seeds": {
+      "first": 441,
+      "last": 448
+     },
+     "sigma_next": {
+      "p": 0.7225,
+      "theta": 0.36125,
+      "w": 0.36125
+     },
+     "sigma_used": {
+      "p": 0.85,
+      "theta": 0.425,
+      "w": 0.425
+     },
+     "stopped": null,
+     "validation_rejected": false,
+     "validation_reward": 1.343958
+    },
+    {
+     "accepted": false,
+     "best_generation": 1,
+     "best_validation": 1.343958,
+     "confirmation": {
+      "mean_d": -0.458387,
+      "n": 12,
+      "stdev_d": 1.124651,
+      "threshold": 0.583087,
+      "winner_rejected": false
+     },
+     "confirmation_seeds": {
+      "first": 469,
+      "last": 480
+     },
+     "generation": 4,
+     "params": {
+      "p": 3,
+      "theta": 3.3703,
+      "weights": {
+       "heart_rate": 0.3372,
+       "respiratory_rate": 0.5534,
+       "spo2": 1.2459,
+       "temperature": 0.0
+      }
+     },
+     "patience": 3,
+     "reason": "mean(d) not above the threshold",
+     "selection": {
+      "candidates": 30,
+      "candidates_rejected": 0,
+      "current_mean": 0.995927,
+      "current_rejected": false,
+      "winner_mean": 1.145605
+     },
+     "selection_seeds": {
+      "first": 461,
+      "last": 468
+     },
+     "sigma_next": {
+      "p": 0.614125,
+      "theta": 0.3070625,
+      "w": 0.3070625
+     },
+     "sigma_used": {
+      "p": 0.7225,
+      "theta": 0.36125,
+      "w": 0.36125
+     },
+     "stopped": "patience",
+     "validation_rejected": false,
+     "validation_reward": 1.343958
+    }
+   ],
+   "ledger": {
+    "config_sha256": "db1c43805f5ee575d6d52fc3ab5a4c331b218721a591ea4c9b37166abe7e717e",
+    "decision": "no_temperature",
+    "generations": 4,
+    "prev_line_sha256": "a28ddfab85987c3545593f10c5e9555a18406813c72e67ad109b3cd198fb43cb",
+    "seeds": {
+     "first": 401,
+     "last": 480
+    },
+    "shipped": {
+     "generation": 1,
+     "params": {
+      "p": 3,
+      "theta": 3.3703,
+      "weights": {
+       "heart_rate": 0.3372,
+       "respiratory_rate": 0.5534,
+       "spo2": 1.2459,
+       "temperature": 0.0
+      }
+     },
+     "policy_sha256": "522195aa8104271d3bfec0e87ab1f37e07b074dccbd5a347d05191905a12a3b3",
+     "validation_reward": 1.343958
+    },
+    "stop_reason": "patience"
+   },
+   "name": "no temperature",
+   "temperature": false
+  }
+ ],
+ "settings": {
+  "candidates": 30,
+  "confirmation_trials": 12,
+  "generator_seed": 20261112,
+  "lambda": 0.5,
+  "max_generations": 40,
+  "patience": 3,
+  "search": "(1+30) evolution strategy with a reward; not deep or per-step reinforcement learning",
+  "validation_seeds": {
+   "first": 341,
+   "last": 400
+  }
+ },
+ "stop": {
+  "decision": "stop",
+  "prev_line_sha256": "37451a8ebd8403a06738a99a7be87afc91b7db73c484f2192cdcd3a6a5244470",
+  "reason": "no change proposed: in round-2 gen-01 to gen-03 the winners were confirmed slightly better than the incumbent (mean d +0.20, +0.33, +0.12) but below their thresholds, which points to a plateau whose gains are near the 0.19 validation margin rather than to any menu key, as the round-2 proposal pre-registered."
+ },
+ "time": {
+  "note": "no wall time: this log is built from committed records, no trial was opened",
+  "recorded": false
+ }
+}
