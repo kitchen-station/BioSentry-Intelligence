@@ -466,3 +466,17 @@ describe("simulated runs: the timer", () => {
     expect(document.activeElement).toBe(panel);
   });
 });
+
+describe("the state text flips when it changes", () => {
+  it("flips Waiting for the lab worker to the next state, and only that", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    api.getLabRuns.mockResolvedValueOnce([item({ id: 1 })]).mockResolvedValue([item({ id: 1, state: "done" })]);
+    render(<LabRuns role="md" />);
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    const flips = () => [...document.querySelectorAll('[class*="_flip_"]')].map((e) => e.textContent);
+    expect(flips()).toEqual([]);
+    await act(() => vi.advanceTimersByTimeAsync(5_000));
+    expect(flips()).toEqual(["Done"]);
+    vi.useRealTimers();
+  });
+});

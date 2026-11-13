@@ -457,3 +457,54 @@ describe("an administrator's ward page (read only)", () => {
     expect(screen.getAllByRole("button", { name: "Record vitals" }).length).toBeGreaterThan(0);
   });
 });
+
+describe("flip on change", () => {
+  const advance = (ms: number) =>
+    act(async () => {
+      await vi.advanceTimersByTimeAsync(ms);
+    });
+  const flips = () => [...document.querySelectorAll('[class*="_flip_"]')].map((e) => e.textContent);
+  const withScore = (score: number): WardResponse => ({ ...ward(), ranked: [{ ...rows[0], score }] });
+  beforeEach(() => {
+    api.build.usesServer = true;
+    api.getLiveWard.mockResolvedValue(published({ speed: 60 }));
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+
+  it("flips nothing on first load, and nothing on a poll that changed nothing", async () => {
+    page();
+    await screen.findByRole("group", { name: "Ward clock" });
+    expect(flips()).toEqual([]);
+    api.getWard.mockResolvedValue(ward()); // a new object, the same figures
+    await advance(2_100);
+    expect(api.getWard).toHaveBeenCalledTimes(2);
+    expect(flips()).toEqual([]);
+  });
+
+  it("flips only the score of a row whose score changed", async () => {
+    page();
+    await screen.findByRole("group", { name: "Ward clock" });
+    api.getWard.mockResolvedValue(withScore(8));
+    await advance(2_100);
+    expect(flips()).toEqual(["8"]);
+    expect(screen.getByLabelText(/NEWS2 8/).textContent).toBe("8");
+  });
+
+  it("flips a count at the top when it changes", async () => {
+    page();
+    await screen.findByRole("group", { name: "Ward clock" });
+    api.getWard.mockResolvedValue(withScore(3));
+    await advance(2_100);
+    expect(flips()).toContain("0"); // high risk 1 -> 0
+    expect(flips()).toContain("3");
+  });
+
+  it("flips the clock's time when the minute changes", async () => {
+    page();
+    const el = await screen.findByRole("group", { name: "Ward clock" });
+    api.getLiveWard.mockResolvedValue(published({ speed: 60, clockS: 109_260 }));
+    await advance(2_100);
+    expect(flips()).toEqual([`4 ${SEP}, 21:21 · 60x`]);
+    expect(el.textContent).toBe(`Ward clock4 ${SEP}, 21:21 · 60x`);
+  });
+});

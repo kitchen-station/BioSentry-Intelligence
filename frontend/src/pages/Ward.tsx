@@ -7,6 +7,7 @@ import {
   getAcknowledgements,
   getWard,
 } from "../api";
+import { Flip, useMoveOnReorder } from "../components/Flip";
 import { WardRow } from "../components/WardRow";
 import { band, obsDue, unacknowledged } from "../components/risk";
 import { formatClock, formatSimClock } from "../components/format";
@@ -113,6 +114,8 @@ export function Ward({ session, onSignOut }: Props) {
     return () => clearInterval(t);
   }, []);
 
+  const moveRef = useMoveOnReorder(data ? data.ranked.map((r) => r.id) : []);
+
   const alerts = data && acked ? unacknowledged(data.ranked, acked) : [];
   const alertKey = alerts.map((a) => `${a.id}:${a.score}`).join(",");
 
@@ -188,7 +191,7 @@ export function Ward({ session, onSignOut }: Props) {
               <span className={styles.statusDivider} />
               <span className={styles.statusItem} role="group" aria-label="Ward clock">
                 <span className={styles.statusLabel}>Ward clock</span>
-                <span className={styles.statusValue}>{formatSimClock(sim)}</span>
+                <span className={styles.statusValue}><Flip>{formatSimClock(sim)}</Flip></span>
               </span>
             </>
           )}
@@ -207,23 +210,23 @@ export function Ward({ session, onSignOut }: Props) {
       <div className={styles.summary}>
         <div className={styles.summaryInner}>
           <div className={styles.summaryCard} data-tone={high > 0 ? "alert" : undefined}>
-            <span className={styles.summaryNumber}>{high}</span>
+            <span className={styles.summaryNumber}><Flip>{high}</Flip></span>
             <span className={styles.summaryLabel}>High risk &middot; NEWS2 7+</span>
           </div>
           <div className={styles.summaryCard} data-tone={medium > 0 ? "alert-soft" : undefined}>
-            <span className={styles.summaryNumber}>{medium}</span>
+            <span className={styles.summaryNumber}><Flip>{medium}</Flip></span>
             <span className={styles.summaryLabel}>Medium &middot; 5&ndash;6 / single 3</span>
           </div>
           <div className={styles.summaryCard}>
-            <span className={styles.summaryNumber}>{rising}</span>
+            <span className={styles.summaryNumber}><Flip>{rising}</Flip></span>
             <span className={styles.summaryLabel}>Rising</span>
           </div>
           <div className={styles.summaryCard} data-tone={data.abstained.length > 0 ? "secondary" : undefined}>
-            <span className={styles.summaryNumber}>{data.abstained.length}</span>
+            <span className={styles.summaryNumber}><Flip>{data.abstained.length}</Flip></span>
             <span className={styles.summaryLabel}>Not ranked &middot; act</span>
           </div>
           <div className={styles.summaryCard} data-tone={overdue > 0 ? "alert-soft" : undefined}>
-            <span className={styles.summaryNumber}>{overdue}</span>
+            <span className={styles.summaryNumber}><Flip>{overdue}</Flip></span>
             <span className={styles.summaryLabel}>Obs overdue</span>
           </div>
         </div>
@@ -272,7 +275,9 @@ export function Ward({ session, onSignOut }: Props) {
 
         <div className={styles.rowList}>
           {data.ranked.map((row) => (
-            <WardRow key={row.id} row={row} role={session.role} now={now} ageOffsetS={ageOffsetS} />
+            <div key={row.id} ref={moveRef(row.id)}>
+              <WardRow row={row} role={session.role} now={now} ageOffsetS={ageOffsetS} />
+            </div>
           ))}
         </div>
 

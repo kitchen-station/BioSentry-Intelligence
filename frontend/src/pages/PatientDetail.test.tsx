@@ -838,3 +838,38 @@ describe("PatientDetail follows the ward's speed", () => {
     expect(screen.queryByRole("group", { name: "Ward clock" })).toBeNull();
   });
 });
+
+describe("PatientDetail flips on a changed refresh", () => {
+  const advance = (ms: number) =>
+    act(async () => {
+      await vi.advanceTimersByTimeAsync(ms);
+    });
+  const flips = () => [...document.querySelectorAll('[class*="_flip_"]')].map((e) => e.textContent);
+  beforeEach(() => {
+    api.usesServer = true;
+    api.getLiveWard.mockResolvedValue({
+      shared: { clockS: 109_200, speed: 60, ended: false, counts: { received: 1, rejected: 0, abstained: 0 } },
+      patients: [],
+      can_control: false,
+    });
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("flips the score and one vital, and nothing on first load or an unchanged refresh", async () => {
+    page();
+    await loaded();
+    expect(flips()).toEqual([]);
+    api.getPatient.mockResolvedValue({ ...base }); // a new object, the same figures
+    await advance(2_100);
+    expect(flips()).toEqual([]);
+    const hr = base.vitals.heart_rate;
+    api.getPatient.mockResolvedValue({
+      ...base,
+      score: base.score - 1,
+      vitals: { ...base.vitals, heart_rate: { ...hr, data: { present: true, value: 77 } } },
+    });
+    await advance(2_100);
+    expect(flips().sort()).toEqual([String(base.score - 1), "77 bpm"].sort());
+  });
+});

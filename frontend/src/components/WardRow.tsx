@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import type { ScoreRow, SessionRole } from "../types";
 import { formatAge, formatBloodPressure, formatClock, nurseEntryText, patchInUse, STALE_AFTER_S } from "./format";
+import { Flip } from "./Flip";
 import { MeasurementDisplay } from "./MeasurementDisplay";
 import { news2Points } from "./news2";
 import { band, driftResponse, obsDue, response } from "./risk";
@@ -47,9 +48,9 @@ export function WardRow({ row, role, now, ageOffsetS }: Props) {
       <div className={styles.row} data-band={b}>
         {/* Rank + score */}
         <div className={styles.rankCol}>
-          <span className={styles.rank}>{row.rank}</span>
+          <span className={styles.rank}><Flip>{row.rank}</Flip></span>
           <div className={styles.scoreBlock}>
-            <span className={styles.score} aria-label={`NEWS2 ${row.score}, ${b} risk`}>{row.score}</span>
+            <span className={styles.score} aria-label={`NEWS2 ${row.score}, ${b} risk`}><Flip>{row.score}</Flip></span>
             <span className={styles.trend} data-trend={row.trend}>{TREND_CHAR[row.trend]}</span>
           </div>
         </div>

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useParams, Link } from "react-router-dom";
 import type { ClinicalNote, PatientDetail as PatientDetailType, Session, SessionRole, VitalsRecorded } from "../types";
 import { getPatient, getNotes, addNote, canRecordVitals, usesServer } from "../api";
+import { Flip } from "../components/Flip";
 import { SessionMenu } from "../components/SessionMenu";
 import { SimulatedNote } from "../components/LabFrame";
 import { BaselinePanel, isComputed, isObj, num } from "../components/BaselinePanel";
@@ -201,7 +202,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
           <div className={styles.stripRight}>
             {sim !== null && (
               <span className={styles.stripSignal} role="group" aria-label="Ward clock">
-                Ward clock {formatSimClock(sim)}
+                Ward clock <Flip>{formatSimClock(sim)}</Flip>
               </span>
             )}
             <span className={styles.stripSignal}>
@@ -236,7 +237,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
           <div className={styles.summaryInner}>
             <div className={styles.summaryBlock} data-band={band(patient)}>
               <span className={styles.summaryLabel}>NEWS2</span>
-              <span className={styles.summaryBig}>{patient.score}</span>
+              <span className={styles.summaryBig}><Flip>{patient.score}</Flip></span>
             </div>
             {band(patient) !== "low" && (
               <div className={styles.summaryBlock} data-band={band(patient)} data-kind="response">
