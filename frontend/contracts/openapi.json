@@ -2772,7 +2772,7 @@
       },
       "Provenance": {
         "additionalProperties": false,
-        "description": "Where a value came from. Every key is required; null is allowed only where stated.",
+        "description": "Where a value came from. Every key is required and null is allowed only where stated, except the\nthree file fields of a model value: they are served only for a model value.",
         "properties": {
           "computed_at": {
             "anyOf": [

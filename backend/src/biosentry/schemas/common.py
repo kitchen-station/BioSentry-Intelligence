@@ -64,7 +64,8 @@ _FILE_FIELDS = ("variant", "file_sha256", "run_id")
 
 
 class Provenance(Contract):
-    """Where a value came from. Every key is required; null is allowed only where stated."""
+    """Where a value came from. Every key is required and null is allowed only where stated, except the
+    three file fields of a model value: they are served only for a model value."""
 
     source: ProvenanceSource
     tier: Tier | None

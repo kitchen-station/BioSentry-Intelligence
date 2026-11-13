@@ -33,21 +33,21 @@ export const PIPELINE: readonly Stage[] = [
     evidence: "services/scoring.py (drift), domain/scoring/tier_b/baseline.py (baseline_finding), domain/arbiter.py (Ranked.sort_key), frontend/src/components/BaselinePanel.tsx",
   },
   {
-    id: "prediction", name: "Prediction model", state: "research only, offline",
-    in: "Simulator readings grouped in fifteen-minute bins", out: "A score for each bin, offline only",
-    text: ["A small MindSpore network (one hidden layer, 1,185 parameters) gives a score for each 15-minute bin of simulator data. It is fitted to the outputs of a larger network, which bought nothing measurable on validation.", "Trained and judged on the same simulator, not validated. It is not connected to the API, the rank or the arbiter."],
+    id: "prediction", name: "Prediction model", state: "shown, does not change the ranking",
+    in: "Simulator readings grouped in fifteen-minute bins", out: "A reason line on the row when the confidence check says alert",
+    text: ["A small MindSpore network (one hidden layer, 1,185 parameters) gives a score for each 15-minute bin of simulator data. It is fitted to the outputs of a larger network, which bought nothing measurable on validation.", "Trained and judged on the same simulator, not validated. The API computes it for each ranked patient at the last stored 15-minute bin: a flag adds a reason line to the row and changes no score, rank or order."],
     evidence: "models/tier_c/student_vitals/card.md, research/README.md, frontend/src/data/researchResults.ts",
   },
   {
-    id: "reward", name: "Alert policy learned by reward", state: "research only, offline",
-    in: "Simulator trials and an alert rule of six numbers", out: "A changed rule and its reward on trials, offline only",
-    text: ["An alert rule of six numbers. Each generation tries 30 candidates and keeps a winner only if it also beats the current rule on a second batch of new simulator trials.", "Learned on synthetic trials, not validated, and not connected to the API, the rank or the arbiter."],
+    id: "reward", name: "Alert policy learned by reward", state: "shown, does not change the ranking",
+    in: "Simulator trials and an alert rule of six numbers", out: "A reason line on the row when the rule alerts",
+    text: ["An alert rule of six numbers. Each generation tries 30 candidates and keeps a winner only if it also beats the current rule on a second batch of new simulator trials.", "Learned on synthetic trials, not validated. The API computes its state for each ranked patient: an alert adds a reason line to the row and changes no score, rank or order."],
     evidence: "models/tier_b/reward_policy/card.md, research/README.md, frontend/src/data/researchResults.ts",
   },
   {
-    id: "confidence", name: "Confidence check", state: "research only, offline",
-    in: "A model score for one simulator bin", out: "Alert, not sure or quiet, offline only",
-    text: ["A check on the student: when a score passes the student's threshold but is too low to support an alert, the bin is marked not sure, and a not sure bin never alerts. On simulator trials it met its pre-registered target: on average over stays, 0.65 in 100 checks (95% interval 0.57 to 0.74) on patients who were not starting to deteriorate showed a supported alert, against a target of 1 in 100.", "Not validated, and not connected to the API, the rank or the arbiter. The arbiter's slot for it changes nothing."],
+    id: "confidence", name: "Confidence check", state: "shown, does not change the ranking",
+    in: "A model score for one simulator bin", out: "Alert, not sure or quiet; only alert lets the prediction model flag",
+    text: ["A check on the student: when a score passes the student's threshold but is too low to support an alert, the bin is marked not sure, and a not sure bin never alerts. On simulator trials it met its pre-registered target: on average over stays, 0.65 in 100 checks (95% interval 0.57 to 0.74) on patients who were not starting to deteriorate showed a supported alert, against a target of 1 in 100.", "Not validated. In the API only an alert from this check lets the prediction model add its reason line; not sure adds none."],
     evidence: "models/tier_c/confidence_check/card.md, research/confidence.py, domain/arbiter.py (Guarantees, _inert)",
   },
   {
@@ -59,7 +59,7 @@ export const PIPELINE: readonly Stage[] = [
   {
     id: "arbiter", name: "The arbiter", state: "live in the ranking", decides: true,
     in: "NEWS2 result and the own-baseline flag", out: "Ranked list, or NOT RANKED with a reason",
-    text: ["The only part that decides what reaches the nurse.", "Three rules are live: a NEWS2 trigger escalates the patient; an own-baseline change is listed as a reason and breaks ties between equal NEWS2 totals below a trigger; a missing or impossible required input lists the patient NOT RANKED. Its other slots (prediction model, learned alert policy, notes layer, worried pin, confidence check) accept input and change nothing; today nothing is passed to them."],
+    text: ["The only part that decides what reaches the nurse.", "Three rules are live: a NEWS2 trigger escalates the patient; an own-baseline change is listed as a reason and breaks ties between equal NEWS2 totals below a trigger; a missing or impossible required input lists the patient NOT RANKED. A prediction model flag and an alert policy flag each add a reason line and change nothing else. Its other slots (notes layer, worried pin) accept input and change nothing; today nothing is passed to them."],
     evidence: "domain/arbiter.py (arbitrate, rank_ward), services/scoring.py (decide)",
   },
 ];

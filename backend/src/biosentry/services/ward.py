@@ -65,6 +65,15 @@ def supporting(news2: News2Score) -> str:
     )
 
 
+MODEL_ERROR = "model error"
+
+
+def _log_once(reason: str) -> None:
+    if reason not in _LOGGED:
+        _LOGGED.add(reason)
+        log.warning("model result not computed: %s", reason)
+
+
 def _flag_state(value: object) -> str:
     if isinstance(value, Check):
         return {Check.ALERT: "flag", Check.NOT_SURE: "not_sure", Check.QUIET: "no_flag"}[value]
@@ -79,9 +88,7 @@ def _signal(
 ) -> ModelSignal:
     """Served as the models computed it. A not-computed result keeps its fixed reason; no probability."""
     if isinstance(result, NotComputed):
-        if result.reason not in _LOGGED:
-            _LOGGED.add(result.reason)
-            log.warning("model result not computed: %s", result.reason)
+        _log_once(result.reason)
         return ModelSignal(state="not_computed", reason=result.reason, bin_start=None, bin_end=None, provenance=[])
     when = sig.provenance[model_id]
     return ModelSignal(
@@ -180,7 +187,12 @@ class WardService:
         """Rows ranked relative to this set, and the state each row was built from."""
         read = (self._store.read(pid) for pid in sorted(ids))
         states = {s.id: s for s in read if s is not None}
-        signals = ward_model_signals(self._store, states, self._models)  # two statements for the set
+        try:
+            signals = ward_model_signals(self._store, states, self._models)  # two statements for the set
+        except Exception as e:  # research code must never take the NEWS2 list down
+            _log_once(f"{MODEL_ERROR} ({type(e).__name__})")
+            failed = NotComputed(MODEL_ERROR)
+            signals = {pid: ModelSignals(failed, failed, failed, {}) for pid in states}
         decisions = [
             decide(s, TierCSignal(g.probability, g.check), PolicySignal(g.policy))
             for s, g in ((s, signals[s.id]) for s in states.values())

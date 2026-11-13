@@ -491,7 +491,7 @@ describe("PatientDetail own-baseline reason and patch display", () => {
     expect(screen.getByText("(circulatory)")).toBeTruthy();
   });
 
-  it("lists the two model reasons in the reasons for a low patient and adds no response line", async () => {
+  it("lists the two model reasons apart, as research with the rank unchanged, and adds no response line", async () => {
     api.getPatient.mockResolvedValue({
       ...base,
       score: 2,
@@ -505,6 +505,20 @@ describe("PatientDetail own-baseline reason and patch display", () => {
     expect(screen.getByText("Prediction model flag (synthetic, not validated)")).toBeTruthy();
     expect(screen.getByText("Alert policy flag (learned by reward; synthetic, not validated)")).toBeTruthy();
     expect(screen.queryByText(/^Not a NEWS2 trigger/)).toBeNull();
+    // Only model lines: the patient is where NEWS2 puts them, and the page still says so.
+    expect(screen.getByText("Sorted on NEWS2 only")).toBeTruthy();
+    const label = screen.getByText("Research models \u00b7 rank unchanged");
+    const why = screen.getByText("Why this patient is up");
+    expect(why.compareDocumentPosition(label) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(label.compareDocumentPosition(screen.getByText("Prediction model flag (synthetic, not validated)")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("shows no research line for a patient with no model flag", async () => {
+    api.getPatient.mockResolvedValue({ ...base, score: 2, escalation_reasons: [] } as Detail);
+    page();
+    await loaded();
+    expect(screen.getByText("Sorted on NEWS2 only")).toBeTruthy();
+    expect(screen.queryByText(/Research models/)).toBeNull();
   });
 
   it("shows no signal figure when all four values are nurse-typed", async () => {

@@ -36,7 +36,7 @@ from biosentry.schemas import Acvpu, EscalationRule, Provenance, Spo2Scale
 from biosentry.services import model_signals as ms
 from biosentry.services import models as loader
 from biosentry.services.model_signals import ModelProvenance, ModelSignals
-from biosentry.services.ward import row_models
+from biosentry.services.ward import _flag_state, row_models
 
 STUDENT = Provenance.model_validate(model_provenance("C", ms.STUDENT_ID))
 CHECK = Provenance.model_validate(model_provenance("C", ms.CHECK_ID))
@@ -320,3 +320,9 @@ def test_the_three_file_fields_are_served_only_for_a_model_value() -> None:
     assert {"variant", "file_sha256", "run_id"} <= set(Provenance.model_validate(plain).model_dump())
     device = {k: v for k, v in {**plain, "source": "device", "tier": None}.items() if k not in ("variant", "file_sha256", "run_id")}
     assert not {"variant", "file_sha256", "run_id"} & set(Provenance.model_validate(device).model_dump())
+
+
+def test_every_value_of_the_check_has_its_state() -> None:
+    """A value added to the check later must get a state here first, or a ward read would fail."""
+    assert {c: _flag_state(c) for c in Check} == {Check.ALERT: "flag", Check.NOT_SURE: "not_sure", Check.QUIET: "no_flag"}
+    assert (_flag_state(True), _flag_state(False)) == ("flag", "no_flag")

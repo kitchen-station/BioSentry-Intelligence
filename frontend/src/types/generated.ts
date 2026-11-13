@@ -656,7 +656,8 @@ export interface components {
         };
         /**
          * Provenance
-         * @description Where a value came from. Every key is required; null is allowed only where stated.
+         * @description Where a value came from. Every key is required and null is allowed only where stated, except the
+         *     three file fields of a model value: they are served only for a model value.
          */
         readonly Provenance: {
             readonly computed_at: string | null;

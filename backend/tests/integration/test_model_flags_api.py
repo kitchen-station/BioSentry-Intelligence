@@ -256,6 +256,31 @@ def test_each_fixed_reason_is_logged_once_per_process_without_patient_data(
     assert first and not any(p in m for m in first for p in ("w-1", "w-2", "w-3", "w-4", "w-5"))
 
 
+def test_an_error_in_the_model_code_leaves_the_ranked_list_up(
+    api: Api, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The NEWS2 list never depends on research code: any error there is "not computed", said once."""
+    world(api)
+    monkeypatch.setattr(ward_module, "_LOGGED", set())
+    client = client_for(api, REAL)
+    before = read(api, client)
+
+    def broken(*_: Any) -> None:
+        raise RuntimeError("w-1 heart rate 118")  # nothing of this text may reach the log or the answer
+
+    monkeypatch.setattr(ward_module, "ward_model_signals", broken)
+    with caplog.at_level(logging.WARNING, logger="biosentry.services.ward"):
+        after = read(api, client)
+        detail = read(api, client, "/patients/w-1")
+    order = lambda got: [(r["id"], r["rank"], r["score"]) for r in got["ranked"]]  # noqa: E731
+    assert order(after) == order(before) and after["abstained"] == before["abstained"]
+    failed = {"state": "not_computed", "reason": "model error", "bin_start": None, "bin_end": None, "provenance": []}
+    for row in (*after["ranked"], detail):
+        assert row["models"] == {"prediction": failed, "alert_policy": failed}
+        assert PREDICTION_FLAG not in texts(row) and POLICY_FLAG not in texts(row)
+    assert [r.getMessage() for r in caplog.records] == ["model result not computed: model error (RuntimeError)"]
+
+
 def test_the_seeded_ward_serves_what_the_fixture_file_says(api: Api) -> None:
     """The public demo's data holds the value the server computes for the seeded ward: not computed, with the reason."""
     seeded = {r["id"]: r for r in DATA["ranked"]}
