@@ -691,7 +691,7 @@ commands, the run logs and the notebooks.
 ## Evaluation export (for the Analytics page)
 
 The page types no number. Each file it reads is made by a command, never by hand: the same inputs and the same
-`--date` give the same bytes. This repository owns two exported files (evaluation data contract v3.4): `evaluations.json`
+`--date` give the same bytes. This repository owns two exported files (evaluation data contract v3.6): `evaluations.json`
 and `registry.json`. Standard library only; `registry` reads the cards and needs no trial data.
 
 ```
@@ -699,16 +699,33 @@ python -m research.evaluate <ward-v2 folders> --json held-evaluate.json
 python -m research.evaluate_student <folders as above> --json held-student.json
 python -m research.reward_loop --evaluate <ward-v2> --out models/tier_b/reward_policy --json held-reward.json
 python -m research.confidence evaluate <ward-v2 folders 11-30> --json held-confidence.json
-python -m research.export_evaluation evaluations --date YYYY-MM-DD --commit <40 hex> [--source "<command>"]... --held-out held-*.json [--drop-rule <id>]... [--confidence <heldout.json>] --out frontend/src/data/evaluation/evaluations.json
+python -m research.export_evaluation evaluations --date YYYY-MM-DD --commit <40 hex> --source "<command line that made held-student.json>" --source "<command line that made held-confidence.json>" --held-out held-student.json --held-out held-confidence.json [--drop-rule <id>]... [--confidence held-confidence.json] --out frontend/src/data/evaluation/evaluations.json
 python -m research.export_evaluation registry --date YYYY-MM-DD --commit <40 hex> --out frontend/src/data/evaluation/registry.json
 ```
 
 `--json` holds the same numbers as the printed table, from the same pass (full precision; the exporter rounds). The
-printed text does not change. The path is checked first: if it cannot be written, nothing is read or written. Held-out
+printed text does not change. The path is checked first: if it cannot be written, nothing is read or written. The file is written through a scratch file with a name nothing else has (an existing file is never touched), and a write error after the run is a one-line refusal with exit 2. Held-out
 seeds are read once per model. A text report is never a source of a number, so a result that exists only as text is
 absent from `rules` (the exporter says so in `notes`). A rule in two held-out files must have the same numbers; more
-than 30 rules need `--drop-rule`, which writes a line in `notes` naming each dropped row. `--confidence` names the confidence check's held-out JSON; its `confidence` block is copied with floats rounded to 4 decimals, with its repository path and sha256 (null, with a note, without it). `evaluations.json` has format `biosentry-evaluation/4`. The files refuse a banned word, a number with no plain spelling and a cap that is
+than 30 rules need `--drop-rule`, which writes a line in `notes` naming each dropped row. `--source` is required for `evaluations` (once for each command line that made a held-out file). `--confidence` names the confidence check's held-out JSON (it may be a `--held-out` file too); its `confidence` block is copied with floats rounded to 4 decimals, with its repository path and sha256 (null, with a note, without it). `evaluations.json` has format `biosentry-evaluation/4`. The files refuse a banned word, a number with no plain spelling and a cap that is
 broken, and write nothing then.
+
+## Golden fixture for the wiring slice
+
+`research/tests/data/wiring/golden.json` is a committed golden file. The backend cannot import `research/`, so it
+tests its own feature builder, forward pass, confidence check and policy state machine against it, bin by bin.
+Make it again (ML venv, deterministic bytes): `python -m research.wiring_fixture --out research/tests/data/wiring/golden.json`.
+Shape, format `biosentry-wiring-golden/1`:
+
+- top level: `about`, `bin_minutes`, `files` (path, bytes, sha256 of each model, calibration and policy file), `constants` (t, q, policy params and form, baseline counts, lags), `feature_names`, `stays`, `summary`;
+- a stay: `id`, `source`, `admit_minute`, `bins`: every 15-minute boundary from the first row to the last (`minute` is the END of the bin; a gap has `row` null);
+- a bin: the stored `row`, `news2` (ranked, total, temperature points), `baseline_formed` per vital;
+- a scored bin: per variant `student` (float32 `features`, `p`, `check`) and `policy` (clipped `z`, `score`, `alerting`);
+- a NOT RANKED bin has `student` and `policy` null and `policy_run_reset` true.
+
+Stays: the toy trial and one synthetic 94-bin stay (a gap, a NOT RANKED bin, new blood pressure readings and oxygen
+switched on). The file holds what the research code computes on every scored bin. It does not apply the product's
+gates (nothing computed while the baseline forms; the 672-bin cap): `baseline_formed` lets the backend test its own.
 
 ## Real data (eICU-CRD Demo 2.0.1)
 
