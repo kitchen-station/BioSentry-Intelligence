@@ -191,6 +191,7 @@ class WardService:
             signals = ward_model_signals(self._store, states, self._models)  # two statements for the set
         except Exception as e:  # research code must never take the NEWS2 list down
             _log_once(f"{MODEL_ERROR} ({type(e).__name__})")
+            _LOGGED.add(MODEL_ERROR)  # the line above already says it, with the kind of error
             failed = NotComputed(MODEL_ERROR)
             signals = {pid: ModelSignals(failed, failed, failed, {}) for pid in states}
         decisions = [

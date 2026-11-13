@@ -269,6 +269,7 @@ def test_an_error_in_the_model_code_leaves_the_ranked_list_up(
         raise RuntimeError("w-1 heart rate 118")  # nothing of this text may reach the log or the answer
 
     monkeypatch.setattr(ward_module, "ward_model_signals", broken)
+    caplog.clear()  # the read above logged its own reasons
     with caplog.at_level(logging.WARNING, logger="biosentry.services.ward"):
         after = read(api, client)
         detail = read(api, client, "/patients/w-1")
