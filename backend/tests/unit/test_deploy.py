@@ -377,6 +377,7 @@ def test_setup_adds_the_public_file_for_a_tailnet_name_and_opens_nothing_itself(
         ".ts.net",
         "a..ts.net",
         "server.tail1234.ts.net.example.com",
+        "server.evilts.net",  # the dot before ts.net is part of the rule
     ],
 )
 def test_setup_refuses_a_public_host_that_is_not_a_plain_tailnet_name(
@@ -389,11 +390,42 @@ def test_setup_refuses_a_public_host_that_is_not_a_plain_tailnet_name(
     assert "funnel" not in done.stdout
 
 
-@pytest.mark.parametrize("on", ["true", "TRUE", " True ", '"true"'])
-def test_setup_refuses_public_mode_with_the_open_ward_view_on(host: dict[str, Path], on: str) -> None:
-    _set(host, "PUBLIC_HOST=server.tail1234.ts.net", f"BIOSENTRY_OPEN_WARD_VIEW={on}")
+@pytest.mark.parametrize(
+    "line",
+    [  # every spelling compose reads as on
+        "BIOSENTRY_OPEN_WARD_VIEW=true",
+        "BIOSENTRY_OPEN_WARD_VIEW=TRUE",
+        "BIOSENTRY_OPEN_WARD_VIEW= True ",
+        'BIOSENTRY_OPEN_WARD_VIEW="true"',
+        "BIOSENTRY_OPEN_WARD_VIEW='true'",
+        "BIOSENTRY_OPEN_WARD_VIEW=true # on",
+        "export BIOSENTRY_OPEN_WARD_VIEW=true",
+        " BIOSENTRY_OPEN_WARD_VIEW=true",
+        "BIOSENTRY_OPEN_WARD_VIEW = true",
+        "BIOSENTRY_OPEN_WARD_VIEW: true",
+    ],
+)
+def test_setup_refuses_public_mode_with_the_open_ward_view_on(host: dict[str, Path], line: str) -> None:
+    _set(host, "PUBLIC_HOST=server.tail1234.ts.net", line)
     done = _run(host, "setup.sh")
     assert done.returncode == 1 and "BIOSENTRY_OPEN_WARD_VIEW" in done.stderr
+    assert not any("up -d" in call for call in _calls(host))
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "export PUBLIC_HOST=server.tail1234.ts.net",
+        " PUBLIC_HOST=server.tail1234.ts.net",
+        "PUBLIC_HOST = server.tail1234.ts.net",
+    ],
+)
+def test_setup_refuses_a_public_host_line_it_cannot_read_and_does_not_start_private(
+    host: dict[str, Path], line: str
+) -> None:
+    _set(host, line)
+    done = _run(host, "setup.sh")
+    assert done.returncode == 1 and "PUBLIC_HOST=name" in done.stderr
     assert not any("up -d" in call for call in _calls(host))
 
 

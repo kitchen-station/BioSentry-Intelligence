@@ -12,7 +12,8 @@ services:
       BIOSENTRY_CORS_ORIGINS: https://biosentry-dashboard.pages.dev,https://biosentry-ward-sim.pages.dev
       # Watching the ward without a sign-in is never on while the address is public, whatever .env says.
       BIOSENTRY_OPEN_WARD_VIEW: "false"
-    # The API writes one line for each request: capped, so a flood of requests cannot fill the disk.
+    # The API writes one line for each request: capped, so a flood of requests cannot fill the disk
+    # with log lines. The audit table in the database is not capped (README, "What does not").
     logging:
       driver: json-file
       options:

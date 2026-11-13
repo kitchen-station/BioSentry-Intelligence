@@ -58,6 +58,11 @@ fi
 # Public mode is off unless PUBLIC_HOST is set in .env: the server's own name on the tailnet, which
 # `tailscale funnel` opens to the internet. Checked here because it is printed into commands below.
 public_host=$(sed -n 's/^PUBLIC_HOST=//p' .env | tail -n 1)
+# Another spelling that compose would read is refused, not taken as "private": the operator meant public.
+if ! grep -q '^PUBLIC_HOST=' .env && grep -Eq '^[[:space:]]*(export[[:space:]]+)?PUBLIC_HOST[[:space:]]*[=:]' .env; then
+  echo "PUBLIC_HOST in deploy/.env must be written as PUBLIC_HOST=name at the start of a line (no export, no spaces)" >&2
+  exit 1
+fi
 if [ -z "$public_host" ]; then
   docker compose up -d --build --wait
   echo "up: the team's address answers on this host at 127.0.0.1:8080 (the API alone at 127.0.0.1:8000) and nowhere else."
@@ -74,7 +79,7 @@ if [ -z "$public_host" ]; then
   exit 1
 fi
 # Anyone on the internet could then watch the ward without signing in: never both.
-if grep -Eiq '^BIOSENTRY_OPEN_WARD_VIEW=[[:space:]"]*true[[:space:]"]*$' .env; then
+if grep -Eiq "^[[:space:]]*(export[[:space:]]+)?BIOSENTRY_OPEN_WARD_VIEW[[:space:]]*[=:][[:space:]\"']*true" .env; then
   echo "PUBLIC_HOST and BIOSENTRY_OPEN_WARD_VIEW=true are both set in deploy/.env: remove one (a public address never shows the ward without a sign-in)" >&2
   exit 1
 fi

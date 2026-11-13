@@ -175,8 +175,9 @@ Off unless you turn it on. Turn it on only when the owner and the owner of the t
 
 Public mode lets the two Cloudflare Pages sites, and anyone who has the address, reach this server's
 pages and its API. It opens no port on the server and Docker publishes nothing new. The public door is
-`tailscale funnel` on the host, to the same `127.0.0.1:8080` the private door uses. Tailscale holds the
-HTTPS certificate.
+`tailscale funnel` on the host, to the same `127.0.0.1:8080` the private door uses. `tailscaled` on this
+server holds the HTTPS certificate. The name is not a secret: certificate names are in a public ledger,
+so scanners find it.
 
 Why Funnel, and not a port on the server with a free name such as `<address>.sslip.io`:
 
@@ -187,9 +188,11 @@ Why Funnel, and not a port on the server with a free name such as `<address>.ssl
 - The cost of Funnel: the tailnet's owner must allow it once, Tailscale limits its bandwidth (it
   publishes no figure), and devices on the tailnet get a browser prompt (below).
 
-**What the tailnet's owner must do, once:** allow Funnel for this server. Either open the link that
-`tailscale funnel` prints the first time and approve it, or in the Tailscale admin console, under Access
-controls, give this server the `funnel` node attribute. HTTPS and MagicDNS are already on.
+**What the tailnet's owner must do, once:** allow Funnel. The link that `tailscale funnel` prints the
+first time adds the `funnel` node attribute for every member of the tailnet (`autogroup:member`), not
+for this server only. To allow this server only, add the attribute by hand in the Tailscale admin
+console, under Access controls, with this server's tag or its user as the target. HTTPS and MagicDNS are
+already on.
 
 In order:
 
@@ -197,25 +200,28 @@ In order:
    are in this public repository, so the passphrase is the only secret.
 2. **Back up:** `deploy/backup.sh`.
 3. **Add one line to `deploy/.env`:** `PUBLIC_HOST=<this-host>.<your-tailnet>.ts.net` (the name
-   `tailscale serve status` shows, lower case, no `https://`). `BIOSENTRY_OPEN_WARD_VIEW` must not be
-   `true` in that file: `setup.sh` stops if both are set.
+   `tailscale serve status` shows, lower case, no `https://`, no `export`, no spaces).
+   `BIOSENTRY_OPEN_WARD_VIEW` must not be `true` in that file: `setup.sh` stops if both are set there,
+   and `compose.public.yaml` forces it off whatever the file or the shell says.
 4. **Run `deploy/setup.sh`.** With `PUBLIC_HOST` set it adds `compose.public.yaml`: the API accepts
    browser calls from exactly `https://biosentry-dashboard.pages.dev` and
    `https://biosentry-ward-sim.pages.dev`, watching the ward without a sign-in is forced off, and the
    API's and the web server's logs are capped. It opens nothing itself. It prints the next command.
 5. **Open the door:** `sudo tailscale funnel --bg --https=443 http://127.0.0.1:8080`. Then
    `tailscale funnel status` must list this one address and no longer say `(tailnet only)`.
-6. **Check from a device that is not on the tailnet** (a phone on mobile data):
-   `curl -s -o /dev/null -w '%{http_code}\n' https://$PUBLIC_HOST/api/healthz` answers `200`, and
-   `curl -s -o /dev/null -w '%{http_code}\n' -X POST https://$PUBLIC_HOST/api/sim/runs` answers `404`.
+6. **Check from a device that is not on the tailnet** (a phone on mobile data). With the name from step
+   3 in place of `NAME`:
+   `curl -s -o /dev/null -w '%{http_code}\n' https://NAME/api/healthz` answers `200`, and
+   `curl -s -o /dev/null -w '%{http_code}\n' -X POST https://NAME/api/sim/runs` answers `404`.
 7. **Point the two sites at it.** Each site's build needs one setting, and `setup.sh` prints both:
-   `VITE_API_URL=https://$PUBLIC_HOST/api` for the dashboard and
-   `VITE_VIEW_API_URL=https://$PUBLIC_HOST/api` for the simulator. Never put the ingest key in a build.
+   `VITE_API_URL=https://NAME/api` for the dashboard and `VITE_VIEW_API_URL=https://NAME/api` for the
+   simulator. Never put the ingest key in a build.
 
 **Back to private, one command:**
 `sudo tailscale funnel reset && sudo tailscale serve --bg --https=443 http://127.0.0.1:8080`. The first
-half closes the public door at once; `tailscale funnel status` then says `(tailnet only)`. Afterwards
-remove the `PUBLIC_HOST` line from `deploy/.env` and run `deploy/setup.sh`.
+half closes the public door at once. It also closes the private door and every other `serve` entry on
+this host; the second half opens the private door again, and `tailscale funnel status` then says
+`(tailnet only)`. Afterwards remove the `PUBLIC_HOST` line from `deploy/.env` and run `deploy/setup.sh`.
 
 While public mode is on, start the stack with `deploy/setup.sh` only. A plain `docker compose up` leaves
 out `compose.public.yaml`.
@@ -238,8 +244,18 @@ What protects it:
 What does not:
 
 - A weak, reused or shared passphrase. Nothing else stands between the internet and that clinician's view.
-- A flood of requests. This is one small server with no rate limit of its own. The ward can slow or stop.
-- A lock-out on purpose: anyone can lock a clinician out for 15 minutes with five wrong tries.
+- A flood of requests. This is one small server with no rate limit of its own. About 40 sign-in requests
+  a second keep the API busy for every user and for the ward runner.
+- A lock-out on purpose. The ids are public. Five wrong tries lock one clinician for 15 minutes, and 20
+  tries an hour keep that lock on for as long as the attacker likes. One stranger can do this for every
+  clinician and the admin at the same time, and it also locks people who come through the tailnet. There
+  is no unlock command: close the door, then wait 15 minutes.
+- The audit table. Each request without a valid token and each sign-in try writes one row (about 125
+  bytes) that cannot be deleted. A stranger who keeps sending requests fills the database disk (about
+  2.7 GB a day at 250 requests a second). Look at the disk each day the door is open (`df -h`), and
+  close the door if it grows.
+- Finding who did it. No client address is kept: not in the web server, not in the API's log, not in
+  the audit rows. After an attack there is nothing to block or report.
 
 Also true:
 
