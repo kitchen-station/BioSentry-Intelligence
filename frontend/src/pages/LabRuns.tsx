@@ -156,9 +156,7 @@ export function LabRuns({ role, onSignOut }: { role: SessionRole; onSignOut: () 
       ) : (
         <>
           <p>
-            Ask the simulator for two arms from the same seed that differ in one change, and read what differs. On W4
-            both arms have the same patients; in hospital mode they are partly paired, and the result says how far. It never
-            touches the ward that is running now. Synthetic, not validated.
+            Two arms from one seed that differ in one change. Synthetic, not validated.
           </p>
           <p>A lab worker beside the ward runs each request. If none is running, a request fails after an hour.</p>
 
@@ -173,7 +171,7 @@ export function LabRuns({ role, onSignOut }: { role: SessionRole; onSignOut: () 
                   <label htmlFor="seed">Seed</label>
                   <input id="seed" type="number" min={0} max={SEED_MAX} step={1} value={seed} aria-describedby="seed-hint" onChange={(e) => setSeed(e.target.value)} />
                   <span id="seed-hint" className={seedOk ? undefined : overview.warn}>
-                    A whole number from 0 to 2147483647. The same seed gives the same patients.
+                    A whole number from 0 to 2147483647.
                   </span>
                 </div>
                 {select("Days", days, DAYS, (v) => setDays(Number(v)))}
@@ -181,7 +179,6 @@ export function LabRuns({ role, onSignOut }: { role: SessionRole; onSignOut: () 
                 {select("Change", chosen, changes, setChange)}
               </div>
               <button type="submit" className={overview.refresh} disabled={sending || !seedOk}>Ask for a simulated run</button>
-              <p className={research.small}>One at a time for each clinician, 10 in 24 hours, 5 waiting on the ward.</p>
             </form>
           )}
 

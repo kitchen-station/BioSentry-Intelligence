@@ -35,7 +35,7 @@ describe("the vitals entry form", () => {
     const out = html();
     expect(out).toContain('placeholder="20-300"');
     expect(out).toContain('placeholder="10-200"');
-    expect(out).toContain("nothing");
+    expect(out).toContain("Nothing is filled in for you");
     expect(out).toContain("Nothing to record yet.");
   });
 

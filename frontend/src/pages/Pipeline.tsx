@@ -46,9 +46,6 @@ export function Pipeline({ session, onSignOut }: Props) {
         <h1 className={research.title}>The pipeline</h1>
         <p role="note" className={research.banner}>Synthetic, not validated.</p>
         <p className={research.small}>
-          Not one model doing everything: eight stages in order. Only the arbiter decides what reaches the nurse.
-        </p>
-        <p className={research.small}>
           {tiers === "loading" ? SOURCE.loading : tiers === "failed" ? SOURCE.failed : SOURCE.ok}
         </p>
         <ol role="list" className={styles.stages}>

@@ -14,16 +14,12 @@ export function ResearchAgentSection({ data = RESEARCH_AGENT }: { data?: AgentEx
     <section className={styles.card} aria-labelledby="agent">
       <h2 id="agent" className={styles.heading}>Research agent: questions asked on the simulated ward</h2>
       <p>
-        The agent is a program run by hand from a terminal. This page cannot ask it anything yet: it only
-        shows what was recorded. The agent matches a question to one of three fixed experiments, runs it on
-        simulated trials, and answers in fixed sentences filled with the result&apos;s numbers, or refuses and
-        runs nothing. Every step goes to a ledger. A change it proposes is applied only after a sign-off is
-        recorded.
+        Answers recorded from a program run by hand. This page cannot ask it anything yet.
       </p>
       <p>
         Synthetic, not validated. These answers use tuning seeds 1 to 10, not the held-out seeds 11 to 30 in
         the tables above, so the counts differ. The baseline&apos;s k and p were chosen on these same seeds, so
-        its numbers here flatter it. The rules are judged on the simulator that made the data.
+        its numbers here flatter it.
       </p>
       <p className={styles.small}>
         Source: {P.source} {P.records} ledger records, {P.exportedBy}, {P.date}.

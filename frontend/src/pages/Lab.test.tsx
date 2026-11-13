@@ -59,7 +59,7 @@ describe("lab index", () => {
     vi.stubEnv("VITE_API_URL", "/api");
     lab();
     expect(screen.getByRole("heading", { name: "Outside the lab" })).toBeTruthy();
-    expect(screen.getByText(/can change that ward, and so the ranks on the ward list/)).toBeTruthy();
+    expect(screen.getByText(/a change made there changes the ranks on the ward list/)).toBeTruthy();
     const link = screen.getByRole("link", { name: "Open the ward simulator" });
     expect(link.getAttribute("href")).toBe("/simulator/");
     expect(link.getAttribute("target")).toBe("_blank");
