@@ -3,7 +3,7 @@
 Claims one clinician's question from the API, runs the agent's ask path on it, posts the answer back.
 The question is data: it reaches only `ask.answer`, as one str. The worker writes no file of its own
 (the ledger is written by the agent's code), calls no tool itself and never prints a question, an
-answer, an exception text or the key. Contract: contract-ask v1 and contract-d7 v3.1."""
+answer, an exception text or the key. Contract: contract-ask v1.1 and contract-d7 v3.1."""
 
 import json
 import os
@@ -224,6 +224,8 @@ class Worker:
         body = {"state": "refused", "reason": reason} if reason else report_for(self.cfg, job, self.commit)
         state = body["state"] if self.deliver(jid, body) else "report not delivered"
         self.log(f"job {jid}: {state}")
+        if reason == R_KIND:  # an API that ignores ?kind=question would hand out compare runs: stop, never claim again
+            raise AgentError("the API gave a job of another kind, so it does not serve ?kind=question; the worker stops")
         return True
 
     def loop(self, once: bool = False, max_polls: int | None = None) -> None:
