@@ -79,11 +79,11 @@ export function App() {
       />
       <Route
         path="/ward"
-        element={session?.role === "admin" ? <Navigate to="/overview" replace /> : session ? <Ward session={session} onSignOut={signOut} /> : <ToSignIn />}
+        element={session ? <Ward session={session} onSignOut={signOut} /> : <ToSignIn />}
       />
       <Route
         path="/patient/:id"
-        element={session?.role === "admin" ? <Navigate to="/overview" replace /> : session ? <PatientDetail session={session} onSignOut={signOut} /> : <ToSignIn />}
+        element={session ? <PatientDetail session={session} onSignOut={signOut} /> : <ToSignIn />}
       />
       <Route
         path="/station"

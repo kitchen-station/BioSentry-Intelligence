@@ -208,9 +208,18 @@ describe("route guards", () => {
     expect(screen.getByText("lab page for admin-ruiz")).toBeTruthy();
   });
 
-  it.each(["/ward", "/station", "/patient/p-001"])("sends an admin from %s to the overview", (path) => {
+  it("lets an admin open the ward list and a patient page", () => {
     store(admin);
-    at(path);
+    at("/ward");
+    expect(screen.getByText("ward page for admin-ruiz")).toBeTruthy();
+    cleanup();
+    at("/patient/p-001");
+    expect(screen.getByText("patient page for admin-ruiz")).toBeTruthy();
+  });
+
+  it("still sends an admin from the station to the overview", () => {
+    store(admin);
+    at("/station");
     expect(screen.getByText("overview page for admin-ruiz")).toBeTruthy();
   });
 

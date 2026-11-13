@@ -318,11 +318,11 @@ def _expected_resource(template: str) -> str:
     return PATH_VALUES["ward"] if "{ward}" in template else "-"
 
 
-def test_the_admin_is_refused_on_every_write_route_and_nothing_is_written(api: Api) -> None:
-    headers = add_admin(api)
+def _assert_every_write_refused(api: Api, headers: dict[str, str]) -> None:
     writes = _writes(api)
     assert len(writes) == 10 and set(writes) == set(REFUSED_ACTIONS)
     before = snapshot(api)
+    seq = _last_seq(api)
     for method, template in writes:
         url = template.format(**PATH_VALUES)
         for body in (VALID_BODIES.get((method, template)), {"bogus": 1}):
@@ -341,44 +341,265 @@ def test_the_admin_is_refused_on_every_write_route_and_nothing_is_written(api: A
     expected = [
         (REFUSED_ACTIONS[w], _expected_resource(w[1]), "denied") for w in writes for _ in range(3)
     ]
-    assert audit_of(api, ADMIN) == expected
+    assert [r[2:] for r in _rows_since(api, seq)] == expected
+
+
+def test_the_admin_is_refused_on_every_write_route_and_nothing_is_written(api: Api) -> None:
+    _assert_every_write_refused(api, add_admin(api))
+
+
+def test_the_admin_is_still_refused_on_every_write_after_viewing(api: Api) -> None:
+    headers = add_admin(api)
+    _read_sweep(api, headers)
+    _assert_every_write_refused(api, headers)
 
 
 def test_the_write_actions_are_still_the_body_bearing_routes_only(api: Api) -> None:
     assert set(WRITE_ACTIONS) < set(REFUSED_ACTIONS)
 
 
-def test_an_admin_reads_nothing_beyond_the_overview(api: Api) -> None:
+READS = [("GET", p) for p in (
+    "/wards/{ward}/rows", "/wards/{ward}/stays", "/wards/{ward}/overview", "/wards/{ward}/live",
+    "/wards/{ward}/lab/runs", "/wards/{ward}/lab/runs/{lab_run_id}", "/patients",
+    "/patients/{patient_id}", "/patients/{patient_id}/baseline", "/patients/{patient_id}/notes",
+    "/acknowledgements", "/audit",
+)]
+PATIENT_READS = {
+    "/patients/{patient_id}": "view_patient",
+    "/patients/{patient_id}/baseline": "view_baseline",
+    "/patients/{patient_id}/notes": "view_notes",
+}
+WARD_READS = {
+    "/wards/{ward}/rows": "view_ward",
+    "/wards/{ward}/stays": "view_stays",
+    "/wards/{ward}/overview": "view_overview",
+}
+CLOSED_TO_ADMIN = {
+    "/wards/{ward}/live": "view_live",
+    "/wards/{ward}/lab/runs": "view_lab_runs",
+    "/wards/{ward}/lab/runs/{lab_run_id}": "view_lab_run",
+}
+
+
+def _last_seq(api: Api) -> int:
+    return int(api.sql("SELECT coalesce(max(seq), 0) AS n FROM audit_log")[0]["n"])
+
+
+def _rows_since(api: Api, seq: int) -> list[tuple[str | None, str | None, str, str, str]]:
+    rows = api.sql(
+        "SELECT clinician_id, role, action, resource, outcome FROM audit_log"
+        " WHERE seq > %s ORDER BY seq",
+        seq,
+    )
+    return [(r["clinician_id"], r["role"], r["action"], r["resource"], r["outcome"]) for r in rows]
+
+
+def _read_sweep(api: Api, headers: dict[str, str], pid: str = "p-001") -> None:
+    for _, template in READS:
+        api.client.get(template.format(**{**PATH_VALUES, "patient_id": pid}), headers=headers)
+
+
+def test_every_read_route_is_in_the_matrix(api: Api) -> None:
+    gets = [r for r in _route_table(api.client.app) if r[0] == "GET" and r not in PUBLIC_ROUTES]
+    assert sorted(gets) == sorted(READS)
+
+
+# who, role as stored, patient asked about, ward asked about, may read this patient
+PERSONAS = {
+    "reyes-own": ("rn-reyes", "rn", "p-003", "W4", True),
+    "reyes-not-his": ("rn-reyes", "rn", "p-001", "W4", False),
+    "charge": ("rn-manalo", "charge_rn", "p-001", "W4", True),
+    "md": ("md-santos", "md", "p-001", "W4", True),
+    "admin": (ADMIN, "admin", "p-001", "W4", True),
+    "admin-w9": (ADMIN, "admin", "p-001", "W9", True),
+}
+
+
+@pytest.mark.parametrize("persona", PERSONAS)
+def test_the_role_matrix_over_every_route(api: Api, persona: str) -> None:
+    who, role, pid, ward, may_read = PERSONAS[persona]
+    if who == ADMIN:
+        add_admin(api)
+    headers = api.as_(who)
+    values = {**PATH_VALUES, "patient_id": pid, "ward": ward}
+    is_admin = role == "admin"
+    for method, template in _route_table(api.client.app):
+        if (method, template) in PUBLIC_ROUTES:
+            continue
+        if method != "GET":
+            if is_admin:  # the clinicians' writes act for real: the admin's are tested apart
+                seq = _last_seq(api)
+                body = VALID_BODIES.get((method, template))
+                response = api.client.request(method, template.format(**values), headers=headers, json=body)
+                resource = pid if "{patient_id}" in template else ward if "{ward}" in template else "-"
+                assert response.status_code == 403, (method, template)
+                assert _rows_since(api, seq) == [
+                    (who, role, REFUSED_ACTIONS[(method, template)], resource, "denied")
+                ]
+            continue
+        seq = _last_seq(api)
+        response = api.client.get(template.format(**values), headers=headers)
+        rows = _rows_since(api, seq)
+        status = response.status_code
+        mine = (who, role)
+        if template in CLOSED_TO_ADMIN and is_admin:
+            assert (status, rows) == (403, [(*mine, CLOSED_TO_ADMIN[template], ward, "denied")])
+        elif template == "/wards/{ward}/overview" and not is_admin:
+            assert (status, rows) == (403, [(*mine, "view_overview", ward, "denied")])
+        elif template in WARD_READS and ward != "W4":
+            assert (status, rows) == (404, [(*mine, WARD_READS[template], ward, "not_found")])
+        elif template in WARD_READS:
+            assert (status, rows) == (200, [(*mine, WARD_READS[template], ward, "ok")])
+        elif template in PATIENT_READS:
+            ok = may_read  # a patient route has no ward in its path
+            assert (status, rows) == (
+                (200 if ok else 404),
+                [(*mine, PATIENT_READS[template], pid, "ok" if ok else "not_found")],
+            ), (persona, template)
+        elif template == "/patients":
+            assert (status, rows) == (200, [(*mine, "list_patients", "-", "ok")])
+        elif template == "/acknowledgements":
+            assert (status, rows) == (200, [(*mine, "list_acknowledgements", "-", "ok")])
+            assert response.json() == []
+        elif template == "/audit":
+            assert (status, rows) == (200, [])
+        else:  # a clinician on /live and the lab reads: not changed by this slice
+            assert status in (200, 404) and all(r[4] != "denied" for r in rows), (persona, template)
+
+
+@pytest.mark.parametrize("kind", ["revoked", "unknown", "none"])
+def test_no_token_a_revoked_admin_and_an_unknown_token_get_401_on_every_route(
+    api: Api, kind: str
+) -> None:
+    headers: dict[str, str] = {}
+    if kind == "unknown":
+        headers = {"Authorization": "Bearer nobody"}
+    if kind == "revoked":
+        headers = add_admin(api)
+        write(api, "DELETE FROM session WHERE clinician_id = %s", ADMIN)  # what revoke does
+        write(api, "DELETE FROM clinician WHERE id = %s", ADMIN)
+    seq = _last_seq(api)
+    routes = [r for r in _route_table(api.client.app) if r not in PUBLIC_ROUTES]
+    for method, template in routes:
+        body = VALID_BODIES.get((method, template))
+        response = api.client.request(method, template.format(**PATH_VALUES), headers=headers, json=body)
+        assert response.status_code == 401, (method, template)
+    rows = _rows_since(api, seq)
+    assert len(rows) == len(routes)
+    assert {(r[0], r[1], r[2], r[4]) for r in rows} == {(None, None, "authenticate", "denied")}
+
+
+def test_the_admin_sees_what_the_charge_nurse_sees_except_the_clinician_field(api: Api) -> None:
+    admin, charge = add_admin(api), api.as_("rn-manalo")
+    a = api.client.get("/wards/W4/rows", headers=admin).json()
+    c = api.client.get("/wards/W4/rows", headers=charge).json()
+    assert (a.pop("clinician"), c.pop("clinician")) == (ADMIN, "rn-manalo")
+    assert a == c and len(a["ranked"]) + len(a["abstained"]) == len(IDS)
+    assert [r["id"] for r in a["abstained"]] == [x["id"] for x in DATA["abstained"]]
+
+
+def test_a_patient_assigned_to_nobody_is_seen_by_the_admin_and_not_by_the_charge_nurse(
+    api: Api,
+) -> None:
+    admin, charge = add_admin(api), api.as_("rn-manalo")
+    write(api, "DELETE FROM care_assignment WHERE patient_id = 'p-003'")
+    ids = lambda h: {r["id"] for k in ("ranked", "abstained") for r in api.client.get(  # noqa: E731
+        "/wards/W4/rows", headers=h).json()[k]}
+    assert "p-003" in ids(admin) and "p-003" not in ids(charge)
+    assert api.client.get("/patients/p-003", headers=admin).status_code == 200
+    assert api.client.get("/patients/p-003", headers=charge).status_code == 404
+
+
+def test_the_admins_view_rows_name_the_admin_and_there_is_one_row_per_call(api: Api) -> None:
     headers = add_admin(api)
-    get = api.client.get
-    get("/patients", headers=api.as_("rn-manalo"))  # another clinician's audit row exists
-    rows = get("/wards/W4/rows", headers=headers).json()
-    assert rows["ranked"] == [] and rows["abstained"] == []
-    assert get("/patients", headers=headers).json() == []
-    for path in ("/patients/p-001", "/patients/p-001/notes", "/patients/p-001/baseline"):
-        assert get(path, headers=headers).status_code == 404, path
-    assert get("/wards/W4/stays", headers=headers).json() == []
-    # The live view carries the sim's whole shared blob: refused for an admin, and audited.
-    live = get("/wards/W4/live", headers=headers)
-    assert live.status_code == 403 and live.json() == {"detail": "Forbidden"}
-    assert api.sql(
-        "SELECT action, resource, outcome FROM audit_log WHERE action = 'view_live'"
-    ) == [{"action": "view_live", "resource": "W4", "outcome": "denied"}]
-    assert get("/wards/W9/live", headers=headers).status_code == 403  # the role, before the ward
-    for path in ("/wards/W4/lab/runs", "/wards/W4/lab/runs/1"):  # a row says who asked what
-        assert get(path, headers=headers).status_code == 403, path
-    assert get("/acknowledgements", headers=headers).json() == []
-    # The admin's own trail and nobody else's, though other rows exist.
-    mine = get("/audit", headers=headers).json()
-    own = api.sql("SELECT seq FROM audit_log WHERE clinician_id = %s", ADMIN)
-    assert mine and {r["seq"] for r in mine} == {r["seq"] for r in own}
-    assert api.sql("SELECT count(*) AS n FROM audit_log WHERE clinician_id <> %s", ADMIN)[0]["n"] > 0
+    seq = _last_seq(api)
+    for path in ("/wards/W4/rows", "/patients", "/patients/p-001", "/patients/p-001/baseline",
+                 "/patients/p-001/notes"):
+        assert api.client.get(path, headers=headers).status_code == 200, path
+    assert _rows_since(api, seq) == [
+        (ADMIN, "admin", "view_ward", "W4", "ok"),
+        (ADMIN, "admin", "list_patients", "-", "ok"),
+        (ADMIN, "admin", "view_patient", "p-001", "ok"),
+        (ADMIN, "admin", "view_baseline", "p-001", "ok"),
+        (ADMIN, "admin", "view_notes", "p-001", "ok"),
+    ]
+
+
+def test_every_write_gives_the_same_403_for_a_known_unknown_unranked_and_left_patient(
+    api: Api,
+) -> None:
+    headers = add_admin(api)
+    write(api, "UPDATE patient SET left_at = %s, outcome = 'discharged' WHERE id = 'p-002'", NOW)
+    for method, template in _writes(api):
+        if "{patient_id}" not in template:
+            continue
+        seen = set()
+        for pid in ("p-001", "p-zzz", "p-004", "p-002"):  # known, unknown, NOT RANKED, left
+            seq = _last_seq(api)
+            url = template.format(**{**PATH_VALUES, "patient_id": pid})
+            response = api.client.request(
+                method, url, headers=headers, json=VALID_BODIES.get((method, template))
+            )
+            rows = _rows_since(api, seq)
+            assert [r[2:] for r in rows] == [(REFUSED_ACTIONS[(method, template)], pid, "denied")]
+            seen.add((response.status_code, response.text))
+        assert seen == {(403, '{"detail":"Forbidden"}')}, (method, template)
+
+
+def test_reads_of_an_unknown_a_left_and_an_unranked_patient_are_the_same_404(api: Api) -> None:
+    headers = add_admin(api)
+    write(api, "UPDATE patient SET left_at = %s, outcome = 'discharged' WHERE id = 'p-002'", NOW)
+    for template in ("/patients/{patient_id}", "/patients/{patient_id}/baseline"):
+        seen = set()
+        for pid in ("p-zzz", "p-002", "p-004"):  # unknown, left, NOT RANKED (no detail page)
+            seq = _last_seq(api)
+            response = api.client.get(template.format(patient_id=pid), headers=headers)
+            assert [r[2:] for r in _rows_since(api, seq)] == [
+                (PATIENT_READS[template], pid, "not_found")
+            ]
+            seen.add((response.status_code, response.text))
+        assert len(seen) == 1 and next(iter(seen))[0] == 404, template
+    seen = set()
+    for pid in ("p-zzz", "p-002"):  # notes: a NOT RANKED patient is on the ward, so is readable
+        seen.add((api.client.get(f"/patients/{pid}/notes", headers=headers).status_code,))
+    assert seen == {(404,)}
+    assert api.client.get("/patients/p-004/notes", headers=headers).status_code == 200
+
+
+def test_an_admin_reads_every_patient_page_and_writes_nothing(api: Api) -> None:
+    headers = add_admin(api)
+    before = snapshot(api)
+    for pid in IDS:
+        _read_sweep(api, headers, pid)
+    assert snapshot(api) == before
+    assert api.sql("SELECT count(*) AS n FROM acknowledgement")[0]["n"] == 0
+    assert api.sql("SELECT count(*) AS n FROM clinician_action WHERE clinician_id = %s", ADMIN)[0]["n"] == 0
+
+
+def test_the_admin_reads_the_notes_of_a_patient_nobody_is_assigned_to_and_not_a_deleted_one(
+    api: Api,
+) -> None:
+    headers = add_admin(api)
+    charge = api.as_("rn-manalo")
+    note = api.client.post(
+        "/patients/p-003/notes", headers=charge, json={"author": "a", "role": "RN", "content": "gone"}
+    ).json()
+    assert api.client.delete(f"/patients/p-003/notes/{note['id']}", headers=charge).status_code == 204
+    write(api, "DELETE FROM care_assignment WHERE patient_id = 'p-003'")
+    assert api.client.get("/patients/p-003/notes", headers=charge).status_code == 404
+    shown = api.client.get("/patients/p-003/notes", headers=headers)
+    assert shown.status_code == 200
+    assert {n["id"] for n in shown.json()} == {n["id"] for n in DATA["notes"] if n["patient_id"] == "p-003"}
+    assert note["id"] not in {n["id"] for n in shown.json()}
 
 
 def test_the_charge_nurses_ward_is_byte_for_byte_the_same_once_an_admin_exists(api: Api) -> None:
     before = api.client.get("/wards/W4/rows", headers=api.as_("rn-manalo")).content
     add_admin(api)
     assert overview(api).status_code == 200
+    admin = api.as_(ADMIN)
+    for path in ("/wards/W4/rows", "/patients/p-001", "/patients/p-001/notes"):
+        assert api.client.get(path, headers=admin).status_code == 200, path
     after = api.client.get("/wards/W4/rows", headers=api.as_("rn-manalo")).content
     assert before == after
 
@@ -491,7 +712,14 @@ def test_grant_of_an_existing_id_changes_nothing(cli: Api) -> None:
 def test_revoke_deletes_the_sessions_and_the_row_and_keeps_the_audit_rows(cli: Api) -> None:
     headers = add_admin(cli)
     assert overview(cli).status_code == 200
+    assert cli.client.get("/patients/p-001", headers=headers).status_code == 200
     assert admin_module.main(["revoke", ADMIN]) == 0
+    stale = cli.client.get("/patients/p-001", headers=headers)
+    assert stale.status_code == 401
+    assert cli.sql(
+        "SELECT 1 FROM audit_log WHERE clinician_id IS NULL AND action = 'authenticate'"
+        " AND outcome = 'denied'"
+    )
     assert cli.sql("SELECT 1 FROM clinician WHERE id = %s", ADMIN) == []
     assert cli.sql("SELECT 1 FROM session WHERE clinician_id = %s", ADMIN) == []
     assert cli.client.get("/wards/W4/overview", headers=headers).status_code == 401

@@ -70,7 +70,7 @@ describe("SessionMenu", () => {
     ["rn", ["Ward"]],
     ["charge_rn", ["Ward", "Station"]],
     ["md", ["Ward", "Station"]],
-    ["admin", ["Overview"]],
+    ["admin", ["Overview", "Ward"]],
   ] as const)("shows %s only the bar links for routes it can use", (role, names) => {
     menu({ clinician_id: "x-1", ward: "W4", role });
     const bar = screen.getByRole("navigation", { name: "Pages" });
@@ -174,9 +174,9 @@ describe("SessionMenu", () => {
     expect(screen.queryByText("Ward W4")).toBeNull();
   });
 
-  it("gives an admin the overview in the bar and no ward or station", async () => {
+  it("gives an admin the overview and the ward in the bar, and no station", async () => {
     menu({ clinician_id: "admin-ruiz", ward: "W4", role: "admin" }, "/lab");
-    expect(screen.queryByRole("link", { name: "Ward" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Ward" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Station" })).toBeNull();
     await userEvent.click(screen.getByRole("link", { name: "Overview" }));
     expect(screen.getByText("at /overview")).toBeTruthy();
@@ -184,7 +184,7 @@ describe("SessionMenu", () => {
 
   beforeEach(() => vi.stubEnv("VITE_API_URL", "http://api.test"));
 
-  const NOTICE = "A ward administrator can see which beds you are assigned and counts of your actions from the last 24 hours.";
+  const NOTICE = "A ward administrator can see which beds you are assigned, counts of your actions from the last 24 hours, and every patient's page, including the notes you write.";
 
   it.each(["rn", "md", "charge_rn"] as const)("tells a %s on an API build that an administrator sees counts", async (role) => {
     menu({ clinician_id: "x-1", ward: "W4", role });

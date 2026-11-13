@@ -508,3 +508,48 @@ describe("PatientDetail own-baseline reason and patch display", () => {
     expect(screen.queryByText(/Signal \d+%/)).toBeNull();
   });
 });
+
+describe("PatientDetail for an administrator (read only)", () => {
+  afterEach(() => { api.canRecordVitals = false; });
+
+  it("shows the page and the read-only line, with no note box and no Record vitals", async () => {
+    api.canRecordVitals = true;
+    page("admin");
+    await loaded();
+    expect(screen.getByText("Read-only. Every view is recorded in the audit log.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Record vitals" })).toBeNull();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Notes" }));
+    expect(screen.queryByPlaceholderText("Add a clinical note...")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add note" })).toBeNull();
+  });
+
+  it("reads the notes only when the drawer opens, once per open, and lists them", async () => {
+    api.getNotes.mockResolvedValue([note("n-001", "BP trending down")]);
+    const user = userEvent.setup();
+    page("admin");
+    await loaded();
+    expect(api.getNotes).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Notes" }));
+    expect(await screen.findByText("BP trending down")).toBeTruthy();
+    expect(api.getNotes).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole("button", { name: "Notes (1)" })); // close
+    await user.click(screen.getByRole("button", { name: "Notes (1)" })); // open again: a new read
+    expect(api.getNotes).toHaveBeenCalledTimes(2);
+  });
+
+  it("says so when the notes cannot be read", async () => {
+    api.getNotes.mockRejectedValue(new Error("down"));
+    const user = userEvent.setup();
+    page("admin");
+    await loaded();
+    await user.click(screen.getByRole("button", { name: "Notes" }));
+    expect(await screen.findByText("Notes could not be loaded.")).toBeTruthy();
+  });
+
+  it("does not show the read-only line to a clinician", async () => {
+    page("md");
+    await loaded();
+    expect(screen.queryByText(/Read-only/)).toBeNull();
+  });
+});

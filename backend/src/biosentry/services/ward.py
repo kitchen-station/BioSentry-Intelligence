@@ -1,6 +1,7 @@
 """Read model: the ward, one patient, and the patient picker, scoped to the caller.
 
-Scope is resolved first and fails closed: an unknown clinician sees nobody. Decisions are the
+Scope is resolved first and fails closed: an unknown clinician sees nobody. A clinician sees the
+assigned patients; an admin sees every patient on the ward, read-only. Decisions are the
 real news2() and arbiter, computed here on every request. The rank is relative to the caller's
 set and is never stored. A patient is ranked only while every NEWS2 input is present; otherwise
 the row is NOT RANKED with the arbiter's reason and instruction. Every read appends an audit
@@ -122,6 +123,9 @@ class WardService:
         self._audit = audit
 
     def visible(self, clinician_id: str) -> frozenset[str]:
+        # An admin reads every patient on the ward; every write is refused earlier by `Writer`.
+        if self._store.is_admin(clinician_id):
+            return self._store.on_ward()
         return self._store.assigned(clinician_id)
 
     def _view(

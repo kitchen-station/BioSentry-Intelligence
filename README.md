@@ -71,13 +71,16 @@ seeded before passphrases existed has none either: `make db-reset` seeds it agai
 
 **Admin (ward overview).** An admin sees every bed and its state, who is assigned, each clinician's patient
 count, and counts of each clinician's actions in the last 24 hours (by action and outcome; no patient and no
-time). No patient names or ids are shown. The role is granted only from a shell with database access, run from
+time); the Overview shows no patient name. The admin also reads the ward list and each patient page, read
+only, with every patient on the ward whoever is assigned (notes included). Every view is in the audit log under
+the admin's id and every write stays refused. This reverses the earlier rule that the admin saw no patient
+name. The role is granted only from a shell with database access, run from
 `backend/`: `uv run python -m biosentry.db.admin grant admin-<name>`, then
 `uv run python -m biosentry.db.passphrase admin-<name>`. Revoke with
 `uv run python -m biosentry.db.admin revoke admin-<name>`. No route can grant or change a role. An admin cannot
 write anything and is never assigned to a patient. One admin id per person (for example `admin-santos`), never
 shared. Granting and revoking each write an audit row. Clinicians are told in their own menu that an
-administrator can see these counts. Only someone with database access can see who opened the overview: the
+administrator can see these counts, and every patient's page. Only someone with database access can see who opened the overview: the
 admin's own views are in the audit log, and no route shows them to anyone else.
 
 `make db-down` stops the database (the data stays in a Docker volume). The API reaches it through
@@ -138,7 +141,9 @@ schemas. Every target is in the [Makefile](Makefile).
 - **Overview:** for an admin only, read only, from the "Administration" entry at sign-in (shown when the
   dashboard talks to the API). Every bed and its state, who is assigned, each clinician's patient
   count, counts of their actions in the last 24 hours, and the simulator status. It reads again on Refresh, never on a timer, because every
-  view is recorded in the audit log. An admin lands here and has no ward or station.
+  view is recorded in the audit log. An admin lands here, with a "Ward list" link to the ward and
+  patient pages (read only: no alerts, no timer, a Refresh button, no write control; the notes load when the
+  drawer opens), and has no station.
 - **Station:** admit a patient, enter lab results, upload a document (extraction is a
   placeholder), or see patient flow: who came and went, length of stay and 14 days of bed use.
   A physician or the charge nurse switches between Ward and Station in the top bar.

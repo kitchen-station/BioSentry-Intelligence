@@ -6,7 +6,7 @@ get the same 401, after the same work; five failures for an id within 15 minutes
 anything is hashed; every attempt is audited (ids and outcome, never the passphrase). Missing,
 malformed, unknown or expired credentials get 401 and nothing is served. Identity comes first on
 every route, including for a body that fails validation. Everything else is scoped to the
-caller's patients on the server, on every call, and a patient who does not exist and one who is
+caller's patients (an admin: every patient on the ward, read-only) on the server, on every call, and a patient who does not exist and one who is
 not yours get the same 404. A
 write whose body fails validation leaves a `rejected` audit row (ids only, no values). Responses
 are `Cache-Control: no-store`. The service serves nothing unauthenticated except /healthz and
@@ -376,8 +376,9 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
 
     @app.get("/wards/{ward}/live", response_model=LiveWard)
     def ward_live(ward: str, ctx: Ctx, who: Who) -> LiveWard:
-        # The sim's whole shared view is for the ward's clinicians. An admin gets its status
-        # keys through the overview and nothing more.
+        # The sim's whole shared view is for the ward's clinicians. An admin reads the ward's
+        # patients through /rows and the patient pages, and gets this view's status keys through
+        # the overview, nothing more.
         if ctx.store.is_admin(who):
             ctx.audit.append(who, "view_live", ward, "denied")
             raise HTTPException(status_code=403, detail="Forbidden")
