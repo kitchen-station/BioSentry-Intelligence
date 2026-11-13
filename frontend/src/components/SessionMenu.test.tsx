@@ -51,6 +51,13 @@ describe("SessionMenu", () => {
     expect(screen.getByText("at /research")).toBeTruthy();
   });
 
+  it("links to the pipeline for every role", async () => {
+    menu({ clinician_id: "rn-reyes", ward: "W4", role: "rn" });
+    await open("rn-reyes");
+    await userEvent.click(screen.getByRole("link", { name: "Pipeline" }));
+    expect(screen.getByText("at /pipeline")).toBeTruthy();
+  });
+
   it("closes when the backdrop is clicked", async () => {
     menu({ clinician_id: "rn-reyes", ward: "W4", role: "rn" });
     await open("rn-reyes");
