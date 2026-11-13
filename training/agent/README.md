@@ -7,9 +7,10 @@ Nothing here trains a model. It records a run that was made elsewhere (see
   before and after scores on the blind held-out subsample, and every example with its guard decision.
   Written by `research/agent_tuning/runlog.py`. Weights, adapters and data stay outside the repository.
 - `REGISTRY.md`: every model considered, the weights, the adapter, the data and every source.
-- Not here yet: `runs/run1.json` and `notebooks/finetune.ipynb` (the loss curve, the before and after
-  tables, every example). They need the held-out evaluation, which was still running when this was
-  written, and come in the next pull request. No before/after number exists until then.
+- `runs/run1.scores.json`: the before and after counts for the evaluation site, written by `--scores-out`.
+  `python -m research.agent export --scores` reads it.
+- `notebooks/finetune.ipynb`: reads only `runs/<run-id>.json` (set `RUN` in its second cell) and draws
+  the tables and the loss curve with the standard library. `notebooks/execute.py` runs it again in place.
 
 The first full run learned nothing: on this backend `loss.backward()` does nothing, so the adapter never
 changed. Its log is kept as a frozen-model control, and the run log shows the trained loss next to it
@@ -36,6 +37,10 @@ For the stopped run add `--train_url /run1 --log /run1/log-to-step200.jsonl --ad
 (`run0-learned-nothing`) mounted read-only at `/run0`. Each answers file needs the `.meta.json` that
 `run_model.py` writes beside it; the log is refused (exit 2) when its adapter or data hash does not match.
 
-Test:
+Run the notebook again (the optional environment's Python has nbformat, nbclient and ipykernel):
 
-    python -m pytest -q research/tests/test_agent_runlog.py
+    <env>/bin/python training/agent/notebooks/execute.py
+
+Test (runs without Jupyter):
+
+    python -m pytest -q research/tests/test_agent_runlog.py research/tests/test_agent_training_notebook.py

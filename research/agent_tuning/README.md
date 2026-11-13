@@ -2,8 +2,9 @@
 
 Optional. `research/agent/` runs with no model at all. This folder teaches a small open-weight
 model the two narrow answers the agent can use, and measures it. The model card is `models/agent/card.md`; the
-choice of model and every source are in `training/agent/REGISTRY.md`. No model score is in the
-repository yet: the held-out evaluation was still running when this was written.
+choice of model and every source are in `training/agent/REGISTRY.md`. The held-out scores are in
+the card and in `training/agent/runs/run1.json`. After the guard, the tuned model alone is worse than the keyword
+matcher on the blind questions (7 of 30 answerable questions right, against 13).
 
 The two tasks (one JSON object is the whole answer):
 

@@ -10,7 +10,7 @@
 | framework | MindSpore 2.7.0 as the backend, through MindNLP (pinned as `mindnlp==0.5.1`; the installed library reports itself as 0.5.0rc2). No other framework trained anything |
 | data | generated from our own rule planner and question frames. No patient data of any kind |
 | code | `research/agent_tuning/` |
-| full record | `training/agent/REGISTRY.md` (every model considered, weights, adapter, data, sources). The run log and the notebook come in the next pull request, with the held-out numbers |
+| full record | `training/agent/REGISTRY.md` (every model considered, weights, adapter, data, sources), `training/agent/runs/run1.json` (the run log, with every held-out answer), `training/agent/notebooks/finetune.ipynb` (the loss curve and the tables) |
 
 ## What stops the model doing anything else
 
@@ -53,11 +53,59 @@ All of it on one laptop (Apple M4, CPU only, shared with other jobs). Nothing ra
 
 ## Results on the blind held-out subsample
 
-**Held-out evaluation running. No before/after numbers yet.** No tuned or untuned model score
-exists in this repository. Do not read the training loss above as a result: it shows the adapter
-learned the training examples, not that it answers new questions.
+**After the guard, the tuned model alone is worse than the keyword matcher on the blind
+questions: 7 of 30 answerable questions right, against 13.** It is better than the untuned model
+(2 of 30). Neither model had a refusal question acted on. One run each, greedy decoding, no error
+bars. Every count below is in `training/agent/runs/run1.json`, with every answer.
 
-What is fixed already, with no model involved (`python -m research.agent_tuning.score --baseline ...`):
+Questions: 78, of which 30 are answerable and 48 must be refused.
+
+| | untuned | tuned (step 200) | keyword matcher | perfect answers (ceiling) |
+|---|---|---|---|---|
+| Valid JSON | 53 of 78 | 78 of 78 | 78 of 78 | 78 of 78 |
+| Answers outside the two allowed shapes (target 0) | 73 | 0 | 0 | 0 |
+| Answerable: the answer itself is exactly right | 2 of 30 | 13 of 30 | 14 of 30 | 30 of 30 |
+| Answerable, after the guard: right experiment | 2 | 7 | 13 | 20 |
+| Answerable, after the guard: wrong experiment | 0 | 0 | 2 | 0 |
+| Answerable, after the guard: refused | 28 | 23 | 15 | 10 |
+| Refusal questions the answer itself refuses | 0 of 48 | 48 of 48 | 46 of 48 | 48 of 48 |
+| Refusal questions acted on after the guard (target 0) | 0 | 0 | 2 | 0 |
+
+Planner: 9 examples.
+
+| | untuned | tuned (step 200) | perfect answers |
+|---|---|---|---|
+| Valid JSON | 5 of 9 | 9 of 9 | 9 of 9 |
+| Exactly the rule planner's pick | 0 of 9 | 9 of 9 | 9 of 9 |
+| Outside the schema (target 0) | 9 | 0 | 0 |
+| After the guard | fell back to the rule planner 9 times | acted on 9 | acted on 9 |
+
+How to read it:
+
+- Tuning taught the shape of the answer. The untuned model wrote 73 answers outside the allowed
+  shapes and refused no refusal question itself. The tuned model wrote none outside and refused
+  all 48.
+- The tuned model refuses too much. It refused 16 of the 30 answerable questions itself, 9 of
+  them where the keyword matcher has an answer. That is why it loses to the matcher.
+- The guard dropped 6 of its 13 right answers: 4 because the guard's own checks refuse the
+  question whatever the model says, and 2 because the matcher gave another answer and the matcher
+  wins. In those 2 the matcher was wrong.
+- Where the matcher is silent (14 answerable questions), the tuned model's answer was right on 7,
+  and 4 of those pass the guard. The matcher gets none of them. That is the only place the model
+  adds something.
+- Counted after the fact, and not a planned metric: the tuned model first, then the matcher when
+  the model's answer is refused, gives 18 right, 2 wrong and 10 refused on the 30 answerable
+  questions, and acts on 2 refusal questions. The matcher alone gives 14 right, 2 wrong and 14
+  refused, and acts on the same 2. Both wrong answers and both refusal questions acted on are the
+  matcher's. The matcher row in the table is 13, not 14, because the tuning guard refuses one
+  question that the matcher answers right.
+- The planner result is weak evidence: the task is close to copying (see Limits), and 9 examples
+  is very few.
+
+Do not read the training loss above as a result: it shows the adapter learned the training
+examples, not that it answers new questions.
+
+Fixed before any model was run, with no model involved (`python -m research.agent_tuning.score --baseline ...`):
 
 | On the blind held-out questions | All 300 | Subsample of 78 (the one the models are run on) |
 |---|---|---|
@@ -83,8 +131,8 @@ beforehand.
 
 ## Limits
 
-- The evaluation, when it finishes, is small: 78 questions and 9 planner examples, one run, greedy
-  decoding, no error bars. Its counts will be a first look, not a measurement.
+- The evaluation is small: 78 questions and 9 planner examples, one run, greedy decoding, no error
+  bars. Read the counts as a first look, not a measurement.
 - Training saw 200 of the 476 planned examples, once. No learning rate or length was tuned.
 - The guard refuses about half of the held-out answerable questions whatever the model says: on
   all 180 a perfect model would get 81 through. The guard was frozen before any model answer and

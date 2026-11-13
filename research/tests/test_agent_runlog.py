@@ -343,7 +343,10 @@ def test_scores_file_counts_are_hand_checked_and_the_export_accepts_it(made, tmp
         assert r["answered"] + r["refused"] == s["n"]
     assert before["model"] == "m/m" and after["model"] == "m/m + LoRA adapter " + hashlib.sha256(ADAPTER).hexdigest()[:12]
     assert s["question_set"].startswith("blind held-out questions, first 1 of each group (%d questions; heldout.jsonl sha256 " % len(made.q))
-    assert out["notes"] == runlog.SCORE_NOTES and len(calls) <= len(good)
+    m = doc["evaluations"]["question"]["matcher"]["scores"]
+    assert out["notes"] == [*runlog.SCORE_NOTES, f"With no model, the keyword matcher runs the right experiment for "
+                            f"{m['answerable_acted_right']} of the {m['positives']} answerable questions after the same guard. "
+                            f"The model alone gets 0 before tuning and {len(good)} after."] and len(calls) <= len(good)
     exporting.check_scores(out)
 
 
