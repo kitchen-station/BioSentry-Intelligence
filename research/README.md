@@ -1,7 +1,8 @@
 # research: offline evaluation of alerting rules (synthetic data only)
 
-Standard-library Python plus an import of the backend's own `biosentry` package. No dependency, no
-`pyproject.toml`, nothing here is served by the API. This slice holds the yardstick: how NEWS2
+Standard-library Python plus an import of the backend's own `biosentry` package; the ML parts (slice
+M1 and later) have their own `research/pyproject.toml` and `uv.lock`, and the standard-library parts
+need neither. Nothing here is served by the API. This slice holds the yardstick: how NEWS2
 alone performs as an alerting rule against the simulator's true deterioration episodes. Every
 later model is compared with these numbers.
 
@@ -136,7 +137,7 @@ onnxruntime (`research/pyproject.toml`, `uv.lock`); nothing else in `research/` 
   calibration: the loader opens only `manifest.json` and skips them. ward-v2 folders (seeds 1-60)
   are skipped the same way. Any other seed is refused (161-260 are read by no slice).
 - Held out: ward-v2 seeds 11-30, scored once by `evaluate_student`. It refuses ward-v2 seeds 1-10,
-  which the student no longer uses. The training loader never opens ward-v2. ward-v2-train (31-60)
+  which the student no longer uses. The training loader opens only `manifest.json` of a ward-v2 folder and skips it. ward-v2-train (31-60)
   is the reward loop's data.
 - 100 training trials (about 3 million scored bins) were chosen over 200 because of memory (8 GB
   shared). Validation is never cut. If memory fails, only float32 and chunking may change.
@@ -184,7 +185,7 @@ onnxruntime (`research/pyproject.toml`, `uv.lock`); nothing else in `research/` 
   261-300. Stop after 3 epochs without a strictly lower value. The best epoch's weights are kept (a
   tie keeps the earlier epoch).
 - Soft targets for the students: the chosen teacher's logits on the training rows, clipped to
-  +-9.2102 (p between 1e-4 and 1-1e-4).
+  +-9.2102 (p between 1e-4 and 1-1e-4). This clip is for those targets only.
 
 ### The student (per variant)
 
@@ -230,6 +231,10 @@ All are fitted on the same training rows and scored on validation seeds 261-300.
 - Student: width {8, 16, 32} x inputs {base, trend}: 6 distilled fits. The same 6 on hard labels
   are reference (c).
 - Primary metric for every choice: validation log loss against the true labels of seeds 261-300.
+  Every compared, selected, gated or recorded log loss (teacher, students, references a to d, the ONNX
+  value) comes from one function, `row_loss`, applied to the model's own unclipped probability with
+  the same 1e-7 clip. Ties are compared on unrounded values; rounding to 6 decimals happens only when
+  the metadata is written.
 - Ties: values within 1e-6 count as tied. Then fewer parameters, then base over trend inputs, then
   the larger weight decay.
 - Recorded, never used to choose: average precision, mean p against prevalence, fidelity (RMSE of
@@ -264,8 +269,8 @@ All are fitted on the same training rows and scored on validation seeds 261-300.
   float32 weights (opset 13, IR 7, ops Sub, Div, Gemm, Relu, Sigmoid, `x` [1, n] to `p` [1, 1]).
   MindSpore's own ONNX export gave IR 4 and opset 11 in a probe, so it is not used.
 - `model.ms`, `model_no_temp.ms` (only if the hand-run Lite step is done): written by MindSpore Lite
-  2.11.0 `converter_lite` from the `.mindir`. Research code may not start a process, so this is a
-  separate step: `models/tier_c/student_vitals/convert_lite.sh` (see Commands). Its raw output is
+  2.11.0 `converter_lite` from the `.mindir`. Research code starts no external program (no subprocess, no shell; it does use Python's own
+  worker processes for feature extraction), so this is a separate step: `models/tier_c/student_vitals/convert_lite.sh` (see Commands). Its raw output is
   committed as `models/tier_c/student_vitals/lite.txt` when it is run.
 - Parity on 1,000 fixed training rows: the largest p difference is at most 1e-5 for each pair of
   MindSpore forward, MindIR loaded back with `nn.GraphCell`, and ONNX in onnxruntime. The hand-run
@@ -305,7 +310,7 @@ All are fitted on the same training rows and scored on validation seeds 261-300.
   2.4 h central, 4.5 h worst case. Peak memory 3-4 GB.
 - After the first teacher's first epoch the total is projected: the number of teacher fits x the
   epoch cap x that epoch's seconds, plus 4,320 s for everything else (1,800 students, 900 reference
-  (b), 900 reference (d), 720 features). The first epoch includes graph compilation, so this is a
+  (b), 900 reference (d), 720 features). The first epoch is timed whole, with its validation pass, and includes graph compilation, so this is a
   slight overestimate. If it exceeds 3 h, these cuts are applied in order until it does not: (1) drop
   reference (d); (2) teacher epoch cap 15 to 10; (3) teacher weight decay grid to the larger value
   only. The cuts applied are recorded in `metadata.json`. Wall time is not a metric.
@@ -324,10 +329,21 @@ All are fitted on the same training rows and scored on validation seeds 261-300.
 Run inside the research venv (see the ML gate below). Give only seeds 61-160 and 261-340 (301-340
 and ward-v2 folders are skipped after reading their manifest; other seeds are refused):
 
-    python -m research.train_student <ward-v2-ext folders> [--out <dir>] [--cache <dir>] [--workers N] [--lite_rows <dir>] [--byte_reproducible true|false]
+    python -m research.train_student <ward-v2-ext folders> [--out <dir>] [--cache <dir>] [--workers N] [--lite_rows <dir>] [--byte_reproducible true|false] [--run_log <file>] [--commit <sha>] [--run_id <text>]
     python -m research.train_student --data_url <dir of trial folders> --train_url <dir> [--cache <dir>] [--lite_rows <dir>]
     python -m research.evaluate_student <ward-v2 seed-11..30 folders> <ward-v2-ext seed-61..160 folders> [--cache <dir>]
 
+- `--run_log <file>` (optional) writes one small JSON run log (created with its parent folders):
+  `model`, `run_id`, `commit`, the framework and package versions, the settings, the data (seed
+  lists, row and positive counts, no path), then for every fit of both variants (2 teachers, 6
+  distilled students, 6 hard-label students) its inputs, width, weight decay, parameter count, the
+  mean training loss and the validation log loss of every epoch, the best epoch, the final validation
+  log loss and average precision, plus references (b) and (d) with their iterations, the gate
+  numbers, the chosen models, thresholds and validation burden, and the budget cuts. Every wall-clock
+  number is under one `time` key, so two runs give the same bytes once `time` is removed. The log is
+  separate from `metadata.json` and is not hashed by `evaluate_student`. `--commit` and `--run_id`
+  (letters, digits, `.`, `_`, `-`, at most 64 characters) are recorded as given: research code
+  cannot call git.
 - `--out` defaults to `models/tier_c/student_vitals/`. `--cache` keeps per-trial features in a
   folder outside the repo, keyed by the sha256 of the trial's four files and a feature-code
   version. Progress lines (epoch number and seconds only) are printed as it runs; validation
@@ -342,7 +358,7 @@ and ward-v2 folders are skipped after reading their manifest; other seeds are re
 - `--lite_rows <dir>` (optional) only writes files: for each exported variant, 20 fixed training rows
   as float32 input files (`row<i>.bin`) and the calibration files the MindSpore Lite `benchmark`
   expects (`row<i>.txt`, MindSpore's p), into `<dir>/<model stem>/`.
-- The Lite conversion is a separate, hand-run step, because research code may not start a process:
+- The Lite conversion is a separate, hand-run step, because research code starts no external program (no subprocess, no shell; it does use Python's own worker processes for feature extraction):
 
       sh models/tier_c/student_vitals/convert_lite.sh <unpacked MindSpore Lite 2.11.0 dir> <model dir> <rows dir> | tee lite.txt
 
@@ -639,7 +655,7 @@ It must print "N passed" and `pytest-exit 0`. If `/venv/bin/python` is missing, 
 `uv sync --locked -q` in `/app/backend` first with `-e UV_PROJECT_ENVIRONMENT=/venv -e
 UV_PYTHON_DOWNLOADS=never`. The backend's coverage gate does not measure `research/`.
 
-## Gate (ML-GATE, slice B5)
+## Gate (ML-GATE)
 
 RESEARCH-GATE does not collect `research/tests_ml/` (its venv has no numpy). This gate runs both
 folders in the research venv, so the student tests are never skipped:
