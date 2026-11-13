@@ -129,6 +129,6 @@ describe("formatClockDay", () => {
     const today = new Date(2026, 10, 14, 9, 5).getTime();
     const before = new Date(2026, 10, 13, 22, 15).getTime();
     expect(formatClockDay(today, now)).toBe(formatClock(today));
-    expect(formatClockDay(before, now)).toBe(`13 Nov, ${formatClock(before)}`);
+    expect(formatClockDay(before, now)).toBe(`${new Date(before).toLocaleDateString([], { day: "numeric", month: "short" })}, ${formatClock(before)}`);
   });
 });

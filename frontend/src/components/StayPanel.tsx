@@ -12,10 +12,13 @@ type RunState = "alert" | "not_ranked" | "not_rebuilt" | "no_reading";
 type Kind = "admitted" | "acknowledged" | "vitals_recorded" | "note_added" | "bp_charted";
 interface Run { state: RunState; start: number; end: number; ongoing: boolean; score: number | null; level: Level | null; reasons: string[] }
 interface Ev { kind: Kind; at: number; by: string | null; role: string | null; score: number | null }
-interface Stay { unavailable: string | null; label: string | null; from: number | null; to: number | null; runs: Run[]; events: Ev[]; cut: boolean; usable: boolean }
+interface Stay { unavailable: string | null; from: number | null; to: number | null; runs: Run[]; events: Ev[]; cut: boolean; broken: boolean; dropped: boolean }
 
 const STATES: readonly string[] = ["alert", "not_ranked", "not_rebuilt", "no_reading"];
 const KINDS: readonly string[] = ["admitted", "acknowledged", "vitals_recorded", "note_added", "bp_charted"];
+// The server's own label is not shown: this sentence must not depend on the answer.
+const FIXED = "Rebuilt from stored 15-minute sets. It can differ from the score shown at the time.";
+const WINDOW_MS = 30 * 60_000; // an acknowledgement just after a run ended still belongs to it
 const LEVELS: Record<string, string> = { high: "high", medium: "medium", single_3: "one value at 3" };
 const ROLES: Record<string, string> = { rn: "RN", md: "MD", charge_rn: "Charge RN" };
 const UNAVAILABLE: Record<string, string> = {
@@ -40,59 +43,69 @@ export function place(start: number, end: number, from: number, to: number): { x
 function clean(raw: PatientHistory): Stay {
   const h = rec(raw);
   const runs: Run[] = [];
+  let dropped = false;
   for (const r of Array.isArray(h.runs) ? h.runs : []) {
     const o = rec(r);
     const start = time(o.start);
     const end = time(o.end);
     const state = str(o.state);
-    if (start === null || end === null || end < start || state === null || !STATES.includes(state)) continue;
-    const score = typeof o.peak_score === "number" ? o.peak_score : null;
+    if (start === null || end === null || end < start || state === null || !STATES.includes(state)) {
+      dropped = true;
+      continue;
+    }
+    // An alert whose score or level is unusable is kept: it is shown without them.
     const level = str(o.peak_level);
-    if (state === "alert" && (score === null || level === null || !(level in LEVELS))) continue;
+    const ok = typeof o.peak_score === "number" && level !== null && level in LEVELS;
     const reasons = Array.isArray(o.reasons) ? o.reasons.filter((x): x is string => typeof x === "string") : [];
-    runs.push({ state: state as RunState, start, end, ongoing: o.ongoing === true, score, level: level as Level | null, reasons });
+    runs.push({ state: state as RunState, start, end, ongoing: o.ongoing === true, score: ok ? (o.peak_score as number) : null, level: ok ? (level as Level) : null, reasons });
   }
   const events: Ev[] = [];
   for (const e of Array.isArray(h.events) ? h.events : []) {
     const o = rec(e);
     const at = time(o.at);
     const kind = str(o.kind);
-    if (at === null || kind === null || !KINDS.includes(kind)) continue;
+    if (at === null || kind === null || !KINDS.includes(kind)) {
+      dropped = true;
+      continue;
+    }
     const role = str(o.role);
     events.push({ kind: kind as Kind, at, by: str(o.by), role: role !== null && role in ROLES ? role : null, score: typeof o.score === "number" ? o.score : null });
   }
   const all = [...runs.flatMap((r) => [r.start, r.end]), ...events.map((e) => e.at)];
   const gf = time(h.grid_from);
   const gt = time(h.grid_to);
-  const u = str(h.unavailable);
   return {
-    unavailable: u,
-    label: str(h.label),
+    unavailable: str(h.unavailable),
     from: all.length || gf !== null ? Math.min(...(gf !== null ? [gf] : []), ...all) : null,
     to: all.length || gt !== null ? Math.max(...(gt !== null ? [gt] : []), ...all) : null,
     runs,
     events,
     cut: h.runs_cut === true || h.events_cut === true,
-    usable: u !== null || runs.length > 0 || events.length > 0 || (Array.isArray(h.runs) && Array.isArray(h.events) && h.runs.length === 0 && h.events.length === 0),
+    broken: !Array.isArray(h.runs) || !Array.isArray(h.events) || (dropped && runs.length === 0 && events.length === 0),
+    dropped,
   };
 }
 
 const day = (ms: number) => new Date(ms).toDateString();
 
 function runLine(r: Run): string {
-  const to = r.ongoing ? "now" : formatClockDay(r.end);
-  const head = `${formatClockDay(r.start)} to ${to}`;
-  const why = r.reasons.join(" · ");
-  if (r.state === "alert") return [head, "Alert", `NEWS2 up to ${r.score} (${LEVELS[r.level!]})`, ...(why ? [why] : [])].join(" · ");
-  if (r.state === "not_ranked") return [head, "Not ranked", ...(why ? [why] : [])].join(" · ");
-  if (r.state === "not_rebuilt") return `${head} · Not rebuilt · the stored values do not give the score of that time`;
-  return `${head} · No heart rate reading`;
+  const range =
+    day(r.start) === day(r.end) ? `${formatClockDay(r.start)} to ${formatClock(r.end)}` : `${formatClockDay(r.start, 0)} to ${formatClockDay(r.end, 0)}`;
+  const head = r.ongoing ? `${range} (last stored set)` : range;
+  const why = r.reasons.join(" \u00b7 ");
+  if (r.state === "alert") {
+    const level = r.level === null ? " (details not available)" : `, up to ${r.score} (${LEVELS[r.level]})`;
+    return [head, `NEWS2 at an alert level${level}`, ...(why ? [why] : [])].join(" \u00b7 ");
+  }
+  if (r.state === "not_ranked") return [head, "Not ranked", ...(why ? [why] : [])].join(" \u00b7 ");
+  if (r.state === "not_rebuilt") return `${head} \u00b7 Not rebuilt \u00b7 the score of that time cannot be rebuilt from the stored values`;
+  return `${head} \u00b7 No heart rate reading`;
 }
 
 function eventLine(e: Ev): string {
   const t = formatClockDay(e.at);
   const by = e.by === null ? "" : ` by ${e.by}`;
-  if (e.kind === "admitted") return `Admitted ${t}`;
+  if (e.kind === "admitted") return `Admitted at ${t}`;
   if (e.kind === "acknowledged") return `Acknowledged${by} at ${t}${e.score === null ? "" : ` (NEWS2 ${e.score})`}`;
   if (e.kind === "vitals_recorded") return `Vitals recorded${by} at ${t}`;
   if (e.kind === "note_added") return `Note added at ${t}${e.role === null ? "" : ` (${ROLES[e.role]})`}`;
@@ -100,7 +113,7 @@ function eventLine(e: Ev): string {
 }
 
 function Strip({ stay, from, to }: { stay: Stay; from: number; to: number }) {
-  const id = useId().replace(/:/g, "");
+  const id = useId();
   return (
     <svg className={styles.strip} aria-hidden="true" focusable="false">
       <defs>
@@ -114,20 +127,22 @@ function Strip({ stay, from, to }: { stay: Stay; from: number; to: number }) {
       {stay.runs.map((r, i) => {
         const { x, w } = place(r.start, r.end, from, to);
         // The bar height also tells the level: high is tallest, one value at 3 is shortest.
+        // The bar height also tells the level: high is tallest. The states that are not an alert stay low.
         const h = r.level === "high" ? 20 : r.level === "medium" ? 14 : 9;
+        const low = { y: 14, h: 6 };
         const bar =
           r.state === "alert"
-            ? { kind: r.level === "high" ? "H" : r.level === "medium" ? "M" : "3", cls: r.level === "high" ? styles.high : r.level === "medium" ? styles.medium : styles.single, y: 20 - h, h }
+            ? { kind: r.level === "high" ? "H" : r.level === "medium" ? "M" : r.level === "single_3" ? "3" : "alert", cls: r.level === "high" ? styles.high : r.level === "medium" ? styles.medium : styles.single, y: 20 - h, h }
             : r.state === "not_ranked"
-              ? { kind: "NR", cls: "", y: 0, h: 20 }
+              ? { kind: "NR", cls: "", ...low }
               : r.state === "not_rebuilt"
-                ? { kind: "?", cls: "", y: 0, h: 20 }
-                : { kind: "dashed", cls: styles.dashed, y: 0, h: 20 };
+                ? { kind: "?", cls: "", ...low }
+                : { kind: "dashed", cls: styles.dashed, ...low };
         const fill = r.state === "not_ranked" ? `url(#${id}-nr)` : r.state === "not_rebuilt" ? `url(#${id}-nb)` : undefined;
         return (
           <g key={i}>
             <rect data-kind={bar.kind} className={bar.cls} style={fill ? { fill } : undefined} x={`${x}%`} y={bar.y} width={`${w}%`} height={bar.h} />
-            {w >= LETTER_W && bar.kind !== "dashed" && (
+            {w >= LETTER_W && bar.kind !== "dashed" && bar.kind !== "alert" && (
               <text className={`${styles.letter} ${bar.kind === "H" ? styles.letterHigh : ""}`} x={`${x + w / 2}%`} y={bar.y + bar.h / 2}>{bar.kind}</text>
             )}
           </g>
@@ -145,13 +160,14 @@ function Entries({ stay }: { stay: Stay }) {
   const used = new Set<Ev>();
   const items = [
     ...stay.runs.map((r) => {
-      const inside = stay.events.filter((e) => !used.has(e) && e.at >= r.start && e.at <= r.end);
+      const inside = stay.events.filter((e) => !used.has(e) && e.at >= r.start && (r.ongoing || e.at <= r.end + WINDOW_MS));
       inside.forEach((e) => used.add(e));
       return { at: r.start, run: r, inside };
     }),
   ];
   const loose = stay.events.filter((e) => !used.has(e)).map((e) => ({ at: e.at, event: e }));
   const rows = [...items, ...loose].sort((a, b) => b.at - a.at);
+  if (rows.length === 0) return null;
   return (
     <ul className={styles.list}>
       {rows.map((row, i) => (
@@ -194,6 +210,7 @@ export function StayPanel({ patientId, onSignOut }: { patientId: string; onSignO
     if (reading.current) return;
     reading.current = true;
     setLoading(true);
+    setError(null);
     getPatientHistory(patientId)
       .then((raw) => {
         setStay(clean(raw));
@@ -215,8 +232,8 @@ export function StayPanel({ patientId, onSignOut }: { patientId: string; onSignO
   }, [patientId]);
 
   const crosses = stay !== null && stay.from !== null && stay.to !== null && day(stay.from) !== day(stay.to);
-  const ongoing = stay?.runs.some((r) => r.ongoing) ?? false;
   const end = (ms: number) => (crosses ? formatClockDay(ms, 0) : formatClockDay(ms));
+  const body = stay !== null && stay.unavailable === null;
 
   return (
     <details
@@ -230,36 +247,30 @@ export function StayPanel({ patientId, onSignOut }: { patientId: string; onSignO
     >
       <summary className={styles.summary}>Stay</summary>
       <div className={styles.body}>
-        {loading && <p role="status" className={styles.quiet}>Loading the stay&hellip;</p>}
-        {error && <p role="status" className={styles.error}>{error}</p>}
-        {stay && !stay.usable && <p className={styles.quiet}>The stay could not be shown.</p>}
-        {stay?.usable && stay.unavailable !== null && (
-          <p className={styles.quiet}>{UNAVAILABLE[stay.unavailable] ?? "The stay could not be shown."}</p>
-        )}
-        {stay?.usable && stay.unavailable === null && (
+        <p role="status" className={error ? styles.error : styles.quiet}>{loading ? "Loading the stay\u2026" : (error ?? "")}</p>
+        {stay && stay.unavailable !== null && <p className={styles.quiet}>{UNAVAILABLE[stay.unavailable] ?? "The stay could not be shown."}</p>}
+        {stay && body && (
           <>
             {stay.from !== null && stay.to !== null && (
               <>
                 <Strip stay={stay} from={stay.from} to={stay.to} />
                 <p className={styles.ends}>
                   <span>{end(stay.from)}</span>
-                  <span>{ongoing ? "now" : end(stay.to)}</span>
+                  <span>{end(stay.to)}</span>
                 </p>
               </>
             )}
-            {stay.runs.length === 0 && <p className={styles.quiet}>No alert in this stay.</p>}
+            {stay.broken && <p className={styles.quiet}>The stay could not be shown.</p>}
+            {!stay.broken && !stay.dropped && stay.runs.length === 0 && <p className={styles.quiet}>No alert level in the stored sets.</p>}
             <Entries stay={stay} />
+            {stay.dropped && <p className={styles.quiet}>Some entries could not be shown.</p>}
             {stay.cut && <p className={styles.quiet}>Older entries are not shown.</p>}
           </>
         )}
-        {asked && (
-          <p className={`${styles.quiet} ${styles.foot}`}>
-            {stay?.label ? `${stay.label} ` : ""}Synthetic, not validated.
-          </p>
-        )}
+        {stay && !loading && <p className={`${styles.quiet} ${styles.foot}`}>{FIXED} Synthetic, not validated.</p>}
         {asked && (
           <p className={styles.quiet}>
-            <button type="button" className={styles.button} disabled={loading} onClick={read}>Refresh</button>
+            <button type="button" className={styles.button} aria-disabled={loading} onClick={read}>Refresh</button>
             {readAt && ` Read at ${readAt}.`}
           </p>
         )}

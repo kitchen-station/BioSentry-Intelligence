@@ -1026,14 +1026,14 @@ describe("PatientDetail: stay panel", () => {
       page("rn");
       await loaded();
       await user.click(await screen.findByText("Stay"));
-      await screen.findByText(/^Admitted \d/);
+      await screen.findByText(/^Admitted at /);
       expect(api.getPatientHistory).toHaveBeenCalledTimes(1);
       await act(async () => {
         await vi.advanceTimersByTimeAsync(5_100);
       });
       expect(api.getPatient.mock.calls.length).toBeGreaterThan(1);
       expect((screen.getByText("Stay").closest("details") as HTMLDetailsElement).open).toBe(true);
-      expect(screen.getByText(/^Admitted \d/)).toBeTruthy();
+      expect(screen.getByText(/^Admitted at /)).toBeTruthy();
       expect(api.getPatientHistory).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
