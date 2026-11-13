@@ -16,13 +16,14 @@ import { SignIn } from "./SignIn";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const api = vi.hoisted(() => ({ usesServer: false, signIn: vi.fn() }));
+const api = vi.hoisted(() => ({ usesServer: false, signIn: vi.fn(), clearSession: vi.fn() }));
 vi.mock("../api", async () => ({
   ApiError: (await vi.importActual<typeof import("../api/client")>("../api/client")).ApiError,
   get usesServer() {
     return api.usesServer;
   },
   signIn: api.signIn,
+  clearSession: api.clearSession,
 }));
 
 function Where() {
@@ -236,5 +237,81 @@ describe("with the API", () => {
     expect(await screen.findByText("Choose destination")).toBeTruthy();
     expect(screen.queryByRole("alert")).toBeNull();
     expect(api.signIn).toHaveBeenLastCalledWith("rn-reyes", "second try");
+  });
+
+  it("signs in and goes to the overview when the server answers admin for a nurse card", async () => {
+    api.signIn.mockResolvedValue("admin");
+    const onSignIn = await toPassphrase();
+    await type("a long passphrase");
+    await click("Continue");
+    expect(await screen.findByText("at /overview")).toBeTruthy();
+    expect(onSignIn).toHaveBeenCalledWith({ clinician_id: "rn-reyes", ward: "W4", role: "admin" });
+    expect(screen.queryByText("Choose destination")).toBeNull();
+  });
+
+  it("labels the destination step with the server's role, not the card's", async () => {
+    api.signIn.mockResolvedValue("charge_rn");
+    await toPassphrase();
+    await type("a long passphrase");
+    await click("Continue");
+    await screen.findByText("Choose destination");
+    expect(screen.getByText(/Charge Nurse/)).toBeTruthy();
+    expect(screen.queryByText(/Staff Nurse/)).toBeNull();
+  });
+
+  describe("administration", () => {
+    const toAdmin = async () => {
+      const onSignIn = page();
+      await click(/Administration/);
+      await userEvent.type(screen.getByLabelText("Administrator id"), "admin-ruiz");
+      await userEvent.type(screen.getByLabelText("Passphrase"), "a long passphrase");
+      return onSignIn;
+    };
+
+    it("is not offered in the public demo", async () => {
+      api.usesServer = false;
+      page();
+      await screen.findByText("I am a");
+      expect(screen.queryByRole("button", { name: /Administration/ })).toBeNull();
+    });
+
+    it("asks for an id and passphrase, with no profile card, and lands on the overview", async () => {
+      api.signIn.mockResolvedValue("admin");
+      const onSignIn = await toAdmin();
+      await click("Continue");
+      expect(api.signIn).toHaveBeenCalledWith("admin-ruiz", "a long passphrase");
+      expect(onSignIn).toHaveBeenCalledWith({ clinician_id: "admin-ruiz", ward: "W4", role: "admin" });
+      expect(await screen.findByText("at /overview")).toBeTruthy();
+    });
+
+    it("refuses any other role from the server and clears the session", async () => {
+      api.signIn.mockResolvedValue("rn");
+      const onSignIn = await toAdmin();
+      await click("Continue");
+      expect((await screen.findByRole("alert")).textContent).toBe(
+        "This account is not an administrator. Sign in from Nursing or Medical.",
+      );
+      expect(api.clearSession).toHaveBeenCalledOnce();
+      expect(onSignIn).not.toHaveBeenCalled();
+    });
+
+    it("says a refused sign-in plainly, and Back returns to the departments", async () => {
+      api.signIn.mockRejectedValue(new ApiError(401, "Unauthorized", {}));
+      await toAdmin();
+      await click("Continue");
+      expect((await screen.findByRole("alert")).textContent).toMatch(/Sign-in failed/);
+      await click(/Back/);
+      expect(await screen.findByText("I am a")).toBeTruthy();
+    });
+  });
+
+  it("trusts the server's role over the card's", async () => {
+    api.signIn.mockResolvedValue("charge_rn");
+    const onSignIn = await toPassphrase();
+    await type("a long passphrase");
+    await click("Continue");
+    expect(await screen.findByRole("button", { name: /Station/ })).toBeTruthy();
+    await click(/Ward Monitor/);
+    expect(onSignIn).toHaveBeenCalledWith({ clinician_id: "rn-reyes", ward: "W4", role: "charge_rn" });
   });
 });

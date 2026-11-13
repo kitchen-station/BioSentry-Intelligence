@@ -150,7 +150,7 @@ def test_no_more_than_two_scrypts_run_at_once_however_many_sign_ins_are_waiting(
 
 def test_the_right_passphrase_gets_a_token_that_works(server: Server) -> None:
     response = server.sign_in("rn-manalo")
-    assert response.status_code == 200 and set(response.json()) == {"token"}
+    assert response.status_code == 200 and set(response.json()) == {"token", "role"}
     headers = {"Authorization": f"Bearer {response.json()['token']}"}
     assert server.client.get("/patients", headers=headers).status_code == 200
 

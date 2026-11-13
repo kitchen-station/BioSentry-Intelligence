@@ -97,6 +97,15 @@ describe("httpProvider requests", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("/wards/W4/live");
   });
 
+  it("reads the admin overview, and a 403 is an ApiError", async () => {
+    fetchMock.mockResolvedValueOnce(reply(200, { ward: "W4" }));
+    await expect(httpProvider.getOverview()).resolves.toEqual({ ward: "W4" });
+    expect(fetchMock.mock.calls[0][0]).toBe("/wards/W4/overview");
+    fetchMock.mockResolvedValueOnce(reply(403, { detail: "Forbidden" }));
+    const failure = await httpProvider.getOverview().catch((e: unknown) => e);
+    expect((failure as ApiError).status).toBe(403);
+  });
+
   it("sends the bearer token the session set", async () => {
     setAuthToken("rn-manalo");
     fetchMock.mockResolvedValue(reply(200, { ranked: [], abstained: [] }));

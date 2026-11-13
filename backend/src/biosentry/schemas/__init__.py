@@ -43,6 +43,14 @@ from .common import (
     Trend,
 )
 from .ingest import LiveWard
+from .overview import (
+    OverviewActivity,
+    OverviewClinician,
+    OverviewPatient,
+    OverviewSimCounts,
+    OverviewSimStatus,
+    WardOverview,
+)
 from .records import (
     Acknowledgement,
     ClinicalNote,
@@ -131,6 +139,12 @@ CONTRACT_MODELS: tuple[type[BaseModel], ...] = (
     BaselineForming,
     BaselineUnavailable,
     LiveWard,
+    OverviewPatient,
+    OverviewClinician,
+    OverviewActivity,
+    OverviewSimStatus,
+    OverviewSimCounts,
+    WardOverview,
 )
 
 # Inputs entered by a person: optional fields may be omitted and default to None.
@@ -169,6 +183,11 @@ __all__ = [
     "NewNote",
     "NumberMeasurement",
     "NurseVitalsInput",
+    "OverviewActivity",
+    "OverviewClinician",
+    "OverviewPatient",
+    "OverviewSimCounts",
+    "OverviewSimStatus",
     "PartialAdmitPatientInput",
     "PartialLabInput",
     "PatientDetail",
@@ -202,5 +221,6 @@ __all__ = [
     "VitalTrends",
     "Vitals",
     "VitalsRecorded",
+    "WardOverview",
     "WardResponse",
 ]

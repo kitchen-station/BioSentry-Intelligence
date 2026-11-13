@@ -10,7 +10,7 @@ hash-chained form comes later. `resource` comes from the caller, so it is cut at
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Any, Literal
 
 from biosentry.repositories.postgres import Conn, whole
 
@@ -89,3 +89,17 @@ class AuditLog:
 
     def for_clinician(self, clinician_id: str) -> tuple[AuditRecord, ...]:
         return self.records(clinician_id)
+
+    def recent(self, since: datetime) -> list[dict[str, Any]]:
+        """What nurses and physicians did after `since`, as counts per clinician, action and
+        outcome, by clinician id, action, outcome. Counts, not rows: a row would show which
+        patient a named clinician opened and when, and oversight needs volume and failures.
+        Sign-in rows are left out (they are logged under the id that was tried, not the person
+        who tried), and so is any row without a clinician role."""
+        return self._conn.execute(
+            "SELECT clinician_id, action, outcome, count(*) AS count FROM audit_log"
+            " WHERE at > %s AND role IN ('rn', 'md', 'charge_rn')"
+            " AND action NOT IN ('sign_in', 'authenticate')"
+            " GROUP BY clinician_id, action, outcome ORDER BY clinician_id, action, outcome",
+            (whole(since),),
+        ).fetchall()

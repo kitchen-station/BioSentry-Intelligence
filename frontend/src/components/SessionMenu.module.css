@@ -4,6 +4,20 @@
 
 .wrapper {
   position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.place {
+  font-size: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.place:hover {
+  text-decoration: underline;
 }
 
 .trigger {
@@ -96,4 +110,12 @@
     min-width: 180px;
     max-width: calc(100vw - 32px);
   }
+}
+
+.notice {
+  margin: 0;
+  padding: 0 var(--sp-3) var(--sp-2);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--label);
 }

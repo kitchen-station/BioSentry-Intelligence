@@ -70,6 +70,7 @@ export type {
   VitalHistory,
   VitalHistoryFull,
   VitalTrends,
+  WardOverview,
   Vitals,
   VitalsRecorded,
   PatientStay,

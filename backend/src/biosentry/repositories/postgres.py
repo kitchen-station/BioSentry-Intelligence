@@ -32,6 +32,7 @@ from biosentry.schemas import ClinicalNote, LabPanel, TierStatus, UnscoredPatien
 
 LIVE_WITHIN = timedelta(seconds=30)  # a sim run whose last batch is older is not "receiving data"
 CONTROL_ROLES = ("md", "charge_rn")  # the roles that may send commands to the ward simulation
+ADMIN_ROLE = "admin"  # reads the ward overview, writes nothing, is never assigned to a patient
 SESSION_TTL = timedelta(hours=12)
 # judgement: RCP NEWS2 (2017) chart, "minimum 12 hourly" at aggregate 0, used for every score.
 # A nurse-typed device value counts for this long. It is the nurse's own word, not a patch reading.
@@ -318,6 +319,38 @@ class PostgresStore:
     def can_control(self, clinician_id: str) -> bool:
         """Whether this clinician may send the sim commands: the one place that rule is written."""
         return self.role_of(clinician_id) in CONTROL_ROLES
+
+    def is_admin(self, clinician_id: str) -> bool:
+        """Whether this clinician is an admin: the one place that rule is written."""
+        return self.role_of(clinician_id) == ADMIN_ROLE
+
+    def on_ward(self) -> frozenset[str]:
+        """Every patient still on the ward, whoever is assigned. For the admin overview only."""
+        rows = self.conn.execute(
+            "SELECT id FROM patient WHERE run_id = %s AND left_at IS NULL", (self.run_id,)
+        )
+        return frozenset(r["id"] for r in rows)
+
+    def care(self, ids: frozenset[str]) -> dict[str, list[str]]:
+        """The clinicians assigned to each of these patients, ids sorted."""
+        out: dict[str, list[str]] = {pid: [] for pid in ids}
+        rows = self.conn.execute(
+            "SELECT patient_id, clinician_id FROM care_assignment"
+            " WHERE run_id = %s AND patient_id = ANY(%s) ORDER BY clinician_id",
+            (self.run_id, sorted(ids)),
+        )
+        for r in rows:
+            out[r["patient_id"]].append(r["clinician_id"])
+        return out
+
+    def clinicians(self) -> list[tuple[str, str]]:
+        """Every clinician but an admin, as (id, role), by id."""
+        # shortcut: one ward per database today, so every clinician belongs to it; scope by
+        # ward when clinicians carry one.
+        rows = self.conn.execute(
+            "SELECT id, role FROM clinician WHERE role <> %s ORDER BY id", (ADMIN_ROLE,)
+        )
+        return [(r["id"], r["role"]) for r in rows]
 
     def passphrase_hash(self, clinician_id: str) -> tuple[bool, str | None]:
         """Whether this clinician exists, and their stored hash (None: no passphrase is set)."""

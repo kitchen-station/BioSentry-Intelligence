@@ -21,6 +21,7 @@ export const fixtureProvider: ApiProvider = {
   getStays: fixtures.getStays,
   // No simulator behind the fixture, so no live view.
   getLiveWard: () => Promise.resolve(null),
+  getOverview: () => Promise.reject(new Error("The overview needs the API")),
   admitPatient: fixtures.admitPatient,
   enterLabResults: fixtures.enterLabResults,
   getAcknowledgements: fixtures.getAcknowledgements,

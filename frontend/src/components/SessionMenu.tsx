@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import type { Session } from "../types";
 import styles from "./SessionMenu.module.css";
 
@@ -8,18 +8,25 @@ interface Props {
   onSignOut: () => void;
 }
 
-const ROLE_LABELS: Record<string, string> = {
+export const ROLE_LABELS: Record<string, string> = {
   rn: "Staff Nurse",
   md: "Attending Physician",
   charge_rn: "Charge Nurse",
+  admin: "Administrator",
 };
 
 export function SessionMenu({ session, onSignOut }: Props) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const inLab = useLocation().pathname.startsWith("/lab");
+  const admin = session.role === "admin";
+  const home = admin ? "/overview" : "/ward";
 
   return (
     <div className={styles.wrapper}>
+      <Link to={inLab ? home : "/lab"} className={styles.place}>
+        {inLab ? (admin ? "Back to the overview" : "Back to the ward") : "Simulation lab"}
+      </Link>
       <button
         type="button"
         className={styles.trigger}
@@ -38,22 +45,30 @@ export function SessionMenu({ session, onSignOut }: Props) {
               <span className={styles.ward}>Ward {session.ward}</span>
             </div>
 
+            {/* The same switch as the API build in api/index.ts; read here so the lab never reaches the api module. */}
+            {import.meta.env.VITE_API_URL && !admin && (
+              <p className={styles.notice}>
+                A ward administrator can see which beds you are assigned and counts of your actions from the last 24 hours.
+              </p>
+            )}
+
             <div className={styles.divider} />
 
-            <Link to="/ward" className={styles.menuItem} onClick={() => setOpen(false)}>
-              Ward Monitor
-            </Link>
+            {admin && (
+              <Link to="/overview" className={styles.menuItem} onClick={() => setOpen(false)}>
+                Overview
+              </Link>
+            )}
+            {!admin && (
+              <Link to="/ward" className={styles.menuItem} onClick={() => setOpen(false)}>
+                Ward Monitor
+              </Link>
+            )}
             {(session.role === "md" || session.role === "charge_rn") && (
               <Link to="/station" className={styles.menuItem} onClick={() => setOpen(false)}>
                 Station
               </Link>
             )}
-            <Link to="/research" className={styles.menuItem} onClick={() => setOpen(false)}>
-              Research numbers
-            </Link>
-            <Link to="/pipeline" className={styles.menuItem} onClick={() => setOpen(false)}>
-              Pipeline
-            </Link>
 
             <div className={styles.divider} />
 

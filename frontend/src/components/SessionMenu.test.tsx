@@ -7,7 +7,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Session } from "../types";
 import { SessionMenu } from "./SessionMenu";
 
@@ -17,10 +17,10 @@ function Where() {
   return <p>at {useLocation().pathname}</p>;
 }
 
-const menu = (session: Session) => {
+const menu = (session: Session, path = "/somewhere") => {
   const onSignOut = vi.fn();
   render(
-    <MemoryRouter initialEntries={["/somewhere"]}>
+    <MemoryRouter initialEntries={[path]}>
       <SessionMenu session={session} onSignOut={onSignOut} />
       <Routes>
         <Route path="*" element={<Where />} />
@@ -31,7 +31,10 @@ const menu = (session: Session) => {
 };
 const open = (id: string) => userEvent.click(screen.getByRole("button", { name: new RegExp(id) }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllEnvs();
+});
 
 describe("SessionMenu", () => {
   it("toggles open and closed from the trigger", async () => {
@@ -44,22 +47,24 @@ describe("SessionMenu", () => {
     expect(screen.queryByText("Ward W4")).toBeNull();
   });
 
-  it("links to the research numbers for every role", async () => {
+  it("offers the lab as a visible entry, outside the dropdown, and goes to it", async () => {
     menu({ clinician_id: "rn-reyes", ward: "W4", role: "rn" });
-    await open("rn-reyes");
-    await userEvent.click(screen.getByRole("link", { name: "Research numbers" }));
-    expect(screen.getByText("at /research")).toBeTruthy();
+    await userEvent.click(screen.getByRole("link", { name: "Simulation lab" }));
+    expect(screen.getByText("at /lab")).toBeTruthy();
   });
 
-  it.each([
-    ["rn-reyes", "rn"],
-    ["md-santos", "md"],
-    ["rn-manalo", "charge_rn"],
-  ] as const)("links to the pipeline for %s (%s)", async (clinician_id, role) => {
-    menu({ clinician_id, ward: "W4", role });
-    await open(clinician_id);
-    await userEvent.click(screen.getByRole("link", { name: "Pipeline" }));
-    expect(screen.getByText("at /pipeline")).toBeTruthy();
+  it("reads Back to the ward on a lab page and goes to the ward", async () => {
+    menu({ clinician_id: "rn-reyes", ward: "W4", role: "rn" }, "/lab/research");
+    expect(screen.queryByRole("link", { name: "Simulation lab" })).toBeNull();
+    await userEvent.click(screen.getByRole("link", { name: "Back to the ward" }));
+    expect(screen.getByText("at /ward")).toBeTruthy();
+  });
+
+  it("no longer lists research or the pipeline in the dropdown", async () => {
+    menu({ clinician_id: "md-santos", ward: "W4", role: "md" });
+    await open("md-santos");
+    expect(screen.queryByRole("link", { name: "Research numbers" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Pipeline" })).toBeNull();
   });
 
   it("closes when the backdrop is clicked", async () => {
@@ -105,5 +110,43 @@ describe("SessionMenu", () => {
     expect(onSignOut).toHaveBeenCalledOnce();
     expect(screen.getByText("at /")).toBeTruthy();
     expect(screen.queryByText("Ward W4")).toBeNull();
+  });
+
+  it("gives an admin the overview and no ward or station", async () => {
+    menu({ clinician_id: "admin-ruiz", ward: "W4", role: "admin" });
+    await open("admin-ruiz");
+    expect(screen.getByText("Administrator")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Ward Monitor" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Station" })).toBeNull();
+    await userEvent.click(screen.getByRole("link", { name: "Overview" }));
+    expect(screen.getByText("at /overview")).toBeTruthy();
+  });
+
+  it("returns an admin from the lab to the overview", async () => {
+    menu({ clinician_id: "admin-ruiz", ward: "W4", role: "admin" }, "/lab");
+    expect(screen.queryByRole("link", { name: "Back to the ward" })).toBeNull();
+    await userEvent.click(screen.getByRole("link", { name: "Back to the overview" }));
+    expect(screen.getByText("at /overview")).toBeTruthy();
+  });
+
+  beforeEach(() => vi.stubEnv("VITE_API_URL", "http://api.test"));
+
+  const NOTICE = "A ward administrator can see which beds you are assigned and counts of your actions from the last 24 hours.";
+
+  it.each(["rn", "md", "charge_rn"] as const)("tells a %s on an API build that an administrator sees counts", async (role) => {
+    menu({ clinician_id: "x-1", ward: "W4", role });
+    await open("x-1");
+    expect(screen.getByText(NOTICE)).toBeTruthy();
+  });
+
+  it("does not show the notice to an admin or on the fixture build", async () => {
+    menu({ clinician_id: "admin-ruiz", ward: "W4", role: "admin" });
+    await open("admin-ruiz");
+    expect(screen.queryByText(NOTICE)).toBeNull();
+    cleanup();
+    vi.stubEnv("VITE_API_URL", "");
+    menu({ clinician_id: "rn-reyes", ward: "W4", role: "rn" });
+    await open("rn-reyes");
+    expect(screen.queryByText(NOTICE)).toBeNull();
   });
 });

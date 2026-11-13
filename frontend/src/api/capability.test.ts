@@ -23,3 +23,14 @@ describe("canRecordVitals", () => {
     expect(await canRecordVitalsWith("http://127.0.0.1:8000")).toBe(true);
   });
 });
+
+describe("hasOverview", () => {
+  it("is true only when the build is wired to an API", async () => {
+    vi.stubEnv("VITE_API_URL", "");
+    vi.resetModules();
+    expect((await import("./index")).hasOverview).toBe(false);
+    vi.stubEnv("VITE_API_URL", "http://127.0.0.1:8000");
+    vi.resetModules();
+    expect((await import("./index")).hasOverview).toBe(true);
+  });
+});

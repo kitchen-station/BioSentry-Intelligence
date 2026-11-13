@@ -75,8 +75,8 @@ const page = (role?: SessionRole, path = "/patient/p-001") =>
   render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/patient/:id" element={<PatientDetail session={session(role)} />} />
-        <Route path="*" element={<PatientDetail session={session(role)} />} />
+        <Route path="/patient/:id" element={<PatientDetail session={session(role)} onSignOut={() => undefined} />} />
+        <Route path="*" element={<PatientDetail session={session(role)} onSignOut={() => undefined} />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -92,7 +92,20 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+const expectLabEntry = () => {
+  expect(screen.getAllByRole("link", { name: "Simulation lab" })).toHaveLength(1);
+  expect(screen.getAllByText("Simulated patients until a hospital is connected.")).toHaveLength(1);
+};
+
 describe("PatientDetail", () => {
+  it("says the patients are simulated, once, and has the session menu", async () => {
+    page("rn");
+    await loaded();
+    expect(screen.getAllByText("Simulated patients until a hospital is connected.")).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Simulation lab" }).getAttribute("href")).toBe("/lab");
+    expect(screen.getByRole("button", { name: /rn-manalo/ })).toBeTruthy();
+  });
+
   it("shows the score, why the patient is up, and the nurse's next step", async () => {
     page("rn");
     expect((await loaded()).textContent).toBe(row.name);
@@ -216,19 +229,28 @@ describe("PatientDetail", () => {
     page();
     expect(await screen.findByText("Patient not found.")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Back to ward" }).getAttribute("href")).toBe("/ward");
+    expectLabEntry();
   });
 
   it("shows an error when the patient cannot be loaded", async () => {
     api.getPatient.mockRejectedValue(new Error("offline"));
     page();
     expect((await screen.findByRole("alert")).textContent).toMatch(/could not be loaded/);
+    expectLabEntry();
+  });
+
+  it("shows the lab entry and the quiet line while the patient loads", () => {
+    api.getPatient.mockReturnValue(new Promise(() => {}));
+    page();
+    expectLabEntry();
   });
 
   it("asks for nothing without a patient id", () => {
     const { container } = page(undefined, "/elsewhere");
     expect(api.getPatient).not.toHaveBeenCalled();
     expect(api.getBaseline).not.toHaveBeenCalled();
-    expect(container.textContent).toBe("");
+    expectLabEntry();
+    expect(container.querySelector("h1")).toBeNull();
   });
 
   it("opens the notes drawer with the patient's notes and adds one as the signed-in clinician", async () => {

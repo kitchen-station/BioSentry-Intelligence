@@ -1,0 +1,72 @@
+.page {
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  color: var(--ink);
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-3);
+  min-height: 36px;
+  padding: var(--sp-1) var(--sp-4);
+  font-size: 12px;
+  background: var(--primary);
+  color: var(--button-ink);
+}
+
+.status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-3);
+  font-size: 13px;
+}
+
+.status p {
+  margin: 0;
+}
+
+.refresh {
+  padding: var(--sp-1) var(--sp-3);
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--button-ink);
+  background: var(--button);
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.refresh:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.warn {
+  margin: 0;
+  color: var(--alert);
+}
+
+.group h3 {
+  margin: var(--sp-2) 0 var(--sp-1);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.group ul {
+  margin: 0;
+  padding-left: var(--sp-4);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+/* Words, not figures: left-aligned and on one line. A long row scrolls inside the table's own region. */
+.text th,
+.text td {
+  text-align: left;
+  white-space: nowrap;
+}

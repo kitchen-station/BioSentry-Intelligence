@@ -347,6 +347,51 @@ export interface components {
             readonly temperature?: number | null;
         };
         /**
+         * OverviewActivity
+         * @description How many times a clinician did one action with one outcome in the last day. Counts, not
+         *     rows: a row would show which patient a named clinician opened and when. Oversight needs
+         *     volume and failures.
+         */
+        readonly OverviewActivity: {
+            readonly action: string;
+            readonly clinician_id: string;
+            readonly count: number;
+            readonly outcome: string;
+        };
+        /** OverviewClinician */
+        readonly OverviewClinician: {
+            readonly id: string;
+            readonly patients: number;
+            readonly role: components["schemas"]["SessionRole"];
+        };
+        /** OverviewPatient */
+        readonly OverviewPatient: {
+            readonly bed: string;
+            readonly care: readonly string[];
+            readonly reason: string | null;
+            readonly score: number | null;
+            /** @enum {string} */
+            readonly state: "ranked" | "not_ranked";
+            readonly synthetic: boolean;
+        };
+        /** OverviewSimCounts */
+        readonly OverviewSimCounts: {
+            readonly abstained: number;
+            readonly received: number;
+            readonly rejected: number;
+        };
+        /**
+         * OverviewSimStatus
+         * @description Only what the status line reads from the sim's shared view; nothing else is copied.
+         */
+        readonly OverviewSimStatus: {
+            readonly clockS: number;
+            readonly counts: components["schemas"]["OverviewSimCounts"];
+            readonly ended: boolean;
+            /** @enum {integer} */
+            readonly speed: 0 | 1 | 10 | 60;
+        };
+        /**
          * PartialAdmitPatientInput
          * @description AdmitPatientInput with every field optional (extraction results).
          */
@@ -577,7 +622,7 @@ export interface components {
          * SessionRole
          * @enum {string}
          */
-        readonly SessionRole: "rn" | "md" | "charge_rn";
+        readonly SessionRole: "rn" | "md" | "charge_rn" | "admin";
         /**
          * Sex
          * @enum {string}
@@ -758,6 +803,17 @@ export interface components {
             readonly spo2: readonly (number | null)[];
             readonly temperature: readonly (number | null)[];
         };
+        /** WardOverview */
+        readonly WardOverview: {
+            readonly activity: readonly components["schemas"]["OverviewActivity"][];
+            readonly as_of: string;
+            readonly clinicians: readonly components["schemas"]["OverviewClinician"][];
+            readonly patients: readonly components["schemas"]["OverviewPatient"][];
+            readonly receiving_data: boolean;
+            readonly sim: components["schemas"]["OverviewSimStatus"] | null;
+            readonly synthetic: boolean;
+            readonly ward: string;
+        };
         /** WardResponse */
         readonly WardResponse: {
             readonly abstained: readonly components["schemas"]["AbstainedRow"][];
@@ -808,6 +864,11 @@ export type NewNote = components['schemas']['NewNote'];
 export type NumberMeasurement = components['schemas']['NumberMeasurement'];
 export type NumberPresent = components['schemas']['NumberPresent'];
 export type NurseVitalsInput = components['schemas']['NurseVitalsInput'];
+export type OverviewActivity = components['schemas']['OverviewActivity'];
+export type OverviewClinician = components['schemas']['OverviewClinician'];
+export type OverviewPatient = components['schemas']['OverviewPatient'];
+export type OverviewSimCounts = components['schemas']['OverviewSimCounts'];
+export type OverviewSimStatus = components['schemas']['OverviewSimStatus'];
 export type PartialAdmitPatientInput = components['schemas']['PartialAdmitPatientInput'];
 export type PartialLabInput = components['schemas']['PartialLabInput'];
 export type PatientDetail = components['schemas']['PatientDetail'];
@@ -841,6 +902,7 @@ export type VitalHistoryFull = components['schemas']['VitalHistoryFull'];
 export type Vitals = components['schemas']['Vitals'];
 export type VitalsRecorded = components['schemas']['VitalsRecorded'];
 export type VitalTrends = components['schemas']['VitalTrends'];
+export type WardOverview = components['schemas']['WardOverview'];
 export type WardResponse = components['schemas']['WardResponse'];
 export type $defs = Record<string, never>;
 export type operations = Record<string, never>;

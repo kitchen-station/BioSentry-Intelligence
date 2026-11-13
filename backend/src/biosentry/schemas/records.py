@@ -31,6 +31,7 @@ class SessionRole(StrEnum):
     rn = "rn"
     md = "md"
     charge_rn = "charge_rn"
+    admin = "admin"
 
 
 class Session(Contract):
@@ -48,6 +49,7 @@ class SessionRequest(Contract):
 
 class SessionToken(Contract):
     token: str
+    role: SessionRole
 
 
 class Acknowledgement(Contract):

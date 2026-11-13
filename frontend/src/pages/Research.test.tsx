@@ -12,9 +12,9 @@ import { Research } from "./Research";
 
 afterEach(cleanup);
 
-const show = () =>
+const show = (at = "/") =>
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[at]}>
       <Research session={{ clinician_id: "md-santos", ward: "W4", role: "md" }} onSignOut={() => {}} />
     </MemoryRouter>,
   );
@@ -98,9 +98,11 @@ describe("Research page", () => {
   it("shows one h1, the banner and the six rules in a captioned table", () => {
     show();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(screen.getByRole("note").textContent).toBe(
+    expect(screen.getAllByRole("note").map((n) => n.textContent)).toEqual([
+      "Simulation lab: not the ward. Nothing here changes a patient's rank.",
       "Synthetic, not validated. These numbers come from a simulator, judged on the same simulator. They are not evidence about patients.",
-    );
+    ]);
+    expect(screen.getByRole("link", { name: "Simulation lab" })).toBeTruthy(); // rendered at /, not under /lab
     const table = screen.getAllByRole("table")[0];
     expect(within(table).getByText(/Alert rules on simulated episodes/)).toBeTruthy();
     const rows = within(table).getAllByRole("row").slice(1);
@@ -207,6 +209,19 @@ describe("Research page", () => {
     show();
     expect(screen.getByRole("heading", { level: 2, name: "Research agent: questions asked on the simulated ward" })).toBeTruthy();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
+  it("scrolls to the agent section when the address has its hash, and not without one", () => {
+    // jsdom has no scrollIntoView.
+    const spy = vi.fn();
+    Element.prototype.scrollIntoView = spy;
+    show();
+    expect(spy).not.toHaveBeenCalled();
+    cleanup();
+    show("/lab/research#agent");
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect((spy.mock.contexts[0] as Element).id).toBe("agent");
+    delete (Element.prototype as Partial<Element>).scrollIntoView;
   });
 
   it("makes no API call", () => {

@@ -23,6 +23,7 @@ def _names(url: str) -> list[str]:
 
 
 def test_every_migration_is_recorded_once(database_url: str) -> None:
+    assert "0009_admin_role" in _names(database_url)
     assert _names(database_url) == [p.stem for p in migrations()]
     ensure(database_url)  # a restart
     with connect(database_url) as conn:

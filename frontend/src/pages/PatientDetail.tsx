@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { useParams, Link } from "react-router-dom";
 import type { ClinicalNote, PatientDetail as PatientDetailType, Session, SessionRole, TierBFinding, VitalsRecorded } from "../types";
 import { getPatient, getNotes, addNote, canRecordVitals } from "../api";
+import { SessionMenu } from "../components/SessionMenu";
+import { SimulatedNote } from "../components/LabFrame";
 import { BaselinePanel } from "../components/BaselinePanel";
 import { useBaseline } from "../components/useBaseline";
 import { CurrentVitals, VitalRow } from "../components/CurrentVitals";
@@ -49,11 +52,29 @@ const SECONDARY_AXES = new Set(["hrv"]);
 
 type Drawer = "notes" | "charts" | null;
 
-const ROLE_LABEL: Record<SessionRole, string> = { rn: "RN", charge_rn: "Charge RN", md: "MD" };
+const ROLE_LABEL: Record<SessionRole, string> = { rn: "RN", charge_rn: "Charge RN", md: "MD", admin: "Admin" };
+
+// The top strip and quiet line for the states with no patient to show.
+function Bare({ session, onSignOut, children }: { session: Session; onSignOut: () => void; children?: ReactNode }) {
+  return (
+    <div className={styles.page}>
+      <div className={styles.statusStrip}>
+        <div className={styles.stripInner}>
+          <Link to="/ward" className={styles.back}>&larr; Ward view</Link>
+          <div className={styles.stripRight}>
+            <SessionMenu session={session} onSignOut={onSignOut} />
+          </div>
+        </div>
+      </div>
+      <SimulatedNote />
+      <main>{children}</main>
+    </div>
+  );
+}
 
 // --- Main component ---
 
-export function PatientDetail({ session }: { session: Session }) {
+export function PatientDetail({ session, onSignOut }: { session: Session; onSignOut: () => void }) {
   const role = session.role;
   const { id } = useParams<{ id: string }>();
   const [saves, setSaves] = useState(0);
@@ -118,23 +139,23 @@ export function PatientDetail({ session }: { session: Session }) {
 
   if (notFound) {
     return (
-      <main className={styles.page}>
+      <Bare session={session} onSignOut={onSignOut}>
         <p>Patient not found.</p>
         <Link to="/ward">Back to ward</Link>
-      </main>
+      </Bare>
     );
   }
 
   if (loadError) {
     return (
-      <main className={styles.page}>
+      <Bare session={session} onSignOut={onSignOut}>
         <p role="alert">This patient could not be loaded. Check the connection and reload.</p>
         <Link to="/ward">Back to ward</Link>
-      </main>
+      </Bare>
     );
   }
 
-  if (!patient) return null;
+  if (!patient) return <Bare session={session} onSignOut={onSignOut} />;
 
   const reasons = patient.escalation_reasons;
   const signal = patchInUse(patient.vitals) ? patient.signal_quality : null;
@@ -153,9 +174,11 @@ export function PatientDetail({ session }: { session: Session }) {
               {now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
             </span>
             <span className={styles.stripId}>{patient.id}</span>
+            <SessionMenu session={session} onSignOut={onSignOut} />
           </div>
         </div>
       </div>
+      <SimulatedNote />
 
       {/* Summary bar: NEWS2 + escalation reasons (no rank, no tier badge) */}
       <div className={styles.summaryBar}>

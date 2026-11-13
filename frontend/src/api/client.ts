@@ -4,6 +4,8 @@
  * Invariants: none directly; serves providers that enforce them.
  */
 
+import type { SessionRole } from "../types";
+
 const BASE_URL: string = import.meta.env.VITE_API_URL ?? "";
 
 let _token: string | null = null;
@@ -18,23 +20,24 @@ export function setAuthToken(token: string | null): void {
 }
 
 /**
- * Signs in (POST /session). Resolves once the token is held; rejects with the ApiError when the
+ * Signs in (POST /session). Resolves with the role the server holds once the token is held; rejects with the ApiError when the
  * API refuses (401: wrong passphrase, unknown clinician or none set; 429: too many failures), so
  * the sign-in page can say so. Until it settles, other requests wait; after a refusal they go out
  * without a token and the API answers 401: the client fails closed. The passphrase is only ever
  * in this request body: never stored, never logged.
  */
-export function openSession(clinicianId: string, passphrase: string): Promise<void> {
+export function openSession(clinicianId: string, passphrase: string): Promise<SessionRole> {
   const generation = ++_generation;
   _token = null;
-  const opening = request<{ token: string }>(
+  const opening = request<{ token: string; role: SessionRole }>(
     "/session",
     { method: "POST", body: JSON.stringify({ clinician_id: clinicianId, passphrase }) },
     false,
   ).then((r) => {
     if (generation === _generation) _token = r.token;
+    return r.role;
   });
-  _pending = opening.catch(() => {});
+  _pending = opening.then(() => {}, () => {});
   return opening;
 }
 

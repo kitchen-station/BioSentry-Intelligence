@@ -50,7 +50,17 @@ vi.mock("./pages/Ward", () => ({
   ),
 }));
 vi.mock("./pages/PatientDetail", () => ({
-  PatientDetail: ({ session }: { session: Session }) => <p>patient page for {session.clinician_id}</p>,
+  PatientDetail: ({ session, onSignOut }: { session: Session; onSignOut: () => void }) => (
+    <div>
+      <p>patient page for {session.clinician_id}</p>
+      <button type="button" onClick={onSignOut}>
+        sign out
+      </button>
+    </div>
+  ),
+}));
+vi.mock("./pages/Lab", () => ({
+  Lab: ({ session }: { session: Session }) => <p>lab page for {session.clinician_id}</p>,
 }));
 vi.mock("./pages/Research", () => ({
   Research: ({ session }: { session: Session }) => <p>research page for {session.clinician_id}</p>,
@@ -69,7 +79,12 @@ vi.mock("./pages/Station", () => ({
   ),
 }));
 
+vi.mock("./pages/Overview", () => ({
+  Overview: ({ session }: { session: Session }) => <p>overview page for {session.clinician_id}</p>,
+}));
+
 const KEY = "biosentry.session";
+const admin: Session = { clinician_id: "admin-ruiz", ward: "W4", role: "admin" };
 const nurse: Session = { clinician_id: "rn-reyes", ward: "W4", role: "rn" };
 const charge: Session = { clinician_id: "rn-manalo", ward: "W4", role: "charge_rn" };
 
@@ -110,7 +125,7 @@ describe("restoring the session", () => {
 
   it.each([
     ["malformed JSON", "{not json"],
-    ["an unknown role", JSON.stringify({ ...nurse, role: "admin" })],
+    ["an unknown role", JSON.stringify({ ...nurse, role: "root" })],
     ["a missing ward", JSON.stringify({ clinician_id: "rn-reyes", role: "rn" })],
     ["a non-string clinician id", JSON.stringify({ ...nurse, clinician_id: 7 })],
     ["null", "null"],
@@ -145,16 +160,68 @@ describe("route guards", () => {
     expect(screen.getByText("patient page for rn-reyes")).toBeTruthy();
   });
 
-  it("shows the pipeline to any signed-in clinician", () => {
+  it("signs out from the patient page", async () => {
     store(nurse);
-    at("/pipeline");
-    expect(screen.getByText("pipeline page for rn-reyes")).toBeTruthy();
+    at("/patient/p-001");
+    await userEvent.click(screen.getByRole("button", { name: "sign out" }));
+    expect(screen.getByText("sign-in page from /patient/p-001")).toBeTruthy();
   });
 
-  it("shows the research numbers to any signed-in clinician", () => {
+  it.each([
+    ["rn", nurse],
+    ["md", { clinician_id: "md-santos", ward: "W4", role: "md" }],
+    ["charge_rn", charge],
+  ] as const)("shows every lab page to %s", (_, who) => {
+    store(who);
+    for (const [path, words] of [["/lab", "lab page"], ["/lab/research", "research page"], ["/lab/pipeline", "pipeline page"]]) {
+      const { unmount } = at(path);
+      expect(screen.getByText(`${words} for ${who.clinician_id}`)).toBeTruthy();
+      unmount();
+    }
+  });
+
+  it.each([
+    ["/research", "research page"],
+    ["/pipeline", "pipeline page"],
+  ])("sends the old %s address into the lab", (path, words) => {
     store(nurse);
+    at(path);
+    expect(screen.getByText(`${words} for rn-reyes`)).toBeTruthy();
+  });
+
+  it("sends a signed-out visitor of the lab to sign-in, remembering where", () => {
+    at("/lab/research");
+    expect(screen.getByText("sign-in page from /lab/research")).toBeTruthy();
+  });
+
+  it("sends a signed-out visitor of an old address to sign-in", () => {
     at("/research");
-    expect(screen.getByText("research page for rn-reyes")).toBeTruthy();
+    expect(screen.getByText("sign-in page from /research")).toBeTruthy();
+  });
+
+  it("shows the overview to an admin, who may also open the lab", () => {
+    store(admin);
+    at("/overview");
+    expect(screen.getByText("overview page for admin-ruiz")).toBeTruthy();
+    cleanup();
+    at("/lab");
+    expect(screen.getByText("lab page for admin-ruiz")).toBeTruthy();
+  });
+
+  it.each(["/ward", "/station", "/patient/p-001"])("sends an admin from %s to the overview", (path) => {
+    store(admin);
+    at(path);
+    expect(screen.getByText("overview page for admin-ruiz")).toBeTruthy();
+  });
+
+  it("hands any other role to the overview page, which refuses it, and a signed-out visitor to sign in", () => {
+    store(nurse);
+    at("/overview");
+    expect(screen.getByText("overview page for rn-reyes")).toBeTruthy();
+    cleanup();
+    sessionStorage.clear();
+    at("/overview");
+    expect(screen.getByText("sign-in page from /overview")).toBeTruthy();
   });
 
   it("keeps a staff nurse out of the station: back to the ward", () => {
