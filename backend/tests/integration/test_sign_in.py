@@ -145,6 +145,44 @@ def test_no_more_than_two_scrypts_run_at_once_however_many_sign_ins_are_waiting(
     assert peak[0] == 2  # and two did overlap: the limit is not vacuous
 
 
+def test_a_sign_in_that_gets_no_scrypt_slot_in_time_answers_503_and_leaves_no_row(
+    server: "Server", monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(passphrase_module, "SLOT_WAIT", 0.01)
+    for _ in range(2):
+        passphrase_module._SLOTS.acquire()
+    try:
+        busy = server.sign_in("rn-manalo")
+    finally:
+        for _ in range(2):
+            passphrase_module._SLOTS.release()
+    assert busy.status_code == 503
+    assert busy.headers["retry-after"] == "5"
+    assert server.audit() == []
+    assert server.sign_in("rn-manalo").status_code == 200  # the slots are free again
+
+
+def test_a_locked_id_and_an_anonymous_caller_each_leave_one_audit_row_a_minute(
+    server: "Server",
+) -> None:
+    def rows() -> tuple[int, int]:
+        with connect(server.url) as conn:
+            found = conn.execute("SELECT action, outcome FROM audit_log").fetchall()
+        pairs = [(r["action"], r["outcome"]) for r in found]
+        return pairs.count(("sign_in", "limited")), pairs.count(("authenticate", "denied"))
+
+    for _ in range(SIGN_IN_FAILURES):
+        server.sign_in("rn-manalo", "wrong passphrase")
+    for _ in range(3):
+        assert server.sign_in("rn-manalo").status_code == 429
+        assert server.client.get("/patients").status_code == 401
+    assert rows() == (1, 1)
+    server.wall.now += timedelta(minutes=1, seconds=1)
+    assert server.sign_in("rn-manalo").status_code == 429
+    assert server.client.get("/patients").status_code == 401
+    assert rows() == (2, 2)
+
+
 # --- POST /session -----------------------------------------------------------------------------
 
 
