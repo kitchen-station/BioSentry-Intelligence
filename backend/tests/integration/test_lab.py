@@ -2,6 +2,7 @@
 limits, the timeouts and the table's own checks. The API only stores; nothing here runs anything."""
 
 import json
+import threading
 from datetime import timedelta
 from typing import Any
 
@@ -13,6 +14,7 @@ from test_store import KEY, Api, api, iso  # noqa: F401 (api: fixture)
 
 from biosentry.repositories.postgres import connect
 from biosentry.schemas.lab import HOSPITAL_PAIRS, W4_RULES
+from biosentry.services.lab import CLAIM
 
 W4 = {
     "kind": "compare",
@@ -440,6 +442,88 @@ def test_a_done_report_is_not_refused_for_a_key_the_api_does_not_check(api: Api,
     assert row["state"] == "done" and row["report"] == doc  # stored as it came
 
 
+HEAD = '{"compare_format":1,"synthetic":true,"mode":"w4","x":'
+
+
+def nested(depth: int) -> str:  # the object is depth 1, so `depth - 1` arrays hold the key
+    return HEAD + "[" * (depth - 1) + "]" * (depth - 1) + "}"
+
+
+def test_a_document_of_depth_64_is_stored_and_read_back(api: Api) -> None:
+    running(api)
+    assert report(api, done(nested(64))).status_code == 204
+    assert api.client.get("/wards/W4/lab/runs/1", headers=api.as_(MD)).status_code == 200
+
+
+@pytest.mark.parametrize("doc", [nested(65), HEAD + "[" * 256 + "]" * 256 + "}", nested(300)])
+def test_a_deeper_document_is_a_mismatch(api: Api, doc: str) -> None:
+    running(api)
+    assert report(api, done(doc)).status_code == 422
+    assert runs(api)[0]["state"] == "failed"
+
+
+@pytest.mark.parametrize("value", ["1e400", '"\\ud800"', "-1e999"])
+def test_an_infinity_or_a_lone_surrogate_in_compare_json_is_a_mismatch(api: Api, value: str) -> None:
+    running(api)
+    response = report(api, done(HEAD + value + "}"))
+    assert (response.status_code, response.json()) == (
+        422,
+        {"detail": "The report does not match the request"},
+    )
+    row = runs(api)[0]
+    assert (row["state"], row["report"]) == ("failed", None)
+    assert api.sql("SELECT outcome FROM audit_log WHERE action = 'lab_report'") == [
+        {"outcome": "rejected"}
+    ]
+
+
+def test_an_empty_compare_txt_is_a_mismatch(api: Api) -> None:
+    running(api)
+    response = report(api, done(txt=""))
+    assert (response.status_code, response.json()) == (
+        422,
+        {"detail": "The report does not match the request"},
+    )
+    assert runs(api)[0]["state"] == "failed"
+
+
+def raw(api: Api, text: str) -> Any:  # a JSON library may refuse to build these bodies
+    return api.client.post(
+        "/sim/lab/runs/1/report",
+        headers={**WORKER, "Content-Type": "application/json"},
+        content=text.encode("ascii"),
+    )
+
+
+BAD_BODIES = [
+    '{"state":"failed","reason":"x\\ud800"}',
+    '{"state":"done","compare_json":"{}","compare_txt":"x\\ud800"}',
+    *(
+        f'{{"state":"{s}","reason":"a{c}b"}}'
+        for s in ("failed", "refused")
+        for c in ("\\u0085", "\\u2028", "\\u2029", "\\u202e", "\\u2066", "\\u009f", "\\r", "\\n")
+    ),
+    *(
+        f'{{"state":"done","compare_json":"{{}}","compare_txt":"a{c}b"}}'
+        for c in ("\\u0085", "\\u2028", "\\u2029", "\\u202e", "\\u2069", "\\u009f", "\\r", "\\u007f")
+    ),
+]
+
+
+@pytest.mark.parametrize("text", BAD_BODIES)
+def test_a_lone_surrogate_or_a_line_breaking_character_changes_nothing(api: Api, text: str) -> None:
+    running(api)
+    before = runs(api)
+    assert raw(api, text).status_code == 422
+    assert runs(api) == before
+
+
+def test_lf_is_allowed_in_compare_txt(api: Api) -> None:
+    running(api)
+    assert report(api, done(txt="one\ntwo\n\nthree")).status_code == 204
+    assert runs(api)[0]["report_text"] == "one\ntwo\n\nthree"
+
+
 def test_a_hospital_run_reported_as_w4_fails(api: Api) -> None:
     running(api, HOSPITAL)
     wrong = compare_json(
@@ -452,7 +536,6 @@ def test_a_hospital_run_reported_as_w4_fails(api: Api) -> None:
     "body",
     [
         {"state": "done", "compare_json": "x" * 524289, "compare_txt": "t"},
-        {"state": "done", "compare_json": "{}", "compare_txt": ""},
         {"state": "done", "compare_json": "{}", "compare_txt": "t" * 131073},
         {"state": "done", "compare_json": "{}", "compare_txt": "a\rb"},
         {"state": "done", "compare_json": "{}", "compare_txt": "a\tb"},
@@ -487,6 +570,33 @@ def test_a_report_id_outside_the_database_range_is_422(api: Api) -> None:
     body = {"state": "failed", "reason": "x"}
     assert report(api, body, 0).status_code == 422
     assert report(api, body, 2**63).status_code == 422
+
+
+# --- claim against a timeout --------------------------------------------------------------------
+
+
+def test_the_claim_statement_cannot_start_a_row_that_is_no_longer_queued(api: Api) -> None:
+    """Two connections: one fails the queued row and has not committed; the claim blocks on that
+    row, then runs after the commit. Without `state = 'queued'` it would set the failed row running."""
+    assert ask(api).status_code == 201
+    result: list[Any] = []
+    with connect(api.url) as first, connect(api.url) as second:
+        first.execute("BEGIN")
+        first.execute("UPDATE lab_run SET state = 'failed', reason = 'x', finished_at = now()")
+
+        def claim_now() -> None:
+            second.execute("BEGIN")
+            result.append(second.execute(CLAIM, (api.wall(),)).fetchall())
+            second.execute("COMMIT")
+
+        thread = threading.Thread(target=claim_now)
+        thread.start()
+        thread.join(0.5)
+        assert thread.is_alive()  # waiting for the lock
+        first.execute("COMMIT")
+        thread.join(10)
+    assert result == [[]]
+    assert runs(api)[0]["state"] == "failed"
 
 
 # --- timeouts ----------------------------------------------------------------------------------

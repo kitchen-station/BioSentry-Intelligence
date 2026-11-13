@@ -106,6 +106,13 @@ def get_run(store: PostgresStore, lab_run_id: int) -> LabRunDetail | None:
     )
 
 
+# the outer `state = 'queued'` keeps a row that a concurrent read just failed from becoming running
+CLAIM = (
+    "UPDATE lab_run SET state = 'running', claimed_at = %s WHERE state = 'queued' AND id ="
+    " (SELECT min(id) FROM lab_run WHERE state = 'queued') RETURNING *"
+)
+
+
 def claim(conn: Conn, now: datetime) -> LabJob | None:
     """The oldest queued run, now running. None while nothing is queued or one is running."""
     with transaction(conn):
@@ -113,11 +120,7 @@ def claim(conn: Conn, now: datetime) -> LabJob | None:
         _expire(conn, now)
         if conn.execute("SELECT 1 FROM lab_run WHERE state = 'running'").fetchone():
             return None
-        row = conn.execute(
-            "UPDATE lab_run SET state = 'running', claimed_at = %s WHERE id ="
-            " (SELECT min(id) FROM lab_run WHERE state = 'queued') RETURNING *",
-            (whole(now),),
-        ).fetchone()
+        row = conn.execute(CLAIM, (whole(now),)).fetchone()
     return None if row is None else LabJob.model_validate({k: row[k] for k in LabJob.model_fields})
 
 
@@ -141,11 +144,32 @@ def _refuse_constant(name: str) -> Any:
     raise ValueError(name)  # NaN and Infinity are not JSON and jsonb cannot hold them
 
 
+# A real compare.json is about 5 deep. Deeper is refused: past a limit the stored value could not
+# be served again.
+MAX_DEPTH = 64
+
+
+def _too_deep(doc: Any) -> bool:
+    stack = [(doc, 1)]
+    while stack:
+        node, depth = stack.pop()
+        if isinstance(node, dict | list):
+            if depth > MAX_DEPTH:
+                return True
+            stack.extend((v, depth + 1) for v in (node.values() if isinstance(node, dict) else node))
+    return False
+
+
 def _parse(text: str) -> Any:
     try:
         if "\\u0000" in text:  # jsonb cannot hold a NUL
             return None
-        return json.loads(text, parse_constant=_refuse_constant)
+        doc = json.loads(text, parse_constant=_refuse_constant)
+        if _too_deep(doc):
+            return None
+        # 1e400 is infinity and "\ud800" is a lone surrogate: both fail here, not in the database
+        json.dumps(doc, ensure_ascii=False, allow_nan=False).encode("utf-8")
+        return doc
     except (ValueError, RecursionError):
         return None
 
@@ -161,7 +185,7 @@ def report(conn: Conn, lab_run_id: int, body: LabReport, now: datetime) -> Resul
             return "not_running"
         if isinstance(body, LabDone):
             doc = _parse(body.compare_json)
-            if _matches(row, doc):
+            if body.compare_txt and _matches(row, doc):
                 conn.execute(
                     "UPDATE lab_run SET state = 'done', finished_at = %s, report = %s,"
                     " report_text = %s WHERE id = %s",

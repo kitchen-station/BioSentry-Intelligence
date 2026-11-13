@@ -2,9 +2,10 @@
 the worker's report, and what a clinician reads back. Every value of a request comes from the fixed
 lists below, so a request holds no path, no free text and no patient."""
 
+import re
 from typing import Annotated, Any, Literal, Self
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import AfterValidator, Field, model_validator
 
 from .base import Contract
 
@@ -16,7 +17,23 @@ HOSPITAL_PAIRS = {
     "doh-standard": ("staffing=typical", "nurses=typical", "doctors=typical"),
 }
 
-OneLine = Annotated[str, Field(min_length=1, max_length=300, pattern=r"^[^\x00-\x1f\x7f]+$")]
+# Written once: C0 (LF apart), DEL, C1, the line and paragraph separators and the direction controls.
+_NO_LF = r"\x00-\x09\x0b-\x1f\x7f-\x9f\u2028\u2029\u202a-\u202e\u2066-\u2069"
+_BAD = re.compile(f"[{_NO_LF}]")
+_BAD_OR_LF = re.compile(f"[\\n{_NO_LF}]")
+
+
+def _clean(bad: re.Pattern[str]) -> Any:
+    def check(value: str) -> str:
+        if bad.search(value):
+            raise ValueError("a control or direction character")
+        value.encode("utf-8")  # a lone surrogate is a ValueError here, not a 500 in the database
+        return value
+
+    return AfterValidator(check)
+
+
+OneLine = Annotated[str, Field(min_length=1, max_length=300), _clean(_BAD_OR_LF)]
 State = Literal["queued", "running", "done", "failed", "refused"]
 
 
@@ -52,14 +69,7 @@ class LabJob(Contract):
 class LabDone(Contract):
     state: Literal["done"]
     compare_json: Annotated[str, Field(max_length=524288)]
-    compare_txt: Annotated[str, Field(min_length=1, max_length=131072)]
-
-    @field_validator("compare_txt")
-    @classmethod
-    def _only_lf(cls, value: str) -> str:
-        if any(c < " " and c != "\n" or c == "\x7f" for c in value):
-            raise ValueError("compare_txt may hold LF and no other control character")
-        return value
+    compare_txt: Annotated[str, Field(max_length=131072), _clean(_BAD)]  # empty is a service check
 
 
 class LabRefused(Contract):

@@ -590,6 +590,8 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
         ctx: Ctx,
         _: Annotated[None, Depends(ingest_gate)],
     ) -> Response:
+        # An id of 0 or above the database's range answers 422, not 404. A worker reports only ids
+        # it claimed, so this never happens in normal use.
         # shortcut: Starlette reads the whole body before the 512 KiB cap is checked. Only the
         # ingest key reaches it, inside compose. Upgrade: a body size limit at the proxy.
         result = lab.report(ctx.conn, lab_run_id, body, clock())

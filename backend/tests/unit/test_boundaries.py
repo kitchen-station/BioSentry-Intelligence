@@ -53,7 +53,10 @@ def test_a_ranked_row_may_have_no_patch_signal() -> None:
 
 
 SRC = Path(__file__).resolve().parents[2] / "src" / "biosentry"
-PROCESS = re.compile(r"subprocess|os\.system|os\.exec|os\.spawn|os\.popen|create_subprocess|\bpty\b")
+PROCESS = re.compile(
+    r"subprocess|multiprocessing|posix_spawn|\bfork\b|os\.(system|exec|spawn|popen)|from os import"
+    r"|create_subprocess|\bpty\b|ctypes|__import__|import_module"
+)
 
 
 def test_the_api_never_starts_a_process() -> None:
@@ -66,4 +69,5 @@ def test_nothing_that_ranks_a_patient_reads_a_lab_run() -> None:
     ranking = [SRC / "services" / n for n in ("ward.py", "scoring.py", "patients.py")]
     ranking += list((SRC / "domain").rglob("*.py"))
     assert len(ranking) > 5
-    assert [str(f) for f in ranking if "lab_run" in f.read_text("utf-8")] == []
+    pattern = re.compile(r"lab_run|biosentry\.(services|schemas)\.lab\b|import[^\n]*\blab\b")
+    assert [str(f) for f in ranking if pattern.search(f.read_text("utf-8"))] == []
