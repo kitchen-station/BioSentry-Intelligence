@@ -1,0 +1,15 @@
+MindSpore Lite check of the exported MindIR files (made by convert_lite.sh; nothing is downloaded).
+For each model: converter_lite turns the .mindir into a .ms file; then the Lite benchmark (1 thread)
+runs 20 fixed training rows and each output must equal MindSpore's p to within 1e-5 (absolute).
+== model
+converter command: <lite package>/tools/converter/converter/converter_lite --fmk=MINDIR --modelFile=model.mindir --outputFile=model
+CONVERT RESULT SUCCESS:0
+model.ms: 6688 bytes, sha256 4ca0d0deb3a20835dacd1bc50c3981bae65111051ecc8817265d9e9f4fc06509
+rows within 1e-5: 20 of 20
+average run time: 0.001000 ms (Lite benchmark, 1 thread, row 0, no calibration file)
+== model_no_temp
+converter command: <lite package>/tools/converter/converter/converter_lite --fmk=MINDIR --modelFile=model_no_temp.mindir --outputFile=model_no_temp
+CONVERT RESULT SUCCESS:0
+model_no_temp.ms: 3744 bytes, sha256 fb023119cb8038dfdd174df10d3097e26413a0711b6f76af6ee15f975e445e5a
+rows within 1e-5: 20 of 20
+average run time: 0.002000 ms (Lite benchmark, 1 thread, row 0, no calibration file)

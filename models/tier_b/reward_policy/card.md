@@ -3,259 +3,289 @@
 | | |
 |---|---|
 | id | `tier_b/reward_policy` (and `tier_b/reward_policy/no_temperature`) |
-| files | `policy.json`, `generations/gen-00.json` to `gen-10.json`; the same under `no_temperature/` |
-| code | `research/reward_policy.py` (policy, reward), `research/reward_loop.py` (loop, held-out run) |
+| files | `policy.json` (the incumbent); `rounds/round-1/` and `rounds/round-2/` (`gen-NN.json`, `policy.json`); `no_temperature/` (`generations/gen-00.json` to `gen-04.json`, `policy.json`); `experiments.jsonl` (the ledger); `held_out.txt` (the held-out output, verbatim) |
+| code | `research/reward_policy.py` (policy, reward), `research/reward_loop.py` (inner loop, outer loop, held-out run) |
 | status | learned on synthetic trials, not validated. Not wired to the API, the rank or the arbiter |
 | intended use | research. Tier A (NEWS2) is never changed or learned |
 
-## Result on ward-v2 (temperature rise removed, noise 0.1 C)
+Earlier ward-v1 and B6 results are in git history before this change.
 
-The committed files are now learned on ward-v2 and ward-v2-train: the same trials made again by
-the fixed simulator (sim commit f7647c5, after PR #25 removed `INJECT_TEMPERATURE` and raised
-temperature noise from 0.02 to 0.1 C). Same seeds, scenario, days and command; data card `models/data/ward-v2/card.md`. Same loop, reward,
-lambda, seeds and harness. Nothing was tuned again. The B4 rows use the ward-v2 sweep choice
-(k = 4.0, p = 8); generation 0 is still fixed in code at k = 3.0, p = 4 (weights 1, theta 3).
+## Result
 
-- Shipped, with temperature: generation 4 (validation reward 0.688). Weights: heart rate 0.35,
-  respiratory rate 0.78, SpO2 1.20, temperature 0.08. Theta 2.29, p 6. On ward-v1 the shipped
-  policy put its largest weight on temperature (0.70); here temperature is the smallest.
-- Shipped, no temperature: generation 9 again, with the same six numbers as on ward-v1 (only the
-  validation numbers moved, so its sha256 changed).
-- A candidate was again accepted in all 20 generations. Generation 0 with temperature was
-  rejected on validation again. Validation rests on 9 episodes, so the pick is a selection on
-  noise, as before.
-- Held-out seeds 11 to 30, scored once (91 episodes, 79 not cut short, 4,678 chance windows):
+- Learned: one accepted step. In round 1, generation 2 passed the fresh-batch test; nothing
+  else did. Round 2 (16 selection trials) accepted nothing and was dropped. The outer loop
+  stopped after 2 of the 4 allowed rounds: the research step read the records and proposed no
+  third change.
+- Held-out, added to NEWS2: no gain beyond noise. NEWS2 OR final has any-bin over all episodes
+  0.703 (0.608-0.798) against NEWS2's 0.626 (0.522-0.727). The intervals overlap. It raises
+  more alerts (0.463 against 0.414 per patient per 12 h).
+- Held-out, alone: a quiet rule. 0.153 alerts per patient per 12 h (NEWS2 0.414), time in alert
+  0.035 (NEWS2 0.158), any-bin 0.633 (NEWS2 0.684), median lead -3.8 min (NEWS2 +47.2). Its
+  excess (+0.493) is above NEWS2's (+0.210), but excess is capped at 1 minus chance (chance 0.140
+  against 0.473), so rows with different chance cannot be ranked by excess.
+- The old loop's ward-v2 policy sat in about the same place: 0.150 alerts, any-bin 0.646, chance
+  0.120, excess +0.525, lead -11.2.
+- No temperature: generation 1 was accepted. Held-out alone: 0.131 alerts, time in alert 0.021,
+  any-bin 0.608, lead +20.2. NEWS2 OR it: any-bin all 0.692 (0.596-0.785), overlapping NEWS2's.
+  On validation it scored above the with-temperature policy (1.343958 against 0.992414). That
+  comparison was not pre-registered and reuses validation.
+
+## What the pitch line says and what is true now
+
+- "Points for every real case caught early, points off for every extra alarm": true. That is
+  the reward, unchanged (below).
+- "Thirty slightly different versions of itself": true. 30 candidates per generation.
+- "Keeps the best one": true, with a condition. The best on the selection batch is kept only if
+  it also beats the current policy on a second batch of fresh trials by more than noise.
+- "Starts again from there": true. The next generation starts from the winner (or from the
+  current policy if nothing was accepted).
+- "Each time on patients it has never seen": true. Every generation uses trials no earlier
+  generation saw. Synthetic patients only.
+- "Recursive": true in two senses. The inner loop resumes from its own files and runs until its
+  stop rule. An outer loop changes one search setting per round and records it in a ledger.
+- "Learn by reward, the idea behind reinforcement learning": a (1+30) evolution strategy with a
+  reward. It is not deep or per-step reinforcement learning: no state-action value, no per-step
+  credit, no gradient.
+- "Runs months on the ward": each trial is 30 simulated days of one ward. A generation used 20
+  trials (8 selection, 12 confirmation) in round 1 and the no-temperature run, and 28 (16 and 12)
+  in round 2. Every generation's policy is also scored on the 60 validation trials.
+
+## A person signs off before anything changes
+
+The loop only writes files on a branch. Nothing reaches main or the product without a reviewed
+pull request. The policy is not wired to the API, the rank or the arbiter.
+
+## Data and seed schedule
+
+Synthetic only. Trials: `ward-v2-ext` (data card `models/data/ward-v2-ext/card.md`), 30 simulated
+days each, more draws from the ward-v2 generator.
+
+- Validation: seeds 341-400 (60 trials, 277 evaluated episodes).
+- Round 1: seeds 401-500. Round 2: seeds 501-584. No temperature: seeds 401-480, sharing the
+  round-1 schedule (allowed by the contract).
+- Each seed is used once in the with-temperature schedule. Confirmation seeds come after their
+  generation's selection seeds.
+- Held-out: ward-v2 seeds 11-30 (sim commit f7647c5), scored once at the end.
+- Circular: the episodes, the vitals and the judging all come from one simulator.
+
+## Reward (unchanged)
+
+Per trial: C - 0.5 x E x (a / a_NEWS2). C = evaluated episodes with the policy alerting in a bin
+from episode start to fully in. E = evaluated episodes. a = the policy's alerts per patient per
+12 h; a_NEWS2 = the NEWS2 chart trigger's on the same trial. lambda = 0.5, never tuned. Hard rule:
+a policy whose time in alert is above NEWS2's on any trial of a set is rejected on that set.
+`outcome` (higher care) is never part of the reward.
+
+Amendment 1 (after round 1, before any round-2 result): a trial with no evaluated episode scores
+0 for every policy, by the formula itself; the time-in-alert rule still applies. Round 2 had been
+refused at seed 509. Seeds 509 and 517 are the only trials in 341-584 with no evaluated episode.
+No seed was skipped. Round 1 had no such trial, so its files are unchanged.
+
+## Inner loop
+
+Policy: six numbers. Four non-negative weights (heart rate, respiratory rate, SpO2, temperature)
+on each vital's z from the patient's own baseline, a threshold theta and a persistence p. It
+alerts when the weighted sum is at least theta in p scored bins in a row. Generation 0: weights
+1, 1, 1, 1 (no temperature: 1, 1, 1, 0), theta 3.0, p 4.
+
+Per generation:
+1. Draw 30 candidates around the current policy.
+2. Selection: score the current policy and all 30 on the selection trials (8; 16 in round 2).
+   Drop candidates rejected for time in alert. If the best mean is not strictly above the current
+   policy's, nothing is accepted. Selection numbers are never used to accept (winner's curse).
+3. Confirmation: score the winner and the current policy on 12 fresh trials. d_i = winner minus
+   current on trial i. Accept if and only if the winner is not rejected for time in alert and
+   mean(d) > 1.796 x stdev(d) / sqrt(12) (one-sided paired t-test at 5%, stdev with n - 1).
+4. A winner that fails is not replaced by the second best. The generation accepts nothing.
+
+Stop rule, fixed before the run: stop when the validation reward has not improved for 3
+generations, or at 40 generations, whichever is first. The round ships the generation that last
+improved.
+
+Step size: 0.5 for weights and theta, 1.0 for p, at the start of every round. Multiplied by 0.85
+after a generation that accepts nothing, kept after an accepted one. Floors 0.1 and 0.25.
+
+Power note (pilot on ward-v2-train seeds 31-60 only). Paired SD 0.75. The confirmation margin is
+about 0.39 reward units, about 8.7 more episodes caught early per 100 at equal alerts. False
+accept per generation with no true difference: 5% by design. Power: 45%, 76% and 95% for true
+gains of 0.3, 0.5 and 0.75. The 60 validation trials tell apart a difference of about 0.19.
+
+## Learning curves (from the generation records)
+
+Selection = winner mean vs current mean on the selection trials; rej = candidates (of 30)
+rejected for time in alert. Confirmation = mean d / stdev d / threshold, on 12 trials. Validation =
+seeds 341-400. Sigma = step used for weights and theta / for p.
+
+Round 1 (default configuration, from generation 0):
+
+| Gen | Seeds (sel / conf) | Selection | Rej | Confirmation | Accepted | Validation | Patience | Sigma |
+|---|---|---|---|---|---|---|---|---|
+| 0 | - | - | - | - | - | rejected | 0 | - |
+| 1 | 401-408 / 409-420 | 0.830055 vs -0.488616 | 14 | 0.319833 / 1.187824 / 0.61584 | no | rejected | 1 | 0.5 / 1.0 |
+| 2 | 421-428 / 429-440 | 0.291459 vs -0.461311 | 16 | 0.830741 / 0.592253 / 0.30706 | yes | 0.992414 | 0 | 0.425 / 0.85 |
+| 3 | 441-448 / 449-460 | 1.3606 vs 1.149715 | 0 | -0.010871 / 0.552706 / 0.286556 | no | 0.992414 | 1 | 0.425 / 0.85 |
+| 4 | 461-468 / 469-480 | 1.004686 vs 0.628914 | 0 | -0.334968 / 1.126274 / 0.583929 | no | 0.992414 | 2 | 0.36125 / 0.7225 |
+| 5 | 481-488 / 489-500 | 0.999067 vs 1.07831 | 1 | not tested | no | 0.992414 | 3 (stop) | 0.3070625 / 0.614125 |
+
+Generation 0 with temperature breaks NEWS2's time in alert on 7 of the 60 validation trials.
+
+Round 2 (`selection_trials` 8 to 16, from the round-1 policy):
+
+| Gen | Seeds (sel / conf) | Selection | Rej | Confirmation | Accepted | Validation | Patience | Sigma |
+|---|---|---|---|---|---|---|---|---|
+| 0 | - | - | - | - | - | 0.992414 | 0 | - |
+| 1 | 501-516 / 517-528 | 0.970815 vs 0.732357 | 1 | 0.196165 / 0.612199 / 0.317401 | no | 0.992414 | 1 | 0.5 / 1.0 |
+| 2 | 529-544 / 545-556 | 0.893381 vs 0.649859 | 0 | 0.327919 / 0.654072 / 0.339111 | no | 0.992414 | 2 | 0.425 / 0.85 |
+| 3 | 557-572 / 573-584 | 0.717717 vs 0.680123 | 2 | 0.123924 / 0.436764 / 0.226445 | no | 0.992414 | 3 (stop) | 0.36125 / 0.7225 |
+
+No temperature (default configuration, temperature weight fixed at 0):
+
+| Gen | Seeds (sel / conf) | Selection | Rej | Confirmation | Accepted | Validation | Patience | Sigma |
+|---|---|---|---|---|---|---|---|---|
+| 0 | - | - | - | - | - | 0.785617 | 0 | - |
+| 1 | 401-408 / 409-420 | 0.999889 vs 0.08083 | 6 | 0.943192 / 1.028013 / 0.532984 | yes | 1.343958 | 0 | 0.5 / 1.0 |
+| 2 | 421-428 / 429-440 | 0.712292 vs 0.237418 | 1 | -0.021926 / 0.935766 / 0.485158 | no | 1.343958 | 1 | 0.5 / 1.0 |
+| 3 | 441-448 / 449-460 | 1.432399 vs 1.229555 | 0 | -0.086718 / 0.72782 / 0.377346 | no | 1.343958 | 2 | 0.425 / 0.85 |
+| 4 | 461-468 / 469-480 | 1.145605 vs 0.995927 | 0 | -0.458387 / 1.124651 / 0.583087 | no | 1.343958 | 3 (stop) | 0.36125 / 0.7225 |
+
+In round 1, three winners led on 8 selection trials and lost the lead on 12 fresh ones. In round
+2, with 16 selection trials, the selection lead and the confirmation mean agreed in sign, but no
+confirmation reached its threshold.
+
+## The ledger (`experiments.jsonl`)
+
+- Round 1, baseline. The default configuration. Seeds 401-500, 5 generations, stopped by
+  patience. Shipped generation 2: weights heart rate 0.614, respiratory rate 0.5247, SpO2 1.0638,
+  temperature 0.3149; theta 2.9776; p 5. Validation reward 0.992414. Kept as the first incumbent.
+- Round 2, dropped. Changed `selection_trials` from 8 to 16, because in round 1 the selection
+  winners' leads vanished on the confirmation trials (the winner's-curse pattern). Seeds 501-584,
+  3 generations, nothing accepted, stopped by patience. It shipped its generation 0, the
+  incumbent's own numbers, so against the incumbent: mean 0.0, stdev 0.0, margin 0.0. Dropped; the
+  incumbent stays.
+- Stop. No change proposed: round 2's winners were confirmed slightly better than the incumbent
+  (mean d +0.20, +0.33, +0.12) but below their thresholds, which points to a plateau, not to any
+  setting on the menu.
+- No temperature, learned once with the kept (default) configuration. Seeds 401-480, 4
+  generations, stopped by patience. Shipped generation 1: weights heart rate 0.3372, respiratory
+  rate 0.5534, SpO2 1.2459, temperature 0.0; theta 3.3703; p 3. Validation reward 1.343958.
+
+Policy sha256 (of the file's bytes, as the ledger records them; the `sha256` field inside each
+file is of its content and differs):
+
+| File | File sha256 | Content sha256 |
+|---|---|---|
+| `policy.json` and `rounds/round-1/policy.json` | `21cf038e4ab699906eeab87d56ddbd39965915a8ec085e75f56ca99501114775` | `b364a680b989a659ae747f929806a65a9f828a0e412ba89d35ca72dd840f804f` |
+| `rounds/round-2/policy.json` | `6a07e8939c7556c41e58620eb203507f2d52c355823c773b97c01d2bcdde7de4` | `cf33c1d17c5a0b73d1156f71cc7e11a662bb49f325b39abfdf2b86ef4afcb3b4` |
+| `no_temperature/policy.json` | `522195aa8104271d3bfec0e87ab1f37e07b074dccbd5a347d05191905a12a3b3` | `ef60e564de8e3176d87fe78eabc3fc366e6b802ff0a9034e46122dc78090e020` |
+
+## Validation (seeds 341-400, reused)
+
+Checked by a second agent that did not build it, on the 60 validation trials (277 evaluated
+episodes):
+
+- With temperature (shipped): 115 caught early, 0.1599 alerts per patient per 12 h, time in alert
+  0.0361.
+- No temperature: 128 caught early, 0.1388 alerts, time in alert 0.0223.
+- NEWS2: 0.4118 alerts, time in alert 0.1664.
+- Paired difference, no temperature minus with temperature: mean 0.3515, stdev 0.7105, 2 x SE
+  0.1834, better on 48 of 60 trials. Not pre-registered, and validation was reused.
+
+## Held-out numbers (ward-v2 seeds 11 to 30, scored once)
+
+91 episodes, 79 not cut short, 4,678 chance windows, 1,873 patients.
+
+- Any-bin: alerting in any bin of the window, episodes not cut short. Any-bin, all: over all
+  evaluated episodes, with its 95% interval.
+- Chance and excess: for any-bin, episodes not cut short. Excess = any-bin minus chance.
+- New-alert excess: new alert minus its own chance, episodes not cut short.
+- Lead: median minutes before fully in, episodes with a new alert.
 
 | Policy | Alerts/pt/12 h (95% CI) | Time in alert | Any-bin | Any-bin, all (95% CI) | Chance | Excess | New-alert excess | Lead |
 |---|---|---|---|---|---|---|---|---|
 | NEWS2 chart trigger | 0.414 (0.395-0.434) | 0.158 | 0.684 | 0.626 (0.522-0.727) | 0.473 | +0.210 | +0.179 | 47.2 |
 | B4 baseline alone (k 4.0, p 8) | 0.042 (0.035-0.049) | 0.012 | 0.278 | 0.264 (0.174-0.360) | 0.032 | +0.246 | +0.253 | -82.5 |
 | NEWS2 OR B4 | 0.426 (0.407-0.444) | 0.165 | 0.722 | 0.659 (0.558-0.758) | 0.486 | +0.235 | +0.210 | 39.6 |
-| Reward gen 0 | 0.429 (0.414-0.443) | 0.123 | 0.785 | 0.725 (0.625-0.816) | 0.435 | +0.350 | +0.301 | 23.0 |
-| NEWS2 OR gen 0 | 0.535 (0.520-0.550) | 0.248 | 0.861 | 0.802 (0.716-0.885) | 0.666 | +0.195 | +0.084 | 67.9 |
-| Reward final (gen 4) | 0.150 (0.138-0.162) | 0.029 | 0.646 | 0.582 (0.464-0.678) | 0.120 | +0.525 | +0.534 | -11.2 |
-| NEWS2 OR final | 0.465 (0.446-0.482) | 0.173 | 0.772 | 0.703 (0.608-0.798) | 0.516 | +0.256 | +0.240 | 61.5 |
-| Reward gen 0, no temperature | 0.318 (0.302-0.334) | 0.072 | 0.722 | 0.648 (0.536-0.740) | 0.300 | +0.421 | +0.403 | 18.8 |
-| NEWS2 OR gen 0, no temperature | 0.518 (0.501-0.533) | 0.207 | 0.835 | 0.758 (0.667-0.843) | 0.600 | +0.235 | +0.187 | 50.5 |
-| Reward final (gen 9), no temperature | 0.061 (0.052-0.068) | 0.017 | 0.519 | 0.473 (0.370-0.576) | 0.050 | +0.469 | +0.478 | -38.7 |
-| NEWS2 OR final, no temperature | 0.434 (0.414-0.452) | 0.166 | 0.722 | 0.659 (0.560-0.753) | 0.492 | +0.229 | +0.204 | 60.9 |
+| B4 alone, without temperature | 0.032 (0.026-0.038) | 0.011 | 0.266 | 0.253 (0.165-0.343) | 0.025 | +0.241 | +0.248 | -85.3 |
+| NEWS2 OR B4, without temperature | 0.425 (0.405-0.442) | 0.164 | 0.709 | 0.648 (0.550-0.745) | 0.484 | +0.225 | +0.199 | 44.6 |
+| Reward gen 0, with temperature | 0.429 (0.414-0.443) | 0.123 | 0.785 | 0.725 (0.625-0.816) | 0.435 | +0.350 | +0.301 | 23.0 |
+| NEWS2 OR gen 0, with temperature | 0.535 (0.520-0.550) | 0.248 | 0.861 | 0.802 (0.716-0.885) | 0.666 | +0.195 | +0.084 | 67.9 |
+| Reward final (round 1 gen 2), with temperature | 0.153 (0.140-0.165) | 0.035 | 0.633 | 0.571 (0.458-0.670) | 0.140 | +0.493 | +0.486 | -3.8 |
+| NEWS2 OR final, with temperature | 0.463 (0.444-0.481) | 0.178 | 0.772 | 0.703 (0.608-0.798) | 0.528 | +0.244 | +0.209 | 73.2 |
+| Reward gen 0, without temperature | 0.318 (0.302-0.334) | 0.072 | 0.722 | 0.648 (0.536-0.740) | 0.300 | +0.421 | +0.403 | 18.8 |
+| NEWS2 OR gen 0, without temperature | 0.518 (0.501-0.533) | 0.207 | 0.835 | 0.758 (0.667-0.843) | 0.600 | +0.235 | +0.187 | 50.5 |
+| Reward final (gen 1), without temperature | 0.131 (0.119-0.143) | 0.021 | 0.608 | 0.549 (0.441-0.648) | 0.091 | +0.516 | +0.528 | 20.2 |
+| NEWS2 OR final, without temperature | 0.451 (0.431-0.471) | 0.166 | 0.759 | 0.692 (0.596-0.785) | 0.504 | +0.256 | +0.233 | 56.5 |
+
+Chance rates and excess have no interval. The full output, with per-kind rows, is `held_out.txt`.
 
 What this shows:
-- Added to NEWS2, the final policy gives no gain beyond noise: any-bin over all episodes 0.703
-  (0.608-0.798) against NEWS2's 0.626 (0.522-0.727), intervals overlapping, for 12% more alerts.
-- Alone, the final policy catches about as many episodes as NEWS2 (0.582 against 0.626,
-  intervals overlapping) at about a third of the alerts (0.150 against 0.414, intervals apart),
-  but later: median lead -11.2 min against +47.2. Its excess (+0.525) is above NEWS2's
-  (+0.210), but excess is capped at 1 minus chance (0.880 against 0.527), so the two are not
-  comparable. On new alerts it fires in more windows than NEWS2 (0.560 against 0.363,
-  intervals just overlapping), but mostly after the episode is fully in. This is the same
-  quiet, late pattern as the no-temperature policy on ward-v1.
-- On ward-v1 the final policy alone had any-bin 0.769 (0.676-0.852) and excess +0.700, and
-  NEWS2 OR final had 0.857 (0.779-0.922). The gains seen on ward-v1 went away on ward-v2. Two things changed (the temperature rise was removed and temperature noise went from 0.02 to 0.1 C), and this run cannot say which one caused it.
+- Added to NEWS2, neither learned policy gives a gain beyond noise. Any-bin over all episodes:
+  0.703 (0.608-0.798) with temperature and 0.692 (0.596-0.785) without, against NEWS2's 0.626
+  (0.522-0.727). All three intervals overlap.
+- Learning made generation 0 quieter, beyond noise: alerts 0.429 (0.414-0.443) to 0.153
+  (0.140-0.165) with temperature, 0.318 (0.302-0.334) to 0.131 (0.119-0.143) without. Any-bin over
+  all episodes fell, 0.725 to 0.571 and 0.648 to 0.549, with overlapping intervals.
+- With temperature the final policy alerts late: median lead -3.8 min (generation 0: +23.0).
+  Without temperature it is +20.2 (generation 0: +18.8).
 
-What it cannot show: anything about patients, or that a fewer-alerts rule is safe. "Any-bin"
-counts alerting up to 2 h after fully in, so similar any-bin with a negative lead time is not
-early warning.
-
-## Earlier result on ward-v1 (kept for comparison; the simulator then added a fixed temperature rise)
-
-Everything from here to "Huawei note" describes the ward-v1 run (sim commit 3a15e01). Its
-`policy.json` and generation files are in git history before this change.
-
-## Summary (ward-v1)
-
-- It did not beat the untrained B4 rule.
-- With temperature, it ended within noise of B4.
-- Without temperature, added to NEWS2 it gives nothing: excess +0.243 against +0.237 for NEWS2
-  alone, with no interval.
-- The path from generation to generation is mostly noise. A candidate was accepted in all 20
-  generations. Each generation trains on about 15 episodes, and validation has 9.
-- Synthetic, not validated. Circular: learned and judged on the same simulator.
-
-## What it is
-
-Six numbers. For each 15-minute bin, each device vital's distance from the patient's own
-baseline in the bad direction (z from the backend's `baseline_finding`, clipped at 0) is
-multiplied by a weight and summed. The policy alerts when that sum is at least theta in p
-bins in a row. A missing value or a forming baseline adds nothing. A NOT RANKED bin is not
-scored and ends a run. Each bin reads only itself and earlier bins.
-
-Generation 0 is the B4 rule (k = 3.0, p = 4) in this form: weights 1, 1, 1, 1, theta 3, p 4.
-A sum cannot say "any one vital past 3", so generation 0 alerts whenever B4 does on RANKED
-bins, and also when several vitals are a little off together. It never alerts on a NOT RANKED
-bin, which B4 can.
-
-## Why this is learning by reward, and what it is not
-
-The policy is changed only by a reward computed from simulator runs. No label is fitted. Each
-generation starts from the last one and is tried on three trials no earlier generation saw.
-
-It is NOT deep reinforcement learning. There is no state-action value, no per-step credit, no
-gradient. It is a small black-box search (a (1+30) evolution step) with a reward: draw 30
-nearby settings, keep the best if it beats the current one on the same trials.
-
-## Data
-
-Synthetic only, sim commit 3a15e01, 30 simulated days per trial.
-
-- Training: `ward-v1-train` seeds 31 to 60, three per generation, each used once.
-- Validation and the stop: `ward-v1` seeds 8 to 10 (9 evaluated episodes in all).
-- Held-out: `ward-v1` seeds 11 to 30, scored once at the end.
-- Seeds 1 to 7 are not used. The loaders read `manifest.json` first and refuse seeds 11 to 30
-  before any other file is opened (tested).
-
-## Reward (fixed before any run)
-
-Per trial: C - 0.5 x E x (a / a_NEWS2).
-
-- C: evaluated episodes with the policy alerting in any bin from episode start to fully in
-  (caught early).
-- E: evaluated episodes on the trial. a: the policy's alerts per patient per 12 h. a_NEWS2: the
-  NEWS2 chart trigger's on the same trial. So both terms are counted in episodes.
-- lambda = 0.5. A policy with NEWS2's alert count has to catch more than half the episodes
-  early to beat a silent one. This is judgement and was never tuned.
-- Hard rule: if the time in alert is above the NEWS2 chart trigger's on any trial of the set,
-  the policy is rejected.
-- `outcome` (higher care) is never part of the reward.
-
-## Loop
-
-30 candidates per generation, drawn by a SplitMix64 generator with seed 20261112 + g. The
-draw adds normal noise to the current numbers: sigma 0.5 for the weights and theta, 1.0 for p.
-Sigma is multiplied by 0.9 after each generation. A candidate is accepted only if its mean
-reward is strictly above the current policy's on that generation's trials. After every
-generation, the current policy is scored on seeds 8 to 10. The shipped policy is the
-generation with the best validation reward. The no-temperature run is the same, with the
-temperature weight fixed at exactly 0.
-
-A second full run of the loop with temperature wrote byte-identical files. The no-temperature
-loop was not rerun in full. A test on a tiny synthetic cohort checks that both modes give the
-same bytes twice. Each loop takes about 3 minutes.
-
-## Learning curve
-
-Train = the mean reward over that generation's three new seeds: first the policy it started
-from, then the best candidate. "rej" = candidates rejected for time in alert. Val = seeds 8
-to 10. "rejected" = above NEWS2's time in alert on a validation seed.
-
-| gen | seeds | with temperature: train before -> best (rej) | val | no temperature: train before -> best (rej) | val |
-|---|---|---|---|---|---|
-| 0 | - | - | rejected | - | 0.373 |
-| 1 | 31-33 | rejected -> 0.820 (19) | 0.575 | 0.270 -> 0.941 (7) | 1.042 |
-| 2 | 34-36 | 0.502 -> 1.635 (2) | -0.007 | 1.257 -> 1.579 (0) | 0.512 |
-| 3 | 37-39 | 0.991 -> 1.664 (1) | 0.252 | 0.369 -> 1.352 (0) | 0.966 |
-| 4 | 40-42 | 0.617 -> 0.888 (0) | 0.151 | 0.259 -> 0.567 (0) | 0.596 |
-| 5 | 43-45 | 1.694 -> 1.729 (1) | -0.016 | 0.860 -> 1.392 (0) | 0.400 |
-| 6 | 46-48 | 0.014 -> 0.617 (10) | 0.417 | 0.625 -> 0.928 (0) | 0.252 |
-| 7 | 49-51 | 0.706 -> 1.253 (0) | 0.349 | 0.592 -> 1.113 (0) | 0.467 |
-| 8 | 52-54 | 1.132 -> 1.452 (1) | 0.580 | 0.734 -> 0.840 (0) | 0.205 |
-| 9 | 55-57 | 2.742 -> 2.984 (0) | 0.439 | 2.157 -> 2.586 (0) | **1.073** |
-| 10 | 58-60 | 0.495 -> 1.004 (0) | **0.921** | 0.811 -> 0.931 (0) | 0.538 |
-
-- Shipped, with temperature: generation 10. Weights: heart rate 0.18, respiratory rate 0,
-  SpO2 0.58, temperature 0.70. Theta 3.23, p 1.
-- Shipped, no temperature: generation 9. Weights: heart rate 0.44, respiratory rate 1.13,
-  SpO2 0.35. Theta 3.24, p 6.
-- Generation 0 with temperature was rejected on validation. Its time in alert was above NEWS2's
-  on seeds 9 and 10 (0.121 against 0.117; 0.143 against 0.100).
-
-Read this curve as noise. A candidate was accepted in every generation, in both runs. With 30
-draws scored on only about 15 episodes, the best draw nearly always beats the current policy
-on those same trials. The validation reward does not rise steadily, and it rests on 9 episodes.
-Picking the best of 11 validation scores is itself a selection on noise.
-
-Leaving out any one validation seed picks the same generation. The shipped generation catches
-no more validation episodes early than earlier generations. With temperature it catches 5 of 9,
-as generations 0, 7 and 8 did, so the pick is the fewest alerts at equal catches. Without
-temperature it catches 4 of 9, fewer than generation 0's 5. It wins by raising fewer alerts.
-
-## Held-out numbers (seeds 11 to 30, scored once)
-
-91 episodes, 79 not cut short, 4,678 chance windows, 7,566 patient-days.
-
-- Any-bin: alerting in any bin of the window, episodes not cut short. CI is the 95% interval
-  over all evaluated episodes (the harness has none for the not-cut-short rate).
-- Excess: any-bin minus chance.
-- New-alert excess: new alert minus its own chance, episodes not cut short.
-- Lead: median minutes before fully in, episodes with a new alert.
-
-| Policy | Alerts/pt/12 h (95% CI) | Time in alert | Any-bin | Any-bin, all (95% CI) | Chance | Excess | New-alert excess | Lead |
-|---|---|---|---|---|---|---|---|---|
-| NEWS2 chart trigger | 0.413 (0.394-0.432) | 0.159 | 0.709 | 0.648 (0.545-0.745) | 0.472 | +0.237 | +0.194 | 45.9 |
-| B4 baseline alone | 0.189 (0.175-0.203) | 0.047 | 0.848 | 0.769 (0.677-0.851) | 0.178 | +0.670 | +0.653 | -18.8 |
-| NEWS2 OR B4 | 0.473 (0.455-0.490) | 0.189 | 0.924 | 0.846 (0.771-0.913) | 0.550 | +0.374 | +0.306 | 20.5 |
-| Reward gen 0 | 0.428 (0.413-0.442) | 0.127 | 0.886 | 0.813 (0.727-0.886) | 0.436 | +0.450 | +0.353 | 23.0 |
-| NEWS2 OR gen 0 | 0.533 (0.518-0.548) | 0.251 | 0.937 | 0.868 (0.790-0.933) | 0.665 | +0.271 | +0.139 | 56.5 |
-| Reward final (gen 10) | 0.179 (0.165-0.194) | 0.033 | 0.835 | 0.769 (0.676-0.852) | 0.135 | +0.700 | +0.676 | 19.3 |
-| NEWS2 OR final | 0.462 (0.444-0.479) | 0.177 | 0.937 | 0.857 (0.779-0.922) | 0.526 | +0.410 | +0.341 | 33.8 |
-| B4 alone, no temperature | 0.139 (0.126-0.151) | 0.035 | 0.557 | 0.505 (0.400-0.600) | 0.137 | +0.420 | +0.444 | -14.1 |
-| NEWS2 OR B4, no temperature | 0.462 (0.444-0.480) | 0.181 | 0.747 | 0.681 (0.583-0.770) | 0.533 | +0.213 | +0.199 | 59.7 |
-| Reward gen 0, no temperature | 0.318 (0.302-0.334) | 0.072 | 0.722 | 0.648 (0.536-0.740) | 0.300 | +0.421 | +0.403 | 18.8 |
-| NEWS2 OR gen 0, no temperature | 0.517 (0.500-0.533) | 0.207 | 0.848 | 0.769 (0.674-0.851) | 0.600 | +0.248 | +0.188 | 50.5 |
-| Reward final (gen 9), no temperature | 0.061 (0.052-0.068) | 0.017 | 0.519 | 0.473 (0.370-0.576) | 0.050 | +0.469 | +0.478 | -38.7 |
-| NEWS2 OR final, no temperature | 0.433 (0.412-0.451) | 0.166 | 0.734 | 0.670 (0.570-0.763) | 0.491 | +0.243 | +0.206 | 58.1 |
-
-Chance rates and excess have no interval. The full output, with per-kind rows, comes from the
-reproduce command below.
-
-## Did learning by reward improve on generation 0?
-
-- With temperature: it cut alerts beyond noise. They went from 0.428 to 0.179 per patient per
-  12 h, and the intervals do not overlap. Generation 0's sum form alerts more than twice as
-  often as the B4 rule (0.428 against 0.189 per patient per 12 h), so most of this fall undoes
-  the translation rather than improving on B4. Time in alert went from 0.127 to 0.033. Detection
-  did not change beyond noise: any-bin over all episodes 0.813 against 0.769, with overlapping
-  intervals. But the loop only found its way back to about the B4 rule. B4 alone gives 0.189
-  alerts, any-bin 0.848 and excess +0.670; the final policy gives 0.179, 0.835 and +0.700.
-  These numbers are within noise of each other. Learning beat generation 0's sum form, not the
-  untrained B4 rule.
-- Without temperature: it learned to be quiet and late. Alerts fell from 0.318 to 0.061 (no
-  interval overlap). Any-bin fell from 0.648 to 0.473; the intervals overlap, so that fall is
-  not beyond noise either. Median lead time went from +18.8 to -38.7 min. Excess went from
-  +0.421 to +0.469, but its cap moves when chance falls (see the limits). This is not a better
-  detector. Added to NEWS2, it gives excess +0.243 against +0.237 for NEWS2 alone, with no
-  interval. No gain.
-
-## What depends on temperature
-
-The final policy with temperature puts its largest weight on temperature (0.70) and alerts on
-one bin (p = 1). With the 0.1 °C floor, the simulator's uncited fixed rise of about 0.6 °C in
-every episode is a z of about 6 by itself. So every row with temperature is flattered,
-including the B4 rows and the generation 0 row. Without temperature, no learned row adds
-anything measurable to NEWS2.
+What it cannot show:
+- Anything about patients. These are simulated wards.
+- Validation numbers are optimistic. Validation picks the shipped generation and judges the
+  rounds, so it has been looked at many times.
+- Held-out was read once for these policies. That is by procedure, not enforced by code. The same
+  held-out seeds were used earlier for earlier policies of this card.
+- Any-bin counts alerting up to 2 h after fully in. A quiet rule with a negative or near-zero lead
+  time is not early warning.
 
 ## Limits
 
 - Circular: learned and judged on the same simulator. An upper bound, not a performance claim.
-- Synthetic, not validated. No claim about real patients.
-- Temperature artefact: see above.
-- Few events. About 15 episodes per generation and 9 for validation, so the training and
-  validation rewards are mostly noise.
-- Excess is capped at 1 minus chance. Rows with low chance (the quiet policies) can reach a
-  higher excess, so compare excess only between rows with similar chance.
-- Weights and theta can all be scaled by the same factor without changing the policy. The
-  search does not use that.
-- "Held-out scored once" is by procedure. The code does not stop a second run.
+- Synthetic, not validated.
+- Few events: 4.47 evaluated episodes per trial in the pilot, so the per-generation tests have little
+  power for small gains (see the power note).
+- Excess is capped at 1 minus chance. Compare excess only between rows with similar chance.
+- Weights and theta share a common scale: all can be multiplied by one factor without changing
+  what fires. The search does not use that.
 - Not wired to the API, the rank or the arbiter. NEWS2 is never changed.
 
 ## Huawei note
 
-The policy is 6 numbers and runs as plain arithmetic on the baseline z values, so it needs no
-model file or runtime. A ModelArts training job would be this same script, with a data folder
-in (`--train`, `--validate`) and a model folder out (`--out`). That has not been done here.
+The policy is six numbers and runs as plain arithmetic on the baseline z values, so it needs no
+model file or runtime. The loop is one script with a data folder in (`--data`) and a model folder
+out (`--out`), so it could run as a ModelArts training job. That has not been done. Nothing was
+run in the cloud.
 
 ## Reproduce
 
-Run from the repo root, in either research venv (see `research/README.md`), with the data
-mounted at `/data`:
+From the repo root, in either research venv (see `research/README.md`), data at `/data`:
 
-    python -m research.reward_loop --train /data/trials/ward-v2-train --validate /data/trials/ward-v2 --out models/tier_b/reward_policy
-    python -m research.reward_loop --train /data/trials/ward-v2-train --validate /data/trials/ward-v2 --out models/tier_b/reward_policy --no-temperature
-    python -m research.reward_loop --evaluate /data/trials/ward-v2 --out models/tier_b/reward_policy
+    python -m research.reward_loop --data /data/trials/ward-v2-ext --out models/tier_b/reward_policy --round 1 [--jobs N]
+    python -m research.reward_loop --data /data/trials/ward-v2-ext --out models/tier_b/reward_policy --round 2 --change selection_trials=16 --why "In round-1 gen-01, gen-03 and gen-04 the selection winner led the current policy on the 8 selection trials (+1.32, +0.21, +0.38) and its lead vanished on the 12 confirmation trials (mean d +0.32, -0.01, -0.33). This is the winner's-curse pattern; step size, a dead vital, the form and theta drift are not clearly supported by these records. 16 selection trials halve the selection variance so the winner sent to confirmation is more often truly better." [--jobs N]
+    python -m research.reward_loop --out models/tier_b/reward_policy --stop "no change proposed: in round-2 gen-01 to gen-03 the winners were confirmed slightly better than the incumbent (mean d +0.20, +0.33, +0.12) but below their thresholds, which points to a plateau whose gains are near the 0.19 validation margin rather than to any menu key, as the round-2 proposal pre-registered."
+    python -m research.reward_loop --data /data/trials/ward-v2-ext --out models/tier_b/reward_policy --no-temperature [--jobs N]
+    python -m research.reward_loop --evaluate /data/trials/ward-v2 --out models/tier_b/reward_policy   # once, already done
 
-The held-out command refuses a `policy.json` whose content does not match the sha256 stored in
-it (ward-v2). With temperature: `e2a74b78ad544d33ec3a59b13f0513754273ec83aac2ab9109875d61e8d991ac`.
-No temperature: `2dea2cd388efdbdb312d29f4486517c5633a21d9709afc4f69a6297d41df5a79`. (ward-v1: `cb8eb5d9...` and `2a20d944...`.)
+Exit codes: 0 done, 2 refused (one line on stderr), 3 seeds missing (`needs seeds a to b`). A
+round command resumes from its files; run again after its stop, it changes nothing. The
+held-out command refuses a `policy.json` whose content sha256 does not match, or that is not the
+ledger's incumbent (file sha256 `21cf038e4ab699906eeab87d56ddbd39965915a8ec085e75f56ca99501114775`).
 
-That sha256 is of the policy's content (the file without its own `sha256` field), so `shasum` on the
-file itself gives a different value.
+Checked by a second agent that did not build it: every validation reward, confirmation test, seed
+list, hash chain and ledger field was recomputed and matched. A from-scratch re-run of round 1,
+round 2, the stop line and the no-temperature run wrote 20 byte-identical files. Before any run,
+33 single-line mutations of the loop were tried; after the fixes each one fails a test (one
+equivalent mutant aside).
+
+## References
+
+- Beyer, H.-G. (2000). Evolutionary algorithms in noisy environments: theoretical issues and
+  guidelines for practice. Computer Methods in Applied Mechanics and Engineering 186, 239-267.
+  https://doi.org/10.1016/S0045-7825(99)00386-2
+- Jin, Y., Branke, J. (2005). Evolutionary optimization in uncertain environments - a survey.
+  IEEE Transactions on Evolutionary Computation 9(3), 303-317.
+  https://doi.org/10.1109/TEVC.2005.846356
+- Smith, J. E., Winkler, R. L. (2006). The optimizer's curse: skepticism and postdecision surprise
+  in decision analysis. Management Science 52(3), 311-322. https://doi.org/10.1287/mnsc.1050.0451
+- Dwork, C., Feldman, V., Hardt, M., Pitassi, T., Reingold, O., Roth, A. (2015). The reusable
+  holdout: preserving validity in adaptive data analysis. Science 349(6248), 636-638.
+  https://doi.org/10.1126/science.aaa9375

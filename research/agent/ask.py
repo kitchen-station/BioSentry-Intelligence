@@ -219,6 +219,12 @@ def grounded(text: str, used: list[str], args: dict, result: dict) -> bool:
 
 
 def ask(cfg: Config, question: str) -> str:
+    return answer(cfg, question)["text"]
+
+
+def answer(cfg: Config, question: str) -> dict:
+    """What `ask` does, with the record: status answered | no_template | ungrounded, the text, the ledger step id,
+    and the template, args, result, result_sha256 and numbers (None when no tool ran)."""
     template, threshold = match(question)
     args = None
     if template:
@@ -228,9 +234,11 @@ def ask(cfg: Config, question: str) -> str:
         "planner": "keywords", "rule": template or "none",
         "reason": "matched a fixed template" if template else "no template fits",
         "tool": "evaluate_rules" if template else None, "args": args})
+    out = {"status": "no_template", "text": REFUSAL, "step": sid, "template": None, "args": None,
+           "result": None, "result_sha256": None, "numbers": None}
     if not template:
         ledger.add_step(cfg, sid, [], "Refused: no template fits this question.")
-        return REFUSAL
+        return out
     try:
         result, sha = tools.call(cfg, "evaluate_rules", args)
     except ToolError as e:
@@ -238,9 +246,10 @@ def ask(cfg: Config, question: str) -> str:
                         f"The tool failed: {e}")
         raise
     call = {"tool": "evaluate_rules", "args": args, "ok": True, "result_sha256": sha, "result": result}
-    answer, used = build(template, args, result)
-    if grounded(answer, used, args, result):
-        ledger.add_step(cfg, sid, [call], " ".join(answer.splitlines()), grounding="ok")  # one line: the ledger replaces newlines
-        return answer
+    text, used = build(template, args, result)
+    out.update(template=template, args=args, result=result, result_sha256=sha, numbers=used)
+    if grounded(text, used, args, result):
+        ledger.add_step(cfg, sid, [call], " ".join(text.splitlines()), grounding="ok")  # one line: the ledger replaces newlines
+        return {**out, "status": "answered", "text": text}
     ledger.add_step(cfg, sid, [call], "Refused: a number in the answer is not in the tool result.", grounding="failed")
-    return REFUSAL
+    return {**out, "status": "ungrounded"}

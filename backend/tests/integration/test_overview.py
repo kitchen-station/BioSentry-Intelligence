@@ -321,7 +321,7 @@ def _expected_resource(template: str) -> str:
 def test_the_admin_is_refused_on_every_write_route_and_nothing_is_written(api: Api) -> None:
     headers = add_admin(api)
     writes = _writes(api)
-    assert len(writes) == 9 and set(writes) == set(REFUSED_ACTIONS)
+    assert len(writes) == 10 and set(writes) == set(REFUSED_ACTIONS)
     before = snapshot(api)
     for method, template in writes:
         url = template.format(**PATH_VALUES)
@@ -365,6 +365,8 @@ def test_an_admin_reads_nothing_beyond_the_overview(api: Api) -> None:
         "SELECT action, resource, outcome FROM audit_log WHERE action = 'view_live'"
     ) == [{"action": "view_live", "resource": "W4", "outcome": "denied"}]
     assert get("/wards/W9/live", headers=headers).status_code == 403  # the role, before the ward
+    for path in ("/wards/W4/lab/runs", "/wards/W4/lab/runs/1"):  # a row says who asked what
+        assert get(path, headers=headers).status_code == 403, path
     assert get("/acknowledgements", headers=headers).json() == []
     # The admin's own trail and nobody else's, though other rows exist.
     mine = get("/audit", headers=headers).json()

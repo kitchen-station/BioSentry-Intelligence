@@ -6,6 +6,7 @@
     approve <id> [--by NAME]      a person signs off a proposal (writes only the ledger)
     apply <id>                    copy an approved proposal into the models folder
     export --date D --out F       the questions and proposals as one evaluation JSON file (read only)
+    worker [--once]               answer the questions clinicians ask on the dashboard (needs the API's address and key)
 
 Exit 0 on success, 2 with one `refused: ...` line on any refusal.
 """
@@ -18,6 +19,7 @@ from research.trials import TrialError, show
 from . import ask as asking
 from . import export as exporting
 from . import ledger, loop
+from . import worker as questions
 from .config import AgentError, Config
 from .planner import choose_planner
 
@@ -81,7 +83,12 @@ def export(cfg: Config, args: list[str]) -> str:
     return exporting.run(cfg, args)
 
 
-COMMANDS = {"status": status, "run": run, "ask": ask, "approve": approve, "apply": apply, "export": export}
+def worker(cfg: Config, args: list[str], env=None) -> str:
+    return questions.run(cfg, args, env)
+
+
+COMMANDS = {"status": status, "run": run, "ask": ask, "approve": approve, "apply": apply, "export": export,
+            "worker": worker}
 
 
 def main(argv: list[str], env=None) -> int:
@@ -89,7 +96,8 @@ def main(argv: list[str], env=None) -> int:
         if not argv or argv[0] not in COMMANDS:
             raise AgentError(f"usage: python -m research.agent {'|'.join(COMMANDS)} ..." if not argv
                              else f"unknown command {show(argv[0])!r}")
-        out = COMMANDS[argv[0]](Config.from_env(env), argv[1:])
+        cfg = Config.from_env(env)
+        out = worker(cfg, argv[1:], env) if argv[0] == "worker" else COMMANDS[argv[0]](cfg, argv[1:])
     except (AgentError, TrialError) as e:
         print(f"refused: {e}", file=sys.stderr)
         return 2

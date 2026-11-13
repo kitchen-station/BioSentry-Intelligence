@@ -1,0 +1,17 @@
+{
+ "lite": "made by hand with convert_lite.sh; see lite.txt when present",
+ "metadata_sha256": "4ef6898ca6e9e2ca81b90377586642a3556ff7343bdd1c8f66dbad324ad25094",
+ "note": "MindIR bytes are not reproducible between runs (a timestamp inside): they are checked by sha256 here",
+ "variants": {
+  "all": {
+   "mindir": "model.mindir",
+   "mindir_bytes": 11539,
+   "mindir_sha256": "cbc9c82ae041e5bc01adf7781d81c79339bf26820c646748cfa6ab795ca309b1"
+  },
+  "no_temp": {
+   "mindir": "model_no_temp.mindir",
+   "mindir_bytes": 8706,
+   "mindir_sha256": "6ac94a6b5bee43689187d739b171f91858f96d10e4b11b652ac9c3812e3faa6d"
+  }
+ }
+}

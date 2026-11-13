@@ -1,7 +1,9 @@
 """Small boundaries: settings from the environment, the wall clock, the blood pressure parser and
 the ward row's patch-signal guard."""
 
+import re
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
@@ -48,3 +50,25 @@ def test_a_ranked_row_may_have_no_patch_signal() -> None:
     decision = decide(state)
     assert isinstance(decision, Ranked)
     assert score_row(state, 1, decision, []).signal_quality is None
+
+
+SRC = Path(__file__).resolve().parents[2] / "src" / "biosentry"
+PROCESS = re.compile(
+    r"subprocess|multiprocessing|posix_spawn|\bfork\b|os\.(system|exec|spawn|popen)|from os import"
+    r"|create_subprocess|\bpty\b|ctypes|__import__|import_module"
+)
+
+
+def test_the_api_never_starts_a_process() -> None:
+    files = list(SRC.rglob("*.py"))
+    assert len(files) > 30  # the walk is not vacuous
+    assert [str(f) for f in files if PROCESS.search(f.read_text("utf-8"))] == []
+
+
+def test_nothing_that_ranks_a_patient_reads_a_lab_run() -> None:
+    names = ("ward.py", "scoring.py", "patients.py", "baseline.py")
+    ranking = [SRC / "services" / n for n in names] + [SRC / "repositories" / "postgres.py"]
+    ranking += list((SRC / "domain").rglob("*.py"))
+    assert len(ranking) > 5
+    pattern = re.compile(r"lab_run|biosentry\.(services|schemas)\.lab\b|import[^\n]*\blab\b")
+    assert [str(f) for f in ranking if pattern.search(f.read_text("utf-8"))] == []

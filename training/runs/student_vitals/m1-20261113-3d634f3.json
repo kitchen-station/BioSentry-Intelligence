@@ -1,0 +1,1546 @@
+{
+ "budget_cuts": [],
+ "commit": "3d634f3",
+ "data": {
+  "skipped_unread": {
+   "calibration": [],
+   "ward_v2": []
+  },
+  "train_seeds": [
+   61,
+   62,
+   63,
+   64,
+   65,
+   66,
+   67,
+   68,
+   69,
+   70,
+   71,
+   72,
+   73,
+   74,
+   75,
+   76,
+   77,
+   78,
+   79,
+   80,
+   81,
+   82,
+   83,
+   84,
+   85,
+   86,
+   87,
+   88,
+   89,
+   90,
+   91,
+   92,
+   93,
+   94,
+   95,
+   96,
+   97,
+   98,
+   99,
+   100,
+   101,
+   102,
+   103,
+   104,
+   105,
+   106,
+   107,
+   108,
+   109,
+   110,
+   111,
+   112,
+   113,
+   114,
+   115,
+   116,
+   117,
+   118,
+   119,
+   120,
+   121,
+   122,
+   123,
+   124,
+   125,
+   126,
+   127,
+   128,
+   129,
+   130,
+   131,
+   132,
+   133,
+   134,
+   135,
+   136,
+   137,
+   138,
+   139,
+   140,
+   141,
+   142,
+   143,
+   144,
+   145,
+   146,
+   147,
+   148,
+   149,
+   150,
+   151,
+   152,
+   153,
+   154,
+   155,
+   156,
+   157,
+   158,
+   159,
+   160
+  ],
+  "validation_seeds": [
+   261,
+   262,
+   263,
+   264,
+   265,
+   266,
+   267,
+   268,
+   269,
+   270,
+   271,
+   272,
+   273,
+   274,
+   275,
+   276,
+   277,
+   278,
+   279,
+   280,
+   281,
+   282,
+   283,
+   284,
+   285,
+   286,
+   287,
+   288,
+   289,
+   290,
+   291,
+   292,
+   293,
+   294,
+   295,
+   296,
+   297,
+   298,
+   299,
+   300
+  ],
+  "variants": {
+   "all": {
+    "training_positives": 8327,
+    "training_rows": 3044556,
+    "validation_positives": 3795,
+    "validation_rows": 1207464
+   },
+   "no_temp": {
+    "training_positives": 8327,
+    "training_rows": 3044556,
+    "validation_positives": 3795,
+    "validation_rows": 1207464
+   }
+  }
+ },
+ "framework": "MindSpore",
+ "framework_version": "2.11.0",
+ "model": "tier_c/student_vitals",
+ "packages": {
+  "mindspore": "2.11.0",
+  "numpy": "2.4.6",
+  "onnx": "1.23.2",
+  "onnxruntime": "1.31.1",
+  "protobuf": "7.36.2",
+  "pydantic": "2.14.1",
+  "scikit-learn": "1.9.1",
+  "scipy": "1.17.1",
+  "threadpoolctl": "3.8.0"
+ },
+ "run_id": "m1-20261113-3d634f3",
+ "settings": {
+  "bootstrap": {
+   "resamples": 1000,
+   "seed": 20261112
+  },
+  "device": "CPU",
+  "grid": {
+   "budget_seconds": 10800.0,
+   "hgb_b_iter": 500,
+   "hgb_d_iter": 2000,
+   "hgb_d_min_leaf": 2000,
+   "learning_rate": 0.001,
+   "parity_rows": 1000,
+   "reference_d": true,
+   "student_batch": 4096,
+   "student_decay": 1e-05,
+   "student_epochs": 8,
+   "student_inputs": [
+    "base",
+    "trend"
+   ],
+   "student_patience": 2,
+   "student_widths": [
+    8,
+    16,
+    32
+   ],
+   "teacher_batch": 1024,
+   "teacher_decays": [
+    1e-05,
+    0.0001
+   ],
+   "teacher_epochs": 15,
+   "teacher_patience": 3,
+   "teacher_widths": [
+    256,
+    256
+   ]
+  },
+  "losses": {
+   "distilled": "MSE on the teacher's clipped logits",
+   "hard_label": "BCEWithLogits",
+   "teacher": "BCEWithLogits on the true labels"
+  },
+  "mode": "GRAPH_MODE",
+  "optimiser": {
+   "learning_rate": 0.001,
+   "name": "Adam",
+   "weight_decay": "on weight matrices only"
+  },
+  "seed": 0,
+  "shuffle": "numpy.random.default_rng(0) each epoch",
+  "threads_num": 1
+ },
+ "time": {
+  "fits": {
+   "all distilled base width 16": {
+    "epoch_seconds": [
+     16.811,
+     8.726,
+     10.813,
+     19.769,
+     16.846,
+     20.319,
+     13.771,
+     10.465
+    ],
+    "seconds": 117.52
+   },
+   "all distilled base width 32": {
+    "epoch_seconds": [
+     23.62,
+     12.723,
+     7.585,
+     14.529,
+     7.85,
+     10.546,
+     12.801,
+     9.911
+    ],
+    "seconds": 99.565
+   },
+   "all distilled base width 8": {
+    "epoch_seconds": [
+     7.059,
+     6.378,
+     5.486,
+     4.908,
+     5.054,
+     6.63,
+     11.212,
+     8.656
+    ],
+    "seconds": 55.383
+   },
+   "all distilled trend width 16": {
+    "epoch_seconds": [
+     8.186,
+     5.667,
+     8.436,
+     7.873,
+     7.023,
+     8.885,
+     9.474
+    ],
+    "seconds": 55.543
+   },
+   "all distilled trend width 32": {
+    "epoch_seconds": [
+     10.033,
+     14.612,
+     8.406,
+     19.493,
+     11.099,
+     16.084,
+     10.884,
+     10.325
+    ],
+    "seconds": 100.937
+   },
+   "all distilled trend width 8": {
+    "epoch_seconds": [
+     6.145,
+     5.682,
+     8.037,
+     7.932,
+     9.28,
+     9.444,
+     6.111
+    ],
+    "seconds": 52.631
+   },
+   "all hard-label base width 16": {
+    "epoch_seconds": [
+     20.548,
+     16.372,
+     14.556
+    ],
+    "seconds": 51.476
+   },
+   "all hard-label base width 32": {
+    "epoch_seconds": [
+     11.411,
+     8.137,
+     5.787
+    ],
+    "seconds": 25.335
+   },
+   "all hard-label base width 8": {
+    "epoch_seconds": [
+     9.949,
+     8.97,
+     10.719
+    ],
+    "seconds": 29.637
+   },
+   "all hard-label trend width 16": {
+    "epoch_seconds": [
+     9.077,
+     11.148,
+     10.903,
+     9.041,
+     14.528
+    ],
+    "seconds": 54.698
+   },
+   "all hard-label trend width 32": {
+    "epoch_seconds": [
+     15.28,
+     9.976,
+     10.164,
+     8.753,
+     14.256
+    ],
+    "seconds": 58.429
+   },
+   "all hard-label trend width 8": {
+    "epoch_seconds": [
+     11.882,
+     6.843,
+     9.373,
+     8.814,
+     9.926,
+     9.257,
+     6.794
+    ],
+    "seconds": 62.89
+   },
+   "all teacher decay 0.0001": {
+    "epoch_seconds": [
+     100.573,
+     102.019,
+     104.122,
+     91.55,
+     97.648,
+     107.714,
+     116.248,
+     81.672,
+     97.838,
+     109.014,
+     99.143,
+     104.823
+    ],
+    "seconds": 1212.364
+   },
+   "all teacher decay 1e-05": {
+    "epoch_seconds": [
+     95.524,
+     82.86,
+     77.033,
+     99.275
+    ],
+    "seconds": 354.693
+   },
+   "no_temp distilled base width 16": {
+    "epoch_seconds": [
+     10.73,
+     8.053,
+     7.482,
+     9.018,
+     7.376,
+     6.153
+    ],
+    "seconds": 48.814
+   },
+   "no_temp distilled base width 32": {
+    "epoch_seconds": [
+     7.876,
+     5.52,
+     4.963,
+     6.502,
+     6.479,
+     6.141
+    ],
+    "seconds": 37.481
+   },
+   "no_temp distilled base width 8": {
+    "epoch_seconds": [
+     7.936,
+     5.108,
+     5.421,
+     5.017,
+     5.021,
+     4.91,
+     5.189,
+     4.956
+    ],
+    "seconds": 43.559
+   },
+   "no_temp distilled trend width 16": {
+    "epoch_seconds": [
+     4.987,
+     5.902,
+     3.241,
+     2.833,
+     3.022,
+     3.313,
+     2.891,
+     2.741
+    ],
+    "seconds": 28.929
+   },
+   "no_temp distilled trend width 32": {
+    "epoch_seconds": [
+     4.623,
+     4.199,
+     4.161,
+     4.404,
+     6.534,
+     6.425,
+     5.949,
+     4.624
+    ],
+    "seconds": 40.918
+   },
+   "no_temp distilled trend width 8": {
+    "epoch_seconds": [
+     7.885,
+     7.398,
+     8.046,
+     7.295,
+     6.2,
+     5.419,
+     4.926,
+     6.017
+    ],
+    "seconds": 53.187
+   },
+   "no_temp hard-label base width 16": {
+    "epoch_seconds": [
+     9.446,
+     6.605,
+     4.341
+    ],
+    "seconds": 20.392
+   },
+   "no_temp hard-label base width 32": {
+    "epoch_seconds": [
+     10.322,
+     8.486,
+     12.931,
+     9.017,
+     8.924
+    ],
+    "seconds": 49.68
+   },
+   "no_temp hard-label base width 8": {
+    "epoch_seconds": [
+     5.363,
+     4.895,
+     4.995,
+     4.865,
+     7.275
+    ],
+    "seconds": 27.394
+   },
+   "no_temp hard-label trend width 16": {
+    "epoch_seconds": [
+     5.341,
+     4.292,
+     3.588,
+     5.158,
+     5.198
+    ],
+    "seconds": 23.578
+   },
+   "no_temp hard-label trend width 32": {
+    "epoch_seconds": [
+     5.276,
+     4.98,
+     5.724,
+     5.256,
+     4.99
+    ],
+    "seconds": 26.226
+   },
+   "no_temp hard-label trend width 8": {
+    "epoch_seconds": [
+     8.041,
+     4.2,
+     4.132,
+     4.414,
+     4.184
+    ],
+    "seconds": 24.971
+   },
+   "no_temp teacher decay 0.0001": {
+    "epoch_seconds": [
+     103.373,
+     98.054,
+     93.436,
+     113.025,
+     107.888,
+     123.584,
+     78.574,
+     69.82,
+     110.473,
+     117.688,
+     102.739
+    ],
+    "seconds": 1118.653
+   },
+   "no_temp teacher decay 1e-05": {
+    "epoch_seconds": [
+     100.245,
+     111.296,
+     121.026,
+     117.827
+    ],
+    "seconds": 450.394
+   }
+  },
+  "references": {
+   "all old_recipe": 18.704,
+   "all regularised_gradient_boosting": 228.009,
+   "no_temp old_recipe": 14.508,
+   "no_temp regularised_gradient_boosting": 145.738
+  },
+  "total_seconds": 5090.0
+ },
+ "variants": {
+  "all": {
+   "chosen": {
+    "distilled": true,
+    "shipped": "distilled_student",
+    "student": {
+     "best_epoch": 7,
+     "inputs": "trend",
+     "loss": "mse",
+     "parameters": 1185,
+     "val_log_loss": 0.018969,
+     "val_log_loss_onnx": 0.018969,
+     "weight_decay": 1e-05,
+     "width": 32
+    },
+    "teacher": {
+     "best_epoch": 9,
+     "epochs_run": 12,
+     "parameters": 79873,
+     "train_log_loss": 0.015943,
+     "val_log_loss": 0.018699,
+     "val_log_loss_by_epoch": [
+      0.018998,
+      0.018924,
+      0.019075,
+      0.018815,
+      0.018949,
+      0.018779,
+      0.018776,
+      0.018722,
+      0.018699,
+      0.018767,
+      0.018883,
+      0.018802
+     ],
+     "weight_decay": 0.0001
+    }
+   },
+   "fits": [
+    {
+     "average_precision": 0.118078,
+     "best_epoch": 9,
+     "final_val_log_loss": 0.018699,
+     "inputs": "teacher",
+     "kind": "teacher",
+     "name": "all teacher decay 0.0001",
+     "parameters": 79873,
+     "train_loss_by_epoch": [
+      0.016554,
+      0.016291,
+      0.016186,
+      0.016113,
+      0.016088,
+      0.016047,
+      0.01604,
+      0.016028,
+      0.01602,
+      0.016014,
+      0.016006,
+      0.015985
+     ],
+     "val_log_loss_by_epoch": [
+      0.018998,
+      0.018924,
+      0.019075,
+      0.018815,
+      0.018949,
+      0.018779,
+      0.018776,
+      0.018722,
+      0.018699,
+      0.018767,
+      0.018883,
+      0.018802
+     ],
+     "weight_decay": 0.0001,
+     "width": [
+      256,
+      256
+     ]
+    },
+    {
+     "average_precision": 0.109363,
+     "best_epoch": 1,
+     "final_val_log_loss": 0.019006,
+     "inputs": "teacher",
+     "kind": "teacher",
+     "name": "all teacher decay 1e-05",
+     "parameters": 79873,
+     "train_loss_by_epoch": [
+      0.01625,
+      0.015826,
+      0.015583,
+      0.015317
+     ],
+     "val_log_loss_by_epoch": [
+      0.019006,
+      0.019272,
+      0.019357,
+      0.019473
+     ],
+     "weight_decay": 1e-05,
+     "width": [
+      256,
+      256
+     ]
+    },
+    {
+     "average_precision": 0.060298,
+     "best_epoch": 7,
+     "final_val_log_loss": 0.019492,
+     "inputs": "base",
+     "kind": "distilled",
+     "name": "all distilled base width 8",
+     "parameters": 169,
+     "train_loss_by_epoch": [
+      0.156213,
+      0.125081,
+      0.122967,
+      0.122236,
+      0.12161,
+      0.120937,
+      0.120173,
+      0.119436
+     ],
+     "val_log_loss_by_epoch": [
+      0.019666,
+      0.019644,
+      0.019581,
+      0.01957,
+      0.019542,
+      0.019538,
+      0.019492,
+      0.019516
+     ],
+     "weight_decay": 1e-05,
+     "width": 8
+    },
+    {
+     "average_precision": 0.062523,
+     "best_epoch": 1,
+     "final_val_log_loss": 0.019302,
+     "inputs": "base",
+     "kind": "hard_label",
+     "name": "all hard-label base width 8",
+     "parameters": 169,
+     "train_loss_by_epoch": [
+      0.01726,
+      0.016929,
+      0.016879
+     ],
+     "val_log_loss_by_epoch": [
+      0.019302,
+      0.019327,
+      0.019325
+     ],
+     "weight_decay": 1e-05,
+     "width": 8
+    },
+    {
+     "average_precision": 0.064944,
+     "best_epoch": 7,
+     "final_val_log_loss": 0.019464,
+     "inputs": "base",
+     "kind": "distilled",
+     "name": "all distilled base width 16",
+     "parameters": 337,
+     "train_loss_by_epoch": [
+      0.147238,
+      0.119976,
+      0.117351,
+      0.115735,
+      0.114558,
+      0.114053,
+      0.113769,
+      0.113537
+     ],
+     "val_log_loss_by_epoch": [
+      0.019625,
+      0.019601,
+      0.019517,
+      0.019509,
+      0.019491,
+      0.019504,
+      0.019464,
+      0.019494
+     ],
+     "weight_decay": 1e-05,
+     "width": 16
+    },
+    {
+     "average_precision": 0.06596,
+     "best_epoch": 1,
+     "final_val_log_loss": 0.019294,
+     "inputs": "base",
+     "kind": "hard_label",
+     "name": "all hard-label base width 16",
+     "parameters": 337,
+     "train_loss_by_epoch": [
+      0.01717,
+      0.016871,
+      0.016795
+     ],
+     "val_log_loss_by_epoch": [
+      0.019294,
+      0.019317,
+      0.01931
+     ],
+     "weight_decay": 1e-05,
+     "width": 16
+    },
+    {
+     "average_precision": 0.06725,
+     "best_epoch": 7,
+     "final_val_log_loss": 0.019453,
+     "inputs": "base",
+     "kind": "distilled",
+     "name": "all distilled base width 32",
+     "parameters": 673,
+     "train_loss_by_epoch": [
+      0.144933,
+      0.117241,
+      0.113248,
+      0.111659,
+      0.110965,
+      0.110575,
+      0.110337,
+      0.110172
+     ],
+     "val_log_loss_by_epoch": [
+      0.019618,
+      0.019572,
+      0.019491,
+      0.019483,
+      0.019468,
+      0.019489,
+      0.019453,
+      0.019493
+     ],
+     "weight_decay": 1e-05,
+     "width": 32
+    },
+    {
+     "average_precision": 0.068037,
+     "best_epoch": 1,
+     "final_val_log_loss": 0.019314,
+     "inputs": "base",
+     "kind": "hard_label",
+     "name": "all hard-label base width 32",
+     "parameters": 673,
+     "train_loss_by_epoch": [
+      0.017113,
+      0.016799,
+      0.016716
+     ],
+     "val_log_loss_by_epoch": [
+      0.019314,
+      0.019347,
+      0.019341
+     ],
+     "weight_decay": 1e-05,
+     "width": 32
+    },
+    {
+     "average_precision": 0.08398,
+     "best_epoch": 5,
+     "final_val_log_loss": 0.019076,
+     "inputs": "trend",
+     "kind": "distilled",
+     "name": "all distilled trend width 8",
+     "parameters": 297,
+     "train_loss_by_epoch": [
+      0.142713,
+      0.076193,
+      0.07042,
+      0.067282,
+      0.065992,
+      0.065556,
+      0.065406
+     ],
+     "val_log_loss_by_epoch": [
+      0.019182,
+      0.019143,
+      0.019096,
+      0.019093,
+      0.019076,
+      0.0191,
+      0.019085
+     ],
+     "weight_decay": 1e-05,
+     "width": 8
+    },
+    {
+     "average_precision": 0.09227,
+     "best_epoch": 5,
+     "final_val_log_loss": 0.018925,
+     "inputs": "trend",
+     "kind": "hard_label",
+     "name": "all hard-label trend width 8",
+     "parameters": 297,
+     "train_loss_by_epoch": [
+      0.017242,
+      0.016689,
+      0.016638,
+      0.016601,
+      0.016579,
+      0.016558,
+      0.016535
+     ],
+     "val_log_loss_by_epoch": [
+      0.019011,
+      0.018978,
+      0.018931,
+      0.018941,
+      0.018925,
+      0.018947,
+      0.018935
+     ],
+     "weight_decay": 1e-05,
+     "width": 8
+    },
+    {
+     "average_precision": 0.091279,
+     "best_epoch": 5,
+     "final_val_log_loss": 0.019011,
+     "inputs": "trend",
+     "kind": "distilled",
+     "name": "all distilled trend width 16",
+     "parameters": 593,
+     "train_loss_by_epoch": [
+      0.11363,
+      0.05989,
+      0.055502,
+      0.053158,
+      0.051573,
+      0.050815,
+      0.050401
+     ],
+     "val_log_loss_by_epoch": [
+      0.019144,
+      0.019107,
+      0.019057,
+      0.019044,
+      0.019011,
+      0.019025,
+      0.01902
+     ],
+     "weight_decay": 1e-05,
+     "width": 16
+    },
+    {
+     "average_precision": 0.097204,
+     "best_epoch": 3,
+     "final_val_log_loss": 0.01893,
+     "inputs": "trend",
+     "kind": "hard_label",
+     "name": "all hard-label trend width 16",
+     "parameters": 593,
+     "train_loss_by_epoch": [
+      0.017024,
+      0.016587,
+      0.016503,
+      0.01644,
+      0.016399
+     ],
+     "val_log_loss_by_epoch": [
+      0.018976,
+      0.018955,
+      0.01893,
+      0.018983,
+      0.018982
+     ],
+     "weight_decay": 1e-05,
+     "width": 16
+    },
+    {
+     "average_precision": 0.096846,
+     "best_epoch": 7,
+     "final_val_log_loss": 0.018969,
+     "inputs": "trend",
+     "kind": "distilled",
+     "name": "all distilled trend width 32",
+     "parameters": 1185,
+     "train_loss_by_epoch": [
+      0.10377,
+      0.052777,
+      0.046938,
+      0.044666,
+      0.043761,
+      0.04334,
+      0.043106,
+      0.042914
+     ],
+     "val_log_loss_by_epoch": [
+      0.019123,
+      0.019044,
+      0.018995,
+      0.019003,
+      0.018973,
+      0.018986,
+      0.018969,
+      0.018997
+     ],
+     "weight_decay": 1e-05,
+     "width": 32
+    },
+    {
+     "average_precision": 0.099735,
+     "best_epoch": 3,
+     "final_val_log_loss": 0.018971,
+     "inputs": "trend",
+     "kind": "hard_label",
+     "name": "all hard-label trend width 32",
+     "parameters": 1185,
+     "train_loss_by_epoch": [
+      0.016956,
+      0.01652,
+      0.016421,
+      0.016346,
+      0.016287
+     ],
+     "val_log_loss_by_epoch": [
+      0.018997,
+      0.019001,
+      0.018971,
+      0.019046,
+      0.019064
+     ],
+     "weight_decay": 1e-05,
+     "width": 32
+    }
+   ],
+   "parameters": {
+    "ratio_teacher_to_largest_distilled_student": 67.403376,
+    "ratio_teacher_to_student": 67.403376,
+    "standardisation_constants": 70,
+    "student": 1185,
+    "teacher": 79873
+   },
+   "references": {
+    "constant": {
+     "val_log_loss": 0.021279
+    },
+    "old_recipe": {
+     "iterations": 20,
+     "val_log_loss": 0.021839
+    },
+    "regularised_gradient_boosting": {
+     "iterations": 97,
+     "val_log_loss": 0.018931
+    }
+   },
+   "teacher_gate": {
+    "constant": {
+     "difference": -0.00258,
+     "lower_2_5": -0.003547,
+     "passes": true,
+     "upper_97_5": -0.001749
+    },
+    "hard_label_mlp": {
+     "difference": -0.000227,
+     "lower_2_5": -0.000451,
+     "passes": true,
+     "upper_97_5": -3.4e-05
+    },
+    "much_bigger": true,
+    "old_recipe": {
+     "difference": -0.003141,
+     "lower_2_5": -0.003874,
+     "passes": true,
+     "upper_97_5": -0.002459
+    },
+    "passes": true
+   },
+   "thresholds": {
+    "chart": {
+     "alerts": 12852,
+     "bins": 1458487,
+     "bins_alerting": 249871,
+     "patient_days": 15199.255
+    },
+    "student": {
+     "alerts": 12633,
+     "bins_alerting": 96951,
+     "threshold": 0.006
+    },
+    "teacher": {
+     "alerts": 11667,
+     "bins_alerting": 106842,
+     "threshold": 0.006
+    }
+   }
+  },
+  "no_temp": {
+   "chosen": {
+    "distilled": true,
+    "shipped": "distilled_student",
+    "student": {
+     "best_epoch": 7,
+     "inputs": "trend",
+     "loss": "mse",
+     "parameters": 465,
+     "val_log_loss": 0.019154,
+     "val_log_loss_onnx": 0.019154,
+     "weight_decay": 1e-05,
+     "width": 16
+    },
+    "teacher": {
+     "best_epoch": 8,
+     "epochs_run": 11,
+     "parameters": 76801,
+     "train_log_loss": 0.016171,
+     "val_log_loss": 0.018889,
+     "val_log_loss_by_epoch": [
+      0.019115,
+      0.0191,
+      0.019278,
+      0.018946,
+      0.019035,
+      0.018944,
+      0.018954,
+      0.018889,
+      0.018894,
+      0.018918,
+      0.019025
+     ],
+     "weight_decay": 0.0001
+    }
+   },
+   "fits": [
+    {
+     "average_precision": 0.107075,
+     "best_epoch": 8,
+     "final_val_log_loss": 0.018889,
+     "inputs": "teacher",
+     "kind": "teacher",
+     "name": "no_temp teacher decay 0.0001",
+     "parameters": 76801,
+     "train_loss_by_epoch": [
+      0.016664,
+      0.016423,
+      0.016351,
+      0.016303,
+      0.016282,
+      0.016248,
+      0.016236,
+      0.016236,
+      0.016224,
+      0.016211,
+      0.016211
+     ],
+     "val_log_loss_by_epoch": [
+      0.019115,
+      0.0191,
+      0.019278,
+      0.018946,
+      0.019035,
+      0.018944,
+      0.018954,
+      0.018889,
+      0.018894,
+      0.018918,
+      0.019025
+     ],
+     "weight_decay": 0.0001,
+     "width": [
+      256,
+      256
+     ]
+    },
+    {
+     "average_precision": 0.106881,
+     "best_epoch": 1,
+     "final_val_log_loss": 0.019024,
+     "inputs": "teacher",
+     "kind": "teacher",
+     "name": "no_temp teacher decay 1e-05",
+     "parameters": 76801,
+     "train_loss_by_epoch": [
+      0.01639,
+      0.016061,
+      0.015907,
+      0.015787
+     ],
+     "val_log_loss_by_epoch": [
+      0.019024,
+      0.019294,
+      0.019411,
+      0.019307
+     ],
+     "weight_decay": 1e-05,
+     "width": [
+      256,
+      256
+     ]
+    },
+    {
+     "average_precision": 0.052905,
+     "best_epoch": 7,
+     "final_val_log_loss": 0.019596,
+     "inputs": "base",
+     "kind": "distilled",
+     "name": "no_temp distilled base width 8",
+     "parameters": 137,
+     "train_loss_by_epoch": [
+      0.135271,
+      0.094786,
+      0.092072,
+      0.089931,
+      0.08879,
+      0.088367,
+      0.08813,
+      0.087884
+     ],
+     "val_log_loss_by_epoch": [
+      0.01978,
+      0.019748,
+      0.019707,
+      0.019669,
+      0.019663,
+      0.019624,
+      0.019596,
+      0.019616
+     ],
+     "weight_decay": 1e-05,
+     "width": 8
+    },
+    {
+     "average_precision": 0.054988,
+     "best_epoch": 3,
+     "final_val_log_loss": 0.019533,
+     "inputs": "base",
+     "kind": "hard_label",
+     "name": "no_temp hard-label base width 8",
+     "parameters": 137,
+     "train_loss_by_epoch": [
+      0.01741,
+      0.01709,
+      0.017067,
+      0.017041,
+      0.01703
+     ],
+     "val_log_loss_by_epoch": [
+      0.019553,
+      0.01956,
+      0.019533,
+      0.019568,
+      0.01954
+     ],
+     "weight_decay": 1e-05,
+     "width": 8
+    },
+    {
+     "average_precision": 0.058942,
+     "best_epoch": 4,
+     "final_val_log_loss": 0.019586,
+     "inputs": "base",
+     "kind": "distilled",
+     "name": "no_temp distilled base width 16",
+     "parameters": 273,
+     "train_loss_by_epoch": [
+      0.119485,
+      0.086605,
+      0.083666,
+      0.081955,
+      0.081204,
+      0.080652
+     ],
+     "val_log_loss_by_epoch": [
+      0.019733,
+      0.019675,
+      0.019611,
+      0.019586,
+      0.01959,
+      0.019588
+     ],
+     "weight_decay": 1e-05,
+     "width": 16
+    },
+    {
+     "average_precision": 0.058773,
+     "best_epoch": 1,
+     "final_val_log_loss": 0.019497,
+     "inputs": "base",
+     "kind": "hard_label",
+     "name": "no_temp hard-label base width 16",
+     "parameters": 273,
+     "train_loss_by_epoch": [
+      0.017294,
+      0.016974,
+      0.016929
+     ],
+     "val_log_loss_by_epoch": [
+      0.019497,
+      0.019509,
+      0.019504
+     ],
+     "weight_decay": 1e-05,
+     "width": 16
+    },
+    {
+     "average_precision": 0.062148,
+     "best_epoch": 4,
+     "final_val_log_loss": 0.019568,
+     "inputs": "base",
+     "kind": "distilled",
+     "name": "no_temp distilled base width 32",
+     "parameters": 545,
+     "train_loss_by_epoch": [
+      0.116483,
+      0.084944,
+      0.08183,
+      0.080148,
+      0.079306,
+      0.078815
+     ],
+     "val_log_loss_by_epoch": [
+      0.019721,
+      0.019669,
+      0.019605,
+      0.019568,
+      0.019568,
+      0.019569
+     ],
+     "weight_decay": 1e-05,
+     "width": 32
+    },
+    {
+     "average_precision": 0.064852,
+     "best_epoch": 3,
+     "final_val_log_loss": 0.019498,
+     "inputs": "base",
+     "kind": "hard_label",
+     "name": "no_temp hard-label base width 32",
+     "parameters": 545,
+     "train_loss_by_epoch": [
+      0.017255,
+      0.016928,
+      0.016871,
+      0.016833,
+      0.016811
+     ],
+     "val_log_loss_by_epoch": [
+      0.019506,
+      0.019506,
+      0.019498,
+      0.019557,
+      0.019537
+     ],
+     "weight_decay": 1e-05,
+     "width": 32
+    },
+    {
+     "average_precision": 0.075691,
+     "best_epoch": 7,
+     "final_val_log_loss": 0.019226,
+     "inputs": "trend",
+     "kind": "distilled",
+     "name": "no_temp distilled trend width 8",
+     "parameters": 233,
+     "train_loss_by_epoch": [
+      0.097249,
+      0.053794,
+      0.051132,
+      0.049835,
+      0.049415,
+      0.049326,
+      0.049291,
+      0.049242
+     ],
+     "val_log_loss_by_epoch": [
+      0.019325,
+      0.019289,
+      0.019269,
+      0.019244,
+      0.019241,
+      0.019234,
+      0.019226,
+      0.019248
+     ],
+     "weight_decay": 1e-05,
+     "width": 8
+    },
+    {
+     "average_precision": 0.086833,
+     "best_epoch": 3,
+     "final_val_log_loss": 0.019108,
+     "inputs": "trend",
+     "kind": "hard_label",
+     "name": "no_temp hard-label trend width 8",
+     "parameters": 233,
+     "train_loss_by_epoch": [
+      0.01724,
+      0.01679,
+      0.016735,
+      0.016693,
+      0.016668
+     ],
+     "val_log_loss_by_epoch": [
+      0.019183,
+      0.019152,
+      0.019108,
+      0.01912,
+      0.01912
+     ],
+     "weight_decay": 1e-05,
+     "width": 8
+    },
+    {
+     "average_precision": 0.087059,
+     "best_epoch": 7,
+     "final_val_log_loss": 0.019154,
+     "inputs": "trend",
+     "kind": "distilled",
+     "name": "no_temp distilled trend width 16",
+     "parameters": 465,
+     "train_loss_by_epoch": [
+      0.083246,
+      0.044731,
+      0.039515,
+      0.037187,
+      0.036534,
+      0.036308,
+      0.036125,
+      0.035803
+     ],
+     "val_log_loss_by_epoch": [
+      0.019305,
+      0.019236,
+      0.019193,
+      0.019179,
+      0.019167,
+      0.019165,
+      0.019154,
+      0.019175
+     ],
+     "weight_decay": 1e-05,
+     "width": 16
+    },
+    {
+     "average_precision": 0.090046,
+     "best_epoch": 3,
+     "final_val_log_loss": 0.01915,
+     "inputs": "trend",
+     "kind": "hard_label",
+     "name": "no_temp hard-label trend width 16",
+     "parameters": 465,
+     "train_loss_by_epoch": [
+      0.017173,
+      0.016742,
+      0.016661,
+      0.0166,
+      0.016562
+     ],
+     "val_log_loss_by_epoch": [
+      0.019203,
+      0.019164,
+      0.01915,
+      0.019169,
+      0.019189
+     ],
+     "weight_decay": 1e-05,
+     "width": 16
+    },
+    {
+     "average_precision": 0.088939,
+     "best_epoch": 6,
+     "final_val_log_loss": 0.019156,
+     "inputs": "trend",
+     "kind": "distilled",
+     "name": "no_temp distilled trend width 32",
+     "parameters": 929,
+     "train_loss_by_epoch": [
+      0.079805,
+      0.040181,
+      0.035885,
+      0.034246,
+      0.033451,
+      0.03301,
+      0.032735,
+      0.032479
+     ],
+     "val_log_loss_by_epoch": [
+      0.019279,
+      0.019198,
+      0.01917,
+      0.019174,
+      0.019165,
+      0.019156,
+      0.019157,
+      0.019167
+     ],
+     "weight_decay": 1e-05,
+     "width": 32
+    },
+    {
+     "average_precision": 0.092559,
+     "best_epoch": 3,
+     "final_val_log_loss": 0.019159,
+     "inputs": "trend",
+     "kind": "hard_label",
+     "name": "no_temp hard-label trend width 32",
+     "parameters": 929,
+     "train_loss_by_epoch": [
+      0.017104,
+      0.016685,
+      0.016596,
+      0.016528,
+      0.01648
+     ],
+     "val_log_loss_by_epoch": [
+      0.019204,
+      0.019182,
+      0.019159,
+      0.019196,
+      0.019196
+     ],
+     "weight_decay": 1e-05,
+     "width": 32
+    }
+   ],
+   "parameters": {
+    "ratio_teacher_to_largest_distilled_student": 82.670614,
+    "ratio_teacher_to_student": 165.163441,
+    "standardisation_constants": 54,
+    "student": 465,
+    "teacher": 76801
+   },
+   "references": {
+    "constant": {
+     "val_log_loss": 0.021279
+    },
+    "old_recipe": {
+     "iterations": 20,
+     "val_log_loss": 0.021944
+    },
+    "regularised_gradient_boosting": {
+     "iterations": 63,
+     "val_log_loss": 0.019104
+    }
+   },
+   "teacher_gate": {
+    "constant": {
+     "difference": -0.002389,
+     "lower_2_5": -0.0034,
+     "passes": true,
+     "upper_97_5": -0.001527
+    },
+    "hard_label_mlp": {
+     "difference": -0.000219,
+     "lower_2_5": -0.000471,
+     "passes": true,
+     "upper_97_5": -7e-06
+    },
+    "much_bigger": true,
+    "old_recipe": {
+     "difference": -0.003054,
+     "lower_2_5": -0.00393,
+     "passes": true,
+     "upper_97_5": -0.002279
+    },
+    "passes": true
+   },
+   "thresholds": {
+    "chart": {
+     "alerts": 12852,
+     "bins": 1458487,
+     "bins_alerting": 249871,
+     "patient_days": 15199.255
+    },
+    "student": {
+     "alerts": 12565,
+     "bins_alerting": 97863,
+     "threshold": 0.006
+    },
+    "teacher": {
+     "alerts": 12851,
+     "bins_alerting": 129697,
+     "threshold": 0.005
+    }
+   }
+  }
+ }
+}

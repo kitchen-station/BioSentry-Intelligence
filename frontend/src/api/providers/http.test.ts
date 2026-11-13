@@ -214,3 +214,16 @@ describe("httpProvider maps each call to its endpoint", () => {
     expect((body as FormData).get("file")).toBeInstanceOf(File);
   });
 });
+
+describe("httpProvider lab runs", () => {
+  it("asks, lists and reads only the lab run paths", async () => {
+    fetchMock.mockImplementation(async () => reply(200, {}));
+    const input = { kind: "compare", mode: "w4", seed: 1, days: 1, baseline: "news2_total_ge_5", change: "news2_chart_trigger" } as const;
+    await httpProvider.requestLabRun(input);
+    await httpProvider.getLabRuns();
+    await httpProvider.getLabRun(7);
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual(["/wards/W4/lab/runs", "/wards/W4/lab/runs", "/wards/W4/lab/runs/7"]);
+    expect(fetchMock.mock.calls[0][1].method).toBe("POST");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual(input);
+  });
+});

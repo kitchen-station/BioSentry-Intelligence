@@ -367,6 +367,13 @@ describe("the fixture provider", () => {
     );
   });
 
+  it("has no simulated runs: they need the server", async () => {
+    const input = { kind: "compare", mode: "w4", seed: 1, days: 1, baseline: "news2_total_ge_5", change: "news2_chart_trigger" } as const;
+    for (const call of [() => fixtureProvider.requestLabRun(input), () => fixtureProvider.getLabRuns(), () => fixtureProvider.getLabRun(1)]) {
+      await expect(call()).rejects.toThrow("Simulated runs need the server");
+    }
+  });
+
   it("has no overview: it needs the API", async () => {
     await expect(fixtureProvider.getOverview()).rejects.toThrow("The overview needs the API");
   });

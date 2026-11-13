@@ -1,94 +1,755 @@
 {
- "accepted": true,
- "best_candidate": {
-  "params": {
-   "p": 5,
-   "theta": 2.2563,
-   "weights": {
-    "heart_rate": 0.4381,
-    "respiratory_rate": 0.7824,
-    "spo2": 0.9768,
-    "temperature": 0.0
-   }
-  },
-  "train_reward": 1.580875
+ "accepted": false,
+ "best_generation": 1,
+ "best_validation": 1.343958,
+ "config": {
+  "fix_theta": false,
+  "form": "sum",
+  "frozen_vital": "none",
+  "selection_trials": 8,
+  "shrink": 0.85,
+  "sigma0": 0.5
  },
- "candidates": 30,
- "current_before": {
-  "params": {
-   "p": 5,
-   "theta": 2.8206,
-   "weights": {
-    "heart_rate": 0.4104,
-    "respiratory_rate": 0.7946,
-    "spo2": 0.4868,
-    "temperature": 0.0
+ "config_sha256": "db1c43805f5ee575d6d52fc3ab5a4c331b218721a591ea4c9b37166abe7e717e",
+ "confirmation": {
+  "current_rejected": false,
+  "d": [
+   {
+    "d": -0.838983,
+    "seed": 429
+   },
+   {
+    "d": 0.316832,
+    "seed": 430
+   },
+   {
+    "d": 0.782051,
+    "seed": 431
+   },
+   {
+    "d": 0.302013,
+    "seed": 432
+   },
+   {
+    "d": 0.466555,
+    "seed": 433
+   },
+   {
+    "d": 0.679803,
+    "seed": 434
+   },
+   {
+    "d": -1.03125,
+    "seed": 435
+   },
+   {
+    "d": 0.636364,
+    "seed": 436
+   },
+   {
+    "d": 0.715116,
+    "seed": 437
+   },
+   {
+    "d": 0.532051,
+    "seed": 438
+   },
+   {
+    "d": -2.186969,
+    "seed": 439
+   },
+   {
+    "d": -0.636691,
+    "seed": 440
    }
-  },
-  "train_reward": 1.258276
+  ],
+  "mean": -0.021926,
+  "stdev": 0.935766,
+  "threshold": 0.485158,
+  "winner_rejected": false
  },
+ "confirmation_seeds": [
+  429,
+  430,
+  431,
+  432,
+  433,
+  434,
+  435,
+  436,
+  437,
+  438,
+  439,
+  440
+ ],
  "generation": 2,
- "generator_seed": 20261114,
+ "generator_seed": 20262114,
+ "next_seed": 441,
  "params": {
-  "p": 5,
-  "theta": 2.2563,
+  "p": 3,
+  "theta": 3.3703,
   "weights": {
-   "heart_rate": 0.4381,
-   "respiratory_rate": 0.7824,
-   "spo2": 0.9768,
+   "heart_rate": 0.3372,
+   "respiratory_rate": 0.5534,
+   "spo2": 1.2459,
    "temperature": 0.0
   }
  },
- "rejected_time_in_alert": 0,
- "sigma": {
-  "p": 0.9,
-  "theta": 0.45,
-  "w": 0.45
+ "patience": 1,
+ "prev_sha256": "066aaa35d7ada38feaf3df353a4992632d0c69c57531c78e307d7e7f1d7736c2",
+ "reason": "mean(d) not above the threshold",
+ "round": 1,
+ "schema": 2,
+ "selection": {
+  "candidates": 30,
+  "candidates_rejected": 1,
+  "current_mean": 0.237418,
+  "current_rejected": false,
+  "winner": {
+   "mean": 0.712292,
+   "params": {
+    "p": 5,
+    "theta": 3.0787,
+    "weights": {
+     "heart_rate": 0.383,
+     "respiratory_rate": 0.5107,
+     "spo2": 0.6447,
+     "temperature": 0.0
+    }
+   }
+  }
  },
+ "selection_seeds": [
+  421,
+  422,
+  423,
+  424,
+  425,
+  426,
+  427,
+  428
+ ],
+ "sha256": "e52a191e8b88ede0d1e9c71c493b8d3b70b7321ab17e81884cddbae4a35b8ac6",
+ "sigma_next": {
+  "p": 0.85,
+  "theta": 0.425,
+  "w": 0.425
+ },
+ "sigma_used": {
+  "p": 1.0,
+  "theta": 0.5,
+  "w": 0.5
+ },
+ "stopped": null,
  "synthetic": true,
  "temperature": false,
- "train_seeds": [
-  34,
-  35,
-  36
- ],
  "validated": false,
  "validation": {
   "per_seed": [
    {
-    "alerts_per_patient_12h": 0.177628,
+    "alerts_per_patient_12h": 0.159888,
     "caught_early": 1,
-    "episodes": 5,
-    "news2_time_in_alert": 0.148053,
-    "reward": -0.236559,
-    "seed": 8,
-    "time_in_alert": 0.025641
+    "episodes": 2,
+    "news2_time_in_alert": 0.162093,
+    "reward": 0.589443,
+    "seed": 341,
+    "time_in_alert": 0.009449
    },
    {
-    "alerts_per_patient_12h": 0.201138,
+    "alerts_per_patient_12h": 0.155161,
+    "caught_early": 1,
+    "episodes": 4,
+    "news2_time_in_alert": 0.137353,
+    "reward": 0.223242,
+    "seed": 342,
+    "time_in_alert": 0.020982
+   },
+   {
+    "alerts_per_patient_12h": 0.126338,
+    "caught_early": 1,
+    "episodes": 2,
+    "news2_time_in_alert": 0.132956,
+    "reward": 0.723716,
+    "seed": 343,
+    "time_in_alert": 0.007924
+   },
+   {
+    "alerts_per_patient_12h": 0.140621,
+    "caught_early": 0,
+    "episodes": 2,
+    "news2_time_in_alert": 0.161975,
+    "reward": -0.344411,
+    "seed": 344,
+    "time_in_alert": 0.007146
+   },
+   {
+    "alerts_per_patient_12h": 0.147584,
+    "caught_early": 2,
+    "episodes": 4,
+    "news2_time_in_alert": 0.152714,
+    "reward": 1.190083,
+    "seed": 345,
+    "time_in_alert": 0.024767
+   },
+   {
+    "alerts_per_patient_12h": 0.15817,
+    "caught_early": 4,
+    "episodes": 8,
+    "news2_time_in_alert": 0.194532,
+    "reward": 2.606232,
+    "seed": 346,
+    "time_in_alert": 0.068731
+   },
+   {
+    "alerts_per_patient_12h": 0.218309,
+    "caught_early": 1,
+    "episodes": 4,
+    "news2_time_in_alert": 0.142485,
+    "reward": 0.017045,
+    "seed": 347,
+    "time_in_alert": 0.012205
+   },
+   {
+    "alerts_per_patient_12h": 0.123966,
+    "caught_early": 0,
+    "episodes": 4,
+    "news2_time_in_alert": 0.110476,
+    "reward": -0.661479,
+    "seed": 348,
+    "time_in_alert": 0.012917
+   },
+   {
+    "alerts_per_patient_12h": 0.172566,
+    "caught_early": 3,
+    "episodes": 9,
+    "news2_time_in_alert": 0.202939,
+    "reward": 0.947883,
+    "seed": 349,
+    "time_in_alert": 0.034453
+   },
+   {
+    "alerts_per_patient_12h": 0.111547,
+    "caught_early": 2,
+    "episodes": 6,
+    "news2_time_in_alert": 0.142499,
+    "reward": 1.152174,
+    "seed": 350,
+    "time_in_alert": 0.014385
+   },
+   {
+    "alerts_per_patient_12h": 0.111524,
+    "caught_early": 4,
+    "episodes": 5,
+    "news2_time_in_alert": 0.179762,
+    "reward": 3.394198,
+    "seed": 351,
+    "time_in_alert": 0.02727
+   },
+   {
+    "alerts_per_patient_12h": 0.143459,
+    "caught_early": 3,
+    "episodes": 6,
+    "news2_time_in_alert": 0.182752,
+    "reward": 1.807453,
+    "seed": 352,
+    "time_in_alert": 0.032724
+   },
+   {
+    "alerts_per_patient_12h": 0.149586,
+    "caught_early": 1,
+    "episodes": 4,
+    "news2_time_in_alert": 0.195361,
+    "reward": 0.255034,
+    "seed": 353,
+    "time_in_alert": 0.039117
+   },
+   {
+    "alerts_per_patient_12h": 0.172084,
+    "caught_early": 4,
+    "episodes": 6,
+    "news2_time_in_alert": 0.134694,
+    "reward": 2.815789,
+    "seed": 354,
+    "time_in_alert": 0.027948
+   },
+   {
+    "alerts_per_patient_12h": 0.118039,
+    "caught_early": 4,
+    "episodes": 6,
+    "news2_time_in_alert": 0.173044,
+    "reward": 3.136531,
+    "seed": 355,
+    "time_in_alert": 0.041069
+   },
+   {
+    "alerts_per_patient_12h": 0.148793,
+    "caught_early": 1,
+    "episodes": 6,
+    "news2_time_in_alert": 0.179766,
+    "reward": -0.022293,
+    "seed": 356,
+    "time_in_alert": 0.030835
+   },
+   {
+    "alerts_per_patient_12h": 0.124435,
     "caught_early": 2,
     "episodes": 2,
-    "news2_time_in_alert": 0.116677,
-    "reward": 1.547337,
-    "seed": 9,
-    "time_in_alert": 0.02995
+    "news2_time_in_alert": 0.12481,
+    "reward": 1.66875,
+    "seed": 357,
+    "time_in_alert": 0.013041
    },
    {
-    "alerts_per_patient_12h": 0.232824,
+    "alerts_per_patient_12h": 0.092392,
+    "caught_early": 3,
+    "episodes": 4,
+    "news2_time_in_alert": 0.162645,
+    "reward": 2.513889,
+    "seed": 358,
+    "time_in_alert": 0.020963
+   },
+   {
+    "alerts_per_patient_12h": 0.12812,
+    "caught_early": 1,
+    "episodes": 5,
+    "news2_time_in_alert": 0.132017,
+    "reward": 0.261168,
+    "seed": 359,
+    "time_in_alert": 0.019747
+   },
+   {
+    "alerts_per_patient_12h": 0.131134,
+    "caught_early": 1,
+    "episodes": 5,
+    "news2_time_in_alert": 0.167098,
+    "reward": 0.112595,
+    "seed": 360,
+    "time_in_alert": 0.033008
+   },
+   {
+    "alerts_per_patient_12h": 0.105068,
+    "caught_early": 2,
+    "episodes": 4,
+    "news2_time_in_alert": 0.244858,
+    "reward": 1.429603,
+    "seed": 361,
+    "time_in_alert": 0.019515
+   },
+   {
+    "alerts_per_patient_12h": 0.132218,
+    "caught_early": 4,
+    "episodes": 6,
+    "news2_time_in_alert": 0.188665,
+    "reward": 2.87372,
+    "seed": 362,
+    "time_in_alert": 0.034451
+   },
+   {
+    "alerts_per_patient_12h": 0.176598,
+    "caught_early": 3,
+    "episodes": 4,
+    "news2_time_in_alert": 0.197123,
+    "reward": 2.17193,
+    "seed": 363,
+    "time_in_alert": 0.032511
+   },
+   {
+    "alerts_per_patient_12h": 0.092889,
+    "caught_early": 0,
+    "episodes": 4,
+    "news2_time_in_alert": 0.195093,
+    "reward": -0.421333,
+    "seed": 364,
+    "time_in_alert": 0.019485
+   },
+   {
+    "alerts_per_patient_12h": 0.147955,
+    "caught_early": 1,
+    "episodes": 4,
+    "news2_time_in_alert": 0.18769,
+    "reward": 0.14966,
+    "seed": 365,
+    "time_in_alert": 0.011694
+   },
+   {
+    "alerts_per_patient_12h": 0.132788,
+    "caught_early": 2,
+    "episodes": 6,
+    "news2_time_in_alert": 0.239948,
+    "reward": 1.145161,
+    "seed": 366,
+    "time_in_alert": 0.021305
+   },
+   {
+    "alerts_per_patient_12h": 0.135051,
+    "caught_early": 1,
+    "episodes": 3,
+    "news2_time_in_alert": 0.166054,
+    "reward": 0.439446,
+    "seed": 367,
+    "time_in_alert": 0.007636
+   },
+   {
+    "alerts_per_patient_12h": 0.188096,
+    "caught_early": 0,
+    "episodes": 1,
+    "news2_time_in_alert": 0.11443,
+    "reward": -0.224537,
+    "seed": 368,
+    "time_in_alert": 0.014309
+   },
+   {
+    "alerts_per_patient_12h": 0.087983,
+    "caught_early": 1,
+    "episodes": 4,
+    "news2_time_in_alert": 0.206236,
+    "reward": 0.559055,
+    "seed": 369,
+    "time_in_alert": 0.005633
+   },
+   {
+    "alerts_per_patient_12h": 0.140234,
+    "caught_early": 2,
+    "episodes": 7,
+    "news2_time_in_alert": 0.174424,
+    "reward": 0.597756,
+    "seed": 370,
+    "time_in_alert": 0.034459
+   },
+   {
+    "alerts_per_patient_12h": 0.167078,
+    "caught_early": 2,
+    "episodes": 5,
+    "news2_time_in_alert": 0.156977,
+    "reward": 0.944142,
+    "seed": 371,
+    "time_in_alert": 0.01386
+   },
+   {
+    "alerts_per_patient_12h": 0.159658,
+    "caught_early": 3,
+    "episodes": 8,
+    "news2_time_in_alert": 0.161579,
+    "reward": 1.471264,
+    "seed": 372,
+    "time_in_alert": 0.045962
+   },
+   {
+    "alerts_per_patient_12h": 0.146666,
+    "caught_early": 1,
+    "episodes": 4,
+    "news2_time_in_alert": 0.168131,
+    "reward": 0.306358,
+    "seed": 373,
+    "time_in_alert": 0.013833
+   },
+   {
+    "alerts_per_patient_12h": 0.177282,
+    "caught_early": 1,
+    "episodes": 4,
+    "news2_time_in_alert": 0.145727,
+    "reward": 0.078864,
+    "seed": 374,
+    "time_in_alert": 0.020572
+   },
+   {
+    "alerts_per_patient_12h": 0.186912,
+    "caught_early": 6,
+    "episodes": 8,
+    "news2_time_in_alert": 0.178488,
+    "reward": 4.075472,
+    "seed": 375,
+    "time_in_alert": 0.036074
+   },
+   {
+    "alerts_per_patient_12h": 0.16092,
+    "caught_early": 4,
+    "episodes": 10,
+    "news2_time_in_alert": 0.157165,
+    "reward": 1.938144,
+    "seed": 376,
+    "time_in_alert": 0.036944
+   },
+   {
+    "alerts_per_patient_12h": 0.109806,
+    "caught_early": 2,
+    "episodes": 4,
+    "news2_time_in_alert": 0.169871,
+    "reward": 1.486486,
+    "seed": 377,
+    "time_in_alert": 0.014768
+   },
+   {
+    "alerts_per_patient_12h": 0.154383,
+    "caught_early": 4,
+    "episodes": 5,
+    "news2_time_in_alert": 0.180136,
+    "reward": 3.127726,
+    "seed": 378,
+    "time_in_alert": 0.035568
+   },
+   {
+    "alerts_per_patient_12h": 0.162577,
     "caught_early": 1,
     "episodes": 2,
-    "news2_time_in_alert": 0.100392,
-    "reward": 0.227513,
-    "seed": 10,
-    "time_in_alert": 0.041273
+    "news2_time_in_alert": 0.15646,
+    "reward": 0.627968,
+    "seed": 379,
+    "time_in_alert": 0.018722
+   },
+   {
+    "alerts_per_patient_12h": 0.124054,
+    "caught_early": 3,
+    "episodes": 6,
+    "news2_time_in_alert": 0.174335,
+    "reward": 2.13783,
+    "seed": 380,
+    "time_in_alert": 0.014247
+   },
+   {
+    "alerts_per_patient_12h": 0.136242,
+    "caught_early": 4,
+    "episodes": 5,
+    "news2_time_in_alert": 0.159774,
+    "reward": 3.122984,
+    "seed": 381,
+    "time_in_alert": 0.036916
+   },
+   {
+    "alerts_per_patient_12h": 0.136321,
+    "caught_early": 4,
+    "episodes": 9,
+    "news2_time_in_alert": 0.214026,
+    "reward": 2.760695,
+    "seed": 382,
+    "time_in_alert": 0.023256
+   },
+   {
+    "alerts_per_patient_12h": 0.098167,
+    "caught_early": 2,
+    "episodes": 2,
+    "news2_time_in_alert": 0.16995,
+    "reward": 1.737828,
+    "seed": 383,
+    "time_in_alert": 0.010903
+   },
+   {
+    "alerts_per_patient_12h": 0.123534,
+    "caught_early": 0,
+    "episodes": 1,
+    "news2_time_in_alert": 0.180321,
+    "reward": -0.142202,
+    "seed": 384,
+    "time_in_alert": 0.012016
+   },
+   {
+    "alerts_per_patient_12h": 0.113094,
+    "caught_early": 1,
+    "episodes": 4,
+    "news2_time_in_alert": 0.167581,
+    "reward": 0.496471,
+    "seed": 385,
+    "time_in_alert": 0.015245
+   },
+   {
+    "alerts_per_patient_12h": 0.167905,
+    "caught_early": 2,
+    "episodes": 3,
+    "news2_time_in_alert": 0.13214,
+    "reward": 1.5,
+    "seed": 386,
+    "time_in_alert": 0.016697
+   },
+   {
+    "alerts_per_patient_12h": 0.108999,
+    "caught_early": 2,
+    "episodes": 4,
+    "news2_time_in_alert": 0.148177,
+    "reward": 1.536524,
+    "seed": 387,
+    "time_in_alert": 0.012768
+   },
+   {
+    "alerts_per_patient_12h": 0.105443,
+    "caught_early": 1,
+    "episodes": 6,
+    "news2_time_in_alert": 0.178509,
+    "reward": 0.155102,
+    "seed": 388,
+    "time_in_alert": 0.009682
+   },
+   {
+    "alerts_per_patient_12h": 0.195406,
+    "caught_early": 2,
+    "episodes": 3,
+    "news2_time_in_alert": 0.140175,
+    "reward": 1.408616,
+    "seed": 389,
+    "time_in_alert": 0.026001
+   },
+   {
+    "alerts_per_patient_12h": 0.117606,
+    "caught_early": 4,
+    "episodes": 7,
+    "news2_time_in_alert": 0.138295,
+    "reward": 2.94302,
+    "seed": 390,
+    "time_in_alert": 0.031331
+   },
+   {
+    "alerts_per_patient_12h": 0.185383,
+    "caught_early": 1,
+    "episodes": 2,
+    "news2_time_in_alert": 0.168696,
+    "reward": 0.660976,
+    "seed": 391,
+    "time_in_alert": 0.014927
+   },
+   {
+    "alerts_per_patient_12h": 0.129361,
+    "caught_early": 3,
+    "episodes": 6,
+    "news2_time_in_alert": 0.122313,
+    "reward": 2.061728,
+    "seed": 392,
+    "time_in_alert": 0.021355
+   },
+   {
+    "alerts_per_patient_12h": 0.102737,
+    "caught_early": 3,
+    "episodes": 5,
+    "news2_time_in_alert": 0.153714,
+    "reward": 2.249084,
+    "seed": 393,
+    "time_in_alert": 0.010054
+   },
+   {
+    "alerts_per_patient_12h": 0.166004,
+    "caught_early": 2,
+    "episodes": 3,
+    "news2_time_in_alert": 0.190939,
+    "reward": 1.478417,
+    "seed": 394,
+    "time_in_alert": 0.018013
+   },
+   {
+    "alerts_per_patient_12h": 0.084149,
+    "caught_early": 4,
+    "episodes": 5,
+    "news2_time_in_alert": 0.169524,
+    "reward": 3.513889,
+    "seed": 395,
+    "time_in_alert": 0.040305
+   },
+   {
+    "alerts_per_patient_12h": 0.092748,
+    "caught_early": 2,
+    "episodes": 4,
+    "news2_time_in_alert": 0.169683,
+    "reward": 1.592875,
+    "seed": 396,
+    "time_in_alert": 0.006694
+   },
+   {
+    "alerts_per_patient_12h": 0.14077,
+    "caught_early": 3,
+    "episodes": 5,
+    "news2_time_in_alert": 0.158334,
+    "reward": 2.11512,
+    "seed": 397,
+    "time_in_alert": 0.027491
+   },
+   {
+    "alerts_per_patient_12h": 0.132935,
+    "caught_early": 1,
+    "episodes": 4,
+    "news2_time_in_alert": 0.183473,
+    "reward": 0.32,
+    "seed": 398,
+    "time_in_alert": 0.016485
+   },
+   {
+    "alerts_per_patient_12h": 0.124869,
+    "caught_early": 1,
+    "episodes": 1,
+    "news2_time_in_alert": 0.19346,
+    "reward": 0.802846,
+    "seed": 399,
+    "time_in_alert": 0.012634
+   },
+   {
+    "alerts_per_patient_12h": 0.141829,
+    "caught_early": 4,
+    "episodes": 5,
+    "news2_time_in_alert": 0.110336,
+    "reward": 3.021739,
+    "seed": 400,
+    "time_in_alert": 0.024115
    }
   ],
   "rejected_time_in_alert": false,
-  "reward": 0.512764,
+  "reward": 1.343958,
   "seeds": [
-   8,
-   9,
-   10
+   341,
+   342,
+   343,
+   344,
+   345,
+   346,
+   347,
+   348,
+   349,
+   350,
+   351,
+   352,
+   353,
+   354,
+   355,
+   356,
+   357,
+   358,
+   359,
+   360,
+   361,
+   362,
+   363,
+   364,
+   365,
+   366,
+   367,
+   368,
+   369,
+   370,
+   371,
+   372,
+   373,
+   374,
+   375,
+   376,
+   377,
+   378,
+   379,
+   380,
+   381,
+   382,
+   383,
+   384,
+   385,
+   386,
+   387,
+   388,
+   389,
+   390,
+   391,
+   392,
+   393,
+   394,
+   395,
+   396,
+   397,
+   398,
+   399,
+   400
   ]
  }
 }
