@@ -662,6 +662,28 @@ within 1e-6 of onnxruntime and within 1e-5 of MindSpore and MindIR. The test tha
 `model.json` with the committed models is skipped until the exporter has been run on the real model.
 Tests: `tests/test_plain_student.py` and `tests_ml/test_export_plain.py`.
 
+## Manifest, run logs and notebooks (slices M4 and M6)
+
+Packaging and documentation only: no model is trained or changed, no held-out seed is read, nothing is uploaded.
+`models/README.md` has the layout and the fixed rule for what counts as a model file; `training/README.md` has the
+commands, the run logs and the notebooks.
+
+- `research/manifest.py` (standard library only): `python -m research.manifest --write` makes `models/manifest.json`
+  (path, model, framework and version, format, bytes, sha256, training seeds, run id, commit; sorted, deterministic
+  bytes) from the files and their own metadata; `--check` exits 2 with one line per difference; `--registry` rewrites
+  only the models table of `training/REGISTRY.md`. A field recorded nowhere is `null`. The commit comes from the run
+  logs (research code starts no process, so not from git). Tests: `tests/test_manifest.py`.
+- Run logs are `training/runs/<model>/<run id>.json`. The student's comes from `train_student --run_log`, the
+  confidence check's from `confidence calibrate --run_log`, the reward policy's from
+  `python -m research.reward_loop --run-log <file> --run-id <id> --commit <sha> --out <policy folder>`, which only reads
+  the committed generation records, policy files and ledger (no trial is opened, no wall time). Tests:
+  `tests/test_reward_runlog.py`.
+- Notebooks under `training/notebooks/` read the newest run log and the committed result files and draw them. They
+  need `nbclient`, `ipykernel` and `matplotlib` (exact pins in `pyproject.toml`, research environment only);
+  `python training/notebooks/execute.py` runs them and saves their outputs. `tests_ml/test_notebooks.py` runs them
+  headless in the ML gate (no extra flag) and fails on an error, an absolute path, a read under a trials folder, or an
+  import of MindSpore, scikit-learn, onnxruntime or `research.student`.
+
 ## Real data (eICU-CRD Demo 2.0.1)
 
 The first real dataset: an open ICU database (PhysioNet, ODbL, no account). It measures NEWS2 and the

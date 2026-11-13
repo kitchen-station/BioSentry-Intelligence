@@ -4,10 +4,12 @@
     python -m research.reward_loop --data <ward-v2-ext> --out <dir> --no-temperature [--jobs N]
     python -m research.reward_loop --out <dir> --stop "reason"
     python -m research.reward_loop --evaluate <ward-v2> --out <dir>
+    python -m research.reward_loop --run-log <file> --run-id <id> --commit <sha> --out <dir>
 
 The rules are in research/README.md. A (1+30) evolution strategy with a reward: not deep or
 per-step reinforcement learning. Exit 0 done, 2 refused (one line), 3 seeds are missing (the
-range is on stderr and nothing was written for it). Standard library only.
+range is on stderr and nothing was written for it). `--run-log` only reads the committed records (no trial is
+opened) and writes one training run log. Standard library only.
 """
 
 import argparse
@@ -785,6 +787,89 @@ def evaluate_held_out(root: str, out: Path) -> str:
     return evaluate.run(_held_out_folders(root), pols)
 
 
+# --- the run log: committed records only, no trial is opened ---------------------------------------
+
+RUN_FLAGS = re.compile(r"[A-Za-z0-9._-]{1,64}")
+COMMIT = re.compile(r"[\x21-\x7e]{1,128}")
+
+
+def _span_of(seeds: list) -> dict | None:
+    return {"first": seeds[0], "last": seeds[-1]} if seeds else None
+
+
+def _generation_line(r: dict) -> dict:
+    sel, cf = r["selection"], r["confirmation"]
+    win = None if sel is None else sel["winner"]
+    return {"generation": r["generation"], "accepted": r["accepted"], "reason": r["reason"],
+            "selection_seeds": _span_of(r["selection_seeds"]), "confirmation_seeds": _span_of(r["confirmation_seeds"]),
+            "sigma_used": r["sigma_used"], "sigma_next": r["sigma_next"],
+            "selection": None if sel is None else {
+                "current_mean": sel["current_mean"], "current_rejected": sel["current_rejected"],
+                "candidates": sel["candidates"], "candidates_rejected": sel["candidates_rejected"],
+                "winner_mean": None if win is None else win["mean"]},
+            "confirmation": None if cf is None else {
+                "n": len(cf["d"]), "mean_d": cf["mean"], "stdev_d": cf["stdev"], "threshold": cf["threshold"],
+                "winner_rejected": cf["winner_rejected"]},
+            "params": r["params"], "validation_reward": r["validation"]["reward"],
+            "validation_rejected": r["validation"]["rejected_time_in_alert"],
+            "best_validation": r["best_validation"], "best_generation": r["best_generation"],
+            "patience": r["patience"], "stopped": r["stopped"]}
+
+
+def _read_generations(folder: Path) -> list[dict]:
+    """The generation records of one inner run, each checked against its own sha256 and the numbering."""
+    names = sorted(f.name for f in folder.iterdir() if GEN_FILE.fullmatch(f.name)) if folder.is_dir() else []
+    if not names or names != [f"gen-{i:02d}.json" for i in range(len(names))]:
+        raise refuse(f"{folder.name}: generation files are missing or have a gap")
+    out = []
+    for n in names:
+        try:
+            rec = json.loads(_read_file(folder / n))
+            if digest({k: v for k, v in rec.items() if k != "sha256"}) != rec["sha256"]:
+                raise refuse(f"{n}: content does not match its sha256; refused")
+            out.append(_generation_line(rec) | {"temperature": rec["temperature"], "config": rec["config"]})
+        except TrialError:
+            raise
+        except (ValueError, KeyError, TypeError, AttributeError, RecursionError):
+            raise refuse(f"{n}: malformed record; refused") from None
+    return out
+
+
+def run_log(out: Path, run_id: str | None, commit: str | None) -> dict:
+    """One small JSON for the whole of M2: the ledger lines and, per round and for the no-temperature
+    run, the numbers of every generation. Everything comes from files already committed; there is no
+    wall time to record, and the `time` object says so."""
+    if run_id is not None and not RUN_FLAGS.fullmatch(run_id):
+        raise refuse("--run-id may only hold A-Z a-z 0-9 . _ - and at most 64 characters")
+    if commit is not None and not COMMIT.fullmatch(commit):
+        raise refuse("--commit must be 1 to 128 printable characters without spaces")
+    led = read_ledger(out / LEDGER)
+    if not any(x.get("decision") == "stop" for x in led):
+        raise refuse("the ledger has no stop line; the run is not finished")
+    runs = []
+    for x in led:
+        d = x["decision"]
+        if d in ("baseline", "kept", "dropped"):
+            folder = out / "rounds" / f"round-{x['round']}"
+        elif d == "no_temperature":
+            folder = out / NO_TEMP_DIR / "generations"
+        else:
+            continue
+        gens = _read_generations(folder)
+        runs.append({"name": f"round {x['round']}" if "round" in x else "no temperature", "temperature": gens[0]["temperature"],
+                     "config": gens[0]["config"], "ledger": x, "generations": [{k: v for k, v in g.items()
+                                                                                if k not in ("temperature", "config")} for g in gens]})
+    first = json.loads(_read_file(out / "policy.json"))
+    return {"model": "tier_b/reward_policy", "run_id": run_id, "commit": commit,
+            "framework": "none (six numbers, plain arithmetic)", "framework_version": None,
+            "settings": {"search": "(1+30) evolution strategy with a reward; not deep or per-step reinforcement learning",
+                         "lambda": first["lambda"], "generator_seed": SEED, "candidates": 30,
+                         "validation_seeds": _span_of(first["validation_seeds"]),
+                         "confirmation_trials": 12, "patience": 3, "max_generations": 40},
+            "stop": next(x for x in led if x["decision"] == "stop"), "runs": runs,
+            "time": {"recorded": False, "note": "no wall time: this log is built from committed records, no trial was opened"}}
+
+
 # --- the command ------------------------------------------------------------------------------
 
 class _Parser(argparse.ArgumentParser):
@@ -798,7 +883,7 @@ def main(argv: list[str], *, plan: Plan | None = None, source=None) -> int:
     plan = plan or Plan()
     ap = _Parser(prog="research.reward_loop", add_help=False, allow_abbrev=False)
     ap.add_argument("--out", required=True)
-    for a in ("--data", "--evaluate", "--change", "--why", "--stop"):
+    for a in ("--data", "--evaluate", "--change", "--why", "--stop", "--run-log", "--run-id", "--commit"):
         ap.add_argument(a)
     ap.add_argument("--round", type=int)
     ap.add_argument("--jobs", type=int, default=1)
@@ -808,10 +893,14 @@ def main(argv: list[str], *, plan: Plan | None = None, source=None) -> int:
         out, runner = Path(a.out), Runner(a.jobs)
         if not 1 <= a.jobs <= 64:
             raise refuse("--jobs: 1 to 64")
-        modes = [a.evaluate is not None, a.stop is not None, a.no_temperature, a.round is not None]
+        modes = [a.evaluate is not None, a.stop is not None, a.no_temperature, a.round is not None, a.run_log is not None]
         if sum(modes) != 1:
-            raise refuse("usage: exactly one of --round, --no-temperature, --stop, --evaluate (see research/README.md)")
-        if a.evaluate is not None:
+            raise refuse("usage: exactly one of --round, --no-temperature, --stop, --evaluate, --run-log (see research/README.md)")
+        if (a.run_id is not None or a.commit is not None) and a.run_log is None:
+            raise refuse("--run-id and --commit go with --run-log")
+        if a.run_log is not None:
+            _write(Path(a.run_log), _dump(run_log(out, a.run_id, a.commit)))
+        elif a.evaluate is not None:
             sys.stdout.write(evaluate_held_out(a.evaluate, out))
         elif a.stop is not None:
             stop(out, a.stop)
