@@ -46,11 +46,12 @@ def _odd_digit(text: str) -> bool:
     return any(c.isnumeric() and c not in "0123456789" for c in text)
 
 
-def match(question: str) -> tuple[str | None, int | None]:
-    """(template, threshold). (None, None) is a refusal."""
+def read(question: str) -> tuple[str, bool, bool, int | None] | None:
+    """(lower-case text, baseline words, threshold words, the one usable whole number 1 to 20 or None).
+    None when the refusal list, the digit rules or the number rules refuse the question."""
     t = question[:MAX_QUESTION].lower()
     if _NEVER.search(t) or _odd_digit(t):
-        return None, None
+        return None
     plain = re.sub(r"news ?2|12[- ]hour", " ", t)
     base, thresh = _baseline(t), bool(_THRESHOLD.search(plain))
     numbers = _NUMBER.findall(plain)
@@ -59,7 +60,16 @@ def match(question: str) -> tuple[str | None, int | None]:
         n = None
     # A number is only ever the threshold: one whole number from 1 to 20, next to a threshold word.
     if numbers and (n is None or not thresh or _STRICT.search(plain)):
+        return None
+    return t, base, thresh, n
+
+
+def match(question: str) -> tuple[str | None, int | None]:
+    """(template, threshold). (None, None) is a refusal."""
+    got = read(question)
+    if got is None:
         return None, None
+    t, base, thresh, n = got
     if _NURSE.search(t) and _ALERT.search(t) and _LOAD.search(t):
         if base and thresh:
             return None, None

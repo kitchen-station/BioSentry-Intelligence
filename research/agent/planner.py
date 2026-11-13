@@ -204,6 +204,14 @@ def _pick(raw: bytes, opens: list[Plan], key: str) -> Plan:
     raise _Reject("not_open", content)
 
 
+def messages(model_state: dict, opens: list[Plan]) -> list[dict]:
+    """The two messages the model gets: the fixed instructions with the tool schemas, and the digest."""
+    digest = {"rounds": model_state["rounds"],
+              "open": [{"experiment": p.experiment, "tool": p.tool, "args": p.args} for p in opens]}
+    return [{"role": "system", "content": INSTRUCTIONS + json.dumps(tools.SCHEMAS)},
+            {"role": "user", "content": json.dumps(digest)}]
+
+
 class ModelPlanner:
     def __init__(self, cfg: Config):
         self.cfg = cfg
@@ -214,12 +222,9 @@ class ModelPlanner:
         if not opens:
             return None
         host = urlparse(cfg.model_url).hostname or ""
-        digest = {"rounds": state["rounds"],
-                  "open": [{"experiment": p.experiment, "tool": p.tool, "args": p.args} for p in opens]}
         body = json.dumps({
             "model": cfg.model_name, "temperature": 0, "max_tokens": 300, "stream": False,
-            "messages": [{"role": "system", "content": INSTRUCTIONS + json.dumps(tools.SCHEMAS)},
-                         {"role": "user", "content": json.dumps(digest)}],
+            "messages": messages(state, opens),
         }).encode()
         headers = {"Authorization": f"Bearer {cfg.model_key}", "Content-Type": "application/json"}
         try:
