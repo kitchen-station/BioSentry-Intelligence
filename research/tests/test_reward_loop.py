@@ -803,3 +803,21 @@ def test_a_generation_with_a_no_episode_trial_runs_and_records_d_zero(tmp_path, 
     assert go(part, ["--round", "1"], src) == 3
     src.missing.clear()
     assert go(part, ["--round", "1"], src) == 0 and tree(part) == tree(a)  # resume, same bytes
+
+
+def test_read_policy_reads_current_and_legacy_files_and_refuses_a_tampered_one_of_either(finished, tmp_path):
+    from research import reward_loop_b6
+    cur = finished / "rounds/round-1/policy.json"
+    assert reward_loop.read_policy(cur, True) == Params.from_dict(json.loads(cur.read_text())["params"])
+    val = [prepare(toy(s)) for s in reward_loop_b6.VAL_SEEDS]
+    recs = list(reward_loop_b6.learn(lambda g: [prepare(toy(s)) for s in reward_loop_b6.generation_seeds(g)], val,
+                                     True, generations=1, candidates=2))
+    old = reward_loop_b6.policy_file(recs, True)
+    assert "config" not in old
+    for obj, path in ((json.loads(cur.read_text()), tmp_path / "cur.json"), (old, tmp_path / "old.json")):
+        path.write_text(json.dumps(obj))
+        assert isinstance(reward_loop.read_policy(path, True), Params)
+        obj["params"]["theta"] += 1
+        path.write_text(json.dumps(obj))
+        with pytest.raises(TrialError, match="does not match its sha256"):
+            reward_loop.read_policy(path, True)

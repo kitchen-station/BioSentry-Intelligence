@@ -395,6 +395,9 @@ Written before any M2 run. Code: `reward_policy.py` (the policy and the reward) 
 `tests/test_reward.py` and `tests/test_reward_loop.py`. It is a (1+30) evolution strategy with a
 reward: black-box search, not deep or per-step reinforcement learning. Synthetic, not validated.
 
+The B6 loop is kept as `research/reward_loop_b6.py` for the research agent, reached through
+`python -m research.reward_loop --train ... --validate ...`. It is not the loop the card reports.
+
 - Policy: six numbers, four non-negative weights (heart rate, respiratory rate, SpO2,
   temperature), a threshold theta and a persistence p (integer 1 to 8). Per bin, for each vital,
   z from the patient's own baseline (`baseline_finding` with the detector's DEFAULTS window and
@@ -558,6 +561,75 @@ Transactions on Evolutionary Computation 9(3), 303-317, https://doi.org/10.1109/
 Smith, J. E., Winkler, R. L. (2006), Management Science 52(3), 311-322,
 https://doi.org/10.1287/mnsc.1050.0451. Dwork, C., Feldman, V., Hardt, M., Pitassi, T., Reingold,
 O., Roth, A. (2015), Science 349(6248), 636-638, https://doi.org/10.1126/science.aaa9375.
+
+## The confidence check (slice M3)
+
+Written before any calibration or held-out run. Nothing here is changed after a result is seen.
+
+What is controlled, in plain words: for a patient who is not starting to deteriorate, at most 1 in 100 of
+their 15-minute checks shows a supported alert, on average over patients. That bounds false alarms per
+patient. It does not bound the share of alerts that are true: positives are about 0.25% of bins, so even
+when the target is met most supported alerts are still false. One-sided only, against the negative class:
+"quiet" means only that the student rule did not fire, and no confident-quiet claim is made (a two-sided
+Mondrian version was considered and rejected).
+
+Data and split. Calibration uses ward-v2-ext seeds 301-340 only, all 40. Seeds 61-300 (student training and
+validation) and ward-v2 seeds 11-30 (held out) are never read at calibration: the loader reads `manifest.json`
+first and refuses any other seed before it opens any other file, and a seed given twice. Held out is ward-v2
+seeds 11-30 through `research.evaluate`, run once. Calibration and held-out must share days, speed and
+scenario hash (the file records them; evaluate refuses a mismatch; if so, park M3 and report it).
+
+Method (all constants are in the code: `ALPHA = "0.01"`, `DRAW_SEED = 20261113`).
+- Model: M1's ONNX and M1's threshold t, unchanged; their sha256 and t are copied into the calibration file.
+  A variant with no exported student or no usable t is "not applicable": no file, no rows, said in the output.
+- Score: s = the student's p on a scored (RANKED) bin. Unit: one negative bin (label 0, M1's label rule) per
+  non-starting stay that has one, drawn uniformly with SplitMix64 (`bootstrap.py`) in sorted (seed, stay) order,
+  index `next() % bins`. One draw per stay gives exchangeable draws whatever the dependence between bins of a stay
+  (Dunn, Wasserman and Ramdas, "subsampling once").
+- Quantile: with n drawn scores, j = floor(alpha (n + 1)) in exact `Fraction` arithmetic, k = n + 1 - j, q = the
+  k-th smallest score; j = 0 gives q = +inf (stored as null), so nothing is supported. A bin is supported iff
+  p > q (strict, so ties are conservative). Checked rule: alert iff p >= t and p > q; "not sure" iff p >= t and
+  p <= q; "quiet" iff p < t. A "not sure" bin never alerts. If q < t the check is not binding, and the output says so.
+- alpha = 0.01: below the old student's time in alert (about 2%) so it can bind, and far below NEWS2's (about 16%).
+
+What is reported on held-out, once. Rows `student`, `student_checked`, `news2_or_student`,
+`news2_or_student_checked` (`_no_temp` where applicable) next to the NEWS2 rows, with the usual columns. Then a
+block: (1) the achieved error, the mean over held-out non-starting stays of each stay's share of negative scored
+bins with p > q, with its 95% stay-bootstrap interval (1,000 resamples, seed 20261112) against alpha, and for
+context the same for the checked rule, the student alone and pooled over bins; (2) the "not sure" share of scored
+bins and of the student's alerting bins; (3) alerting bins and new alerts, student against checked (removing bins can
+split an alert, so "removed" can be negative); (4) episodes the student detects and the checked rule does not,
+counted both as alerting in any bin of the window and as a new alert before fully in, for all evaluated episodes and
+for those not cut short; (5) n, k, q, t, alpha and the file's sha256. The text is also written to `heldout.txt`
+beside the calibration; a second held-out run is refused while that file exists (delete it only for a counting
+bug, and then show both outputs).
+
+MET or NOT MET (fixed now). d = 2 sqrt(alpha (1 - alpha) / n) from the calibration n. MET iff the lower end of the
+95% interval in item 1 is <= alpha + d; otherwise NOT MET (the guarantee failed on held-out), which is a finding,
+not a defect. "conservative" is also printed when the upper end is < alpha - d.
+
+Commands (the `--model` folder defaults to `models/tier_c/student_vitals`, `--out` to `models/tier_c/confidence_check`):
+
+    python -m research.confidence calibrate <ward-v2-ext folders of seeds 301-340>... [--model <dir>] [--out <dir>] [--cache <dir>] [--workers N] [--run_log <file> --run_id <text> --commit <sha>]
+    python -m research.confidence evaluate <ward-v2 folders of seeds 11-30>... [--model <dir>] [--out <dir>]
+
+`calibrate` writes `calibration.json` (and `calibration_no_temp.json`) with a sibling `.sha256`. `--cache` is the
+feature cache of `research.student`. `--run_log` writes one small JSON (alpha, draw seed, seeds, n, j, k, q, t,
+binding, the ONNX sha256, package versions, at most 200 quantiles of the drawn scores; all wall-clock numbers under
+`time`; no path). `evaluate` refuses unless the file's sha256, ALPHA, the ONNX sha256 (against the file and
+`metadata.json`), t and the scenario hash all match. Exit 2 with one line on any refusal. Tests:
+`tests/test_confidence.py` (standard library) and `tests_ml/test_confidence_ml.py`.
+
+Limits. Exchangeability holds only inside the simulator, and stays in one trial are dependent, so this is not a
+clinical guarantee ("synthetic, not validated"). The guarantee is marginal: over the calibration draw, the new stay
+and the bin within it; it is not per patient or per shift. It bounds false alerts, not precision. Mathematically
+the check is a second threshold, max(t, q); its only addition is that q has a stated finite-sample meaning. One
+random draw per stay: another DRAW_SEED gives a slightly different q.
+
+References: Vovk, Gammerman, Shafer (2005), Algorithmic Learning in a Random World, Springer,
+https://link.springer.com/book/10.1007/b106715. Angelopoulos, Bates (2021), A Gentle Introduction to Conformal
+Prediction, https://arxiv.org/abs/2107.07511. Dunn, Wasserman, Ramdas (2022), Distribution-free prediction sets for
+two-layer hierarchical models, JASA, https://arxiv.org/abs/1809.07441.
 
 ## Real data (eICU-CRD Demo 2.0.1)
 

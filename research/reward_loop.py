@@ -29,6 +29,8 @@ from .bootstrap import SplitMix64
 from .reward_policy import FORMS, LAMBDA, NAMES, P_MAX, THETA_MIN, Params, Prepared, generation_zero, policies, prepare, score
 from .rescore import check_parity
 from .trials import Trial, TrialError, _int_field, _json, load_trial
+from . import reward_loop_b6
+from .reward_loop_b6 import policy_file  # noqa: F401  (legacy: research/agent/ still uses it)
 
 HELD_OUT = evaluate.HELD_OUT
 SEED = 20261112
@@ -562,6 +564,14 @@ def load_policy(path: Path, temperature: bool) -> tuple[dict, str]:
 
 
 def read_policy(path: Path, temperature: bool) -> Params:
+    """A current-format policy (has `config`) is checked by load_policy; a legacy B6 policy (the
+    research agent's) by reward_loop_b6.read_policy."""
+    try:
+        obj = json.loads(_read_file(path))
+    except (TrialError, ValueError, RecursionError):
+        raise TrialError(f"{path.name}: cannot be read as JSON (run the loop first)") from None
+    if isinstance(obj, dict) and "config" not in obj:
+        return reward_loop_b6.read_policy(path, temperature)
     return Params.from_dict(load_policy(path, temperature)[0]["params"])
 
 
@@ -783,6 +793,8 @@ class _Parser(argparse.ArgumentParser):
 
 
 def main(argv: list[str], *, plan: Plan | None = None, source=None) -> int:
+    if "--train" in argv or "--validate" in argv:  # the legacy B6 command, used by research/agent/
+        return reward_loop_b6.main(argv)
     plan = plan or Plan()
     ap = _Parser(prog="research.reward_loop", add_help=False, allow_abbrev=False)
     ap.add_argument("--out", required=True)
