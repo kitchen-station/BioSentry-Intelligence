@@ -491,6 +491,22 @@ describe("PatientDetail own-baseline reason and patch display", () => {
     expect(screen.getByText("(circulatory)")).toBeTruthy();
   });
 
+  it("lists the two model reasons in the reasons for a low patient and adds no response line", async () => {
+    api.getPatient.mockResolvedValue({
+      ...base,
+      score: 2,
+      escalation_reasons: [
+        { rule: "prediction_model_flag", text: "Prediction model flag (synthetic, not validated)", pathway: null },
+        { rule: "alert_policy_flag", text: "Alert policy flag (learned by reward; synthetic, not validated)", pathway: null },
+      ],
+    } as Detail);
+    page();
+    await loaded();
+    expect(screen.getByText("Prediction model flag (synthetic, not validated)")).toBeTruthy();
+    expect(screen.getByText("Alert policy flag (learned by reward; synthetic, not validated)")).toBeTruthy();
+    expect(screen.queryByText(/^Not a NEWS2 trigger/)).toBeNull();
+  });
+
   it("shows no signal figure when all four values are nurse-typed", async () => {
     const nurse = (m: Detail["vitals"]["heart_rate"]) => ({ ...m, provenance: { ...m.provenance, source: "nurse" as const } });
     const v = base.vitals;

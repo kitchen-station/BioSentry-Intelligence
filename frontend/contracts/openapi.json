@@ -745,7 +745,9 @@
           "tier_a_threshold",
           "tier_c_raise",
           "tier_b_finding",
-          "missing_input"
+          "missing_input",
+          "prediction_model_flag",
+          "alert_policy_flag"
         ],
         "title": "EscalationRule",
         "type": "string"
@@ -1370,6 +1372,68 @@
           "reason"
         ],
         "title": "MeasurementAbsent",
+        "type": "object"
+      },
+      "ModelSignal": {
+        "additionalProperties": false,
+        "description": "One research model's result at the last stored 15-minute bin. Synthetic, not validated.\nA flag adds a reason line and changes nothing else. No probability is served.",
+        "properties": {
+          "bin_end": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bin_start": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "provenance": {
+            "items": {
+              "$ref": "#/components/schemas/Provenance"
+            },
+            "type": "array"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "enum": [
+              "flag",
+              "no_flag",
+              "not_sure",
+              "not_computed"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "reason",
+          "bin_start",
+          "bin_end",
+          "provenance"
+        ],
+        "title": "ModelSignal",
         "type": "object"
       },
       "NewLabRun": {
@@ -2306,6 +2370,9 @@
           "mechanism": {
             "type": "string"
           },
+          "models": {
+            "$ref": "#/components/schemas/RowModels"
+          },
           "name": {
             "type": "string"
           },
@@ -2392,6 +2459,7 @@
           "synthetic",
           "signal_quality",
           "last_update_s",
+          "models",
           "vital_history",
           "tier_breakdown"
         ],
@@ -2717,6 +2785,18 @@
               }
             ]
           },
+          "file_sha256": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "model_id": {
             "anyOf": [
               {
@@ -2734,6 +2814,17 @@
           "quality": {
             "$ref": "#/components/schemas/QualityLevel"
           },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "source": {
             "$ref": "#/components/schemas/ProvenanceSource"
           },
@@ -2749,6 +2840,17 @@
                 "type": "null"
               }
             ]
+          },
+          "variant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "required": [
@@ -2784,6 +2886,23 @@
         ],
         "title": "QualityLevel",
         "type": "string"
+      },
+      "RowModels": {
+        "additionalProperties": false,
+        "properties": {
+          "alert_policy": {
+            "$ref": "#/components/schemas/ModelSignal"
+          },
+          "prediction": {
+            "$ref": "#/components/schemas/ModelSignal"
+          }
+        },
+        "required": [
+          "prediction",
+          "alert_policy"
+        ],
+        "title": "RowModels",
+        "type": "object"
       },
       "ScoreRow": {
         "additionalProperties": false,
@@ -2832,6 +2951,9 @@
           },
           "mechanism": {
             "type": "string"
+          },
+          "models": {
+            "$ref": "#/components/schemas/RowModels"
           },
           "name": {
             "type": "string"
@@ -2912,7 +3034,8 @@
           "escalation_reasons",
           "synthetic",
           "signal_quality",
-          "last_update_s"
+          "last_update_s",
+          "models"
         ],
         "title": "ScoreRow",
         "type": "object"

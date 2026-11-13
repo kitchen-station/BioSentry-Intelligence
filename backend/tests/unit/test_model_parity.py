@@ -14,7 +14,7 @@ from biosentry.domain.scoring.tier_c.confidence import check_calibrated
 from biosentry.domain.scoring.tier_c.features import policy_z, student_features
 from biosentry.domain.scoring.tier_c.plain_mlp import forward
 from biosentry.services.as_of import news2_as_of
-from biosentry.services.model_signals import FORMING, NOT_RANKED, prepare_series, signals
+from biosentry.services.model_signals import FORMING, LATEST, prepare_series, signals
 from biosentry.services.models import load_models
 
 MODELS = load_models(Path(__file__).resolve().parents[3] / "models")
@@ -106,7 +106,7 @@ def test_the_gates_on_the_same_stays_use_the_files_baseline_formed() -> None:
                 continue
             got = signals(prepared(stay, j), rows, MODELS, run_id=1, synthetic=True, computed_at=at(0))
             if not b["news2"]["ranked"]:
-                assert (got.probability, got.check, got.policy) == (NotComputed(NOT_RANKED),) * 3
+                assert (got.probability, got.check, got.policy) == (NotComputed(LATEST),) * 3
             elif not all(b["baseline_formed"].values()):
                 assert (got.probability, got.check, got.policy) == (NotComputed(FORMING),) * 3
             else:

@@ -4,19 +4,27 @@ Scope is resolved first and fails closed: an unknown clinician sees nobody. A cl
 assigned patients; an admin sees every patient on the ward, read-only. Decisions are the
 real news2() and arbiter, computed here on every request. The rank is relative to the caller's
 set and is never stored. A patient is ranked only while every NEWS2 input is present; otherwise
-the row is NOT RANKED with the arbiter's reason and instruction. Every read appends an audit
+the row is NOT RANKED with the arbiter's reason and instruction. The two research models are computed
+for the whole set at once and handed to the arbiter as results: a flag adds a reason line and changes
+nothing else (synthetic, not validated). Every read appends an audit
 record, including reads that find nothing.
 """
 
+import logging
+
 from biosentry.core.audit import AuditLog
-from biosentry.domain.arbiter import NotRanked, Ranked, rank_ward
+from biosentry.domain.arbiter import NotRanked, PolicySignal, Ranked, TierCSignal, rank_ward
+from biosentry.domain.computed import Computed, NotComputed
 from biosentry.domain.scoring.tier_a import News2Score
+from biosentry.domain.scoring.tier_c.confidence import Check
 from biosentry.repositories.postgres import OUT_OF_DATE, PostgresStore
 from biosentry.schemas import (
     AbstainedRow,
     PatientDetail,
     PatientStay,
+    ModelSignal,
     PatientSummary,
+    RowModels,
     ScoreRow,
     Tier,
     TierAScore,
@@ -27,7 +35,12 @@ from biosentry.schemas import (
 )
 from biosentry.schemas.ingest import LiveWard
 
+from .model_signals import POLICY_ID, STUDENT_ID, ModelSignals, ward_model_signals
+from .models import LoadedModels
 from .scoring import decide
+
+log = logging.getLogger(__name__)
+_LOGGED: set[str] = set()  # each fixed not-computed reason is logged once per process; no patient, no value
 
 SHIFT = "07:00"
 _SHORT = {
@@ -52,8 +65,41 @@ def supporting(news2: News2Score) -> str:
     )
 
 
+def _flag_state(value: object) -> str:
+    if isinstance(value, Check):
+        return {Check.ALERT: "flag", Check.NOT_SURE: "not_sure", Check.QUIET: "no_flag"}[value]
+    return "flag" if value else "no_flag"
+
+
+def _signal(
+    result: Computed[Check] | Computed[bool] | NotComputed,
+    sig: ModelSignals,
+    model_id: str,
+    before: tuple[Computed[float] | NotComputed, ...] = (),
+) -> ModelSignal:
+    """Served as the models computed it. A not-computed result keeps its fixed reason; no probability."""
+    if isinstance(result, NotComputed):
+        if result.reason not in _LOGGED:
+            _LOGGED.add(result.reason)
+            log.warning("model result not computed: %s", result.reason)
+        return ModelSignal(state="not_computed", reason=result.reason, bin_start=None, bin_end=None, provenance=[])
+    when = sig.provenance[model_id]
+    return ModelSignal(
+        state=_flag_state(result.value), reason=None, bin_start=when.bin_start, bin_end=when.bin_end,
+        provenance=[c.provenance for c in (*before, result) if isinstance(c, Computed)],
+    )  # fmt: skip
+
+
+def row_models(sig: ModelSignals) -> RowModels:
+    """The two states for a row: prediction needs the student and the check, the policy needs itself."""
+    return RowModels(
+        prediction=_signal(sig.check, sig, STUDENT_ID, (sig.probability,)),
+        alert_policy=_signal(sig.policy, sig, POLICY_ID),
+    )
+
+
 def score_row(
-    state: UnscoredPatient, rank: int, decision: Ranked, tiers: list[TierStatus]
+    state: UnscoredPatient, rank: int, decision: Ranked, tiers: list[TierStatus], models: RowModels
 ) -> ScoreRow:
     return ScoreRow(
         id=state.id,
@@ -73,6 +119,7 @@ def score_row(
         sort_tier=Tier.A,
         tier_status=tiers,
         escalation_reasons=decision.escalation_reasons(),
+        models=models,
         synthetic=state.synthetic,
         signal_quality=state.signal_quality,
         last_update_s=state.last_update_s,
@@ -116,9 +163,10 @@ def abstained_row(state: UnscoredPatient, decision: NotRanked) -> AbstainedRow:
 
 
 class WardService:
-    def __init__(self, store: PostgresStore, audit: AuditLog) -> None:
+    def __init__(self, store: PostgresStore, audit: AuditLog, models: LoadedModels) -> None:
         self._store = store
         self._audit = audit
+        self._models = models  # loaded once at start
 
     def visible(self, clinician_id: str) -> frozenset[str]:
         # An admin reads every patient on the ward; every write is refused earlier by `Writer`.
@@ -132,9 +180,17 @@ class WardService:
         """Rows ranked relative to this set, and the state each row was built from."""
         read = (self._store.read(pid) for pid in sorted(ids))
         states = {s.id: s for s in read if s is not None}
-        ranking = rank_ward(decide(s) for s in states.values())
+        signals = ward_model_signals(self._store, states, self._models)  # two statements for the set
+        decisions = [
+            decide(s, TierCSignal(g.probability, g.check), PolicySignal(g.policy))
+            for s, g in ((s, signals[s.id]) for s in states.values())
+        ]
+        ranking = rank_ward(decisions)
         tiers = self._store.tier_status
-        ranked = [score_row(states[d.patient_id], rank, d, tiers) for rank, d in ranking.ranked]
+        ranked = [
+            score_row(states[d.patient_id], rank, d, tiers, row_models(signals[d.patient_id]))
+            for rank, d in ranking.ranked
+        ]
         abstained = [abstained_row(states[d.patient_id], d) for d in ranking.not_ranked]
         return ranked, abstained, states
 

@@ -14,9 +14,9 @@ from biosentry.domain.scoring.tier_b.interface import (
 )
 from biosentry.domain.signals import SignalInput, apply_windows
 from biosentry.schemas import Provenance, QualityLevel
-from samples import provenance  # isort: skip
+from samples import model_provenance  # isort: skip
 
-PROV = Provenance.model_validate(provenance(source="model", tier="B", model_id="m"))
+PROV = Provenance.model_validate(model_provenance("B", "m"))
 
 
 def signal(samples: Sequence[float], valid: Sequence[bool], fs: float = 1, window_s: float = 2):

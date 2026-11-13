@@ -1,6 +1,6 @@
 """The three model results for one patient, from stored bins (INTEGRATION.md sections 3 to 8; rulings 1 to 17).
 
-Called by nothing in the app yet: `decide`, the arbiter and the responses are the next pull request. The
+`WardService` calls it on every ward and patient read. The
 series come from `scoring.grid()` (one implementation), temperature from its own stored bins (ONE statement
 for a set of patients, not in HISTORY_VITALS and in no response), the NEWS2 of the bins the models need from
 `as_of.news2_as_of` (ONE more statement). Nothing is stored and nothing is approximated: where an input
@@ -39,6 +39,7 @@ from .scoring import BIN, MAX_BINS, counted, grid
 
 T = TypeVar("T")
 NOT_RANKED = "not ranked"
+LATEST = "latest bin not scored"  # the row is ranked now, but the last stored bin does not score when rebuilt
 NOT_COUNTED = "a vital is not counted"
 NO_BINS = "no stored bins"
 PAST_CAP = "stay past 672 bins"
@@ -164,7 +165,8 @@ def _computed(value: T, model_id: str, tier: Tier, file: FileProvenance, prep: P
                  synthetic: bool, computed_at: datetime) -> tuple[Computed[T], ModelProvenance]:
     start, end = bin_window(prep.at(prep.last))
     provenance = Provenance(source=ProvenanceSource.model, tier=tier, observed_at=end, computed_at=computed_at,
-                            model_id=model_id, synthetic=synthetic, quality=QualityLevel.ok)
+                            model_id=model_id, synthetic=synthetic, quality=QualityLevel.ok,
+                            variant=WIRED_VARIANT, file_sha256=file.sha256, run_id=file.run_id)
     # coverage 1.0: the bin has all four device values, or it would not have been scored.
     window = Window((start - prep.start).total_seconds(), (end - prep.start).total_seconds(), 1.0)
     return (Computed(value, provenance, window),
@@ -186,7 +188,7 @@ def signals(
     now = news2_as_of(prep.device(t), rows, bin_window(prep.at(t))[1], earlier=False)
     assert now is not None  # only an earlier bin can be "not stored"
     if not isinstance(now.result, News2Score):
-        return _none(NOT_RANKED)
+        return _none(LATEST)
     if not formed(prep.series, t):
         return _none(FORMING)
     touched = any(baseline_touched(prep.series[v], prep.dropped[v]) for v in NAMES)

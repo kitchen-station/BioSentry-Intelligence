@@ -202,7 +202,7 @@ export interface components {
          * EscalationRule
          * @enum {string}
          */
-        readonly EscalationRule: "tier_a_threshold" | "tier_c_raise" | "tier_b_finding" | "missing_input";
+        readonly EscalationRule: "tier_a_threshold" | "tier_c_raise" | "tier_b_finding" | "missing_input" | "prediction_model_flag" | "alert_policy_flag";
         /**
          * FindingDirection
          * @enum {string}
@@ -339,6 +339,19 @@ export interface components {
             /** @constant */
             readonly present: false;
             readonly reason: string;
+        };
+        /**
+         * ModelSignal
+         * @description One research model's result at the last stored 15-minute bin. Synthetic, not validated.
+         *     A flag adds a reason line and changes nothing else. No probability is served.
+         */
+        readonly ModelSignal: {
+            readonly bin_end: string | null;
+            readonly bin_start: string | null;
+            readonly provenance: readonly components["schemas"]["Provenance"][];
+            readonly reason: string | null;
+            /** @enum {string} */
+            readonly state: "flag" | "no_flag" | "not_sure" | "not_computed";
         };
         /** NewLabRun */
         readonly NewLabRun: {
@@ -557,6 +570,7 @@ export interface components {
             readonly labs: components["schemas"]["LabPanel"];
             readonly last_update_s: number | null;
             readonly mechanism: string;
+            readonly models: components["schemas"]["RowModels"];
             readonly name: string;
             readonly rank: number;
             readonly score: number;
@@ -646,13 +660,19 @@ export interface components {
          */
         readonly Provenance: {
             readonly computed_at: string | null;
+            /** @default null */
+            readonly file_sha256?: string | null;
             readonly model_id: string | null;
             /** Format: date-time */
             readonly observed_at: string;
             readonly quality: components["schemas"]["QualityLevel"];
+            /** @default null */
+            readonly run_id?: string | null;
             readonly source: components["schemas"]["ProvenanceSource"];
             readonly synthetic: boolean;
             readonly tier: components["schemas"]["Tier"] | null;
+            /** @default null */
+            readonly variant?: string | null;
         };
         /**
          * ProvenanceSource
@@ -669,6 +689,11 @@ export interface components {
          * @enum {string}
          */
         readonly QualityLevel: "ok" | "degraded" | "missing";
+        /** RowModels */
+        readonly RowModels: {
+            readonly alert_policy: components["schemas"]["ModelSignal"];
+            readonly prediction: components["schemas"]["ModelSignal"];
+        };
         /**
          * ScoreRow
          * @description A ranked patient: carries a NEWS2 score and rank. That every required input was
@@ -683,6 +708,7 @@ export interface components {
             readonly labs: components["schemas"]["LabPanel"];
             readonly last_update_s: number | null;
             readonly mechanism: string;
+            readonly models: components["schemas"]["RowModels"];
             readonly name: string;
             readonly rank: number;
             readonly score: number;
@@ -912,6 +938,7 @@ export type LabRunDetail = components['schemas']['LabRunDetail'];
 export type LabRunItem = components['schemas']['LabRunItem'];
 export type LiveWard = components['schemas']['LiveWard'];
 export type MeasurementAbsent = components['schemas']['MeasurementAbsent'];
+export type ModelSignal = components['schemas']['ModelSignal'];
 export type NewLabRun = components['schemas']['NewLabRun'];
 export type NewNote = components['schemas']['NewNote'];
 export type NewPatientQuestion = components['schemas']['NewPatientQuestion'];
@@ -935,6 +962,7 @@ export type PatientView = components['schemas']['PatientView'];
 export type Provenance = components['schemas']['Provenance'];
 export type ProvenanceSource = components['schemas']['ProvenanceSource'];
 export type QualityLevel = components['schemas']['QualityLevel'];
+export type RowModels = components['schemas']['RowModels'];
 export type ScoreRow = components['schemas']['ScoreRow'];
 export type Session = components['schemas']['Session'];
 export type SessionRole = components['schemas']['SessionRole'];

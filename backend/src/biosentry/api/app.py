@@ -86,6 +86,7 @@ from biosentry.services.baseline import BaselineService
 from biosentry.services.overview import OverviewService
 from biosentry.services.patient_ask import PatientAskService
 from biosentry.services.patients import PatientService, RejectedError
+from biosentry.services.models import load_models
 from biosentry.services.ward import WardService
 
 NOT_FOUND = "Not found"
@@ -241,13 +242,14 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
     settings = settings or Settings.from_env()
     production = settings.env == "production" or restricted()
     ensure(settings.database_url, settings.dataset, production)
+    models = load_models(settings.models_dir)  # once; a refused file is "not computed" and one warning
 
     def open_ctx() -> Context:
         conn = connect(settings.database_url, production)
         try:  # a connection that cannot become a Context (no run, say) is not left open
             store = PostgresStore(conn, clock)
             audit = AuditLog(conn, clock, store.role_of)
-            wards = WardService(store, audit)
+            wards = WardService(store, audit, models)
             baselines = BaselineService(store, audit, wards)
             return Context(
                 conn,

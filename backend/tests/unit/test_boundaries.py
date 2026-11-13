@@ -10,11 +10,11 @@ import pytest
 from biosentry.core.audit import utc_now
 from biosentry.core.config import DEFAULT_DATABASE_URL, Settings
 from biosentry.domain.arbiter import Ranked
-from biosentry.schemas import UnscoredPatient
+from biosentry.schemas import RowModels, UnscoredPatient
 from biosentry.services.patients import RejectedError, split_blood_pressure
 from biosentry.services.scoring import decide
 from biosentry.services.ward import score_row
-from samples import measurement, present, unscored  # isort: skip
+from samples import measurement, present, row_models, unscored  # isort: skip
 
 
 def test_settings_read_the_environment_and_an_empty_value_is_unset() -> None:
@@ -49,7 +49,7 @@ def test_a_ranked_row_may_have_no_patch_signal() -> None:
     state = UnscoredPatient.model_validate({**payload, "signal_quality": None})
     decision = decide(state)
     assert isinstance(decision, Ranked)
-    assert score_row(state, 1, decision, []).signal_quality is None
+    assert score_row(state, 1, decision, [], RowModels.model_validate(row_models())).signal_quality is None
 
 
 SRC = Path(__file__).resolve().parents[2] / "src" / "biosentry"

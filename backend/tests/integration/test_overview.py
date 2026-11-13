@@ -20,7 +20,7 @@ from test_store import DATA, NOW, Api, api, new_run, sim_patient  # noqa: F401 (
 
 from biosentry.api.app import REFUSED_ACTIONS, WRITE_ACTIONS, create_app
 from biosentry.core.audit import AuditLog
-from biosentry.core.config import Settings
+from biosentry.core.config import DEFAULT_MODELS_DIR, Settings
 from biosentry.db import admin as admin_module
 from biosentry.db import passphrase as passphrase_module
 from biosentry.db.passphrase import hash_passphrase
@@ -28,9 +28,11 @@ from biosentry.db.seed import DEV_PASSPHRASE
 from biosentry.repositories.postgres import PostgresStore, connect
 from biosentry.schemas import WardOverview
 from biosentry.schemas import NewNote, NurseVitalsInput, PartialLabInput
+from biosentry.services.models import load_models
 from biosentry.services.patients import PatientService
 from biosentry.services.ward import WardService
 
+MODELS = load_models(DEFAULT_MODELS_DIR)
 ADMIN = "admin-santos"
 IDS = [r["id"] for r in DATA["ranked"]] + [a["id"] for a in DATA["abstained"]]
 FORBIDDEN_KEYS = {"name", "age", "sex", "vitals", "notes", "admitting_context", "labs"}
@@ -107,7 +109,7 @@ def test_the_admin_sees_every_patient_on_the_ward_and_one_audit_row_is_written(a
     ]
     assert len(body.patients) == len(IDS) == 12
     store = PostgresStore(connect(api.url), api.wall)
-    ranked, abstained = WardService(store, AuditLog(store.conn, api.wall, store.role_of)).compute(
+    ranked, abstained = WardService(store, AuditLog(store.conn, api.wall, store.role_of), MODELS).compute(
         store.on_ward()
     )
     assert [(p.bed, p.state, p.score) for p in body.patients] == [
@@ -795,7 +797,7 @@ def test_an_admin_never_reads_a_discharged_patient_and_stays_is_still_empty(api:
 def _services(api: Api) -> tuple[PostgresStore, WardService, PatientService]:
     store = PostgresStore(connect(api.url), api.wall)
     audit = AuditLog(store.conn, api.wall, store.role_of)
-    wards = WardService(store, audit)
+    wards = WardService(store, audit, MODELS)
     return store, wards, PatientService(store, audit, wards)
 
 

@@ -124,9 +124,9 @@ def test_no_stored_bins_and_a_stay_past_the_cap() -> None:
     assert ms.prepare_series(off, None) == NotComputed(ms.NOT_ALIGNED)
 
 
-def test_the_current_bin_not_scored_on_its_stored_inputs_is_not_ranked() -> None:
-    assert reasons(run(rows=charted(blood_pressure={"at": slot(40)}))) == (ms.NOT_RANKED,) * 3
-    assert reasons(run(rows=charted(consciousness={"absent_reason": "x"}))) == (ms.NOT_RANKED,) * 3
+def test_the_current_bin_not_scored_on_its_stored_inputs_has_its_own_reason() -> None:
+    assert reasons(run(rows=charted(blood_pressure={"at": slot(40)}))) == (ms.LATEST,) * 3
+    assert reasons(run(rows=charted(consciousness={"absent_reason": "x"}))) == (ms.LATEST,) * 3
 
 
 def test_a_baseline_still_forming_in_any_of_the_four_vitals_is_not_computed() -> None:
@@ -190,7 +190,7 @@ def test_an_impossible_earlier_value_is_a_gap_and_the_narrow_rule_applies() -> N
     assert reasons(bad(13)) == (ms.IMPOSSIBLE, ms.IMPOSSIBLE, ms.IMPOSSIBLE_BASELINE)  # t-16, inside the baseline window
     assert reasons(bad(5)) == (ms.IMPOSSIBLE, ms.IMPOSSIBLE, ms.IMPOSSIBLE_BASELINE)  # inside the baseline window
     assert reasons(bad(27)) == ("ok", "ok", "ok")  # an earlier bin that is neither: a gap, the policy run ends
-    assert reasons(bad(29)) == (ms.NOT_RANKED,) * 3  # the current bin
+    assert reasons(bad(29)) == (ms.LATEST,) * 3  # the current bin
     nan = pts(30)
     nan["spo2"][27] = VitalHistory.model_construct(time=slot(27), value=0.0)  # zero SpO2 is not a reading
     assert reasons(model_signals_from(nan)) == ("ok", "ok", "ok")

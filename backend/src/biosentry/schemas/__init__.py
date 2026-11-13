@@ -73,6 +73,8 @@ from .records import (
 )
 from .rows import (
     AbstainedRow,
+    ModelSignal,
+    RowModels,
     PatientDetail,
     PatientStay,
     PatientSummary,
@@ -114,6 +116,8 @@ CONTRACT_MODELS: tuple[type[BaseModel], ...] = (
     TierStatus,
     TierCInput,
     EscalationReason,
+    ModelSignal,
+    RowModels,
     ScoreRow,
     AbstainedRow,
     WardResponse,
@@ -187,6 +191,8 @@ __all__ = [
     "LabRunItem",
     "LiveWard",
     "MeasurementAbsent",
+    "ModelSignal",
+    "RowModels",
     "NewAcknowledgement",
     "NewLabRun",
     "NewNote",

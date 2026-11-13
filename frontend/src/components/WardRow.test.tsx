@@ -191,3 +191,21 @@ describe("a stored signal with no patch value in use", () => {
     expect(screen.queryByText("No patch signal")).toBeNull();
   });
 });
+
+describe("the two model reasons on the row", () => {
+  const model = [
+    { rule: "prediction_model_flag" as const, text: "Prediction model flag (synthetic, not validated)", pathway: null },
+    { rule: "alert_policy_flag" as const, text: "Alert policy flag (learned by reward; synthetic, not validated)", pathway: null },
+  ];
+
+  it("show in the reason line of a low row and add no response line", () => {
+    render(
+      <MemoryRouter>
+        <WardRow row={{ ...row, score: 2, escalation_reasons: model }} role="rn" now={0} ageOffsetS={0} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(`${model[0].text} · ${model[1].text}`)).toBeTruthy();
+    expect(screen.queryByText(/^Not a NEWS2 trigger/)).toBeNull();
+    expect(screen.queryByText(response("low", "rn"))).toBeNull();
+  });
+});

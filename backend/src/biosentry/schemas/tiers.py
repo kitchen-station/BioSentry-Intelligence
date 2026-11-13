@@ -45,6 +45,8 @@ class EscalationRule(StrEnum):
     tier_c_raise = "tier_c_raise"
     tier_b_finding = "tier_b_finding"
     missing_input = "missing_input"
+    prediction_model_flag = "prediction_model_flag"
+    alert_policy_flag = "alert_policy_flag"
 
 
 class EscalationReason(Contract):

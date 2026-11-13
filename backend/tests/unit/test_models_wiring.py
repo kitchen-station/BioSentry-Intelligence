@@ -1,4 +1,4 @@
-"""The model code imports nothing but the standard library and biosentry, and is wired to nothing yet."""
+"""The model code imports nothing but the standard library and biosentry, and only the wiring imports it."""
 
 import ast
 import sys
@@ -56,13 +56,32 @@ def test_the_import_walk_sees_a_module_name_and_a_relative_import() -> None:
     assert any(n.startswith("biosentry") for n in imported(SRC / "api" / "main.py"))
 
 
-def test_nothing_that_ranks_or_serves_imports_the_new_modules_yet() -> None:
-    serving = list((SRC / "api").rglob("*.py")) + [
-        SRC / "services" / "ward.py",
-        SRC / "services" / "scoring.py",
-        SRC / "domain" / "arbiter.py",
-    ]
-    assert len(serving) > 3
-    for path in serving:
-        for name in imported(path):
-            assert not any(name == mod or name.startswith(mod + ".") for mod in NEW_MODULES), f"{path.name}: {name}"
+def importers(module: str) -> set[str]:
+    """Every file under src that imports this module (or one inside it), as a path inside biosentry."""
+    return {
+        path.relative_to(SRC).as_posix()
+        for path in SRC.rglob("*.py")
+        if any(n == module or n.startswith(module + ".") for n in imported(path))
+    }
+
+
+def test_only_the_wiring_imports_the_model_modules() -> None:
+    assert importers("biosentry.services.model_signals") == {"services/ward.py"}
+    assert importers("biosentry.services.models") == {
+        "api/app.py",
+        "services/model_signals.py",
+        "services/ward.py",
+    }
+    assert importers("biosentry.services.as_of") == {"services/model_signals.py"}
+
+
+def test_the_arbiter_and_the_ranking_code_only_receive_results() -> None:
+    """The arbiter takes the confidence check's enum to type a result and nothing else of the model code;
+    Tier A and `scoring.py` take no model module at all."""
+    allowed = {"biosentry.domain.scoring.tier_c.confidence", "biosentry.domain.scoring.tier_c.confidence.Check"}  # `Check`: an enum, no code that computes
+    ranking = [SRC / "domain" / "arbiter.py", SRC / "services" / "scoring.py", *(SRC / "domain" / "scoring" / "tier_a").rglob("*.py")]
+    assert len(ranking) > 3
+    for path in ranking:
+        used = {n for n in imported(path) if any(n == m or n.startswith(m + ".") for m in NEW_MODULES)}
+        assert used <= (allowed if path.name == "arbiter.py" else set()), f"{path.name}: {used}"
+    assert "biosentry.domain.scoring.tier_c.confidence" in imported(SRC / "domain" / "arbiter.py")  # the walk sees it

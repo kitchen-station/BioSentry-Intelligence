@@ -50,6 +50,8 @@ from biosentry.schemas import (
     PatientStay,
     PatientSummary,
     Provenance,
+    ModelSignal,
+    RowModels,
     ScoreRow,
     Session,
     Spo2ScaleMeasurement,
@@ -114,6 +116,14 @@ def provenance(**overrides: Any) -> dict[str, Any]:
     return {**base, **overrides}
 
 
+FILE_SHA = "ab" * 32
+
+
+def model_provenance(tier: str, model_id: str) -> dict[str, Any]:
+    """A model value names its file and run (variant, file_sha256, run_id)."""
+    return provenance(source="model", tier=tier, model_id=model_id, variant="all", file_sha256=FILE_SHA, run_id="m1-x")
+
+
 def present(value: Any) -> dict[str, Any]:
     return {"present": True, "value": value}
 
@@ -154,6 +164,15 @@ def tier_status() -> dict[str, Any]:
     return {"tier": "A", "live": True, "label": "NEWS2"}
 
 
+def model_signal() -> dict[str, Any]:
+    """A model result that was not computed: the only state that needs no file."""
+    return {"state": "not_computed", "reason": "baseline forming", "bin_start": None, "bin_end": None, "provenance": []}
+
+
+def row_models() -> dict[str, Any]:
+    return {"prediction": model_signal(), "alert_policy": model_signal()}
+
+
 def score_row() -> dict[str, Any]:
     return {
         "id": "p-001",
@@ -176,6 +195,7 @@ def score_row() -> dict[str, Any]:
         "synthetic": True,
         "signal_quality": 94,
         "last_update_s": 4,
+        "models": row_models(),
     }
 
 
@@ -306,6 +326,8 @@ _BUILDERS: dict[type[BaseModel], Any] = {
         "text": "KDIGO rising",
         "pathway": "renal",
     },
+    ModelSignal: model_signal,
+    RowModels: row_models,
     ScoreRow: score_row,
     AbstainedRow: abstained_row,
     WardResponse: lambda: {

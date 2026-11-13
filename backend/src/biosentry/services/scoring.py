@@ -4,7 +4,7 @@ import math
 from collections.abc import Sequence
 from datetime import datetime, timedelta
 
-from biosentry.domain.arbiter import NotRanked, Ranked, TierBSignal, arbitrate
+from biosentry.domain.arbiter import NotRanked, PolicySignal, Ranked, TierBSignal, TierCSignal, arbitrate
 from biosentry.domain.computed import NotComputed
 from biosentry.domain.scoring.tier_a import News2Abstained, inputs_from_vitals, score_news2
 from biosentry.domain.scoring.tier_b.baseline import Deviation, baseline_finding
@@ -93,9 +93,14 @@ def drift(state: UnscoredPatient) -> tuple[tuple[Finding, Deviation], ...]:
     return tuple(found)
 
 
-def decide(state: UnscoredPatient) -> Decision:
+def decide(
+    state: UnscoredPatient, tier_c: TierCSignal | None = None, policy: PolicySignal | None = None
+) -> Decision:
     """NEWS2, then the arbiter. Pure: nothing is cached, so a recorded value re-ranks at once.
-    A NOT RANKED patient gets no finding computed."""
+    A NOT RANKED patient gets no finding computed. The model results arrive ready made."""
     tier_a = score_news2(inputs_from_vitals(state.vitals))
     ranked = not isinstance(tier_a, News2Abstained)
-    return arbitrate(state.id, tier_a, tier_b=TierBSignal(drift(state)) if ranked else None)
+    return arbitrate(
+        state.id, tier_a, tier_b=TierBSignal(drift(state)) if ranked else None,
+        tier_c=tier_c, policy=policy,
+    )  # fmt: skip
