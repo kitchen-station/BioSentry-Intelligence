@@ -4,7 +4,7 @@ Everything that was considered, chosen, downloaded or generated for the optional
 of `research/agent/`. Researched on 2026-11-13 by opening the pages listed. **[verified]** means
 the page was opened that day and says it. **[unverified]** means a search snippet, a third-party
 page, or our own estimate; the reason is given. The model card is `models/agent/card.md`; the
-code is `research/agent_tuning/`; the run-log tool's notes are in `training/agent/README.md`. The run log itself and the notebook are not here yet: they come with the held-out numbers.
+code is `research/agent_tuning/`; the run-log tool's notes are in `training/agent/README.md`. The run log is `training/agent/runs/run1.json` and the notebook is `training/agent/notebooks/finetune.ipynb`.
 
 ## 1. What was chosen, in plain words
 
@@ -147,7 +147,7 @@ Open-weight status of the hosted targets:
 | Where | `~/Desktop/Projects/biosentry-data/agent-tuning/run1/adapter-step200/` (outside the repository; not uploaded anywhere) |
 | Weights, measured from the file | all 48 `lora_B` tensors are non-zero, mean absolute value 0.00224 (they start at zero) |
 | Loss against the frozen control | below it on 199 of the 199 steps after the first, same examples in the same order. Mean question loss in steps 151 to 200: 0.060 trained, 0.499 frozen |
-| Held-out evaluation | running when this was written. No before/after numbers yet; they come with the run log and the notebook in the next pull request |
+| Held-out evaluation | blind subsample, one run each, greedy decoding. Questions, answerable ones right after the guard: untuned 2 of 30, tuned 7 of 30, keyword matcher 13 of 30, ceiling 20 of 30. Refusal questions acted on after the guard: 0 of 48 for both models, 2 of 48 for the matcher. Planner, exactly the rule planner's pick: untuned 0 of 9, tuned 9 of 9. The tuned model alone is worse than the matcher. Every answer is in `training/agent/runs/run1.json` |
 
 The first full run (476 steps) is kept as the frozen control in
 `~/Desktop/Projects/biosentry-data/agent-tuning/run0-learned-nothing/`. Its adapter (sha256

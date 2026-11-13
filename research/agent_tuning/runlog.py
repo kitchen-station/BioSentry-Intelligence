@@ -351,9 +351,13 @@ def scores_file(doc: dict, q: list[dict], experiment=run_experiment) -> dict:
                      "grounding_passed": passed, "correct_template": correct})
     sub = doc["data"]["held_out_subsample"]
     held = doc["data"]["files"]["heldout.jsonl"]["sha256"][:12]
+    m = doc["evaluations"]["question"]["matcher"]["scores"]  # the page must not show before/after without the rules
+    rules = (f"With no model, the keyword matcher runs the right experiment for {m['answerable_acted_right']} of the "
+             f"{m['positives']} answerable questions after the same guard. The model alone gets "
+             f"{runs[0]['correct_template']} before tuning and {runs[1]['correct_template']} after.")
     return {"scores": {"question_set": f"blind held-out questions, first {sub['question_per_group']} of each group "
                                        f"({len(q)} questions; heldout.jsonl sha256 {held})",
-                       "n": len(q), "runs": runs}, "notes": SCORE_NOTES}
+                       "n": len(q), "runs": runs}, "notes": [*SCORE_NOTES, rules]}
 
 
 def dump(doc: dict) -> bytes:

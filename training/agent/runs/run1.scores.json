@@ -1,0 +1,29 @@
+{
+ "notes": [
+  "The scores are on the blind held-out question subsample, not on research/agent/eval_questions.json. One run each, greedy decoding, no error bars.",
+  "grounding_passed counts the answered questions whose numbers passed the code check against the tool result. That check is code and is the same before and after tuning.",
+  "With no model, the keyword matcher runs the right experiment for 13 of the 30 answerable questions after the same guard. The model alone gets 2 before tuning and 7 after."
+ ],
+ "scores": {
+  "n": 78,
+  "question_set": "blind held-out questions, first 6 of each group (78 questions; heldout.jsonl sha256 d16d2686e51b)",
+  "runs": [
+   {
+    "answered": 2,
+    "correct_template": 2,
+    "grounding_passed": 2,
+    "label": "before",
+    "model": "Qwen/Qwen2.5-0.5B-Instruct",
+    "refused": 76
+   },
+   {
+    "answered": 7,
+    "correct_template": 7,
+    "grounding_passed": 7,
+    "label": "after",
+    "model": "Qwen/Qwen2.5-0.5B-Instruct + LoRA adapter 6f9ceb056616",
+    "refused": 71
+   }
+  ]
+ }
+}
