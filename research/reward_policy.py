@@ -164,8 +164,9 @@ def prepare(trial: Trial) -> Prepared:
         fired, alerting = scan(CHART, r)
         alerts += len(fired)
         on += len(alerting)
-    if not wins or shifts <= 0 or alerts == 0:
-        raise TrialError(f"{trial.name}: needs evaluated episodes, patient-days and NEWS2 alerts for the reward")
+    # No evaluated episode is allowed: E = 0 makes the reward 0 for every policy (the time-in-alert rule still applies).
+    if shifts <= 0 or alerts == 0:
+        raise TrialError(f"{trial.name}: needs patient-days and NEWS2 alerts for the reward")
     return Prepared(trial.seed, rows, {p: z_series(r) for p, r in rows.items()},
                     {w.patient: (w.start, w.full_in) for w in wins}, len(wins), len(trial.rows),
                     shifts, alerts / shifts, on)

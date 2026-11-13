@@ -784,3 +784,22 @@ def test_an_out_that_cannot_be_written_is_refused(tmp_path, capsys):
     blocker.write_text("")
     assert go(blocker, ["--round", "1"]) == 2
     assert capsys.readouterr().err.startswith("refused:")
+
+
+def test_a_generation_with_a_no_episode_trial_runs_and_records_d_zero(tmp_path, monkeypatch):
+    from test_reward import no_episode_trial
+    monkeypatch.setitem(_PREP, 113, prepare(no_episode_trial(113)))  # a confirmation seed of generation 1
+    monkeypatch.setitem(_PREP, 102, prepare(no_episode_trial(102)))  # and a validation seed
+    a, b = tmp_path / "a", tmp_path / "b"
+    assert go(a, ["--round", "1"]) == 0 and go(b, ["--round", "1"]) == 0 and tree(a) == tree(b)
+    r = recs(a)
+    c = r[1]["confirmation"]
+    assert c is not None and not c["winner_rejected"] and not c["current_rejected"]
+    assert dict((e["seed"], e["d"]) for e in c["d"])[113] == 0.0
+    ps = {x["seed"]: x for x in r[0]["validation"]["per_seed"]}
+    assert ps[102]["episodes"] == 0 and ps[102]["reward"] == 0.0 and ps[102]["caught_early"] == 0
+    part = tmp_path / "part"
+    src = MemSource(missing={113})
+    assert go(part, ["--round", "1"], src) == 3
+    src.missing.clear()
+    assert go(part, ["--round", "1"], src) == 0 and tree(part) == tree(a)  # resume, same bytes

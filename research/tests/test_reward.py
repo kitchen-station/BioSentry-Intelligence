@@ -142,3 +142,30 @@ def _write_folder(root, seed: int) -> None:
         "scenario_sha256": "0" * 64, "sim_commit": "abcdef1", "node_major": 22, "bin_minutes": 15,
         "patients": len(t.episodes), "episodes": sum(e.kind is not None for e in t.episodes)}))
     (d / "summary.json").write_text(json.dumps({"patient_days": t.patient_days}))
+
+
+def no_episode_trial(seed: int = 31):
+    t = toy(seed)
+    return replace(t, episodes=tuple(Episode(e.patient, e.admit_minute, None, None, None, None) for e in t.episodes))
+
+
+def test_a_trial_with_no_evaluated_episode_scores_zero_for_every_policy():
+    p = prepare(no_episode_trial())
+    assert p.episodes == 0 and p.news2_on > 0
+    silent = score(Params((0.0, 0.0, 0.0, 0.0), 10.0, 1), p)
+    assert (silent.reward, silent.caught_early, silent.alerts_per_12h, silent.rejected) == (0.0, 0, 0.0, False)
+    loud = score(Params((1.0, 1.0, 1.0, 1.0), 2.0, 1), p)  # alerts, but within NEWS2's time in alert
+    assert loud.alerts_per_12h > 0 and not loud.rejected and loud.time_in_alert > 0
+    assert loud.reward == 0.0 and str(loud.reward) == "0.0" and loud.caught_early == 0
+    over = score(Params((1.0, 1.0, 1.0, 1.0), 2.0, 1), replace(p, news2_on=0))  # above NEWS2's time in alert
+    assert over.rejected and over.reward == 0.0 and over.time_in_alert == loud.time_in_alert
+    assert mean_reward(Params((1.0, 1.0, 1.0, 1.0), 2.0, 1), [p, replace(p, news2_on=0)])[0] is None
+
+
+def test_a_trial_still_needs_patient_days_and_news2_alerts():
+    t = no_episode_trial()
+    with pytest.raises(TrialError, match="patient-days"):
+        prepare(replace(t, patient_days=0.0))
+    quiet = tuple(replace(r, heart_rate=70.0, respiratory_rate=16.0, spo2=97.0) for r in t.rows if r.patient != "p-sick")
+    with pytest.raises(TrialError, match="NEWS2 alerts"):
+        prepare(replace(t, rows=quiet))
