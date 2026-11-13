@@ -111,6 +111,11 @@ services:
     tmpfs: ["/tmp:size=64m"]
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
+    # Bounds for a run that goes wrong, so it cannot take the database's memory: the 30-day hospital
+    # run peaked near 200 MB and 25 processes and threads.
+    mem_limit: 1g
+    pids_limit: 128
+    cpus: 2
 
   # The address the team opens: the dashboard at /, the full ward simulator at /simulator/ and the API at /api,
   # from one small web server (web.Dockerfile, Caddyfile). The pages call the API on their own address,

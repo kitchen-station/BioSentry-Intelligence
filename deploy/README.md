@@ -41,9 +41,14 @@ this server (and see "A page served from somewhere else" for why a public page c
   on the dashboard's Simulation lab page (without it a request waits, then fails). It is the same image
   as `sim` with another command (`node dist/lab/lab-worker.js`). It claims a request from the API with
   the ingest key, runs the simulator's compare, and posts the result back. It publishes no port and
-  sits on an internal network (`labnet`) with the API alone: no route out and none to the database. Its
-  filesystem is read-only apart from an in-memory `/tmp`, all capabilities are dropped, and it keeps
-  nothing. One run at a time; a run may use one CPU for up to 15 minutes. It refuses to start if a proxy
+  sits on an internal network (`labnet`) with the API alone (and, as on any Docker network, the host's
+  own address on that bridge: keep the host's services off it, see the firewall note below): no route out
+  and none to the database. Its
+  filesystem is read-only apart from an in-memory `/tmp` capped at 64 MB (Docker's own `/dev/shm` is
+  writable too; the worker does not use it), all capabilities are dropped, and it keeps
+  nothing. One run at a time, for up to 15 minutes; a run uses about one CPU (the service is capped at
+  two) and 1 GB of memory at most. The largest request, a 30-day hospital run, took about 2 minutes and
+  200 MB on a laptop. It refuses to start if a proxy
   variable (`HTTP_PROXY` and the like) is set, so do not give the stack one.
 - There is one ward. While the runner is live, a browser simulator started with the ingest key is
   **refused with 409** ("Another ward simulation is live"): use the ward on the server, not a second one.

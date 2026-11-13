@@ -50,6 +50,13 @@ def _web() -> list[str]:
 def test_the_database_publishes_nothing_and_the_api_only_the_hosts_loopback() -> None:
     code = _code(DEPLOY / "compose.yaml")
     assert code.count("ports:") == 2  # only the API and the web server publish anything
+    # No other spelling of a risky key anywhere (one line, quoted, or with a comment after it).
+    risky = (
+        r"""^['"]?(ports|expose|privileged|cap_add|devices|pid|ipc|userns_mode|network_mode|user"""
+        r"""|entrypoint|<<)['"]?\s*:"""
+    )
+    assert [ln for ln in code if re.match(risky, ln)] == ["ports:", "ports:"]
+    assert [ln for ln in code if re.match(r"""^['"]?volumes['"]?\s*:""", ln)] == ["volumes:"] * 3
     published = [code[i + 1] for i, ln in enumerate(code) if ln == "ports:"]
     assert published == [  # both on the host's loopback; the variables move the host port only
         '- "127.0.0.1:${API_PORT:-8000}:8000"',
@@ -113,27 +120,30 @@ def test_the_ward_simulator_publishes_nothing_and_waits_for_a_healthy_api() -> N
 
 
 def test_the_lab_worker_publishes_nothing_reaches_only_the_api_and_can_write_only_in_memory() -> None:
-    lab = _lab()
-    assert "ports:" not in lab and "expose:" not in lab and "network_mode: host" not in lab
-    # One internal network, shared with the API alone: no route out, none to the database.
-    assert [ln for ln in lab if ln.startswith("networks:")] == ["networks: [labnet]"]
-    assert "context: ${SIM_DIR:-../../biosentry-ward-sim}" in lab  # the image the runner is built from
-    assert 'command: ["node", "dist/lab/lab-worker.js"]' in lab
-    assert "restart: unless-stopped" in lab
-    wait = lab[lab.index("depends_on:") :]
-    assert wait[:3] == ["depends_on:", "api:", "condition: service_healthy"]
-    # Its whole environment: the API's address inside compose and the ingest key, which has no default.
-    # No proxy variable (the worker refuses to start with one), nothing about the database.
-    assert lab[lab.index("environment:") + 1 : lab.index("networks: [labnet]")] == [
+    # The whole service, line for line. A key this list does not have (a port, a volume, a capability,
+    # a user, a second network), in any YAML spelling or with a comment after it, fails here.
+    assert _lab() == [
+        "lab:",
+        "build:",
+        "context: ${SIM_DIR:-../../biosentry-ward-sim}",  # the image the runner is built from
+        "network: host",
+        'command: ["node", "dist/lab/lab-worker.js"]',
+        "restart: unless-stopped",
+        "depends_on:",
+        "api:",
+        "condition: service_healthy",
+        "environment:",  # the API's address inside compose and the key, no default; no proxy variable
         "BIOSENTRY_API_URL: http://api:8000",
         "BIOSENTRY_INGEST_KEY: ${BIOSENTRY_INGEST_KEY:?set BIOSENTRY_INGEST_KEY in deploy/.env}",
+        "networks: [labnet]",  # one internal network, shared with the API alone
+        "read_only: true",
+        'tmpfs: ["/tmp:size=64m"]',  # the one place it writes, in memory and capped
+        "cap_drop: [ALL]",
+        'security_opt: ["no-new-privileges:true"]',
+        "mem_limit: 1g",  # a run that goes wrong cannot take the database's memory
+        "pids_limit: 128",
+        "cpus: 2",
     ]
-    banned = ("POSTGRES", "DATABASE", "PROXY", "ENV_FILE")
-    assert not any(word in ln.upper() for ln in lab for word in banned)
-    assert "read_only: true" in lab and "cap_drop: [ALL]" in lab
-    assert 'security_opt: ["no-new-privileges:true"]' in lab
-    assert 'tmpfs: ["/tmp:size=64m"]' in lab  # the one place it writes, in memory and capped
-    assert "volumes:" not in lab and "privileged: true" not in lab and "cap_add:" not in lab
 
 
 def test_the_web_server_publishes_only_the_hosts_loopback_and_holds_no_secret() -> None:
