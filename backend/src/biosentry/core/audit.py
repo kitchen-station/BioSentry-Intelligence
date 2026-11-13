@@ -22,7 +22,14 @@ RoleOf = Callable[[str], str | None]
 # same resource with outcome ok is recorded at most once in VIEW_ROW_EVERY (the owner's decision
 # for the automatic refresh). Every other action, and every outcome but ok, is always recorded.
 REPEATED_VIEWS = frozenset(
-    {"view_ward", "view_live", "view_patient", "view_baseline", "view_lab_runs"}
+    {
+        "view_ward",
+        "view_live",
+        "view_patient",
+        "view_baseline",
+        "view_lab_runs",
+        "view_lab_questions",
+    }
 )
 VIEW_ROW_EVERY = timedelta(minutes=1)
 

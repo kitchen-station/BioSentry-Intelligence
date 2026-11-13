@@ -537,7 +537,7 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
     @app.get("/wards/{ward}/lab/questions", response_model=list[QuestionItem])
     def lab_questions(ward: str, ctx: Ctx, who: Who) -> list[QuestionItem]:
         lab_reader(ctx, who, "view_lab_questions", ward)
-        ctx.audit.append(who, "view_lab_questions", ward, "ok")
+        ctx.audit.append_view(who, "view_lab_questions", ward)  # the page reads it on a timer
         return lab.list_questions(ctx.store)
 
     @app.get("/wards/{ward}/lab/questions/{lab_run_id}", response_model=QuestionDetail)
