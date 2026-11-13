@@ -1,6 +1,7 @@
-"""The deployment files: what the VPS stack publishes (the API on the host's loopback, the database
-and the ward simulator nothing), pinned images, secrets that have no defaults, and the two scripts, run here with a stand-in
-for docker (the real stack was built, run, backed up and restored by hand; see deploy/README.md)."""
+"""The deployment files: what the server's stack publishes (the API and the web server on the host's
+loopback, the database and the ward simulator nothing), pinned images, secrets that have no defaults, the
+web server that hides the ingest door, and the two scripts, run here with a stand-in for docker (the real
+stack was built, run, backed up and restored by hand; see deploy/README.md)."""
 
 import os
 import re
@@ -28,26 +29,44 @@ def _code(path: Path) -> list[str]:
 
 
 def _sim() -> list[str]:
-    """The code lines of the `sim` service: the last one, before the top-level networks."""
+    """The code lines of the `sim` service: up to the `web` service that follows it."""
     code = _code(DEPLOY / "compose.yaml")
-    return code[code.index("sim:") : code.index("networks:")]
+    return code[code.index("sim:") : code.index("web:")]
+
+
+def _web() -> list[str]:
+    """The code lines of the `web` service: the last one, before the top-level networks."""
+    code = _code(DEPLOY / "compose.yaml")
+    return code[code.index("web:") : code.index("networks:")]
 
 
 def test_the_database_publishes_nothing_and_the_api_only_the_hosts_loopback() -> None:
     code = _code(DEPLOY / "compose.yaml")
-    assert code.count("ports:") == 1  # only the API publishes anything
-    assert code[code.index("ports:") + 1] == '- "127.0.0.1:8000:8000"'
+    assert code.count("ports:") == 2  # only the API and the web server publish anything
+    published = [code[i + 1] for i, ln in enumerate(code) if ln == "ports:"]
+    assert published == [  # both on the host's loopback; the variables move the host port only
+        '- "127.0.0.1:${API_PORT:-8000}:8000"',
+        '- "127.0.0.1:${WEB_PORT:-8080}:8080"',
+    ]
+    # Nothing else in the file is a port mapping (quoted, bare or in the long form), and none names
+    # another address.
+    mapping = r'^-\s*"?[^"\s]*:\d+(/\w+)?"?$|^published:'
+    assert [ln for ln in code if re.search(mapping, ln)] == published
+    assert "0.0.0.0" not in "\n".join(code)
     assert "network_mode: host" not in code  # no service runs on the host's network
-    assert code.count("network: host") == 2  # only the two builds (the API's and the simulator's) do
+    assert code.count("network: host") == 3  # only the three builds (the API, the simulator, the web) do
     assert code.index("network: host") < code.index("restart: unless-stopped", code.index("build:"))
     postgres = code[code.index("postgres:") : code.index("api:")]
     assert "networks: [backend]" in postgres and "ports:" not in postgres
     assert any(ln.startswith("internal: true") for ln in code)  # the database's network
+    # Only the top-level block is spelt `networks:` alone: a service names its networks as `[..]`,
+    # so the _sim and _web slices end where they should and cannot hide one.
+    assert code.count("networks:") == 1
 
 
 def test_the_stack_restarts_waits_for_a_healthy_database_and_keeps_the_data_in_a_volume() -> None:
     text = "\n".join(_code(DEPLOY / "compose.yaml"))
-    assert text.count("restart: unless-stopped") == 3
+    assert text.count("restart: unless-stopped") == 4
     assert "condition: service_healthy" in text
     assert "pgdata:/var/lib/postgresql" in text and text.endswith("volumes:\npgdata:\nsimstate:")
     assert "BIOSENTRY_ENV: production" in text
@@ -75,6 +94,55 @@ def test_the_ward_simulator_publishes_nothing_and_waits_for_a_healthy_api() -> N
     assert "WARD_STATE_FILE: /state/ward-state.json" in sim
     assert sim[sim.index("volumes:") + 1] == "- simstate:/state"
     assert not any("POSTGRES" in ln or "DATABASE" in ln for ln in sim)
+
+
+def test_the_web_server_publishes_only_the_hosts_loopback_and_holds_no_secret() -> None:
+    web = _web()
+    assert web[web.index("ports:") + 1] == '- "127.0.0.1:${WEB_PORT:-8080}:8080"'
+    assert web.count("ports:") == 1 and "expose:" not in web and "network_mode: host" not in web
+    assert not any(ln.startswith("networks:") for ln in web)  # the default network only: no database
+    assert not any(word in ln for ln in web for word in ("POSTGRES", "DATABASE", "INGEST", "env_file"))
+    assert "read_only: true" in web and "cap_drop: [ALL]" in web
+    assert 'security_opt: ["no-new-privileges:true"]' in web
+    assert "restart: unless-stopped" in web
+    wait = web[web.index("depends_on:") :]
+    assert wait[:3] == ["depends_on:", "api:", "condition: service_healthy"]
+    assert "sim: ${SIM_DIR:-../../biosentry-ward-sim}" in web  # the checkout the runner is built from
+
+
+def test_the_web_image_is_pinned_runs_unprivileged_and_bakes_in_only_the_api_path() -> None:
+    lines = _lines(DEPLOY / "web.Dockerfile")
+    assert lines[0].startswith("# syntax=docker/dockerfile:") and "@sha256:" in lines[0]
+    code = _code(DEPLOY / "web.Dockerfile")
+    stages = [ln for ln in code if ln.startswith("FROM ")]
+    assert stages[:2] == ["FROM ${NODE} AS dashboard", "FROM ${NODE} AS simulator"]
+    assert len(stages) == 3 and stages[2].startswith("FROM caddy:")
+    for line in (next(ln for ln in code if ln.startswith("ARG NODE=")), stages[2]):
+        assert re.search(r"@sha256:[0-9a-f]{64}$", line), line
+    assert [ln for ln in code if ln.startswith("USER ")] == ["USER 65534:65534"]
+    # The one setting built into each page is the path /api on its own address: no host, no key.
+    assert [ln for ln in code if "VITE_" in ln] == [
+        "RUN VITE_API_URL=/api npx vite build",
+        "RUN VITE_VIEW_API_URL=/api npx vite build --base=/simulator/",
+    ]
+    assert code.count("RUN npm ci") == 2  # from each lock file
+    copied_from = [ln.split()[1] for ln in code if ln.startswith("COPY --from=")]
+    assert set(copied_from) <= {  # the two checkouts and the two build stages: no image pulled unpinned
+        "--from=frontend", "--from=sim", "--from=dashboard", "--from=simulator"
+    }
+    assert not any("INGEST" in ln or ".env" in ln for ln in code)
+    assert _code(DEPLOY / ".dockerignore") == ["*", "!Caddyfile"]  # deploy/.env never reaches a build
+
+
+def test_the_web_server_hides_the_ingest_door_and_passes_requests_only_to_the_api() -> None:
+    code = _code(DEPLOY / "Caddyfile")
+    assert "admin off" in code
+    assert ":8080 {" in code and not any(ln.startswith(("tls", "bind")) for ln in code)
+    api = code[code.index("handle_path /api/* {") :]
+    # Refused before anything is passed on: `respond` runs ahead of `reverse_proxy` in one block.
+    assert api[1:4] == ["@ingest path /sim /sim/*", "respond @ingest 404", "reverse_proxy api:8000"]
+    assert [ln for ln in code if "reverse_proxy" in ln] == ["reverse_proxy api:8000"]
+    assert "browse" not in " ".join(code)  # no directory listing
 
 
 def test_the_database_image_is_the_one_the_dev_compose_uses() -> None:
