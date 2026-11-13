@@ -49,7 +49,9 @@ describe("the panel", () => {
     panel();
     await settle();
     expect(screen.getByRole("heading", { level: 2, name: "Ask about this patient" })).toBeTruthy();
-    expect(screen.getByText("The agent sees this patient's data only, with no name. Synthetic, not validated.")).toBeTruthy();
+    expect(
+      screen.getByText("The agent sees this patient's data only, with no name. Do not type a name in your question. Synthetic, not validated."),
+    ).toBeTruthy();
     expect(screen.getByText("No question yet.")).toBeTruthy();
     expect(screen.getByText("0/500")).toBeTruthy();
     expect(input().maxLength).toBe(500);
@@ -66,6 +68,8 @@ describe("the panel", () => {
       item({ id: 5, state: "refused", reason: "not a question about this patient" }),
       item({ id: 6, state: "failed", reason: "no worker claimed it within an hour" }),
       item({ id: 7, state: "failed" }),
+      item({ id: 8, state: "refused", reason: "Refused: a number in the answer is not in this patient's data." }),
+      item({ id: 9, state: "paused" as PatientQuestionItem["state"] }),
     ]);
     panel();
     await settle();
@@ -81,6 +85,9 @@ describe("the panel", () => {
     expect(rows[4]).toContain("Refused: not a question about this patient");
     expect(rows[5]).toContain("Failed: no worker claimed it within an hour");
     expect(rows[6]).toContain("Failed: no reason given");
+    expect(rows[7]).toContain("\u00b7 Refused: a number in the answer is not in this patient's data."); // the word once
+    expect(rows[8]).toContain("\u00b7 paused"); // a state this build does not know is shown as it came
+    expect(rows[8]).not.toContain("undefined");
   });
 
   it("renders a server string as text, never as markup", async () => {
@@ -145,7 +152,9 @@ describe("sending", () => {
     await settle();
     await userEvent.type(input(), "Another");
     expect(ask().disabled).toBe(true);
-    expect(screen.getByText("Wait for the answer to your last question.")).toBeTruthy();
+    expect(
+      screen.getByText("Wait for the answer to your last question. A question that is not taken within one hour fails by itself."),
+    ).toBeTruthy();
     fireEvent.submit(input().closest("form")!);
     expect(api.askPatient).not.toHaveBeenCalled();
   });
@@ -156,11 +165,12 @@ describe("sending", () => {
     await settle();
     await userEvent.type(input(), "Another");
     expect(ask().disabled).toBe(false);
-    expect(screen.queryByText("Wait for the answer to your last question.")).toBeNull();
+    expect(screen.queryByText(/Wait for the answer to your last question/)).toBeNull();
   });
 
   it.each([
     [429, "Question limit reached. Try again later."],
+    [403, "You cannot ask about this patient."],
     [404, "This patient is no longer on your list."],
     [422, "The question could not be sent. Use one line, up to 500 characters."],
     [500, "Cannot reach the ward server."],
@@ -237,13 +247,15 @@ describe("the answer", () => {
     expect(api.getPatientQuestion).toHaveBeenCalledTimes(1);
   });
 
-  it("shows an empty text when the server holds no answer", async () => {
+  it.each([null, ""])("says so when the server holds no answer text (%j), and shows no empty answer", async (answer) => {
     api.getPatientQuestions.mockResolvedValue([item({ id: 9 })]);
-    api.getPatientQuestion.mockResolvedValue(detail({ id: 9, answer: null }));
+    api.getPatientQuestion.mockResolvedValue(detail({ id: 9, answer }));
     const { container } = panel();
     await settle();
     await userEvent.click(screen.getByRole("button", { name: "Show answer" }));
-    expect(container.querySelector("pre")!.textContent).toBe("");
+    expect(container.querySelector("pre")).toBeNull();
+    expect(screen.getByText("No answer text was stored.")).toBeTruthy();
+    expect(screen.queryByText(/Answered from the data/)).toBeNull();
   });
 
   it("says a failed read in one line and can try again", async () => {
@@ -299,6 +311,24 @@ describe("the timer", () => {
     cleanup();
     await tick(60_000);
     expect(api.getPatientQuestions).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not let a read that answers late replace a newer list", async () => {
+    let late: (v: PatientQuestionItem[]) => void = () => {};
+    const theirs = [item({ id: 1, state: "queued", requested_by: "md-santos" })]; // a colleague's open question keeps the timer on
+    const both = [item({ id: 2, state: "queued", question: "Mine?" }), ...theirs];
+    api.getPatientQuestions.mockResolvedValueOnce(theirs).mockReturnValueOnce(new Promise((r) => { late = r; })).mockResolvedValue(both);
+    api.askPatient.mockResolvedValue(both[0]);
+    await start();
+    await tick(5_000); // the timed read is in flight
+    fireEvent.change(input(), { target: { value: "Mine?" } });
+    fireEvent.click(ask());
+    await tick(0); // the send, then its own read
+    expect(screen.getByText("Mine?")).toBeTruthy();
+    late(theirs); // the older read answers now
+    await tick(0);
+    expect(screen.getByText("Mine?")).toBeTruthy();
+    expect(ask().disabled).toBe(true);
   });
 
   it("does not start a read while one is in flight", async () => {

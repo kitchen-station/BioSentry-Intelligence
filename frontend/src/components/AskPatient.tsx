@@ -11,14 +11,16 @@ const GONE = "This patient is no longer on your list.";
 
 const clock = (iso: string) => formatClock(Date.parse(iso));
 const isOpen = (q: PatientQuestionItem) => q.state === "queued" || q.state === "running";
-const stateText = (q: PatientQuestionItem) =>
+// The worker's own texts already begin with the word, so it is not said twice.
+const said = (word: string, reason: string | null) => `${word}: ${(reason ?? "no reason given").replace(`${word}: `, "")}`;
+const stateText = (q: PatientQuestionItem): string =>
   ({
     queued: "Waiting",
     running: q.claimed_at ? `Working since ${clock(q.claimed_at)}` : "Working",
     done: "Answered",
-    refused: `Refused: ${q.reason ?? "no reason given"}`,
-    failed: `Failed: ${q.reason ?? "no reason given"}`,
-  })[q.state];
+    refused: said("Refused", q.reason),
+    failed: said("Failed", q.reason),
+  })[q.state] ?? q.state; // a state from a newer server is shown as it came
 
 /**
  * A clinician's questions about this one patient. The agent answers by code from a frozen copy of the patient's data. It reads on
@@ -46,6 +48,7 @@ export function AskPatient({ patientId, clinicianId, onSignOut }: { patientId: s
     setError(
       {
         401: "Your session has ended. Sign in again.",
+        403: "You cannot ask about this patient.",
         404: GONE,
         422: "The question could not be sent. Use one line, up to 500 characters.",
         429: "Question limit reached. Try again later.",
@@ -54,10 +57,13 @@ export function AskPatient({ patientId, clinicianId, onSignOut }: { patientId: s
   }, []);
 
   const reading = useRef(false);
+  const round = useRef(0); // an answer that comes back late must not replace a newer list
   const load = useCallback(() => {
     reading.current = true;
+    const n = ++round.current;
     return getPatientQuestions(patientId)
       .then((rows) => {
+        if (n !== round.current) return;
         setItems(rows);
         setStalled(false);
         setError(null);
@@ -117,29 +123,34 @@ export function AskPatient({ patientId, clinicianId, onSignOut }: { patientId: s
   return (
     <section aria-labelledby={heading}>
       <h2 id={heading} className={styles.heading}>Ask about this patient</h2>
-      <p className={styles.quiet}>The agent sees this patient&apos;s data only, with no name. Synthetic, not validated.</p>
+      <p className={styles.quiet}>
+        The agent sees this patient&apos;s data only, with no name. Do not type a name in your question. Synthetic, not validated.
+      </p>
       <form className={styles.form} onSubmit={send}>
         <label className={styles.field}>
           Your question
           <input type="text" maxLength={MAX} value={text} onChange={(e) => setText(e.target.value)} />
-          <span className={styles.count}>{text.length}/{MAX}</span>
+          <span className={styles.count} aria-hidden="true">{text.length}/{MAX}</span>
         </label>
         <button type="submit" className={styles.button} disabled={!question || sending || mine}>Ask</button>
       </form>
-      {mine && <p className={styles.quiet}>Wait for the answer to your last question.</p>}
+      {mine && (
+        <p className={styles.quiet}>Wait for the answer to your last question. A question that is not taken within one hour fails by itself.</p>
+      )}
       {error && <p role="alert" className={styles.error}>{error}</p>}
       <button type="button" className={styles.button} onClick={refresh}>Refresh</button>
       {items.length === 0 ? (
         <p className={styles.quiet}>No question yet.</p>
       ) : (
-        <ul className={styles.list} aria-live="polite">
+        <ul className={styles.list}>
           {items.map((q) => {
             const region = `${heading}-answer-${q.id}`;
             const open = shown.includes(q.id);
             return (
               <li key={q.id} className={styles.item}>
                 <p>{q.question}</p>
-                <p className={styles.meta}>
+                {/* Only the state line is announced: an opened answer is long, and the reader chose to open it. */}
+                <p className={styles.meta} aria-live="polite">
                   {q.requested_by !== clinicianId ? `asked by ${q.requested_by} \u00b7 ` : ""}
                   {clock(q.requested_at)} &middot; {stateText(q)}
                 </p>
@@ -149,12 +160,15 @@ export function AskPatient({ patientId, clinicianId, onSignOut }: { patientId: s
                       {open ? "Hide answer" : "Show answer"}
                     </button>
                     <div id={region} hidden={!open}>
-                      {open && (
-                        <>
-                          <pre className={styles.answer}>{answers[q.id]}</pre>
-                          <p className={styles.meta}>Answered from the data as it was at {clock(q.requested_at)}.</p>
-                        </>
-                      )}
+                      {open &&
+                        (answers[q.id] ? (
+                          <>
+                            <pre className={styles.answer}>{answers[q.id]}</pre>
+                            <p className={styles.meta}>Answered from the data as it was at {clock(q.requested_at)}.</p>
+                          </>
+                        ) : (
+                          <p className={styles.meta}>No answer text was stored.</p>
+                        ))}
                     </div>
                   </>
                 )}
