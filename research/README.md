@@ -946,7 +946,7 @@ The question text is what a person typed: a page must show it as text.
 
 It answers the questions that clinicians type on the dashboard's Ask page. It claims one question from the
 API, runs the same `ask` code as `python -m research.agent ask`, and posts the answer and the record of the
-experiment back. The question is data: it is never read as a command. The contracts are `contract-ask` v1
+experiment back. The question is data: it is never read as a command. The contracts are `contract-ask` v1.1
 and `contract-d7` v3.1.
 
     python -m research.agent worker [--once]
@@ -970,6 +970,12 @@ commands.
 It needs Python 3.11, the backend package, the trial root read-only (`ward-v2`, seeds 1 to 10) and a
 writable agent home outside the repository. Nothing in this repository starts it, and where it runs is not
 decided.
+
+Do not start the worker until the API serves `?kind=question` on the claim (dashboard round 6c, migration
+0011). An older API ignores `?kind=` and hands out a clinician's compare run. The worker refuses that job
+with the `kind` reason, as the contract says, and the API stores that run as refused. So after the first
+job of another kind the worker prints one `refused: ...` line and exits 2. It never claims again, and an
+old API loses at most one compare run.
 
 It runs in-process, on the main thread, one job at a time. There is no child-process mode, so the reason
 `the agent did not finish within 15 minutes` is never sent. Every report uses one fixed reason:

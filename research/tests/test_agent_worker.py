@@ -246,10 +246,31 @@ def test_a_bad_question_is_refused_without_running(cfg, monkeypatch, q):
 
 
 @pytest.mark.parametrize("kind", ["compare", "", None, 3])
-def test_a_wrong_kind_is_refused(cfg, kind):
-    fake = Fake((200, {"id": 7, "kind": kind, "question": Q}))
-    go(cfg, fake, max_polls=1)
+def test_a_wrong_kind_is_refused_once_and_the_worker_stops(cfg, kind, monkeypatch):
+    """An API that ignores ?kind=question hands out compare runs. The worker refuses one and never claims again."""
+    monkeypatch.setattr(ask, "answer", lambda *a: pytest.fail("a job of another kind must not run"))
+    fake = Fake((200, {"id": 7, "kind": kind, "question": Q}), (204, b""), (200, {"id": 8, "kind": kind, "question": Q}))
+    with pytest.raises(AgentError, match="does not serve"):
+        go(cfg, fake, max_polls=5)
+    assert len(fake.claims) == 1 and len(fake.reports) == 1 and not fake.violations
     assert body_of(fake.reports[0]) == {"state": "refused", "reason": "the worker does not accept this job: kind"}
+
+
+def test_a_wrong_kind_ends_the_command_with_exit_2_and_one_line(cfg, capsys):
+    fake = Fake((200, {"id": 7, "kind": "compare", "mode": "ward"}))
+    env = {"BIOSENTRY_API_URL": BASE, "BIOSENTRY_INGEST_KEY": KEY}
+    clock, lines = Clock(), []
+    with pytest.raises(AgentError) as e:  # `main` turns an AgentError into one `refused: ...` line and exit 2
+        worker.run(cfg, [], env, fake, clock.sleep, clock, lines.append, 5)
+    line = f"refused: {e.value}"
+    assert "\n" not in line and KEY not in line and "compare" not in line
+    assert lines[-1] == "job 7: refused" and len(fake.claims) == 1
+
+
+def test_a_bad_question_does_not_stop_the_worker(cfg):
+    fake = Fake(job(id=1, question=""), job(id=2, question=""))
+    go(cfg, fake, max_polls=2)
+    assert len(fake.claims) == 2 and len(fake.reports) == 2
 
 
 def test_500_code_points_of_allowed_unicode_are_accepted_and_unknown_fields_ignored(cfg, monkeypatch):
