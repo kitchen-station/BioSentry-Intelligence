@@ -12,6 +12,7 @@ import { WardRow } from "../components/WardRow";
 import { band, obsDue, unacknowledged } from "../components/risk";
 import { formatClock, formatSimClock, simStatus } from "../components/format";
 import type { SimStatus } from "../components/format";
+import { SimulatedNote } from "../components/LabFrame";
 import { SessionMenu } from "../components/SessionMenu";
 import { standing } from "../components/vitalsDraft";
 import { NotRankedSection } from "./NotRankedSection";
@@ -174,6 +175,7 @@ export function Ward({ session, onSignOut }: Props) {
           </div>
         </div>
       </div>
+      <SimulatedNote />
 
       {failedSince && (
         <p className={styles.offline} role="status">

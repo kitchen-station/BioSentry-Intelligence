@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { Session, AdmitPatientInput, LabExtractionResult, PatientExtractionResult } from "../types";
 import { admitPatient, enterLabResults, extractLabsFromFile, extractPatientFromFile, listAllPatients } from "../api";
+import { SimulatedNote } from "../components/LabFrame";
 import { SessionMenu } from "../components/SessionMenu";
 import { FlowSection } from "./Flow";
 import styles from "./Station.module.css";
@@ -35,6 +36,7 @@ export function Station({ session, onSignOut }: Props) {
           </div>
         </div>
       </div>
+      <SimulatedNote />
 
       <div className={`${styles.tabBar} ${section === "flow" ? styles.wide : ""}`}>
         <button

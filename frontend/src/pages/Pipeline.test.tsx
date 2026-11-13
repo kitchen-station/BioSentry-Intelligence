@@ -52,6 +52,7 @@ describe("pipeline page", () => {
     expect(states()).toEqual(OWN);
     expect(screen.getByText("Reading the ward's tier status.")).toBeTruthy();
     expect(screen.getByText(/Synthetic, not validated/)).toBeTruthy();
+    expect(screen.getByText(/Simulation lab: not the ward/)).toBeTruthy();
     expect(screen.getByText("The only part that decides what reaches the nurse.")).toBeTruthy();
   });
 

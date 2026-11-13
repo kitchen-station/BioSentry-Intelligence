@@ -1,6 +1,5 @@
-import { Link } from "react-router-dom";
 import type { Session } from "../types";
-import { SessionMenu } from "../components/SessionMenu";
+import { LabFrame } from "../components/LabFrame";
 import { LEARNED_RULES, RESEARCH_PROVENANCE as P, RESEARCH_RESULTS, RUN_COMPARISON } from "../data/researchResults";
 import { ResearchAgentSection } from "./ResearchAgentSection";
 import styles from "./Research.module.css";
@@ -22,11 +21,7 @@ const Rate = ({ rate, n, d }: { rate: number; n?: number; d?: number }) => (
 /** What the offline evaluation found. Static: reads no patient data, makes no API call, changes no rank. */
 export function Research({ session, onSignOut }: Props) {
   return (
-    <div className={styles.page}>
-      <div className={styles.bar}>
-        <Link to="/ward">BioSentry &middot; Ward {session.ward}</Link>
-        <SessionMenu session={session} onSignOut={onSignOut} />
-      </div>
+    <LabFrame session={session} onSignOut={onSignOut}>
       <main className={styles.main}>
         <h1 className={styles.title}>Research numbers</h1>
         <p role="note" className={styles.banner}>
@@ -193,6 +188,6 @@ export function Research({ session, onSignOut }: Props) {
           changed by any of this.
         </p>
       </main>
-    </div>
+    </LabFrame>
   );
 }

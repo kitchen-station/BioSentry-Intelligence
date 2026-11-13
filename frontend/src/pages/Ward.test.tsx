@@ -61,6 +61,14 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+describe("the simulated note", () => {
+  it("says the patients are simulated, once, with the lab entry in the bar", async () => {
+    page();
+    expect(await screen.findAllByText("Simulated patients until a hospital is connected.")).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Simulation lab" }).getAttribute("href")).toBe("/lab");
+  });
+});
+
 describe("acknowledging an alert", () => {
   // Timed out at the default 5s on a slow Cloudflare build.
   it("saves through the API and closes the alert once it is saved", async () => {

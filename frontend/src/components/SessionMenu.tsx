@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import type { Session } from "../types";
 import styles from "./SessionMenu.module.css";
 
@@ -17,9 +17,13 @@ const ROLE_LABELS: Record<string, string> = {
 export function SessionMenu({ session, onSignOut }: Props) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const inLab = useLocation().pathname.startsWith("/lab");
 
   return (
     <div className={styles.wrapper}>
+      <Link to={inLab ? "/ward" : "/lab"} className={styles.place}>
+        {inLab ? "Back to the ward" : "Simulation lab"}
+      </Link>
       <button
         type="button"
         className={styles.trigger}
@@ -48,12 +52,6 @@ export function SessionMenu({ session, onSignOut }: Props) {
                 Station
               </Link>
             )}
-            <Link to="/research" className={styles.menuItem} onClick={() => setOpen(false)}>
-              Research numbers
-            </Link>
-            <Link to="/pipeline" className={styles.menuItem} onClick={() => setOpen(false)}>
-              Pipeline
-            </Link>
 
             <div className={styles.divider} />
 

@@ -98,9 +98,11 @@ describe("Research page", () => {
   it("shows one h1, the banner and the six rules in a captioned table", () => {
     show();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(screen.getByRole("note").textContent).toBe(
+    expect(screen.getAllByRole("note").map((n) => n.textContent)).toEqual([
+      "Simulation lab: not the ward. Nothing here changes a patient's rank.",
       "Synthetic, not validated. These numbers come from a simulator, judged on the same simulator. They are not evidence about patients.",
-    );
+    ]);
+    expect(screen.getByRole("link", { name: "Simulation lab" })).toBeTruthy(); // rendered at /, not under /lab
     const table = screen.getAllByRole("table")[0];
     expect(within(table).getByText(/Alert rules on simulated episodes/)).toBeTruthy();
     const rows = within(table).getAllByRole("row").slice(1);

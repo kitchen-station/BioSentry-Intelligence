@@ -113,13 +113,17 @@ schemas. Every target is in the [Makefile](Makefile).
   (a wrong one, an unknown clinician and one with no passphrase set all get the same refusal; 5 failures
   for a clinician within 15 minutes lock that clinician out for the rest of the 15 minutes) and audits
   every attempt. The token is kept in memory only, so a reload returns to sign-in. The public demo (no
-  API) checks nothing and says so.
+  API) checks nothing and says so. It lands on the ward, marked as simulated patients until a hospital
+  is connected.
 - **Ward:** patients in priority order, each with its score and why. A patient the system
   cannot score is listed as NOT RANKED, with the reason and what to record to fix it.
 - **Patient detail:** the score and what drives it, vitals and labs with where each value
   came from, notes, and trend charts (patch data only).
 - **Station:** admit a patient, enter lab results, upload a document (extraction is a
   placeholder), or see patient flow: who came and went, length of stay and 14 days of bed use.
+- **Simulation lab:** one link in the top bar of every page. Research numbers, the pipeline and the research
+  agent's findings, under a label that it is not the ward. The one-address deployment also links the ward
+  simulator from there.
 
 ## What the database stores
 

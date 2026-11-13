@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { getWard } from "../api";
 import type { Session } from "../types";
-import { SessionMenu } from "../components/SessionMenu";
+import { LabFrame } from "../components/LabFrame";
 import { PIPELINE, type StageState } from "../data/pipeline";
 import research from "./Research.module.css";
 import styles from "./Pipeline.module.css";
@@ -42,11 +41,7 @@ export function Pipeline({ session, onSignOut }: Props) {
   };
 
   return (
-    <div className={research.page}>
-      <div className={research.bar}>
-        <Link to="/ward">BioSentry &middot; Ward {session.ward}</Link>
-        <SessionMenu session={session} onSignOut={onSignOut} />
-      </div>
+    <LabFrame session={session} onSignOut={onSignOut}>
       <main className={research.main}>
         <h1 className={research.title}>The pipeline</h1>
         <p role="note" className={research.banner}>Synthetic, not validated.</p>
@@ -69,6 +64,6 @@ export function Pipeline({ session, onSignOut }: Props) {
           ))}
         </ol>
       </main>
-    </div>
+    </LabFrame>
   );
 }

@@ -17,10 +17,10 @@ function Where() {
   return <p>at {useLocation().pathname}</p>;
 }
 
-const menu = (session: Session) => {
+const menu = (session: Session, path = "/somewhere") => {
   const onSignOut = vi.fn();
   render(
-    <MemoryRouter initialEntries={["/somewhere"]}>
+    <MemoryRouter initialEntries={[path]}>
       <SessionMenu session={session} onSignOut={onSignOut} />
       <Routes>
         <Route path="*" element={<Where />} />
@@ -44,22 +44,24 @@ describe("SessionMenu", () => {
     expect(screen.queryByText("Ward W4")).toBeNull();
   });
 
-  it("links to the research numbers for every role", async () => {
+  it("offers the lab as a visible entry, outside the dropdown, and goes to it", async () => {
     menu({ clinician_id: "rn-reyes", ward: "W4", role: "rn" });
-    await open("rn-reyes");
-    await userEvent.click(screen.getByRole("link", { name: "Research numbers" }));
-    expect(screen.getByText("at /research")).toBeTruthy();
+    await userEvent.click(screen.getByRole("link", { name: "Simulation lab" }));
+    expect(screen.getByText("at /lab")).toBeTruthy();
   });
 
-  it.each([
-    ["rn-reyes", "rn"],
-    ["md-santos", "md"],
-    ["rn-manalo", "charge_rn"],
-  ] as const)("links to the pipeline for %s (%s)", async (clinician_id, role) => {
-    menu({ clinician_id, ward: "W4", role });
-    await open(clinician_id);
-    await userEvent.click(screen.getByRole("link", { name: "Pipeline" }));
-    expect(screen.getByText("at /pipeline")).toBeTruthy();
+  it("reads Back to the ward on a lab page and goes to the ward", async () => {
+    menu({ clinician_id: "rn-reyes", ward: "W4", role: "rn" }, "/lab/research");
+    expect(screen.queryByRole("link", { name: "Simulation lab" })).toBeNull();
+    await userEvent.click(screen.getByRole("link", { name: "Back to the ward" }));
+    expect(screen.getByText("at /ward")).toBeTruthy();
+  });
+
+  it("no longer lists research or the pipeline in the dropdown", async () => {
+    menu({ clinician_id: "md-santos", ward: "W4", role: "md" });
+    await open("md-santos");
+    expect(screen.queryByRole("link", { name: "Research numbers" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Pipeline" })).toBeNull();
   });
 
   it("closes when the backdrop is clicked", async () => {

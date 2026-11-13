@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import type { ClinicalNote, PatientDetail as PatientDetailType, Session, SessionRole, TierBFinding, VitalsRecorded } from "../types";
 import { getPatient, getNotes, addNote, canRecordVitals } from "../api";
+import { SessionMenu } from "../components/SessionMenu";
+import { SimulatedNote } from "../components/LabFrame";
 import { BaselinePanel } from "../components/BaselinePanel";
 import { useBaseline } from "../components/useBaseline";
 import { CurrentVitals, VitalRow } from "../components/CurrentVitals";
@@ -53,7 +55,7 @@ const ROLE_LABEL: Record<SessionRole, string> = { rn: "RN", charge_rn: "Charge R
 
 // --- Main component ---
 
-export function PatientDetail({ session }: { session: Session }) {
+export function PatientDetail({ session, onSignOut }: { session: Session; onSignOut: () => void }) {
   const role = session.role;
   const { id } = useParams<{ id: string }>();
   const [saves, setSaves] = useState(0);
@@ -153,9 +155,11 @@ export function PatientDetail({ session }: { session: Session }) {
               {now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
             </span>
             <span className={styles.stripId}>{patient.id}</span>
+            <SessionMenu session={session} onSignOut={onSignOut} />
           </div>
         </div>
       </div>
+      <SimulatedNote />
 
       {/* Summary bar: NEWS2 + escalation reasons (no rank, no tier badge) */}
       <div className={styles.summaryBar}>

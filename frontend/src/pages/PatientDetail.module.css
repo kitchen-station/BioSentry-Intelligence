@@ -22,7 +22,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  height: 36px;
+  flex-wrap: wrap;
+  min-height: 36px;
 }
 
 .back {
@@ -40,6 +41,8 @@
 
 .stripRight {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
   gap: var(--sp-3);
   font-family: var(--font-sans);

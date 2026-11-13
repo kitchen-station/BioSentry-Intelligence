@@ -8,6 +8,7 @@ import { PatientDetail } from "./pages/PatientDetail";
 import { Station } from "./pages/Station";
 import { Pipeline } from "./pages/Pipeline";
 import { Research } from "./pages/Research";
+import { Lab } from "./pages/Lab";
 
 // Per tab, gone when the tab closes. Only who is signed in is kept here, never a token: with the
 // API the token lives in memory, so a reload returns to sign-in (restoreSession says false). With
@@ -81,7 +82,7 @@ export function App() {
       />
       <Route
         path="/patient/:id"
-        element={session ? <PatientDetail session={session} /> : <ToSignIn />}
+        element={session ? <PatientDetail session={session} onSignOut={signOut} /> : <ToSignIn />}
       />
       <Route
         path="/station"
@@ -92,13 +93,19 @@ export function App() {
         }
       />
       <Route
-        path="/research"
+        path="/lab"
+        element={session ? <Lab session={session} onSignOut={signOut} /> : <ToSignIn />}
+      />
+      <Route
+        path="/lab/research"
         element={session ? <Research session={session} onSignOut={signOut} /> : <ToSignIn />}
       />
       <Route
-        path="/pipeline"
+        path="/lab/pipeline"
         element={session ? <Pipeline session={session} onSignOut={signOut} /> : <ToSignIn />}
       />
+      <Route path="/research" element={session ? <Navigate to="/lab/research" replace /> : <ToSignIn />} />
+      <Route path="/pipeline" element={session ? <Navigate to="/lab/pipeline" replace /> : <ToSignIn />} />
     </Routes>
   );
 }

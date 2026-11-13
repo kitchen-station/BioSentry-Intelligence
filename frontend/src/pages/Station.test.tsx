@@ -68,6 +68,11 @@ afterEach(() => {
 });
 
 describe("Station tabs", () => {
+  it("says the patients are simulated, once", () => {
+    page();
+    expect(screen.getAllByText("Simulated patients until a hospital is connected.")).toHaveLength(1);
+  });
+
   it("opens patient flow", async () => {
     api.getStays.mockResolvedValue([]);
     page();

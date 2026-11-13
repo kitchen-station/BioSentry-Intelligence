@@ -75,8 +75,8 @@ const page = (role?: SessionRole, path = "/patient/p-001") =>
   render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/patient/:id" element={<PatientDetail session={session(role)} />} />
-        <Route path="*" element={<PatientDetail session={session(role)} />} />
+        <Route path="/patient/:id" element={<PatientDetail session={session(role)} onSignOut={() => undefined} />} />
+        <Route path="*" element={<PatientDetail session={session(role)} onSignOut={() => undefined} />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -93,6 +93,14 @@ afterEach(() => {
 });
 
 describe("PatientDetail", () => {
+  it("says the patients are simulated, once, and has the session menu", async () => {
+    page("rn");
+    await loaded();
+    expect(screen.getAllByText("Simulated patients until a hospital is connected.")).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Simulation lab" }).getAttribute("href")).toBe("/lab");
+    expect(screen.getByRole("button", { name: /rn-manalo/ })).toBeTruthy();
+  });
+
   it("shows the score, why the patient is up, and the nurse's next step", async () => {
     page("rn");
     expect((await loaded()).textContent).toBe(row.name);
