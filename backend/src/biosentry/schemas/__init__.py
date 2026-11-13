@@ -42,7 +42,7 @@ from .common import (
     Tier,
     Trend,
 )
-from .history import HistoryEvent, HistoryProvenance, HistoryRun, PatientHistory
+from .history import HistoryEvent, HistoryProvenance, HistoryRun, PatientHistory, SimulatedEpisode
 from .ingest import LiveWard
 from .lab import (
     LabRunDetail,
@@ -160,6 +160,7 @@ CONTRACT_MODELS: tuple[type[BaseModel], ...] = (
     HistoryRun,
     HistoryEvent,
     PatientHistory,
+    SimulatedEpisode,
 )
 
 # Inputs entered by a person: optional fields may be omitted and default to None.
@@ -230,6 +231,7 @@ __all__ = [
     "SessionRole",
     "SessionToken",
     "Sex",
+    "SimulatedEpisode",
     "Spo2Scale",
     "Spo2ScaleMeasurement",
     "Tier",

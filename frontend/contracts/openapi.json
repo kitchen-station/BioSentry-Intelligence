@@ -937,6 +937,20 @@
             "format": "date-time",
             "type": "string"
           },
+          "in_episode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "inside",
+                  "outside"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "ongoing": {
             "type": "boolean"
           },
@@ -1012,6 +1026,7 @@
           "peak_score",
           "peak_level",
           "peak_at",
+          "in_episode",
           "reasons",
           "provenance"
         ],
@@ -2768,6 +2783,16 @@
           "runs_cut": {
             "type": "boolean"
           },
+          "simulated_episode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SimulatedEpisode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "synthetic": {
             "type": "boolean"
           },
@@ -2795,6 +2820,7 @@
           "grid_from",
           "grid_to",
           "bins",
+          "simulated_episode",
           "runs",
           "runs_cut",
           "events",
@@ -3385,6 +3411,40 @@
         ],
         "title": "Sex",
         "type": "string"
+      },
+      "SimulatedEpisode": {
+        "additionalProperties": false,
+        "description": "What the simulator says about this stay. It exists only for a simulated run: on a real ward\nthis truth does not exist. Served times, as the runs' start and end.",
+        "properties": {
+          "full": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "respiratory",
+              "tachycardic",
+              "hypotensive"
+            ],
+            "type": "string"
+          },
+          "source": {
+            "const": "simulation",
+            "type": "string"
+          },
+          "start": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "start",
+          "full",
+          "source"
+        ],
+        "title": "SimulatedEpisode",
+        "type": "object"
       },
       "Spo2Scale": {
         "description": "RCP NEWS2 SpO2 scoring scale. Scale 2 is clinician-assigned (hypercapnic failure).",

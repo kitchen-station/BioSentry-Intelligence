@@ -9,7 +9,7 @@ Research code: synthetic data only, not validated.
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from itertools import groupby
 from typing import Any, Literal
 
@@ -24,9 +24,11 @@ from biosentry.schemas.history import (
     HistoryProvenance,
     HistoryRun,
     PatientHistory,
+    SimulatedEpisode,
 )
 
 from .as_of import news2_as_of
+from .episodes import Started, started
 from .model_signals import NO_BINS, NOT_ALIGNED, PAST_CAP, bin_window, prepare_series
 from .scoring import BIN, decide
 from .ward import WardService
@@ -68,9 +70,15 @@ def classify(device: dict[str, float | None], rows: Sequence[StoredObservation],
     return BinState("alert", decision.news2.total, LEVEL[decision.news2.risk], tuple(r.text for r in decision.reasons))
 
 
-def fold(bins: Sequence[BinState], start: datetime, computed_at: datetime, synthetic: bool) -> tuple[list[HistoryRun], bool]:
+def label(episode: Started, alert_at: datetime) -> Literal["inside", "outside"]:
+    """From the episode's start to two hours after it was fully in, both included (research/events.py)."""
+    return "inside" if episode.start <= alert_at <= episode.full + timedelta(minutes=120) else "outside"
+
+
+def fold(bins: Sequence[BinState], start: datetime, computed_at: datetime, synthetic: bool, episode: Started | None = None) -> tuple[list[HistoryRun], bool]:
     """Runs of consecutive bins of one state, oldest first, the newest MAX_RUNS kept. `start` is the
-    stored bin_at of bin 0. A quiet bin ends a run and is not returned."""
+    stored bin_at of bin 0. A quiet bin ends a run and is not returned. With a started `episode`, an alert run is
+    labelled by the END of its first bin: the minute the bin was posted at and scored on."""
     provenance = HistoryProvenance(source="derived", tier="A", rule="news2_as_of_bins", computed_at=computed_at, synthetic=synthetic)
     runs = []
     # A NOT RANKED run ends when its reason changes: the missing input is the fact a nurse acts on.
@@ -92,6 +100,7 @@ def fold(bins: Sequence[BinState], start: datetime, computed_at: datetime, synth
                 peak_score=bins[peak].total,
                 peak_level=bins[peak].level,  # type: ignore[arg-type]
                 peak_at=at if state == "alert" else None,
+                in_episode=None if episode is None or state != "alert" else label(episode, bin_window(start + ks[0] * BIN)[1]),
                 reasons=list(bins[peak].reasons),
                 provenance=provenance,
             )
@@ -163,7 +172,9 @@ class HistoryService:
         temperature = store.temperature_bins([patient_id]).get(patient_id, [])
         points = {"heart_rate": h.heart_rate, "respiratory_rate": h.respiratory_rate, "spo2": h.spo2, "temperature": temperature}
         prep = prepare_series(points, state.admitted_at)
-        whole = dict(patient_id=patient_id, synthetic=state.synthetic, label=HISTORY_LABEL)
+        episode = started(store, patient_id)
+        shown = None if episode is None else SimulatedEpisode(kind=episode.kind, start=episode.start, full=episode.full, source="simulation")  # type: ignore[arg-type]
+        whole = dict(patient_id=patient_id, synthetic=state.synthetic, label=HISTORY_LABEL, simulated_episode=shown)
         if isinstance(prep, NotComputed):  # no history, and the answer says why
             return PatientHistory(
                 **whole, unavailable=UNAVAILABLE[prep.reason], grid_from=None, grid_to=None, bins=0,
@@ -178,7 +189,7 @@ class HistoryService:
             classify(prep.device(k), rows, bin_window(prep.at(k))[1], earlier=k < prep.last, patient_id=patient_id)
             for k in range(prep.last + 1)
         ]
-        runs, runs_cut = fold(bins, prep.start, store.now(), state.synthetic)
+        runs, runs_cut = fold(bins, prep.start, store.now(), state.synthetic, episode)
         stored = store.history_events(patient_id, start, until, MAX_EVENTS + 1)
         done, events_cut = events(state.admitted_at, rows, stored, start, until)
         return PatientHistory(

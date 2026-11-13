@@ -49,6 +49,7 @@ from biosentry.schemas import (
     PatientDetail,
     PatientExtractionResult,
     PatientHistory,
+    SimulatedEpisode,
     PatientQuestionDetail,
     PatientQuestionItem,
     PatientStay,
@@ -420,15 +421,18 @@ _BUILDERS: dict[type[BaseModel], Any] = {
     },
     HistoryRun: lambda: {
         "state": "alert", "start": "2026-09-03T05:00:00Z", "end": "2026-09-03T06:00:00Z", "ongoing": False,
-        "bins": 4, "peak_score": 7, "peak_level": "high", "peak_at": "2026-09-03T05:30:00Z",
+        "bins": 4, "peak_score": 7, "peak_level": "high", "peak_at": "2026-09-03T05:30:00Z", "in_episode": "inside",
         "reasons": ["Total 7 (≥7): high"], "provenance": _BUILDERS[HistoryProvenance](),
     },
     HistoryEvent: lambda: {
         "kind": "acknowledged", "at": "2026-09-03T05:40:00Z", "by": "rn-delacruz", "role": None,
         "score": 7, "note_id": None, "source": "clinician_action",
     },
+    SimulatedEpisode: lambda: {
+        "kind": "respiratory", "start": "2026-09-03T04:30:00Z", "full": "2026-09-03T05:15:00Z", "source": "simulation",
+    },
     PatientHistory: lambda: {
-        "patient_id": "p-001", "synthetic": True,
+        "patient_id": "p-001", "synthetic": True, "simulated_episode": _BUILDERS[SimulatedEpisode](),
         "label": "Rebuilt from stored 15-minute bins. It can differ from the score shown at the time.",
         "unavailable": None,
         "grid_from": "2026-09-03T00:00:00Z", "grid_to": "2026-09-03T06:00:00Z", "bins": 24,

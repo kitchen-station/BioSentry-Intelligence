@@ -72,6 +72,7 @@ from biosentry.schemas import (
     WardOverview,
     WardResponse,
 )
+from biosentry.schemas.episodes import Episodes
 from biosentry.schemas.ingest import (
     BIGINT_MAX,
     Actions,
@@ -83,7 +84,7 @@ from biosentry.schemas.ingest import (
     NewRun,
 )
 from biosentry.schemas.lab import LabJob, LabReport, PatientQuestionJob
-from biosentry.services import ingest, lab
+from biosentry.services import episodes, ingest, lab
 from biosentry.services.baseline import BaselineService
 from biosentry.services.history import HistoryService
 from biosentry.services.overview import OverviewService
@@ -126,6 +127,7 @@ UNAUTHENTICATED_WRITES = {
     ("POST", "/sim/runs"),
     ("POST", "/sim/runs/{run_id}/batch"),
     ("POST", "/sim/runs/{run_id}/view"),
+    ("POST", "/sim/runs/{run_id}/episodes"),
     ("GET", "/sim/runs/{run_id}/actions"),
     ("GET", "/sim/runs/{run_id}/commands"),
     ("POST", "/sim/lab/claim"),
@@ -647,6 +649,17 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
     ) -> Response:
         if not ingest.set_view(ctx.conn, run_id, body):
             raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return Response(status_code=204)
+
+    @app.post("/sim/runs/{run_id}/episodes", status_code=204)
+    def add_episodes(
+        run_id: int, body: Episodes, ctx: Ctx, _: Annotated[None, Depends(ingest_gate)]
+    ) -> Response:
+        if not episodes.store_episodes(ctx.conn, run_id, body, clock):
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        # Truth entered the database: one row for each accepted post, the run's id only (contract-truth 7).
+        # The batch post writes none; this one is rare (the runner posts an episode once).
+        ctx.audit.append(None, "ingest_episodes", f"run:{run_id}", "ok")
         return Response(status_code=204)
 
     @app.get("/sim/runs/{run_id}/actions", response_model=Actions)

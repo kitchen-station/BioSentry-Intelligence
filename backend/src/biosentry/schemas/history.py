@@ -32,6 +32,9 @@ class HistoryRun(Contract):
     peak_score: Score | None  # alert only: the highest NEWS2 total in the run
     peak_level: Literal["single_3", "medium", "high"] | None  # alert only
     peak_at: AwareDatetime | None  # alert only: the start of the peak bin (the earliest on a tie)
+    # Alert only, and only when the patient's simulated episode has started: whether the run's first
+    # bin ended from the episode's start to two hours after it was fully in. Null otherwise.
+    in_episode: Literal["inside", "outside"] | None
     reasons: Annotated[list[Text], Field(max_length=4)]  # the arbiter's texts, or a fixed text
     provenance: HistoryProvenance
 
@@ -46,6 +49,16 @@ class HistoryEvent(Contract):
     source: Literal["clinician_action", "clinical_note", "observation", "patient"]
 
 
+class SimulatedEpisode(Contract):
+    """What the simulator says about this stay. It exists only for a simulated run: on a real ward
+    this truth does not exist. Served times, as the runs' start and end."""
+
+    kind: Literal["respiratory", "tachycardic", "hypotensive"]
+    start: AwareDatetime
+    full: AwareDatetime
+    source: Literal["simulation"]
+
+
 class PatientHistory(Contract):
     patient_id: Id
     synthetic: Flag
@@ -56,6 +69,7 @@ class PatientHistory(Contract):
     grid_from: AwareDatetime | None  # the start of the first bin; null: no history
     grid_to: AwareDatetime | None  # the end of the latest bin
     bins: Annotated[int, Field(strict=True, ge=0, le=672)]
+    simulated_episode: SimulatedEpisode | None  # null: none stored, or it has not started yet
     runs: Annotated[list[HistoryRun], Field(max_length=200)]  # oldest first; the newest 200 kept
     runs_cut: Flag
     events: Annotated[list[HistoryEvent], Field(max_length=300)]  # oldest first; the newest 300 kept

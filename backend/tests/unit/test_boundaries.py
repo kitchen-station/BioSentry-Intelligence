@@ -102,3 +102,13 @@ def test_nothing_that_ranks_or_scores_a_patient_reads_the_history() -> None:
     assert [str(f) for f in scoring if pattern.search(f.read_text("utf-8"))] == []
     users = sorted(f.name for f in SRC.rglob("*.py") if re.search(r"biosentry\.services\.history", f.read_text("utf-8")))
     assert users == ["app.py"]  # only the route reads it
+
+
+def test_the_simulators_episode_truth_is_reachable_only_through_the_history_route() -> None:
+    files = list(SRC.rglob("*.py")) + list(SRC.rglob("*.sql"))
+    assert len(files) > 30  # the walk is not vacuous
+    named = {f.relative_to(SRC).as_posix() for f in files if "sim_episode" in f.read_text("utf-8")}
+    assert named == {"db/migrations/0012_sim_episode.sql", "services/episodes.py"}
+    importing = re.compile(r"services\.episodes|from \.episodes|from \. import[^\n]*\bepisodes\b|from biosentry\.services import[^\n]*\bepisodes\b")
+    users = {f.relative_to(SRC).as_posix() for f in files if f.suffix == ".py" and importing.search(f.read_text("utf-8"))}
+    assert users == {"services/history.py", "api/app.py"}

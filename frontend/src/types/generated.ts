@@ -249,6 +249,7 @@ export interface components {
             readonly bins: number;
             /** Format: date-time */
             readonly end: string;
+            readonly in_episode: ("inside" | "outside") | null;
             readonly ongoing: boolean;
             readonly peak_at: string | null;
             readonly peak_level: ("single_3" | "medium" | "high") | null;
@@ -648,6 +649,7 @@ export interface components {
             readonly patient_id: string;
             readonly runs: readonly components["schemas"]["HistoryRun"][];
             readonly runs_cut: boolean;
+            readonly simulated_episode: components["schemas"]["SimulatedEpisode"] | null;
             readonly synthetic: boolean;
             readonly unavailable: ("no_bins" | "past_cap" | "not_aligned") | null;
         };
@@ -795,6 +797,21 @@ export interface components {
          * @enum {string}
          */
         readonly Sex: "M" | "F";
+        /**
+         * SimulatedEpisode
+         * @description What the simulator says about this stay. It exists only for a simulated run: on a real ward
+         *     this truth does not exist. Served times, as the runs' start and end.
+         */
+        readonly SimulatedEpisode: {
+            /** Format: date-time */
+            readonly full: string;
+            /** @enum {string} */
+            readonly kind: "respiratory" | "tachycardic" | "hypotensive";
+            /** @constant */
+            readonly source: "simulation";
+            /** Format: date-time */
+            readonly start: string;
+        };
         /**
          * Spo2Scale
          * @description RCP NEWS2 SpO2 scoring scale. Scale 2 is clinician-assigned (hypercapnic failure).
@@ -1028,6 +1045,7 @@ export type ScoreRow = components['schemas']['ScoreRow'];
 export type Session = components['schemas']['Session'];
 export type SessionRole = components['schemas']['SessionRole'];
 export type Sex = components['schemas']['Sex'];
+export type SimulatedEpisode = components['schemas']['SimulatedEpisode'];
 export type Spo2Scale = components['schemas']['Spo2Scale'];
 export type Spo2ScaleMeasurement = components['schemas']['Spo2ScaleMeasurement'];
 export type Spo2ScalePresent = components['schemas']['Spo2ScalePresent'];

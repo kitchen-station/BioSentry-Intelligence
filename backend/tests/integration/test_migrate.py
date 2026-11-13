@@ -23,7 +23,7 @@ def _names(url: str) -> list[str]:
 
 
 def test_every_migration_is_recorded_once(database_url: str) -> None:
-    assert {"0010_lab_run", "0011_patient_question"} <= set(_names(database_url))
+    assert {"0010_lab_run", "0011_patient_question", "0012_sim_episode"} <= set(_names(database_url))
     assert _names(database_url) == [p.stem for p in migrations()]
     ensure(database_url)  # a restart
     with connect(database_url) as conn:
@@ -179,7 +179,7 @@ def test_a_compare_run_from_before_the_patient_question_survives_with_the_new_co
             )
         )
         before = conn.execute("SELECT id, state, mode, report, report_text FROM lab_run ORDER BY id").fetchall()
-        assert migrate(conn) == ["0011_patient_question"]
+        assert migrate(conn) == ["0011_patient_question", "0012_sim_episode"]
         after = conn.execute("SELECT * FROM lab_run ORDER BY id").fetchall()
         names = {
             r["conname"]

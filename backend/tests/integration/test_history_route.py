@@ -252,10 +252,11 @@ def test_the_ward_read_runs_the_same_statements_as_before_and_reads_nothing_of_t
         assert table not in joined
 
 
-def test_one_history_read_runs_three_statements_of_its_own(api: Api) -> None:
+def test_one_history_read_runs_four_statements_of_its_own(api: Api) -> None:
     start(api, patients=[stay("s-1", 20)])
     ran = statements(api, lambda s, a, w: HistoryService(s, a, w).compute("rn-delacruz", "s-1"))
-    assert len(ran) == 2 + 3 + 3  # scope, the patient read, then temperature, observations and events
+    assert len(ran) == 2 + 3 + 3 + 1  # scope, the patient read, then temperature, observations and events, and the episode
+    assert sum("sim_episode" in q for q in ran) == 1
     assert sum("clinician_action" in q for q in ran) == 1 and sum("temperature" in q for q in ran) == 1
     assert sum("FROM observation" in q or "JOIN observation" in q for q in ran) >= 1
 
