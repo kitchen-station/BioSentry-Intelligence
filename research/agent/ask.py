@@ -4,6 +4,8 @@ NEWS2 threshold. The answer is fixed sentences filled with numbers from the tool
 
 import re
 
+from biosentry.domain.scoring.tier_a.tables import MEDIUM_FROM
+
 from . import ledger, tools
 from .config import Config
 from .tools import ToolError
@@ -19,11 +21,13 @@ FIXED = ("NEWS2", "12-hour", "seeds 1 to 10", "per 100 patient-days", LAST_LINE)
 
 _NEVER = re.compile(
     r"\b(approve|apply|ignore|disregard|override|overwrite|delete|deploy|install|adopt|write|edit|modify|"
-    r"ledger|proposal|prompt|instructions?|p-[0-9]{4})\b|\b(change|set|update)\b.*\b(policy|model|models|file|setting|settings|params)\b"
+    r"ledger|proposal|prompt|instructions?|p-[0-9]{4}|commit\w*|authori[sz]\w*|lock in|for everyone|from now on|"
+    r"from tomorrow|permanent(ly)?|in the product|go(es)? live|going live|roll(ed)? out|live system|on all wards|"
+    r"for the ward)\b|\b(change|set|update)\b.*\b(policy|model|models|file|setting|settings|params)\b"
     r"|held[- ]?out|hold-?out|real[- ]world|real (patients?|data)|\bactual\b|\bproduction\b|\bdefault\b"
     r"|\b(validation|test) (data|set|seeds?)\b|\bseeds?\s*(1[1-9]|[23][0-9])\b"
     r"|\b(this|that|my|our|one|single|named) patient\b|\bpatient\s+(number|no|id|named?|called)\b|\bpatient\s+[a-z]?-?[0-9]+\b"
-    r"|\bbed\s+[0-9]+\b|\broom\b|\bward\s+[0-9]+\b|\b(mr|mrs|ms|dr|he|she|him|her|his|hers)\b"
+    r"|\bbed\s+[0-9]+\b|\broom\b|\bward\s+[0-9]+\b|\b(mr|mrs|ms|dr|he|she|him|her|his|hers|bay|gentleman|lady|man|woman|boy|girl|child)\b"
     r"|\b(last (night|week|month|year)|yesterday|today|tonight)\b"
     r"|\b(dose|dosage|treat|treatment|treating|medication|drug|prescribe|antibiotics?|mg|oxygen|fluids?|icu|intubat\w*|transfer|discharge)\b"
     r"|@|https?:|\b(e-?mail|send|upload|download|execute|sudo|curl|rm)\b|[;|`$\\]")
@@ -35,6 +39,24 @@ _NUMBER = re.compile(r"[-+]?[0-9]+(?:[.,][0-9]+)?[a-z%]*")  # a sign, a decimal 
 _NURSE = re.compile(r"\bnurses?\b")
 _ALERT = re.compile(r"\b(alert(s|ed)?|alarms?)\b")
 _LOAD = re.compile(r"\b(shifts?|workload|burden|how many)\b")
+
+
+_OLD = str(MEDIUM_FROM)  # the current total trigger: the only old value a comparison may name
+_FILL = r"(?:\s+(?:a|the|current|usual|up|down|threshold|cut-?\s?off|total|score|of))*"
+# which number is the new one must be said: "7 instead of 5", "from 5 to 7", "to 7 from 5"
+_VERSUS = (re.compile(rf"\b([0-9]+){_FILL}\s+(?:instead of|rather than|in place of){_FILL}\s+{_OLD}\b"),
+           re.compile(rf"\bfrom{_FILL}\s+{_OLD}{_FILL}\s+to{_FILL}\s+([0-9]+)\b"),
+           re.compile(rf"\bto{_FILL}\s+([0-9]+)\s+from{_FILL}\s+{_OLD}\b"))
+
+
+def _new_value(plain: str, numbers: list[str]) -> int | None:
+    """The new threshold of a comparison with the current one, when exactly those two numbers are there."""
+    for rx in _VERSUS:
+        m = rx.search(plain)
+        if m and re.fullmatch(r"[1-9][0-9]?", m[1]) and sorted(numbers) == sorted([m[1], _OLD]) \
+                and 1 <= int(m[1]) <= 20 and m[1] != _OLD:
+            return int(m[1])
+    return None
 
 
 def _baseline(t: str) -> bool:
@@ -58,6 +80,8 @@ def read(question: str) -> tuple[str, bool, bool, int | None] | None:
     n = int(numbers[0]) if len(numbers) == 1 and re.fullmatch(r"[1-9][0-9]?", numbers[0]) else None
     if n is not None and not 1 <= n <= 20:
         n = None
+    if len(numbers) == 2:
+        n = _new_value(plain, numbers)
     # A number is only ever the threshold: one whole number from 1 to 20, next to a threshold word.
     if numbers and (n is None or not thresh or _STRICT.search(plain)):
         return None

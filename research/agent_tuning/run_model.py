@@ -1,7 +1,7 @@
 """Run a model over a data file and write its raw answers, one line per example.
 
     python research/agent_tuning/run_model.py --model <dir> [--adapter <dir>] --data <file.jsonl> \
-        --out <outputs.jsonl> [--per-group N] [--task planner|question]
+        --out <outputs.jsonl> [--per-group N] [--task planner|question] [--device CPU]
 
 Greedy decoding. At most 200 new tokens for the planner task and 40 for the question task. A run
 that stops can be started again: ids already in --out are skipped. Score with
@@ -13,7 +13,7 @@ import json
 import time
 from pathlib import Path
 
-from common import backend, load, read
+from common import backend, complete_lines, load, read
 
 MAX_NEW = {"planner": 200, "question": 40}
 
@@ -26,12 +26,15 @@ def main() -> None:
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--per-group", type=int)
     ap.add_argument("--task", choices=("planner", "question"))
+    ap.add_argument("--device", default="CPU")
     a = ap.parse_args()
-    _, torch = backend()
+    _, torch = backend(a.device)
     examples = read(a.data, a.per_group, a.task)
     done = set()
     if a.out.exists():
-        done = {json.loads(line)["id"] for line in a.out.read_text().splitlines() if line}
+        lines = complete_lines(a.out)
+        done = {json.loads(line)["id"] for line in lines}
+        a.out.write_text("".join(line + "\n" for line in lines))  # drop a half-written last line before appending
     tok, model = load(a.model, torch, a.adapter)
     model.eval()
     with open(a.out, "a") as out:

@@ -409,7 +409,7 @@ counts, which is why the chance control is always printed next to it. A keyword 
 common forms of a question about one patient, a treatment, real or held-out data, or a request to
 change or approve anything; it does not catch every form (a surname alone gets through). Also
 refused: "above 5" or "under 7" (which rule?), a decimal, a sign, or a second number. `eval_questions.json` holds
-the agent's own test questions (34, 18 of them refusals) and runs in the gate.
+the agent's own test questions (44, 23 of them refusals) and runs in the gate. Two numbers are read only as a comparison that says which is the new threshold and names the current trigger, 5, as the old one ("7 instead of 5", "from 5 to 7", "to 7 from 5"); any other pair is refused.
 
 Settings (environment variables; all optional):
 

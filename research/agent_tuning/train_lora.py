@@ -1,7 +1,7 @@
 """LoRA fine-tuning of the chosen model on the generated pairs, on the MindSpore backend.
 
     python research/agent_tuning/train_lora.py --data_url <dir with train.jsonl> --train_url <out dir> \
-        --model <dir> [--per-group N] [--epochs 1] [--lr 2e-4] [--max_len 1536]
+        --model <dir> [--per-group N] [--epochs 1] [--lr 2e-4] [--max_len 1536] [--device CPU]
 
 `--data_url` and `--train_url` are the ModelArts training-job argument names, so the same file
 runs there with its paths. LoRA r 8, alpha 16, dropout 0.05 on the attention query and value
@@ -18,18 +18,10 @@ import sys
 import time
 from pathlib import Path
 
-from common import backend, load, read
+from common import backend, encode, load, read
 
 SEED = 20261113
 LORA = {"r": 8, "lora_alpha": 16, "lora_dropout": 0.05, "target_modules": ["q_proj", "v_proj"]}
-
-
-def encode(tok, ex: dict) -> tuple[list[int], list[int]]:
-    """Prompt and answer as one sequence; the prompt positions are masked out of the loss."""
-    prompt = tok.apply_chat_template(ex["messages"], tokenize=False, add_generation_prompt=True)
-    p = tok(prompt)["input_ids"]
-    a = tok(ex["expected"] + "<|im_end|>")["input_ids"]
-    return p + a, [-100] * len(p) + a
 
 
 def main() -> None:
@@ -41,9 +33,11 @@ def main() -> None:
     ap.add_argument("--epochs", type=int, default=1)
     ap.add_argument("--lr", type=float, default=2e-4)
     ap.add_argument("--max_len", type=int, default=1536)
+    ap.add_argument("--device", default="CPU")
     a = ap.parse_args()
-    mindspore, torch = backend()
+    mindspore, torch = backend(a.device)
     mindspore.set_seed(SEED)
+    torch.manual_seed(SEED)
     from peft import LoraConfig, get_peft_model
 
     examples = read(a.data_url / "train.jsonl", a.per_group)

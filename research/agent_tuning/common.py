@@ -10,10 +10,10 @@ import sys
 from pathlib import Path
 
 
-def backend():
+def backend(device: str = "CPU"):
     import mindspore
 
-    mindspore.set_context(device_target="CPU")
+    mindspore.set_context(device_target=device)
     import mindnlp  # noqa: F401  (the import does the patching)
     import torch
 
@@ -33,6 +33,25 @@ def load(model_dir: str, torch, adapter: str | None = None):
 
         model = PeftModel.from_pretrained(model, adapter)
     return tok, model
+
+
+def encode(tok, ex: dict) -> tuple[list[int], list[int]]:
+    """Prompt and answer as one sequence; the prompt positions are masked out of the loss."""
+    prompt = tok.apply_chat_template(ex["messages"], tokenize=False, add_generation_prompt=True)
+    p = tok(prompt)["input_ids"]
+    a = tok(ex["expected"] + "<|im_end|>")["input_ids"]
+    return p + a, [-100] * len(p) + a
+
+
+def complete_lines(path: Path) -> list[str]:
+    """The non-empty lines of a file a run may have stopped in the middle of: a last line that is not JSON is dropped."""
+    rows = [line for line in path.read_text().splitlines() if line]
+    if rows:
+        try:
+            json.loads(rows[-1])
+        except ValueError:
+            rows.pop()
+    return rows
 
 
 def group(example: dict) -> str:

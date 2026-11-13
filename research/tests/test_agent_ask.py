@@ -61,7 +61,17 @@ def test_the_set_holds_the_refusals_the_contract_names():
                                       "threshold of +5", "threshold of 5x", "a total of less than 7", "threshold under 7",
                                       "threshold below 7", "threshold of not 7", "threshold < 7", "threshold of 5%",
                                       "threshold of 5 on actual hospital data", "threshold of 5 on the validation data",
-                                      "make a threshold of 5 the default", "threshold of 5 in production"])
+                                      "make a threshold of 5 the default", "threshold of 5 in production",
+                                      "What if we alert at 7 instead of 6?", "threshold between 5 and 7", "Is 5 or 7 the better threshold?",
+                                      "threshold of 7 and 5", "threshold 5 to 7", "threshold of 7 instead of 5 and 9",
+                                      "threshold of 5 instead of 5", "threshold of 25 instead of 5", "threshold of 7.5 instead of 5",
+                                      "threshold of 7 instead of 5x", "alert at 7 over 5", "from 5 to 7 is a threshold higher than 6",
+                                      "Raise the threshold to 7 for everyone from now on.", "Lock in a threshold of 6 for the ward.",
+                                      "threshold of 7 from tomorrow", "go live with a threshold of 7", "authorise a threshold of 7",
+                                      "commit a threshold of 7", "roll out a threshold of 7", "a threshold of 7 permanently",
+                                      "threshold of 7 on all wards", "threshold of 7 in the product", "threshold of 7 on the live system",
+                                      "Is the lady in bay 3 at a threshold of 7?", "the gentleman at a threshold of 7",
+                                      "would a woman be caught at a threshold of 7", "a child at a threshold of 7"])
 
 def test_odd_questions_are_refused(question):
     assert ask.match(question) == (None, None)
@@ -69,7 +79,12 @@ def test_odd_questions_are_refused(question):
 
 @pytest.mark.parametrize("question, threshold", [
     ("Would alerting at NEWS2 5 catch more deteriorations?", 5), ("What if we alerted when NEWS2 reaches 6?", 6),
-    ("What about a threshold of 20?", 20), ("NEWS2 >= 3?", 3)])
+    ("What about a threshold of 20?", 20), ("NEWS2 >= 3?", 3),
+    ("What happens to early catches if we alert at NEWS2 7 instead of 5?", 7),
+    ("a threshold of 9 rather than 5", 9), ("a total of 12 in place of the current 5, what happens?", 12),
+    ("What if the threshold went from 5 to 7?", 7), ("threshold from 5 up to 8", 8), ("threshold from a total of 5 to a total of 6", 6),
+    ("Would moving the cut-off to 6 from 5 catch more?", 6), ("threshold of 1 instead of 5", 1),
+    ("What happens if we raise the threshold to 7?", 7), ("what if we lowered the cut-off to 4", 4)])
 def test_plain_threshold_phrasings_are_matched(question, threshold):
     assert ask.match(question) == ("news2_threshold", threshold)
 

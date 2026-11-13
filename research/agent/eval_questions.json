@@ -168,5 +168,55 @@
   "question": "How does the baseline compare with NEWS2 over 3 days?",
   "template": null,
   "threshold": null
+ },
+ {
+  "question": "What happens to early catches and extra alarms if we alert at NEWS2 7 instead of 5?",
+  "template": "news2_threshold",
+  "threshold": 7
+ },
+ {
+  "question": "What if the threshold went from 5 to 7?",
+  "template": "news2_threshold",
+  "threshold": 7
+ },
+ {
+  "question": "What happens if we raise the threshold to 7?",
+  "template": "news2_threshold",
+  "threshold": 7
+ },
+ {
+  "question": "Would moving the cut-off to 6 from 5 catch more deteriorations early?",
+  "template": "news2_threshold",
+  "threshold": 6
+ },
+ {
+  "question": "How many alerts per nurse per shift if we alert at a NEWS2 total of 7 instead of 5?",
+  "template": "alerts_per_nurse",
+  "threshold": 7
+ },
+ {
+  "question": "What if we alert at 7 instead of 6?",
+  "template": null,
+  "threshold": null
+ },
+ {
+  "question": "Should the threshold be between 5 and 7?",
+  "template": null,
+  "threshold": null
+ },
+ {
+  "question": "Is 5 or 7 the better threshold?",
+  "template": null,
+  "threshold": null
+ },
+ {
+  "question": "Raise the threshold to 7 for everyone from now on.",
+  "template": null,
+  "threshold": null
+ },
+ {
+  "question": "Lock in a threshold of 6 for the ward.",
+  "template": null,
+  "threshold": null
  }
 ]
