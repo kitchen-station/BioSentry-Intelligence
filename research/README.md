@@ -32,7 +32,7 @@ Trials must share format version, days, speed and scenario hash.
 
 Seeds 1 to 10 are "tuning", 11 to 30 "held out". Metrics use the held-out seeds only. Tuning seeds
 are loaded and parity-checked, then not scored here. `research.sweep` chooses the baseline's k and p on them. A seed outside
-1 to 30 is refused.
+1 to 30 is refused. The student (slice M1) uses its own split, in its section.
 
 ## Definitions
 
@@ -107,140 +107,258 @@ The command writes nothing unless `--write-params <path>` is given. `evaluate` t
 rows for the chosen k and p, read from `models/tier_b/baseline/params.json` when it exists,
 otherwise the detector's DEFAULTS (it prints which).
 
-## The distilled vitals student (slice B5)
+## The distilled vitals student (slice M1; replaces B5)
 
-Written before any training run. Code: `student.py` (features, labels, models, ONNX),
-`train_student.py` and `evaluate_student.py` (the commands). These three need numpy,
-scikit-learn, onnx and onnxruntime (`research/pyproject.toml`, `uv.lock`); nothing else in
-`research/` imports them, so the stdlib parts and RESEARCH-GATE run without them.
-Vulnerability check of the locked requirements (pip-audit, 2026-11-12): "No known
-vulnerabilities found".
+DRAFT (split, features, labels and threshold rule only; the model part is not written yet).
+Written before any M1 training run. B5 was one teacher (gradient-boosted trees), a ridge and a
+16-unit student on seeds 1-10, with 3 validation trials. It could not show that the student
+earned its teacher, and its no-temperature rows were stuck open. M1 replaces it. Code:
+`student.py` (features, split, teacher, networks, ONNX), `train_student.py` and
+`evaluate_student.py` (the commands). They need numpy, scikit-learn, onnx and onnxruntime
+(`research/pyproject.toml`, `uv.lock`); nothing else in `research/` imports them. Vulnerability
+check of the locked requirements (pip-audit, 2026-11-12): "No known vulnerabilities found".
+The contract is pre-registered; nothing here changes after a validation number has been seen.
 
-- Bins: one feature row per cohort row (a 15-minute bin), built from that bin and earlier bins
-  of the same stay only. A bin with no cohort row has no feature row. NOT RANKED bins are not
-  scored (abstention is an output): they get no probability, are not alerting, and are not
-  trained on. Their vitals still feed the baseline, as in the B4 policies.
-- Features (19), in this order, per vital (heart rate, respiratory rate, SpO2, temperature):
-  the value; a missing flag; z from the patient's own baseline (`baseline_finding` with the
-  detector's DEFAULTS window and floors, called on the bins up to this one, so it is the same
-  baseline as B4); a z-missing flag (set while the baseline is forming, fewer than 24 valid
-  bins, or when this bin's value is missing). Then the NEWS2 total, on oxygen (0/1) and
-  consciousness not A (0/1). Missing is missing: a missing input is the number 0 with its flag
-  set; no clinical value is ever filled in. On the ward-v1 trials, and on ward-v2 (checked from
-  the files: 992,988 RANKED rows, none missing a device vital), a RANKED row always has all
-  four device vitals, so the value-missing flags are always 0 on scored bins; they are kept so a
-  future cohort with gaps cannot be silently imputed.
-- No-temperature features (15): the same without the four temperature features, and the NEWS2
-  total minus its temperature points (from the backend's own parameter scores). This removes
-  every temperature input.
-- Label per scored bin, from the generator's true episode only (`outcome`/higher care is never
-  a label): positive when `episode_start <= minute <= episode_start + ramp_minutes` (start to
-  fully in); bins after fully in until the stay ends are excluded (neither class); every other
-  bin is negative, including every bin of a patient with no episode. Starting patients (admit
-  minute 0) are left out of training and selection, as they are out of sensitivity: their true
-  arrival is unknown and one has a scripted worsening that is not an episode.
-- Split: teacher and students train on seeds 1 to 7; early stopping, the choice of student and
-  the threshold use seeds 8 to 10; seeds 11 to 30 are scored once by `evaluate_student`. The
-  training loader reads a folder's `manifest.json` first and skips a held-out seed before any
-  other file of it is opened.
-- Teacher: scikit-learn `HistGradientBoostingClassifier`, `random_state=0`, early stopping on
-  the loss of seeds 8 to 10 (`X_val`), at most 500 iterations, 20 without improvement.
-- Students, trained on the teacher's probabilities for seeds 1 to 7 (soft labels; no true label
-  is used to fit them): (a) logistic: a linear model of the teacher's log-odds (probabilities
-  clipped to 1e-4 and 1 - 1e-4) fitted by least squares with ridge alpha 1, then a sigmoid; (b)
-  MLP: one hidden layer of 16 ReLU units fitted to the same log-odds (scikit-learn
-  `MLPRegressor`, adam, alpha 1e-4, `random_state=0`). Inputs are standardised with the mean
-  and standard deviation of seeds 1 to 7 (a standard deviation of 0 becomes 1); those constants
-  are inside the ONNX graph. The student with the higher average precision against the true
-  labels of seeds 8 to 10 is kept; both are recorded.
-- Export: the student only, ONNX opset 13, IR version 7, float32, input `x` of shape
-  [1, n_features], output `p` of shape [1, 1]; ops Sub, Div, Gemm, Relu, Sigmoid; built with
-  `onnx.helper`. Parity: onnxruntime equals the numpy forward pass within 1e-5 on 1,000 rows
-  of seeds 1 to 7.
-- Threshold: on seeds 8 to 10, the alert rule above is run with "alerting when p >= t" for t in
-  0.001 to 0.009 and 0.01 to 0.99 (steps of 0.001 then 0.01). The smallest t whose alerts do not
-  exceed the NEWS2 chart trigger's alerts on the same seeds is chosen (matched burden, the
-  same patient-days). If none qualifies, nothing is chosen. The teacher gets its own threshold
-  by the same rule. "NEWS2 OR student" uses the student's threshold and so carries more alerts
-  than NEWS2 alone; its burden is printed.
-- Rule for any future selection (written after B5's held-out run; not applied to B5): a
-  threshold also qualifies only when its time in alert (alerting bins over bins) on the
-  validation seeds is at most the NEWS2 chart trigger's on the same seeds. Counting alerts alone
-  is not enough: one alert that stays open looks like a small burden. B5's no-temperature
-  models fail this rule (52.7% against 12.4% on seeds 8 to 10), so `evaluate_student` labels
-  their rows "no usable threshold: alert stuck open; not a working rule".
-- The same recipe is run twice: with all 19 features and with the 15 no-temperature features.
-- Held-out rows (`evaluate_student`): teacher, student, NEWS2 OR student, and the three
-  no-temperature versions, next to the NEWS2 and baseline rows, with the alert rule, windows,
-  chance control and bootstrap above. It retrains on seeds 1 to 10 (deterministic) and refuses
-  to run unless the retrained students' ONNX bytes have the sha256 in the model's metadata; the
-  student rows then run the committed ONNX file through onnxruntime.
+Goal: a small neural network, trained inside the simulation and distilled from a much bigger
+model, that every 15 minutes gives the probability that a patient is starting to deteriorate. If
+the evidence does not support "distilled", the fallbacks below say what ships instead.
 
-Run (inside `biosentry-research-venv`, see the gate below):
+- Data: `ward-v2-ext` (data card `models/data/ward-v2-ext/card.md`), made by the same generator as
+  ward-v2. The loader refuses a trial whose days, speed or scenario sha256 differ from ward-v2's
+  (30, 60, `95052d02...98a8`).
+- Split by seed. 61-160 train (teacher, networks, standardisation constants). 261-300 validate
+  (early stopping, every model choice, the threshold). 301-340 are reserved for conformal
+  calibration: the loader opens only `manifest.json` and skips them. ward-v2 folders (seeds
+  1-60) are skipped the same way. Any other seed is refused (161-260 are read by no slice).
+  Held out: ward-v2 seeds 11-30, scored once by `evaluate_student`. ward-v2 seeds 1-10 are no
+  longer used by the student; `evaluate_student` refuses them. ward-v2-train (31-60) is the
+  reward loop's data and is not read here. 100 training trials (about 3 million scored bins)
+  were chosen over 200 because of memory (8 GB shared); validation is never cut.
+- Bins and labels, unchanged from B5. One feature row per scored bin, from that bin and earlier
+  bins of the same stay only. A bin is positive from `episode_start` to fully in (`episode_start`
+  plus `ramp_minutes`); bins after fully in are excluded; starting patients (admit minute 0) are
+  left out; `outcome` is never a label. NOT RANKED bins are not scored and not trained on, but
+  their values still feed lags, windows and the baseline.
+- Base inputs (19; 15 without temperature), in this order. Per vital (heart rate, respiratory
+  rate, SpO2, temperature): the value; a missing flag; z from the patient's own baseline
+  (`baseline_finding`, the detector's DEFAULTS, bins up to this one); a z-missing flag (set while
+  the baseline forms, fewer than 24 valid bins). Then the NEWS2 total, on oxygen, consciousness
+  not A. Missing is missing: the number 0 and its flag; nothing is imputed. The no-temperature
+  set drops the four temperature inputs and uses the NEWS2 total minus its temperature points.
+- Trend inputs (student option; 16 more, 12 without temperature): per vital d1h = value(t) -
+  value(t - 60 min) and d4h = value(t) - value(t - 240 min). The lag bin is any cohort row at
+  that minute with a value, RANKED or not. A missing lag gives 0 and a set flag. 35 inputs in
+  all (27).
+- Teacher inputs (53; 41): the base inputs, then per vital d1h, d4h, the mean of valid values
+  over the last 16 bins, and the least-squares slope per hour over the same 16 bins (at least 4
+  valid points), each with a missing flag; then the change in the NEWS2 total over one hour with
+  a flag (without temperature: the total minus its temperature points).
+- Never an input: time since admission, patient id, seed, anything from `episodes.csv`, `outcome`.
+  Known artefact: the missing flags also mark the first hours of a stay.
+- DRAFT, to be rewritten by the MindSpore builder: the teacher, the student networks, the grid, the
+  metric and tie-breaks, the references, the teacher gate (the patient-level paired bootstrap helper
+  `paired_gate` exists: SplitMix64, 1,000 resamples, seed 20261112; "below" means the 97.5th
+  percentile of the paired difference is under 0), the fallbacks, `metadata.json` and `timing.json`.
+  The sections above and the threshold rule below are the framework-agnostic parts.
+- Threshold (the student, the teacher and the two no-temperature models): the alert rule above
+  with "alerting when p >= t", t from 0.001 to 0.009 (steps of 0.001) and 0.01 to 0.99 (steps of
+  0.01), on seeds 261-300. A threshold qualifies only if BOTH its alerts and its time in alert
+  (alerting bins over cohort bins) are at most the NEWS2 chart trigger's on the same seeds. The
+  smallest qualifying t is taken; if none qualifies the row is "no usable threshold" and is not
+  scored. Counting alerts alone is not enough: one alert that stays open looks like a small
+  burden (B5's no-temperature models: 52.7% time in alert against 12.4%). "NEWS2 OR student" uses
+  the student's threshold.
+- Stop rule: at most 3 build and evaluate rounds; a round fixes bugs or contract violations only.
+  The grid, the metric, the thresholds and the rules never change after a validation number has
+  been seen. If a bug forces a second held-out run, both runs are reported.
+- Limits: the data are circular (the same simulator makes the data and judges the alerts);
+  seeds 261-300 both stop and choose, so validation numbers are optimistic; the missing flags
+  mark the start of a stay; `shortcut`: parameter counts read scikit-learn's private
+  `_predictors`, and timing uses `timeit.default_timer` because `research/` may not import
+  `time`.
 
-    python -m research.train_student /data/trials/ward-v2/seed-* [--out <dir>]
-    python -m research.evaluate_student /data/trials/ward-v2/seed-*
+Run (inside `biosentry-research-venv`, see the gate below). Give only seeds 61-160 and 261-340
+(301-340 and ward-v2 folders are skipped after reading their manifest; other seeds are refused):
 
-`--out` defaults to `models/tier_c/student_vitals/`.
+    python -m research.train_student <ward-v2-ext folders> [--out <dir>] [--cache <dir>] [--workers N]
+    python -m research.evaluate_student <ward-v2 seed-11..30 folders> <ward-v2-ext seed-61..160 folders> [--cache <dir>]
 
-## The reward-driven alerting policy (slice B6)
+`--out` defaults to `models/tier_c/student_vitals/`. `--cache` keeps per-trial features in a
+folder outside the repo, keyed by the sha256 of the trial's four files and a feature-code version.
+Progress lines are printed as it runs; validation numbers come only in the final summary.
 
-Written before any run. Code: `reward_policy.py` (the policy and the reward) and `reward_loop.py`
-(the loop and the held-out command). Standard library only; the tests are in `tests/`.
+References: Hinton, Vinyals, Dean 2015 (arXiv 1503.02531); Fakoor et al. 2020, NeurIPS (arXiv
+2006.14284), where the distilled model is compared with one trained on the raw labels, hence
+reference (c); van den Goorbergh et al. 2022, JAMIA 29(9) (no reweighting).
+
+## The reward-driven alerting policy (slice M2; replaces B6's loop)
+
+Written before any M2 run. Code: `reward_policy.py` (the policy and the reward) and `reward_loop.py`
+(the loop, the outer loop and the held-out command). Standard library only; the tests are in
+`tests/test_reward.py` and `tests/test_reward_loop.py`. It is a (1+30) evolution strategy with a
+reward: black-box search, not deep or per-step reinforcement learning. Synthetic, not validated.
 
 - Policy: six numbers, four non-negative weights (heart rate, respiratory rate, SpO2,
   temperature), a threshold theta and a persistence p (integer 1 to 8). Per bin, for each vital,
   z from the patient's own baseline (`baseline_finding` with the detector's DEFAULTS window and
   floors, called on the bins up to this one, as in B4 and B5), clipped at 0 in the bad direction.
-  Score = the weighted sum. Alerting when the score is at least theta in p consecutive scored
-  bins. A NOT RANKED bin is not scored: it is not alerting and ends a run (abstention is an
-  output). A bin with no row ends a run. A vital whose value is missing, or whose baseline is
-  still forming, contributes nothing; nothing is filled in. Causal: a bin reads itself and
-  earlier bins only.
-- Generation 0 is the B4 rule's equivalent: weights 1, 1, 1, 1, theta 3.0, p 4. B4 alerts when
-  ONE vital has z at least 3 for 4 bins; the sum form cannot express "any one", so with equal
-  weights and theta = k it alerts whenever B4 does on RANKED bins, and also when several vitals
-  are moderately off together (a superset). Unlike B4 it never alerts on a NOT RANKED bin. The
-  weights and theta are only defined up to a common factor; the search does not use that.
-- Reward for one trial: C - lambda * S * a. C = evaluated episodes (the windows above) with the
-  policy alerting in a bin from `episode_start` to fully in (caught early). a = the policy's
-  alerts per patient per 12 h on the trial (alert rule above). S = E / a_news2: E evaluated
-  episodes of the trial over the NEWS2 chart trigger's alerts per patient per 12 h on the same
-  trial, so the penalty is lambda * E * (a / a_news2) and both terms are in episodes. lambda =
-  0.5: a policy with NEWS2's alert count must catch more than half the episodes early to score
-  above a silent one (judgement, fixed now, never tuned). Hard constraint: time in alert
-  (alerting bins over cohort rows) at most the NEWS2 chart trigger's on the same trial; a
-  candidate that breaks it on any trial of the set is rejected. `outcome`/higher care is never
-  part of the reward. A set of trials is scored by the mean reward.
-- Loop: generation g (1 to 10) learns on three training seeds no other generation sees: 31-33,
-  34-36, ..., 58-60 of `ward-v2-train` (`ward-v1-train` for the earlier run). It samples 30 candidates around the current parameters
-  (weights and theta: plus a normal draw times sigma, weights floored at 0, theta at 0.1; p:
-  plus a normal draw times sigma_p, rounded and clipped to 1-8; values rounded to 4 decimals),
-  from a SplitMix64 generator (seed 20261112 + g, Box-Muller normals). sigma starts at 0.5 for
-  weights and theta and 1.0 for p, and is multiplied by 0.9 after each generation. The current
-  policy and every candidate are scored on the generation's three seeds; the policy moves to
-  the best non-rejected candidate only if its mean reward is strictly higher than the current
-  policy's on those seeds (ties: the first drawn). A (1+30) evolution step: black-box search
-  with a reward, not deep or per-step reinforcement learning.
-- Validation and stop: after each generation (and at generation 0) the current policy is scored
-  on ward-v2 seeds 8 to 10. The shipped policy is the generation with the highest validation
-  reward among those not rejected there (ties: the earlier generation). Seeds 1 to 7 are not used.
-- Files: `models/tier_b/reward_policy/generations/gen-NN.json` and `policy.json` (with its own
-  sha256); the no-temperature run writes the same under `no_temperature/`. Same inputs give the
-  same bytes.
-- No-temperature run: the same loop with the temperature weight fixed at exactly 0 (never
-  sampled), generation 0 weights 1, 1, 1, 0.
-- The loaders open `<root>/seed-NN` only for the seeds named above, read `manifest.json` first,
-  and refuse a seed that differs from the folder name or is one of 11 to 30 before any other
-  file is opened. Held-out seeds 11 to 30 are scored once, by `--evaluate`, which refuses a
-  `policy.json` whose sha256 does not match its content. Rows: generation 0 and the shipped
-  policy, each alone and OR NEWS2 chart trigger, for both runs, next to NEWS2 and the B4 rows,
-  through `research.evaluate` (same windows, chance control, bootstrap).
+  Score = the weighted sum (form `sum`) or the largest single weighted z (form `max`).
+  Alerting when the score is at least theta in p consecutive scored bins. A NOT RANKED bin is not
+  scored: it is not alerting and ends a run (abstention is an output). A bin with no row ends a
+  run. A vital whose value is missing, or whose baseline is still forming, contributes nothing;
+  nothing is filled in. Causal: a bin reads itself and earlier bins only.
+- Generation 0 is the B4 rule's equivalent: weights 1, 1, 1, 1, theta 3.0, p 4. It is a superset
+  of B4, which needs the same vital past k for p bins in a row. With form `sum`, several moderate
+  vitals together also fire. With form `max`, any one vital clearing theta in each of the p bins
+  fires, possibly a different vital in each bin. Unlike B4 it never alerts on a NOT RANKED bin.
+- Reward for one trial (unchanged since B6): C - lambda * S * a. C = evaluated episodes with the
+  policy alerting in a bin from `episode_start` to fully in. a = the policy's alerts per patient
+  per 12 h. S = E / a_news2, so the penalty is lambda * E * (a / a_news2) and both terms are in
+  episodes. lambda = 0.5, fixed, never tuned. Hard rule: time in alert at most the NEWS2 chart
+  trigger's on the same trial; a policy over it on any trial of a set is rejected on that set.
+  `outcome`/higher care is never part of the reward. A set is scored by the mean reward. NEWS2 is
+  never learned.
+- Data: all trials are in `ward-v2-ext`. Validation is seeds 341-400 (60 trials, about 270
+  episodes). Generation seeds start at 401, strictly increasing, each used once in the
+  with-temperature schedule. Generation g of round 1 takes selection seeds 401+20(g-1) to
+  408+20(g-1), then confirmation seeds 409+20(g-1) to 420+20(g-1). Round R+1 starts at the first
+  seed after round R's last generation. Budget: generation seeds 401-2800; a round starts only if
+  a full 40-generation round still fits (rounds 1-3 always do; round 4 only if rounds 1-3 used at
+  most 1,600 seeds). Seeds 61-340 belong to other slices and ward-v2 seeds 11-30 are held out:
+  the loaders refuse them, and a manifest that names another seed or a trial whose days, speed
+  or scenario hash differ from the validation trials', before any file but `manifest.json` is
+  opened. Before a generation loads anything, every folder of its 20 seeds must have
+  `manifest.json` and `summary.json`; if not, nothing is written, `needs seeds a to b` is printed
+  on stderr (that generation's whole range) and the exit code is 3.
+- One generation, with the current policy c:
+  1. Draw 30 candidates around c: SplitMix64 seeded 20261112 + 1000 x R + g (R the round, g the
+     generation), Box-Muller normals, weights floored at 0, theta at 0.1, p rounded and clipped
+     to 1-8, values rounded to 4 decimals.
+  2. Selection: score c and all 30 on the 8 selection seeds. Drop any candidate rejected for time
+     in alert on any of them. The winner has the highest mean reward (ties: first drawn). If no
+     candidate is left, or the winner's mean is not strictly above c's on the same seeds, the
+     generation accepts nothing. Selection numbers are never used to accept: the best of 30 is
+     biased upward (winner's curse).
+  3. Confirmation: score the winner and c on 12 fresh seeds. d_i = winner minus c on seed i.
+     Accept if and only if the winner is not rejected for time in alert on any of the 12 and
+     mean(d) > 1.796 x stdev(d) / sqrt(12) (stdev with n - 1; strict; 1.796 is the one-sided 5%
+     t value for 11 degrees of freedom). If stdev(d) is 0 the rule is mean(d) > 0. c's own
+     rejection status does not block or force acceptance; it is recorded.
+  4. A winner that fails step 3 is not replaced by the second best: that would be a second look
+     at the same confirmation batch. The generation accepts nothing.
+- Step size sigma: 0.5 for weights and theta, 1.0 for p, at the start of every round. After a
+  generation that accepts nothing, multiply by 0.85; after an accepted one keep it (a crude
+  success rule, Beyer 2000). Floors: 0.1 for weights and theta, 0.25 for p.
+- Validation and the fixed stop rule: after generation 0 and after every generation, the current
+  policy is scored on seeds 341-400. Its validation reward is the mean, or "rejected" if it
+  breaks the time-in-alert rule on any of the 60. "Improved" means not rejected and strictly above
+  the best validation reward so far in this round (generation 0 counts; if it was rejected, any
+  non-rejected value improves). A generation that accepts nothing has the same policy, so it is not
+  improved. The patience counter is 0 after generation 0 and after an improving generation, and
+  plus 1 otherwise. The round stops when it reaches 3, or after generation 40, whichever is
+  first. The round ships the generation that last improved (the highest validation reward, ties:
+  the earlier generation). If no generation is non-rejected, the round ships nothing and is
+  dropped.
+- Sizes and the power note. Pilot: ward-v2-train seeds 31-60 only (old training data), 30 trials,
+  134 evaluated episodes. The SD of one trial's reward is about 1.1; the SD of the paired
+  difference between two nearby policies is about 0.75 (design value; median 0.74 for sigma 0.5
+  mutations, 0.56 for sigma 0.25). The 8-trial selection batch has a paired SE of 0.27, below the
+  0.35 spread of true differences among mutations, so the ranking carries some signal. The
+  12-trial confirmation has an SE of 0.22 and a margin of 0.39 reward units (8.7 more episodes
+  caught early per 100 at equal alerts). False accept per generation with no true difference: 5%
+  by design (4.6% on resampled pilot differences); only one candidate is tested, so it does not
+  grow with the 30 draws; at most about 2 over 40 generations. Power: true gain 0.3 gives 45%, 0.5
+  gives 76%, 0.75 gives 95%. Validation on 60 trials: one policy's mean has SE 0.14, a paired
+  difference 0.097; the smallest difference it can tell from noise is about 0.16 (one-sided, 5%).
+  Today's B6 loop always accepted because on 3 trials the paired SE (0.43) made the best of 30
+  sit about 0.9 above its true value.
+- Search configuration (six keys, the defaults first). A round changes exactly one key of the
+  incumbent's:
 
-Run (either venv):
+  | Key | Values |
+  |---|---|
+  | `sigma0` | 0.5 (p 1.0); 0.25 (p 0.5); 1.0 (p 2.0) |
+  | `shrink` | 0.85; 0.7 |
+  | `selection_trials` | 8; 16 (8 more seeds per generation) |
+  | `form` | `sum`; `max` |
+  | `fix_theta` | false; true (theta not mutated) |
+  | `frozen_vital` | none; heart_rate, respiratory_rate, spo2 or temperature (weight fixed at 0) |
 
-    python -m research.reward_loop --train /data/trials/ward-v2-train --validate /data/trials/ward-v2 --out models/tier_b/reward_policy [--no-temperature]
+  The reward, lambda, the time-in-alert rule, the 30 candidates, the stop rule, the validation
+  seeds and the held-out split are not keys and never change. A frozen weight is set to 0 in the
+  round's generation 0 as well.
+- Outer loop. A round is one finished inner run with one configuration, with temperature. Round 1
+  is generation 0 with the default configuration and is the first incumbent ("baseline"). Rounds
+  2-4 start from the incumbent's shipped params, on fresh seeds, with sigma reset, and change
+  exactly one key; the command refuses any other change. After a round, a research agent reads
+  that round's generation records and the ledger, then writes exactly one change and why (at most
+  600 characters, naming the generation records it relies on) or "no change proposed: stop".
+  Kept rule: let v_i be the per-seed difference on seeds 341-400 between the round's shipped policy
+  and the incumbent. Keep if the round's policy is not rejected and mean(v) > 2 x stdev(v) /
+  sqrt(60). Otherwise drop; the incumbent stays. Why 2 SE: validation is reused. It picks the
+  shipped generation in every round and judges up to 4 rounds, so its numbers are optimistic
+  (Dwork et al. 2015); 2 SE is a guard, not a test with an exact level. Held-out stays honest
+  because nothing reads it before the final command.
+- Ledger: `experiments.jsonl`, one JSON object per line, sorted keys, each carrying
+  `prev_line_sha256` (sha256 of the previous line; "none" for the first). Round lines: `round`,
+  `started_from` (round, policy sha256, validation reward), `change` (key, from, to), `why`,
+  `config_sha256`, `seeds` (first, last), `generations`, `stop_reason`, `shipped` (generation,
+  params, validation reward, policy sha256), `vs_incumbent` (mean, stdev, margin), `decision`
+  (`baseline`, `kept` or `dropped`). The outer loop ends with `{"decision": "stop", "reason": ...}`
+  (no change proposed, 4 rounds done, or budget).
+- No temperature: after the stop line, the no-temperature policy is learned once by the same inner
+  loop from generation 0 (weights 1, 1, 1, 0), with the finally kept configuration and the
+  temperature weight fixed at exactly 0. It shares the seed schedule from 401, uses round number 1
+  for its generator seeds, has no outer loop, and adds one `no_temperature` ledger record.
+- Files (same inputs, same bytes): `models/tier_b/reward_policy/rounds/round-R/gen-NN.json` and
+  `round-R/policy.json`; the incumbent's policy as `policy.json` at the top;
+  `no_temperature/generations/gen-NN.json` and `no_temperature/policy.json`. Every generation
+  record (schema 2) holds the round, the configuration and its sha256, the seeds, sigma used and
+  next, the selection summary, the confirmation (per-seed d_i, mean, stdev, threshold, reason),
+  the params after, the validation (mean and per seed), best, patience, `stopped`, `prev_sha256`
+  (sha256 of the previous file's bytes; for generation 0 the starting policy file's bytes, or
+  "none") and its own `sha256`. Resume: on start the command reads `gen-00` to the last file and
+  refuses (exit 2) a missing number, a body that does not match its `sha256`, a broken link, a
+  different configuration or temperature flag, seeds that are not the schedule, or a file after a
+  stopped record; a stopped record rewrites `policy.json` and exits 0; otherwise it continues
+  (each generation seeds its own generator, so no RNG state is carried). A stray `.tmp` is
+  deleted. The hash chain catches accidents and half-written files, not a forger; the pull request
+  review is the guard. `--jobs N` parallelises preparing trials and scoring with the standard
+  library (fork start method; serial elsewhere); results are collected and summed in seed order,
+  so the bytes do not depend on N. The 60 validation trials stay in memory for the run.
+  shortcut: resuming prepares the validation trials again (minutes), fine for 4 rounds.
+- Held-out, once: `--evaluate` goes through `research.evaluate` (same windows, chance control,
+  bootstrap), refuses a `policy.json` whose sha256 does not match, and builds each policy from
+  the `config` in its file. Rows: NEWS2 chart trigger; B4 alone and NEWS2 OR B4; B4 no
+  temperature alone and OR; generation 0, the final policy, and the same two without temperature,
+  each alone and OR NEWS2. Generation 0 is always the fixed start under the default
+  configuration (form `sum`, no frozen vital: weights 1, 1, 1, 1 and 1, 1, 1, 0, theta 3.0, p 4),
+  not the final configuration's. It opens only `seed-11` to `seed-30` of the folder given, by
+  name, manifest first, and refuses a folder without them. It also refuses unless the ledger has
+  its stop line and `policy.json` is the ledger's current incumbent policy (same sha256). Run
+  once, at the very end, and the output goes in the card verbatim.
+- Limits: validation numbers are optimistic (reused); the data and the episodes come from one
+  simulator, so this is circular and synthetic, not validated. A person signs off before anything
+  changes: the loop only writes files on a branch.
+
+Run (either venv; `--data` is `ward-v2-ext`, `--out` is `models/tier_b/reward_policy`):
+
+    python -m research.reward_loop --data /data/trials/ward-v2-ext --out models/tier_b/reward_policy --round 1 [--jobs N]
+    python -m research.reward_loop --data /data/trials/ward-v2-ext --out models/tier_b/reward_policy --round R --change key=value --why "text" [--jobs N]   # R = 2 to 4
+    python -m research.reward_loop --out models/tier_b/reward_policy --stop "reason"
+    python -m research.reward_loop --data /data/trials/ward-v2-ext --out models/tier_b/reward_policy --no-temperature [--jobs N]
     python -m research.reward_loop --evaluate /data/trials/ward-v2 --out models/tier_b/reward_policy
+
+A round command resumes by itself when generation files exist, and at the round's stop it judges
+the round against the incumbent and appends its ledger line (running it again changes nothing).
+Exit codes: 0 done, 2 refused (one line on stderr), 3 seeds are missing (`needs seeds a to b`).
+
+References: Beyer, H.-G. (2000), Computer Methods in Applied Mechanics and Engineering 186,
+239-267, https://doi.org/10.1016/S0045-7825(99)00386-2. Jin, Y., Branke, J. (2005), IEEE
+Transactions on Evolutionary Computation 9(3), 303-317, https://doi.org/10.1109/TEVC.2005.846356.
+Smith, J. E., Winkler, R. L. (2006), Management Science 52(3), 311-322,
+https://doi.org/10.1287/mnsc.1050.0451. Dwork, C., Feldman, V., Hardt, M., Pitassi, T., Reingold,
+O., Roth, A. (2015), Science 349(6248), 636-638, https://doi.org/10.1126/science.aaa9375.
 
 ## Real data (eICU-CRD Demo 2.0.1)
 
