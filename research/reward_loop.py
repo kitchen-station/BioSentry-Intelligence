@@ -3,7 +3,7 @@
     python -m research.reward_loop --data <ward-v2-ext> --out <dir> --round R [--change key=value --why "text"] [--jobs N]
     python -m research.reward_loop --data <ward-v2-ext> --out <dir> --no-temperature [--jobs N]
     python -m research.reward_loop --out <dir> --stop "reason"
-    python -m research.reward_loop --evaluate <ward-v2> --out <dir>
+    python -m research.reward_loop --evaluate <ward-v2> --out <dir> [--json <held-out.json>]
     python -m research.reward_loop --run-log <file> --run-id <id> --commit <sha> --out <dir>
 
 The rules are in research/README.md. A (1+30) evolution strategy with a reward: not deep or
@@ -768,7 +768,7 @@ def _held_out_folders(root) -> list[str]:
     return found
 
 
-def evaluate_held_out(root: str, out: Path) -> str:
+def evaluate_held_out(root: str, out: Path, result: dict | None = None) -> str:
     led = read_ledger(out / LEDGER)
     if not any(x.get("decision") == "stop" for x in led):
         raise refuse("the ledger has no stop line; the held-out run comes last")
@@ -784,7 +784,7 @@ def evaluate_held_out(root: str, out: Path) -> str:
     b4, _ = evaluate._baseline_params()
     k, p = b4.k, b4.p
     pols = (POLICIES[0], *baseline_policies(k, p), *baseline_policies(k, p, "_no_temp", NO_TEMP), *rows)
-    return evaluate.run(_held_out_folders(root), pols)
+    return evaluate.run(_held_out_folders(root), pols, result)
 
 
 # --- the run log: committed records only, no trial is opened ---------------------------------------
@@ -883,7 +883,7 @@ def main(argv: list[str], *, plan: Plan | None = None, source=None) -> int:
     plan = plan or Plan()
     ap = _Parser(prog="research.reward_loop", add_help=False, allow_abbrev=False)
     ap.add_argument("--out", required=True)
-    for a in ("--data", "--evaluate", "--change", "--why", "--stop", "--run-log", "--run-id", "--commit"):
+    for a in ("--data", "--evaluate", "--change", "--why", "--stop", "--run-log", "--run-id", "--commit", "--json"):
         ap.add_argument(a)
     ap.add_argument("--round", type=int)
     ap.add_argument("--jobs", type=int, default=1)
@@ -896,12 +896,19 @@ def main(argv: list[str], *, plan: Plan | None = None, source=None) -> int:
         modes = [a.evaluate is not None, a.stop is not None, a.no_temperature, a.round is not None, a.run_log is not None]
         if sum(modes) != 1:
             raise refuse("usage: exactly one of --round, --no-temperature, --stop, --evaluate, --run-log (see research/README.md)")
+        if a.json is not None and a.evaluate is None:
+            raise refuse("--json goes with --evaluate")
         if (a.run_id is not None or a.commit is not None) and a.run_log is None:
             raise refuse("--run-id and --commit go with --run-log")
         if a.run_log is not None:
             _write(Path(a.run_log), _dump(run_log(out, a.run_id, a.commit)))
         elif a.evaluate is not None:
-            sys.stdout.write(evaluate_held_out(a.evaluate, out))
+            evaluate.check_json_path(a.json)  # before any trial is read
+            result: dict = {}
+            text = evaluate_held_out(a.evaluate, out, result if a.json else None)
+            if a.json:
+                evaluate.write_json(a.json, result)
+            sys.stdout.write(text)
         elif a.stop is not None:
             stop(out, a.stop)
         else:

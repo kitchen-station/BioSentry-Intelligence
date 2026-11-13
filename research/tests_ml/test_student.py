@@ -1051,6 +1051,24 @@ def test_a_changed_byte_in_metadata_json_is_refused(tmp_path, monkeypatch, built
         evaluate_student.run([str(held), str(tr)], out=out, workers=1)
 
 
+def test_the_json_flag_writes_the_held_out_json_and_refuses_an_unwritable_path_first(tmp_path, monkeypatch, capsys):
+    calls = []
+
+    def fake(folders, out, cache, workers, result=None):
+        calls.append(result)
+        if result is not None:
+            result.update({"format": "biosentry-held-out/1", "rules": [], "context": {}})
+        return "the text\n"
+
+    monkeypatch.setattr(evaluate_student, "run", fake)
+    path = tmp_path / "held.json"
+    assert evaluate_student.main(["x", "--json", str(path)]) == 0 and calls[-1] == json.loads(path.read_text())
+    assert capsys.readouterr().out == "the text\n"
+    assert evaluate_student.main(["x"]) == 0 and calls[-1] is None and capsys.readouterr().out == "the text\n"
+    n = len(calls)
+    assert evaluate_student.main(["x", "--json", str(tmp_path / "no" / "h.json")]) == 2 and len(calls) == n
+
+
 def test_exact_mode_reads_no_validation_folder_but_the_fallback_does(tmp_path, monkeypatch, opened, built, tfs):
     log, note = opened
     note.root = tmp_path

@@ -220,6 +220,47 @@ def test_the_checked_policy_alerts_on_a_subset_and_the_held_out_block_adds_up(tm
         c.evaluate(f, model, out, cal_seeds=SEEDS)  # the held-out run is made once
 
 
+def test_the_json_flag_holds_the_held_out_numbers_and_the_text_is_unchanged(tmp_path, patched, model, cohort):
+    _calibrate(tmp_path, model)
+    out, out2 = tmp_path / "out" / "model", tmp_path / "out2"
+    shutil.copytree(out, out2)
+    f = _held(tmp_path)
+    plain = c.evaluate(f, model, out, cal_seeds=SEEDS)
+    path = tmp_path / "held.json"
+    text = c.evaluate(f, model, out2, cal_seeds=SEEDS, json_path=str(path))
+    assert text == plain and (out2 / c.HELD_OUTPUT).read_text() == plain
+    obj = json.loads(path.read_text())
+    block = obj["confidence"]["all"]
+    err = re.search(r"1\. achieved error: mean over (\d+) held-out non-starting stays .*?: (\S+), 95% stay-bootstrap "
+                    r"interval (\S+) to (\S+), against alpha", plain)
+    assert int(err[1]) == block["n_stays"] and err[2] == f"{block['achieved_error']['mean']:.4f}"
+    assert (err[3], err[4]) == (f"{block['achieved_error']['lo']:.4f}", f"{block['achieved_error']['hi']:.4f}")
+    assert re.search(r"verdict: (MET|NOT MET)", plain)[1] == block["verdict"]
+    m = re.search(r"alerting bins: student (\d+), checked (\d+), removed (-?\d+).*new alerts: student (\d+), checked (\d+)", plain)
+    assert tuple(map(int, m.groups())) == (block["alerting_bins"]["student"], block["alerting_bins"]["checked"],
+                                          block["alerting_bins"]["student"] - block["alerting_bins"]["checked"],
+                                          block["new_alerts"]["student"], block["new_alerts"]["checked"])
+    m = re.search(r"not sure .*? \S+ \((\d+)/(\d+)\) of scored bins, \S+ \((\d+)/(\d+)\)", plain)
+    ns = block["not_sure"]
+    assert tuple(map(int, m.groups())) == (ns["bins"], ns["of_scored_bins"], ns["bins"], ns["of_student_alerting_bins"])
+    cal, _ = c.load(out / "calibration.json")
+    assert (block["q"], block["t"], block["alpha"], block["n_calibration"]) == (cal.q, cal.t, cal.alpha, cal.n)
+    assert set(block["lost"]) == {"all", "not_cut_short"} and set(block["lost"]["all"]) == {"any", "early"}
+    assert obj["format"] == "biosentry-held-out/1" and any(r["id"] == "student_checked" for r in obj["rules"])
+
+
+def test_an_unwritable_json_path_refuses_before_any_trial_is_read_and_writes_nothing(tmp_path, patched, model, monkeypatch):
+    _calibrate(tmp_path, model)
+    out = tmp_path / "out" / "model"
+    f = _held(tmp_path)
+    monkeypatch.setattr(evaluate, "load_trial", lambda x: pytest.fail("a trial was read"))
+    monkeypatch.setattr(trials, "load_trial", lambda x: pytest.fail("a trial was read"))
+    with pytest.raises(TrialError, match="--json"):
+        c.evaluate(f, model, out, cal_seeds=SEEDS, json_path=str(tmp_path / "no" / "such" / "h.json"))
+    assert not (out / c.HELD_OUTPUT).exists()
+    assert c.main(["evaluate", *f, "--model", str(model), "--out", str(out), "--json", str(tmp_path / "no" / "h.json")]) == 2
+
+
 def test_evaluation_refuses_a_changed_calibration_file_threshold_or_model(tmp_path, patched, model, cohort):
     _calibrate(tmp_path, model)
     out = tmp_path / "out" / "model"

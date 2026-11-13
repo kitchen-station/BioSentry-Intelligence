@@ -684,6 +684,28 @@ commands, the run logs and the notebooks.
   headless in the ML gate (no extra flag) and fails on an error, an absolute path, a read under a trials folder, or an
   import of MindSpore, scikit-learn, onnxruntime or `research.student`.
 
+## Evaluation export (for the Analytics page)
+
+The page types no number. Each file it reads is made by a command, never by hand: the same inputs and the same
+`--date` give the same bytes. This repository owns two exported files (evaluation data contract v3.1): `evaluations.json`
+and `registry.json`. Standard library only; `registry` reads the cards and needs no trial data.
+
+```
+python -m research.evaluate <ward-v2 folders> --json held-evaluate.json
+python -m research.evaluate_student <folders as above> --json held-student.json
+python -m research.reward_loop --evaluate <ward-v2> --out models/tier_b/reward_policy --json held-reward.json
+python -m research.confidence evaluate <ward-v2 folders 11-30> --json held-confidence.json
+python -m research.export_evaluation evaluations --date YYYY-MM-DD --commit <40 hex> [--source "<command>"]... --held-out held-*.json [--drop-rule <id>]... --out frontend/src/data/evaluation/evaluations.json
+python -m research.export_evaluation registry --date YYYY-MM-DD --commit <40 hex> --out frontend/src/data/evaluation/registry.json
+```
+
+`--json` holds the same numbers as the printed table, from the same pass (full precision; the exporter rounds). The
+printed text does not change. The path is checked first: if it cannot be written, nothing is read or written. Held-out
+seeds are read once per model. A text report is never a source of a number, so a result that exists only as text is
+absent from `rules` (the exporter says so in `notes`). A rule in two held-out files must have the same numbers; more
+than 20 rules need `--drop-rule`. The files refuse a banned word, a number with no plain spelling and a cap that is
+broken, and write nothing then.
+
 ## Real data (eICU-CRD Demo 2.0.1)
 
 The first real dataset: an open ICU database (PhysioNet, ODbL, no account). It measures NEWS2 and the

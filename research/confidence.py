@@ -4,6 +4,7 @@
                                   [--out <dir>] [--cache <dir>] [--workers N]
                                   [--run_log <file>] [--run_id <text>] [--commit <sha>]
     python -m research.confidence evaluate <ward-v2 folders of seeds 11-30>... [--model <dir>] [--out <dir>]
+                                  [--json <held-out.json>]
 
 The student alerts when p >= t. The check lets that alert through only when p > q, where q is the
 finite-sample quantile of one randomly drawn negative bin per calibration stay; otherwise the bin is
@@ -325,8 +326,10 @@ def calibrate(folders: Sequence[str], model: Path = MODEL, out: Path = OUT, cach
     return notes
 
 
-def _block(tag: str, cal: Calibration, files: Sequence[str], scorer, student_policy: Policy, checked: Policy) -> list[str]:
-    """The contract's held-out block for one variant, from the trials' rows and the student's p."""
+def _block(tag: str, cal: Calibration, files: Sequence[str], scorer, student_policy: Policy, checked: Policy,
+           data: dict | None = None) -> list[str]:
+    """The contract's held-out block for one variant, from the trials' rows and the student's p. When `data`
+    is a dict it is filled with the same numbers at full precision (the --json file)."""
     import numpy as np
 
     from . import bootstrap
@@ -388,6 +391,25 @@ def _block(tag: str, cal: Calibration, files: Sequence[str], scorer, student_pol
     ci = lambda k: "n/a" if iv["stays", k] is None else f"{iv['stays', k][0]:.4f} to {iv['stays', k][1]:.4f}"  # noqa: E731
     ratio = lambda a, b: "n/a" if b == 0 else f"{a / b:.4f} ({a}/{b})"  # noqa: E731
     s_on, c_on = alerts["student"][1], alerts["checked"][1]
+    if data is not None:
+        pair = lambda k: {"lo": None if iv["stays", k] is None else iv["stays", k][0],  # noqa: E731
+                          "hi": None if iv["stays", k] is None else iv["stays", k][1]}
+        data.update({
+            "alpha": cal.alpha, "n_calibration": cal.n, "j": cal.j, "k": cal.k, "q": cal.q, "t": cal.t,
+            "binding": cal.binding, "onnx_sha256": cal.onnx_sha256, "n_stays": len(shares),
+            "achieved_error": {"mean": mean["error"], **pair("error")},
+            "checked_share": {"mean": mean["checked"], **pair("checked")},
+            "student_share": {"mean": mean["student"], **pair("student")},
+            "verdict": "MET" if met else "NOT MET", "conservative": conservative,
+            "bound": float(Fraction(cal.alpha)) + spread(cal.alpha, cal.n), "spread": spread(cal.alpha, cal.n),
+            "pooled": {"scored_bins": bins["scored"], "negative_bins": bins["neg"], "above_q": bins["neg_q"],
+                       "checked": bins["neg_chk"], "student": bins["neg_t"]},
+            "not_sure": {"bins": bins["alert"] - bins["sure"], "of_scored_bins": bins["scored"],
+                         "of_student_alerting_bins": bins["alert"]},
+            "alerting_bins": {"student": s_on, "checked": c_on},
+            "new_alerts": {"student": alerts["student"][0], "checked": alerts["checked"][0]},
+            "lost": {"all": dict(lost["all"]), "not_cut_short": dict(lost["uncut"])},
+        })
     return [
         f"[{tag}] confidence check, alpha {cal.alpha}, held-out ward-v2 seeds 11-30",
         f"calibration facts: n={cal.n} k={cal.k} (j={cal.j}) q={cal.q} t={cal.t} alpha={cal.alpha} "
@@ -412,11 +434,14 @@ def _block(tag: str, cal: Calibration, files: Sequence[str], scorer, student_pol
     ]
 
 
-def evaluate(folders: Sequence[str], model: Path = MODEL, out: Path = OUT, cal_seeds: range = CAL_SEEDS) -> str:
+def evaluate(folders: Sequence[str], model: Path = MODEL, out: Path = OUT, cal_seeds: range = CAL_SEEDS,
+             *, json_path: str | None = None) -> str:
+    """With `json_path`, the held-out JSON (rules and the confidence blocks) is written next to heldout.txt."""
     jobs = _manifests(folders, HELD_SEEDS, "held-out ward-v2")
     if (out / HELD_OUTPUT).exists():
         raise TrialError(f"{HELD_OUTPUT} exists: the held-out run was already made (delete it only for a counting bug)")
     from . import evaluate as ev
+    ev.check_json_path(json_path)  # before any trial is read
     from .student import Scorer, onnx_predict, prob_policy, session
     meta, found = _model(model)
     shape = (jobs[0][2]["days"], jobs[0][2]["speed"], jobs[0][2]["scenario_sha256"])
@@ -439,18 +464,30 @@ def evaluate(folders: Sequence[str], model: Path = MODEL, out: Path = OUT, cal_s
         policies += pols
         cals[tag] = (cal, digest, scorer, pols)
         notes.append(f"{tag}: calibration {CALIBRATION[tag]} sha256 {digest}")
-    text = ev.run([f for _, f, _ in jobs], POLICIES + tuple(policies))
+    result: dict = {}
+    text = ev.run([f for _, f, _ in jobs], POLICIES + tuple(policies), result if json_path else None)
     files = [f for _, f, _ in jobs]
     Scorer.clear()
     for _, _, scorer, _ in cals.values():
         scorer._memo.clear()
     block = [f"confidence check (slice M3): split-conformal, one negative bin per calibration stay, alpha {ALPHA}", *notes, ""]
+    confidence = {}
     for tag, (cal, digest, scorer, pols) in cals.items():
-        block += _block(tag, cal, files, scorer, pols[0], pols[1]) + [f"   calibration file sha256 {digest}", ""]
-    result = text + "\n" + "\n".join(block)
-    with open(out / HELD_OUTPUT, "x", encoding="utf-8") as f:  # "x": a second held-out run is refused, not overwritten
-        f.write(result)
-    return result
+        data: dict = {"calibration_sha256": digest}
+        block += _block(tag, cal, files, scorer, pols[0], pols[1], data) + [f"   calibration file sha256 {digest}", ""]
+        confidence[tag] = data
+    whole = text + "\n" + "\n".join(block)
+    if json_path:
+        result["confidence"] = confidence
+        ev.write_json(json_path, result)  # first, so a failure writes nothing of heldout.txt
+    try:
+        with open(out / HELD_OUTPUT, "x", encoding="utf-8") as f:  # "x": a second held-out run is refused, not overwritten
+            f.write(whole)
+    except OSError:
+        if json_path:
+            os.remove(json_path)
+        raise
+    return whole
 
 
 class _Parser(argparse.ArgumentParser):
@@ -473,6 +510,8 @@ def _parser() -> argparse.ArgumentParser:
         s.add_argument("folders", nargs="*")
         s.add_argument("--model")
         s.add_argument("--out")
+        if name == "evaluate":
+            s.add_argument("--json")
         if name == "calibrate":
             for flag in ("--cache", "--run_log", "--run_id", "--commit"):
                 s.add_argument(flag)
@@ -489,7 +528,7 @@ def main(argv: list[str]) -> int:
                               a.run_id, a.commit)
             sys.stdout.write("\n".join(lines) + "\n")
         else:
-            text = evaluate(a.folders, model, out)
+            text = evaluate(a.folders, model, out, json_path=a.json)
             sys.stdout.write(text + f"\n{HELD_OUTPUT} sha256 {hashlib.sha256(text.encode()).hexdigest()}\n")
     except TrialError as e:
         print(f"refused: {e}", file=sys.stderr)
