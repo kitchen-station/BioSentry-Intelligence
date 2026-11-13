@@ -1,0 +1,55 @@
+{
+ "body": {
+  "datasets": [
+   {
+    "id": "eicu-crd-demo",
+    "licence": "Open Data Commons Open Database License v1.0 (ODbL)",
+    "name": "eICU-CRD Demo 2.0.1",
+    "path": null,
+    "source": "models/data/eicu-crd-demo/card.md"
+   },
+   {
+    "id": "ward-v2",
+    "licence": "not stated",
+    "name": "Simulator trials ward-v2 and ward-v2-train",
+    "path": null,
+    "source": "models/data/ward-v2/card.md"
+   },
+   {
+    "id": "ward-v2-ext",
+    "licence": "not stated",
+    "name": "Simulator trials ward-v2-ext",
+    "path": null,
+    "source": "models/data/ward-v2-ext/card.md"
+   }
+  ],
+  "open_weights": [
+   {
+    "id": "Qwen/Qwen2.5-0.5B-Instruct",
+    "licence": "Apache-2.0",
+    "name": "Qwen2.5-0.5B-Instruct",
+    "path": null,
+    "source": "models/agent/card.md"
+   }
+  ]
+ },
+ "format": "biosentry-evaluation/2",
+ "notes": [
+  "Licence is 'not stated' where the card says nothing. Open weights: only the model the agent card says was tuned; models it names as a fallback or a hosted target are not used and not listed."
+ ],
+ "provenance": {
+  "commit": "e82cb9a9481e714a72a8241bf48366c6fc86f7b2",
+  "data": "model and dataset cards",
+  "date": "2026-11-13",
+  "exporter": {
+   "name": "research.export_evaluation",
+   "version": "1"
+  },
+  "repo": "kitchen-station/BioSentry-Intelligence",
+  "seeds": [],
+  "source": [],
+  "synthetic": true,
+  "validated": false
+ },
+ "section": "registry"
+}
