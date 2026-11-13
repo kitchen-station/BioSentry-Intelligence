@@ -92,5 +92,6 @@ weights came from and their sha256.
 - `upload_adapter.py`: `prepare` makes a release folder outside the repository (the adapter, its config with the
   base model's public name, a sha256 file and a card). `upload` sends that folder to a private Hugging Face model
   repository. It takes no token: it uses the login the owner makes on the machine. It uploads nothing unless the
-  repository reports itself private. `upload` was never run.
+  repository reports itself private. `upload` was run once, on 2026-11-13, at the owner's request
+  (`training/agent/REGISTRY.md`, section 6).
 - `SERVER.md`: what the team server needs to run the tuned model, with the measured memory and time.
