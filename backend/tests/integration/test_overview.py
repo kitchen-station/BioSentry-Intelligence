@@ -351,6 +351,7 @@ def test_the_write_actions_are_still_the_body_bearing_routes_only(api: Api) -> N
 def test_an_admin_reads_nothing_beyond_the_overview(api: Api) -> None:
     headers = add_admin(api)
     get = api.client.get
+    get("/patients", headers=api.as_("rn-manalo"))  # another clinician's audit row exists
     rows = get("/wards/W4/rows", headers=headers).json()
     assert rows["ranked"] == [] and rows["abstained"] == []
     assert get("/patients", headers=headers).json() == []
@@ -363,9 +364,13 @@ def test_an_admin_reads_nothing_beyond_the_overview(api: Api) -> None:
     assert api.sql(
         "SELECT action, resource, outcome FROM audit_log WHERE action = 'view_live'"
     ) == [{"action": "view_live", "resource": "W4", "outcome": "denied"}]
+    assert get("/wards/W9/live", headers=headers).status_code == 403  # the role, before the ward
     assert get("/acknowledgements", headers=headers).json() == []
+    # The admin's own trail and nobody else's, though other rows exist.
     mine = get("/audit", headers=headers).json()
-    assert mine and {r["clinician_id"] for r in api.sql("SELECT clinician_id FROM audit_log")} == {ADMIN}
+    own = api.sql("SELECT seq FROM audit_log WHERE clinician_id = %s", ADMIN)
+    assert mine and {r["seq"] for r in mine} == {r["seq"] for r in own}
+    assert api.sql("SELECT count(*) AS n FROM audit_log WHERE clinician_id <> %s", ADMIN)[0]["n"] > 0
 
 
 def test_the_charge_nurses_ward_is_byte_for_byte_the_same_once_an_admin_exists(api: Api) -> None:
