@@ -114,7 +114,8 @@ describe("Overview", () => {
     expect(screen.getByText("view_patient ok: 12")).toBeTruthy();
     expect(screen.getByText("view_patient not_found: 1")).toBeTruthy();
     expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(2);
-    expect(screen.getByText("charge_rn")).toBeTruthy();
+    expect(screen.getByText("Charge Nurse")).toBeTruthy();
+    expect(screen.queryByText("charge_rn")).toBeNull();
   });
 
   it("reads again once per Refresh click, disabled while loading, and never on a timer", async () => {
@@ -170,7 +171,7 @@ describe("Overview", () => {
     expect(out).toHaveBeenCalledOnce();
   });
 
-  it.each([{}, "not an overview"])("shows no tables for a malformed body %j", async (body) => {
+  it.each([{}, "not an overview", { patients: [], clinicians: [], activity: [], sim: null }])("shows no tables for a malformed body %j", async (body) => {
     api.getOverview.mockResolvedValue(body);
     show();
     expect((await screen.findByRole("alert")).textContent).toBe("The overview could not be loaded. Try Refresh.");
@@ -205,6 +206,7 @@ describe("Overview", () => {
     show({ clinician_id: "rn-reyes", ward: "W4", role: "rn" });
     expect(screen.getByText("Not available for this account.")).toBeTruthy();
     expect(screen.getByRole("button", { name: /rn-reyes/ })).toBeTruthy();
+    expect(screen.queryByText(/Every view is recorded/)).toBeNull(); // nothing was viewed, so nothing was recorded
     expect(api.getOverview).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Refresh" })).toBeNull();
   });

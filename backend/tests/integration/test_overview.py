@@ -357,8 +357,12 @@ def test_an_admin_reads_nothing_beyond_the_overview(api: Api) -> None:
     for path in ("/patients/p-001", "/patients/p-001/notes", "/patients/p-001/baseline"):
         assert get(path, headers=headers).status_code == 404, path
     assert get("/wards/W4/stays", headers=headers).json() == []
-    live = get("/wards/W4/live", headers=headers).json()
-    assert live["patients"] == [] and live["can_control"] is False
+    # The live view carries the sim's whole shared blob: refused for an admin, and audited.
+    live = get("/wards/W4/live", headers=headers)
+    assert live.status_code == 403 and live.json() == {"detail": "Forbidden"}
+    assert api.sql(
+        "SELECT action, resource, outcome FROM audit_log WHERE action = 'view_live'"
+    ) == [{"action": "view_live", "resource": "W4", "outcome": "denied"}]
     assert get("/acknowledgements", headers=headers).json() == []
     mine = get("/audit", headers=headers).json()
     assert mine and {r["clinician_id"] for r in api.sql("SELECT clinician_id FROM audit_log")} == {ADMIN}

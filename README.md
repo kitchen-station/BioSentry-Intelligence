@@ -137,7 +137,7 @@ schemas. Every target is in the [Makefile](Makefile).
   view is recorded in the audit log. An admin lands here and has no ward or station.
 - **Station:** admit a patient, enter lab results, upload a document (extraction is a
   placeholder), or see patient flow: who came and went, length of stay and 14 days of bed use.
-- **Simulation lab:** one link in the top bar of every page. Research numbers, the pipeline and the research
+- **Simulation lab:** one link in the top bar of every signed-in page. Research numbers, the pipeline and the research
   agent's findings, under a label that it is not the ward. The one-address deployment also links the ward
   simulator from there.
 

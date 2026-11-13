@@ -362,6 +362,11 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
 
     @app.get("/wards/{ward}/live", response_model=LiveWard)
     def ward_live(ward: str, ctx: Ctx, who: Who) -> LiveWard:
+        # The sim's whole shared view is for the ward's clinicians. An admin gets its status
+        # keys through the overview and nothing more.
+        if ctx.store.is_admin(who):
+            ctx.audit.append(who, "view_live", ward, "denied")
+            raise HTTPException(status_code=403, detail="Forbidden")
         if ward != ctx.store.ward:
             ctx.audit.append(who, "view_live", ward, "not_found")
             raise HTTPException(status_code=404, detail=NOT_FOUND)

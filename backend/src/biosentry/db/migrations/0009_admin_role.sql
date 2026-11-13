@@ -1,4 +1,4 @@
--- An admin reads the ward overview and nothing else. Granted only from the command line
+-- An admin reads the ward overview and writes nothing. Granted only from the command line
 -- (python -m biosentry.db.admin); no route writes a role.
 ALTER TABLE clinician DROP CONSTRAINT clinician_role_check;
 ALTER TABLE clinician ADD CONSTRAINT clinician_role_check

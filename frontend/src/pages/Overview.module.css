@@ -63,3 +63,10 @@
   font-size: 12px;
   overflow-wrap: anywhere;
 }
+
+/* Words, not figures: left-aligned and on one line. A long row scrolls inside the table's own region. */
+.text th,
+.text td {
+  text-align: left;
+  white-space: nowrap;
+}

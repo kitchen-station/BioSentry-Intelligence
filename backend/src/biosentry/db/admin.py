@@ -6,8 +6,8 @@
 `grant` adds a new clinician whose id starts `admin-`; it never promotes an existing clinician,
 who would keep their patients. The admin cannot sign in until `db.passphrase` sets a passphrase.
 `revoke` deletes the admin and their sessions and keeps their audit rows.
-One admin id per person (for example `admin-santos`), never shared. An id is not granted again
-after a revoke for a different person: the audit rows keep the id.
+One admin id per person (for example `admin-santos`), never shared. Never grant an id again to
+a different person after a revoke: the audit rows keep the id.
 Each command writes one audit row in the same transaction, with no clinician (nobody is signed in).
 BIOSENTRY_DATABASE_URL names the database.
 """

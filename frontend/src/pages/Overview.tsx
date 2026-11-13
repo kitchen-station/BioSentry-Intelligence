@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { Session, WardOverview } from "../types";
 import { ApiError, getOverview, hasOverview } from "../api";
 import { SimulatedNote } from "../components/LabFrame";
-import { SessionMenu } from "../components/SessionMenu";
+import { ROLE_LABELS, SessionMenu } from "../components/SessionMenu";
 import { formatSimClock, simStatus } from "../components/format";
 import research from "./Research.module.css";
 import styles from "./Overview.module.css";
@@ -25,7 +25,8 @@ export function Overview({ session, onSignOut }: { session: Session; onSignOut: 
       .then((d: unknown) => {
         const o = d as Partial<WardOverview> | null;
         const ok =
-          Array.isArray(o?.patients) &&
+          typeof o?.as_of === "string" &&
+          Array.isArray(o.patients) &&
           Array.isArray(o.clinicians) &&
           Array.isArray(o.activity) &&
           (o.sim === null || typeof o.sim === "object");
@@ -76,7 +77,6 @@ export function Overview({ session, onSignOut }: { session: Session; onSignOut: 
       <SimulatedNote />
       <main className={research.main}>
         <h1 className={research.title}>Ward overview</h1>
-        <p className={research.small}>Read-only. Every view is recorded in the audit log.</p>
 
         {!admin ? (
           <p>Not available for this account.</p>
@@ -84,6 +84,7 @@ export function Overview({ session, onSignOut }: { session: Session; onSignOut: 
           <p>The overview needs the live API. This demo has no server.</p>
         ) : (
           <>
+            <p className={research.small}>Read-only. Every view is recorded in the audit log.</p>
             <div className={styles.status}>
               {data && <p>As of {when(data.as_of)}</p>}
               {sim && <p>Simulator: {formatSimClock(sim)}</p>}
@@ -101,7 +102,7 @@ export function Overview({ session, onSignOut }: { session: Session; onSignOut: 
             <section className={research.card} aria-labelledby="patients">
               <h2 id="patients" className={research.heading}>Patients</h2>
               <div className={research.scroll} tabIndex={0} role="region" aria-labelledby="patients">
-                <table className={research.table}>
+                <table className={`${research.table} ${styles.text}`}>
                   <thead>
                     <tr><th scope="col">Bed</th><th scope="col">State</th><th scope="col">Nurse</th><th scope="col">Physician</th></tr>
                   </thead>
@@ -126,7 +127,7 @@ export function Overview({ session, onSignOut }: { session: Session; onSignOut: 
             <section className={research.card} aria-labelledby="clinicians">
               <h2 id="clinicians" className={research.heading}>Clinicians</h2>
               <div className={research.scroll} tabIndex={0} role="region" aria-labelledby="clinicians">
-                <table className={research.table}>
+                <table className={`${research.table} ${styles.text}`}>
                   <thead>
                     <tr><th scope="col">Clinician</th><th scope="col">Role</th><th scope="col">Patients</th></tr>
                   </thead>
@@ -134,7 +135,7 @@ export function Overview({ session, onSignOut }: { session: Session; onSignOut: 
                     {data.clinicians.map((c) => (
                       <tr key={c.id}>
                         <th scope="row">{c.id}</th>
-                        <td>{c.role}</td>
+                        <td>{ROLE_LABELS[c.role] ?? c.role}</td>
                         <td>{c.patients}</td>
                       </tr>
                     ))}

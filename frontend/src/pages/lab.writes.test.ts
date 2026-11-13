@@ -56,6 +56,14 @@ describe("lab modules", () => {
     // SessionMenu imports nothing from the api today. Its clearSession would only drop the local token and send no request.
     expect(users).toEqual({ "./Pipeline.tsx": ['import { getWard } from "../api"'] });
   });
+
+  it("send no request of their own", () => {
+    // A request made outside the api module would slip past the import check above.
+    const direct = /\bfetch\s*\(|XMLHttpRequest|sendBeacon/;
+    expect(reached(roots).filter((p) => !p.includes("/api/") && direct.test(sources[p]))).toEqual([]);
+    expect(direct.test("await fetch(url)")).toBe(true);
+    expect(direct.test("navigator.sendBeacon(url)")).toBe(true);
+  });
 });
 
 describe("the api matcher", () => {
