@@ -1,5 +1,6 @@
 """Shared builders for the tests. Nothing here reads the clock, the network or a random source."""
 
+import re
 import shutil
 from pathlib import Path
 
@@ -86,8 +87,43 @@ def check_rules_against_text(rules: list[dict], text: str) -> None:
         assert c["episodes ALERTING in any bin / episodes not cut short"] == frac(r["any_bin_not_cut_short"])
         assert c["chance: control windows with a NEW alert / control windows"] == frac(r["chance_new"])
         assert c["chance: control windows ALERTING in any bin / control windows"] == frac(r["chance_any"])
-        ex = r["excess_any_not_cut_short"]
-        assert c["excess over chance, ALERTING in any bin, episodes not cut short"] == ("n/a" if ex is None else f"{ex:+.3f}")
+        assert c["episodes with a NEW alert / episodes not cut short"] == frac(r["new_alert_not_cut_short"])
+        for label, key in (("NEW alert, all evaluated episodes", "excess_new"), ("NEW alert, episodes not cut short", "excess_new_not_cut_short"),
+                           ("ALERTING in any bin, all evaluated episodes", "excess_any"),
+                           ("ALERTING in any bin, episodes not cut short", "excess_any_not_cut_short")):
+            ex = r[key]
+            assert c[f"excess over chance, {label}"] == ("n/a" if ex is None else f"{ex:+.3f}"), (r["id"], key)
         lead = r["lead"]
         assert c["lead time median, minutes (episodes with a new alert)"] == ("n/a" if lead["median"] is None else f"{lead['median']:.1f}")
         assert c["lead time interquartile range, minutes"] == ("n/a" if lead["q1"] is None else f"{lead['q1']:.1f} to {lead['q3']:.1f}")
+
+
+def check_context_against_text(ctx: dict, text: str) -> None:
+    """Every `context` field of the held-out JSON equals what the header lines of the printed text say."""
+    def line(prefix: str) -> str:
+        found = [ln for ln in text.split("\n") if ln.lstrip().startswith(prefix.lstrip())]
+        assert len(found) == 1, prefix
+        return found[0]
+    def num(prefix: str, pattern: str = r"(\d+(?:\.\d+)?)\s*$") -> float:
+        m = re.search(pattern, line(prefix))
+        assert m, prefix
+        return float(m[1])
+    assert ctx["trials"] == len(ctx["held_out_seeds"])
+    assert line("held-out seeds (11 to 30)").endswith(": " + ", ".join(str(x) for x in ctx["held_out_seeds"]))
+    assert ctx["patients"] == num("held-out patients: ")
+    assert f"{ctx['patient_days']:.1f}" == line("held-out patient-days").split(": ")[1]
+    assert ctx["episodes_evaluated"] == num("episodes evaluated: ")
+    assert ctx["episodes_not_cut_short"] == num("evaluated episodes not cut short")
+    assert ctx["control_windows"] == num("chance control: ")
+    ci = ctx["ci"]
+    assert (ci["level_percent"], ci["method"]) == (95, "patient-level bootstrap")
+    m = re.fullmatch(r"confidence intervals: patient-level bootstrap, (\d+) resamples, SplitMix64 generator seed (\d+), percentile 2.5 to 97.5;.*",
+                     line("confidence intervals: "))
+    assert m and (ci["resamples"], ci["generator_seed"]) == (int(m[1]), int(m[2]))
+    m = re.search(r"re-arms after (\d+) hours \((\d+) bins\)", line("alert: a policy turns"))
+    assert m and ctx["bin_minutes"] * int(m[2]) == 60 * int(m[1])
+    assert any(f"alerts per patient per {ctx['shift_hours']}-hour shift" in ln for ln in text.split("\n"))
+    k, p = re.search(r"baseline policies: k=([\d.]+), p=(\d+)", text).groups()
+    assert ctx["tuning"] in (f"Detector settings k={k} p={p} were chosen on seeds 1 to 10.",
+                             f"Detector settings k={k} p={p} are the detector's defaults; no params.json.")
+    assert (("chosen on seeds 1-10" in line("baseline policies: ")) == ("were chosen" in ctx["tuning"]))

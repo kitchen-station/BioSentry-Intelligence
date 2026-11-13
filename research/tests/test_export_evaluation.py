@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from helpers import TOY, check_rules_against_text
+from helpers import TOY, check_context_against_text, check_rules_against_text, copy_toy
 from research import evaluate, export_evaluation as ex
 from research.export_evaluation import Refused
 
@@ -97,6 +97,8 @@ def test_json_flag_leaves_the_text_byte_identical_and_holds_the_printed_numbers(
     obj = json.loads(path.read_text())
     assert obj["format"] == "biosentry-held-out/1" and path.read_text().endswith("}\n")
     check_rules_against_text(obj["rules"], plain)
+    check_context_against_text(obj["context"], plain)
+    assert obj["context"]["episodes_not_cut_short"] == obj["context"]["episodes_evaluated"] == 2
     chart = obj["rules"][0]
     assert chart["id"] == "news2_chart_trigger" and (chart["new_alert"]["n"], chart["new_alert"]["d"]) == (1, 2)
     assert chart["lead"]["n"] == 1 and chart["lead"]["median"] == 90.0 and chart["lead"]["q1"] is None
@@ -104,6 +106,21 @@ def test_json_flag_leaves_the_text_byte_identical_and_holds_the_printed_numbers(
     assert "/" not in json.dumps(obj["context"])
     again = tmp_path / "h2.json"
     assert evaluate.main([str(TOY), "--json", str(again)]) == 0 and again.read_bytes() == path.read_bytes()
+
+
+def test_json_matches_the_text_when_an_episode_is_cut_short(tmp_path):
+    """One of the two episodes ends with its stay: evaluated and not-cut-short counts differ, so the not-cut-short fields are told apart."""
+    cut = copy_toy(tmp_path / "cut", **{"episodes.csv": ("n-0002,120,1000", "n-0002,120,700")})
+    result: dict = {}
+    text = evaluate.run([str(cut)], result=result)
+    ctx = result["context"]
+    assert (ctx["episodes_evaluated"], ctx["episodes_not_cut_short"]) == (2, 1)
+    check_context_against_text(ctx, text)
+    check_rules_against_text(result["rules"], text)
+    r0 = result["rules"][0]
+    assert (r0["new_alert_not_cut_short"]["d"], r0["any_bin_not_cut_short"]["d"]) == (1, 1) and r0["new_alert"]["d"] == 2
+    assert r0["excess_new_not_cut_short"] != r0["excess_new"] or r0["excess_any_not_cut_short"] != r0["excess_any"]
+    assert all(r["per_shift"]["lo"] < r["per_shift"]["hi"] for r in result["rules"] if r["per_shift"]["value"] > 0)
 
 
 def test_the_toy_text_is_unchanged_by_the_json_pass():
@@ -214,3 +231,74 @@ def test_the_confidence_block_is_a_rounded_copy_of_the_committed_file(tmp_path):
     outside = tmp_path / "elsewhere.json"
     outside.write_bytes(src.read_bytes())
     assert ex.main(["evaluations", *ARGS, "--held-out", str(path), "--confidence", str(outside), "--out", str(tmp_path / "x")]) == 2
+
+
+def _distinct_rule(rid: str, base: float) -> dict:
+    """Every field of a held-out rule gets its own number, so a field read from the wrong place shows."""
+    n = iter(range(1, 100))
+    frac = lambda: (lambda i: {"n": i, "d": i + 50, "rate": i / (i + 50) + 0.00049})(next(n))  # noqa: E731
+    ivl = lambda: (lambda i: {"lo": i / 100 + 0.00049, "hi": i / 100 + 0.2 + 0.00049})(next(n))  # noqa: E731
+    return {"id": rid, "per_shift": {"value": base + 0.1234, "lo": base + 0.0111, "hi": base + 0.2222},
+            "time_in_alert": frac(), "new_alert": {**frac(), **ivl()}, "any_bin": {**frac(), **ivl()},
+            "any_bin_not_cut_short": frac(), "new_alert_not_cut_short": frac(), "chance_new": frac(), "chance_any": frac(),
+            "excess_new": 0.31, "excess_new_not_cut_short": 0.32, "excess_any": 0.33, "excess_any_not_cut_short": next(n) / 100 + 0.00049,
+            "lead": {"n": 7, "median": 40.04, "q1": 12.34, "q3": 99.96}}
+
+
+def test_every_exported_field_is_the_source_field_rounded_by_its_kind(tmp_path):
+    _, result, _ = toy_held_out(tmp_path)
+    ctx = result["context"]
+    ctx |= {"patients": 17, "patient_days": 3.456, "episodes_evaluated": 9, "episodes_not_cut_short": 6, "control_windows": 23,
+            "trials": 3, "shift_hours": 8, "bin_minutes": 5, "held_out_seeds": [11, 12, 13],
+            "ci": {"level_percent": 90, "resamples": 77, "generator_seed": 5, "method": "patient-level bootstrap"}}
+    src = {"format": "biosentry-held-out/1", "context": ctx,
+           "rules": [_distinct_rule("student", 0.2), _distinct_rule("news2_or_student_checked", 0.5), _distinct_rule("teacher_no_temp", 0.7)]}
+    path = tmp_path / "distinct.json"
+    path.write_text(json.dumps(src))
+    _, obj = make(tmp_path, "evaluations", "--held-out", str(path))
+    body = obj["body"]
+    assert body["context"] == {**{k: ctx[k] for k in ("shift_hours", "bin_minutes", "trials", "patients", "episodes_evaluated",
+                                                       "episodes_not_cut_short", "control_windows", "tuning")},
+                               "ci": ctx["ci"], "patient_days": 3.5}
+    assert obj["provenance"]["seeds"] == [{"role": "held out", "seeds": [11, 12, 13]}]
+    f3 = lambda x: round(x, 3)  # noqa: E731
+    fr = lambda f, iv=False: {"n": f["n"], "d": f["d"], "rate": f3(f["rate"]), **({"lo": f3(f["lo"]), "hi": f3(f["hi"])} if iv else {})}  # noqa: E731
+    assert [r["id"] for r in body["rules"]] == [r["id"] for r in src["rules"]]
+    for e, r in zip(body["rules"], src["rules"]):
+        assert e["per_shift"] == {"value": f3(r["per_shift"]["value"]), "lo": f3(r["per_shift"]["lo"]), "hi": f3(r["per_shift"]["hi"])}
+        assert e["time_in_alert"] == fr(r["time_in_alert"])
+        assert e["new_alert"] == fr(r["new_alert"], True) and e["any_bin"] == fr(r["any_bin"], True)
+        assert e["any_bin_not_cut_short"] == fr(r["any_bin_not_cut_short"])
+        assert e["chance_new"] == fr(r["chance_new"]) and e["chance_any"] == fr(r["chance_any"])
+        assert e["excess_any_not_cut_short"] == f3(r["excess_any_not_cut_short"])
+        assert e["lead"] == {"n": 7, "median_minutes": 40.0, "q1_minutes": 12.3, "q3_minutes": 100.0}
+        assert set(e) == {"id", "name", "adds_to", "per_shift", "time_in_alert", "new_alert", "any_bin", "any_bin_not_cut_short",
+                          "chance_new", "chance_any", "excess_any_not_cut_short", "lead"}
+    assert [r["adds_to"] for r in body["rules"]] == [None, "news2", None]
+
+
+def test_evaluations_needs_a_source_and_registry_does_not(tmp_path, capsys):
+    _, _, path = toy_held_out(tmp_path)
+    no_source = ["--date", "2026-11-13", "--commit", COMMIT]
+    out = tmp_path / "ns.json"
+    assert ex.main(["evaluations", *no_source, "--held-out", str(path), "--out", str(out)]) == 2
+    assert "--source" in capsys.readouterr().err and not out.exists()
+    assert ex.main(["registry", *no_source, "--out", str(tmp_path / "r.json")]) == 0
+
+
+def test_json_never_touches_an_existing_tmp_file_and_a_write_error_is_one_refusal_line(tmp_path, capsys):
+    path = tmp_path / "h.json"
+    for name in ("h.json.tmp", "h.json.part", ".h.json.tmp"):
+        (tmp_path / name).write_text("mine")
+    assert evaluate.main([str(TOY), "--json", str(path)]) == 0
+    capsys.readouterr()
+    assert all((tmp_path / n).read_text() == "mine" for n in ("h.json.tmp", "h.json.part", ".h.json.tmp"))
+    assert sorted(p.name for p in tmp_path.iterdir()) == [".h.json.tmp", "h.json", "h.json.part", "h.json.tmp"]
+    assert oct(path.stat().st_mode & 0o777) == "0o644"
+    # the folder is writable, so the early check passes; the write itself fails (the path is a folder)
+    target = tmp_path / "is-a-folder"
+    target.mkdir()
+    assert evaluate.main([str(TOY), "--json", str(target)]) == 2
+    cap = capsys.readouterr()
+    assert cap.out == "" and cap.err == "refused: --json: cannot write that file\n"
+    assert sorted(p.name for p in tmp_path.iterdir()) == [".h.json.tmp", "h.json", "h.json.part", "h.json.tmp", "is-a-folder"]

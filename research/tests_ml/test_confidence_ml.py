@@ -3,12 +3,16 @@ import json
 import os
 import re
 import shutil
+import sys
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
 import pytest
 
-from cohort import trial, vitals_row
+sys.path.insert(0, str(Path(__file__).parent.parent / "tests"))  # the shared text-table helpers
+from cohort import trial, vitals_row  # noqa: E402
+from helpers import check_context_against_text, check_rules_against_text  # noqa: E402
 from research import confidence as c
 from research import evaluate, student, trials
 from research.alerts import POLICIES, scan
@@ -220,6 +224,34 @@ def test_the_checked_policy_alerts_on_a_subset_and_the_held_out_block_adds_up(tm
         c.evaluate(f, model, out, cal_seeds=SEEDS)  # the held-out run is made once
 
 
+def _check_block_against_text(text: str, tag: str, block: dict) -> None:
+    """Everything the text block of one variant prints is in the JSON block, field by field (shares with their intervals,
+    pooled ratios, d and the bound, both "4." lines, n, k, j, q, t, alpha, binding, the ONNX sha256)."""
+    mine = text[text.index(f"[{tag}] confidence check"):]
+    mine = mine.split("\n\n")[0]
+    f4 = lambda x: f"{x:.4f}"  # noqa: E731
+    m = re.search(r"calibration facts: n=(\d+) k=(\d+) \(j=(\d+)\) q=(\S+) t=(\S+) alpha=(\S+) onnx sha256 (\S+)", mine)
+    assert (int(m[1]), int(m[2]), int(m[3]), float(m[4]), float(m[5]), m[6], m[7]) == (
+        block["n_calibration"], block["k"], block["j"], block["q"], block["t"], block["alpha"], block["onnx_sha256"])
+    assert (re.search(r"^binding$", mine, re.M) is not None) == block["binding"] and ("NOT binding" in mine) != block["binding"]
+    ae, cs, ss = block["achieved_error"], block["checked_share"], block["student_share"]
+    m = re.search(r"mean over (\d+) held-out .*?: (\S+), 95% stay-bootstrap interval (\S+) to (\S+), against alpha (\S+)", mine)
+    assert (int(m[1]), m[2], m[3], m[4], m[5]) == (block["n_stays"], f4(ae["mean"]), f4(ae["lo"]), f4(ae["hi"]), block["alpha"])
+    m = re.search(r"context: the same share for the checked rule (\S+) \((\S+) to (\S+)\), for the student alone \(p >= t\) "
+                  r"(\S+) \((\S+) to (\S+)\); pooled over bins: p > q (\S+) \((\d+)/(\d+)\), checked (\S+) \((\d+)/(\d+)\), "
+                  r"student (\S+) \((\d+)/(\d+)\)", mine)
+    assert m.groups()[:6] == (f4(cs["mean"]), f4(cs["lo"]), f4(cs["hi"]), f4(ss["mean"]), f4(ss["lo"]), f4(ss["hi"]))
+    pool = block["pooled"]
+    for i, key in ((7, "above_q"), (10, "checked"), (13, "student")):
+        assert (m[i], int(m[i + 1]), int(m[i + 2])) == (f4(pool[key] / pool["negative_bins"]), pool[key], pool["negative_bins"])
+    m = re.search(r"verdict: (MET|NOT MET) \(rule: lower end <= alpha \+ d, d = (\S+) from", mine)
+    assert m[1] == block["verdict"] and m[2] == f4(block["spread"])
+    assert abs(block["bound"] - (float(block["alpha"]) + block["spread"])) < 1e-12 and block["bound"] > block["spread"]
+    lines = re.findall(r"^4\. episodes \((all evaluated|not cut short)\) .*?any bin of the window (\d+); caught early .*? (\d+)$", mine, re.M)
+    assert [(a, int(b), int(d)) for a, b, d in lines] == [("all evaluated", block["lost"]["all"]["any"], block["lost"]["all"]["early"]),
+                                                        ("not cut short", block["lost"]["not_cut_short"]["any"], block["lost"]["not_cut_short"]["early"])]
+
+
 def test_the_json_flag_holds_the_held_out_numbers_and_the_text_is_unchanged(tmp_path, patched, model, cohort):
     _calibrate(tmp_path, model)
     out, out2 = tmp_path / "out" / "model", tmp_path / "out2"
@@ -247,6 +279,58 @@ def test_the_json_flag_holds_the_held_out_numbers_and_the_text_is_unchanged(tmp_
     assert (block["q"], block["t"], block["alpha"], block["n_calibration"]) == (cal.q, cal.t, cal.alpha, cal.n)
     assert set(block["lost"]) == {"all", "not_cut_short"} and set(block["lost"]["all"]) == {"any", "early"}
     assert obj["format"] == "biosentry-held-out/1" and any(r["id"] == "student_checked" for r in obj["rules"])
+    _check_block_against_text(plain, "all", block)
+    assert block["student_share"]["lo"] < block["student_share"]["hi"]
+
+
+def _cut_short(t: Trial, patients: tuple[str, ...]) -> Trial:
+    """The stays of `patients` end shortly after their episode is fully in, before its window ends."""
+    out_eps, drop = [], set()
+    for e in t.episodes:
+        if e.patient in patients:
+            e = replace(e, leave_minute=int(e.start + e.ramp_minutes) + 30)
+            drop.add((e.patient, e.leave_minute))
+        out_eps.append(e)
+    leave = {p: m for p, m in drop}
+    rows = tuple(r for r in t.rows if r.minute <= leave.get(r.patient, 10 ** 9))
+    return replace(t, rows=rows, episodes=tuple(out_eps))
+
+
+def _mild(t: Trial, patients: tuple[str, ...]) -> Trial:
+    """From its episode's start on, these patients have constant vitals that the test model scores 0.66: above t (0.61) and
+    below q (0.76), so the student alerts and the checked rule does not (an episode the check loses)."""
+    start = {e.patient: e.start for e in t.episodes}
+    rows = tuple(vitals_row(r.patient, r.minute, 130, 16, 97, 36.8) if r.patient in patients and r.minute >= start[r.patient] else r
+                 for r in t.rows)
+    return replace(t, rows=rows)
+
+
+def _burst(t: Trial, patients: tuple[str, ...], first: int, last: int) -> Trial:
+    """A run of low heart rate, low temperature (the test model scores these 1.0, above the calibration's q) in stays that have no
+    episode: negative bins with a supported alert, in some stays only."""
+    rows = tuple(vitals_row(r.patient, r.minute, 40, 8, 97, 35.0) if r.patient in patients and first <= r.minute // 15 <= last else r
+                 for r in t.rows)
+    return replace(t, rows=rows)
+
+
+def test_the_json_block_matches_the_text_when_episodes_are_cut_short(tmp_path, patched, model, cohort, monkeypatch):
+    _calibrate(tmp_path, model)
+    cut = {**cohort, **{s: _cut_short(_mild(cohort[s], ("p-000", "p-004")), ("p-000", "p-002")) for s in HELD}}
+    cut[11] = _burst(cut[11], ("p-001", "p-003"), 40, 60)  # some stays, not all, have bins above q: the interval is not a point
+    cut[12] = _burst(cut[12], ("p-001",), 40, 52)
+    monkeypatch.setattr(trials, "load_trial", lambda f: cut[seed_of(f)])
+    monkeypatch.setattr(evaluate, "load_trial", lambda f: cut[seed_of(f)])
+    path = tmp_path / "cut.json"
+    text = c.evaluate(_held(tmp_path), model, tmp_path / "out" / "model", cal_seeds=SEEDS, json_path=str(path))
+    obj = json.loads(path.read_text())
+    ctx, block = obj["context"], obj["confidence"]["all"]
+    assert ctx["episodes_not_cut_short"] < ctx["episodes_evaluated"]
+    _check_block_against_text(text, "all", block)
+    check_context_against_text(ctx, text)
+    check_rules_against_text(obj["rules"], text)
+    assert block["achieved_error"]["lo"] < block["achieved_error"]["hi"]
+    assert block["lost"]["all"]["any"] > block["lost"]["not_cut_short"]["any"] > 0  # the cut-short episodes add to "all" only
+    assert block["lost"]["all"] != block["lost"]["not_cut_short"]
 
 
 def test_an_unwritable_json_path_refuses_before_any_trial_is_read_and_writes_nothing(tmp_path, patched, model, monkeypatch):
@@ -259,6 +343,22 @@ def test_an_unwritable_json_path_refuses_before_any_trial_is_read_and_writes_not
         c.evaluate(f, model, out, cal_seeds=SEEDS, json_path=str(tmp_path / "no" / "such" / "h.json"))
     assert not (out / c.HELD_OUTPUT).exists()
     assert c.main(["evaluate", *f, "--model", str(model), "--out", str(out), "--json", str(tmp_path / "no" / "h.json")]) == 2
+
+
+def test_a_json_write_error_after_the_run_is_one_refusal_and_leaves_nothing_written(tmp_path, patched, model, capsys, monkeypatch):
+    _calibrate(tmp_path, model)
+    real = c.evaluate
+    monkeypatch.setattr(c, "evaluate", lambda *a, **k: real(*a, cal_seeds=SEEDS, **k))  # the tests calibrate on 301-313
+    out = tmp_path / "out" / "model"
+    before = sorted(p.name for p in out.iterdir())
+    target = tmp_path / "is-a-folder"
+    target.mkdir()  # the early check can create a scratch file next to it; the write cannot replace a folder
+    assert c.main(["evaluate", *_held(tmp_path), "--model", str(model), "--out", str(out), "--json", str(target)]) == 2
+    cap = capsys.readouterr()
+    assert cap.out == "" and cap.err == "refused: --json: cannot write that file\n"
+    assert sorted(p.name for p in out.iterdir()) == before and not (out / c.HELD_OUTPUT).exists()
+    assert sorted(p.name for p in tmp_path.iterdir() if p.name != "held") == ["is-a-folder", "out"]
+    assert list(target.iterdir()) == []
 
 
 def test_evaluation_refuses_a_changed_calibration_file_threshold_or_model(tmp_path, patched, model, cohort):

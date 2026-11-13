@@ -1,10 +1,11 @@
-"""The two exported files of the evaluation data contract (v3.4) that this repository owns, each written by one
+"""The two exported files of the evaluation data contract (v3.6) that this repository owns, each written by one
 command (standard library only).
 
     python -m research.export_evaluation registry    --date YYYY-MM-DD --commit <40 hex> [--source <text>]... --out <path>
-    python -m research.export_evaluation evaluations --date YYYY-MM-DD --commit <40 hex> [--source <text>]...
+    python -m research.export_evaluation evaluations --date YYYY-MM-DD --commit <40 hex> --source <command line>...
                                          --held-out <held-out.json>... [--drop-rule <id>]... [--confidence <heldout.json>] --out <path>
 
+`--source` is required for `evaluations` (the command lines that made the held-out files, at least one).
 The held-out JSON files are what `--json` of research.evaluate, research.evaluate_student,
 research.reward_loop --evaluate and research.confidence evaluate write. A text report is never a source here.
 The same inputs and the same --date give the same bytes. A file with a banned word, a cap broken or a number
@@ -313,6 +314,8 @@ def run(argv: list[str]) -> None:
         raise Refused("--date must be YYYY-MM-DD")
     if not re.fullmatch(r"[0-9a-f]{40}", a.commit):
         raise Refused("--commit must be 40 lowercase hex characters")
+    if a.command == "evaluations" and not a.source:
+        raise Refused("--source: at least one is required (the command lines that made the held-out files)")
     root = Path(a.root)
     if a.command == "registry":
         body, notes = build_registry(root)

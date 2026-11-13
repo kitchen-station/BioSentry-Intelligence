@@ -10,6 +10,7 @@ import math
 import os
 import statistics
 import sys
+import tempfile
 from bisect import bisect_left
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -223,22 +224,37 @@ def held_out_json(pool: Pool, policies: tuple[Policy, ...], rules: list[dict], p
             "rules": rules}
 
 
+def _scratch(path: str) -> tuple[int, str]:
+    """A new file next to `path` with a name nothing else has (created exclusively): an existing file is never touched."""
+    p = Path(path)
+    return tempfile.mkstemp(prefix=f".{p.name}.", suffix=".part", dir=p.parent)
+
+
 def check_json_path(path: str | None) -> None:
     """Refuse before any trial is read when the --json file cannot be written."""
     if path is not None:
         try:
-            with open(path + ".tmp", "wb"):
-                pass
-            os.remove(path + ".tmp")
+            fd, tmp = _scratch(path)
+            os.close(fd)
+            os.remove(tmp)
         except OSError:
             raise TrialError("--json: cannot write that file") from None
 
 
 def write_json(path: str, obj: dict) -> None:
+    """Written whole or not at all; an OSError is a one-line refusal, and no scratch file stays behind."""
     data = (json.dumps(obj, indent=1, sort_keys=True, ensure_ascii=False) + "\n").encode()
-    with open(path + ".tmp", "wb") as f:
-        f.write(data)
-    os.replace(path + ".tmp", path)
+    tmp = None
+    try:
+        fd, tmp = _scratch(path)
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        os.chmod(tmp, 0o644)  # mkstemp makes it private; the file is an ordinary result file
+        os.replace(tmp, path)
+    except OSError:
+        if tmp is not None and os.path.exists(tmp):
+            os.remove(tmp)
+        raise TrialError("--json: cannot write that file") from None
 
 
 def pop_json(argv: list[str]) -> tuple[list[str], str | None]:
