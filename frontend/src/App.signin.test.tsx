@@ -19,6 +19,7 @@ const api = vi.hoisted(() => ({
 vi.mock("./api", async () => ({
   ApiError: (await vi.importActual<typeof import("./api/client")>("./api/client")).ApiError,
   restoreSession: api.restoreSession,
+  hasLabQuestions: false,
   clearSession: api.clearSession,
   signIn: api.signIn,
   get usesServer() {

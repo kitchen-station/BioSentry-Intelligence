@@ -1,26 +1,16 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
-import type { PatientQuestionItem } from "../types";
-import { ApiError, askPatient, getPatientQuestion, getPatientQuestions } from "../api";
-import { formatClock } from "./format";
+import { useCallback, useId } from "react";
+import { askPatient, getPatientQuestion, getPatientQuestions } from "../api";
+import { MAX, clock, stateText, useQuestions } from "./useQuestions";
 import styles from "./AskPatient.module.css";
 
-// The same pace as the lab run list.
-const POLL_MS = 5_000;
-const MAX = 500;
 const GONE = "This patient is no longer on your list.";
-
-const clock = (iso: string) => formatClock(Date.parse(iso));
-const isOpen = (q: PatientQuestionItem) => q.state === "queued" || q.state === "running";
-// The worker's own texts already begin with the word, so it is not said twice.
-const said = (word: string, reason: string | null) => `${word}: ${(reason ?? "no reason given").replace(`${word}: `, "")}`;
-const stateText = (q: PatientQuestionItem): string =>
-  ({
-    queued: "Waiting",
-    running: q.claimed_at ? `Working since ${clock(q.claimed_at)}` : "Working",
-    done: "Answered",
-    refused: said("Refused", q.reason),
-    failed: said("Failed", q.reason),
-  })[q.state] ?? q.state; // a state from a newer server is shown as it came
+const ERRORS = {
+  401: "Your session has ended. Sign in again.",
+  403: "You cannot ask about this patient.",
+  404: GONE,
+  422: "The question could not be sent. Use one line, up to 500 characters.",
+  429: "Question limit reached. Try again later.",
+};
 
 /**
  * A clinician's questions about this one patient. The agent answers by code from a frozen copy of the patient's data. It reads on
@@ -29,96 +19,12 @@ const stateText = (q: PatientQuestionItem): string =>
  */
 export function AskPatient({ patientId, clinicianId, onSignOut }: { patientId: string; clinicianId: string; onSignOut: () => void }) {
   const heading = useId();
-  const [items, setItems] = useState<PatientQuestionItem[]>([]);
-  const [text, setText] = useState("");
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [stalled, setStalled] = useState(false); // a failed read stops the timer until a read works
-  // The answer of each question is read once; `shown` says which are open.
-  const [answers, setAnswers] = useState<Record<number, string>>({});
-  const [shown, setShown] = useState<number[]>([]);
-
-  const signOut = useRef(onSignOut);
-  useEffect(() => {
-    signOut.current = onSignOut;
-  }, [onSignOut]);
-  const fail = useCallback((failure: unknown) => {
-    const status = failure instanceof ApiError ? failure.status : 0;
-    if (status === 401) signOut.current();
-    setError(
-      {
-        401: "Your session has ended. Sign in again.",
-        403: "You cannot ask about this patient.",
-        404: GONE,
-        422: "The question could not be sent. Use one line, up to 500 characters.",
-        429: "Question limit reached. Try again later.",
-      }[status] ?? "Cannot reach the ward server.",
-    );
-  }, []);
-
-  const reading = useRef(false);
-  const round = useRef(0); // an answer that comes back late must not replace a newer list
-  const load = useCallback(() => {
-    reading.current = true;
-    const n = ++round.current;
-    return getPatientQuestions(patientId)
-      .then((rows) => {
-        if (n !== round.current) return;
-        setItems(rows);
-        setStalled(false);
-        setError(null);
-      })
-      .catch((failure: unknown) => {
-        setStalled(true);
-        fail(failure);
-      })
-      .finally(() => {
-        reading.current = false;
-      });
-  }, [patientId, fail]);
-  const refresh = useCallback(() => {
-    if (!reading.current) void load();
-  }, [load]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const pending = items.some(isOpen);
-  useEffect(() => {
-    if (!pending || stalled) return;
-    const t = setInterval(refresh, POLL_MS);
-    return () => clearInterval(t);
-  }, [pending, stalled, refresh]);
-
-  const mine = items.some((q) => q.requested_by === clinicianId && isOpen(q));
-  const question = text.trim();
-
-  const send = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!question || sending || mine) return;
-    setSending(true);
-    askPatient(patientId, question)
-      .then(() => {
-        setText("");
-        setError(null);
-        return load();
-      })
-      .catch(fail)
-      .finally(() => setSending(false));
-  };
-
-  const toggle = (id: number) => {
-    if (shown.includes(id)) return setShown(shown.filter((s) => s !== id));
-    if (id in answers) return setShown([...shown, id]);
-    getPatientQuestion(patientId, id)
-      .then((d) => {
-        setAnswers((a) => ({ ...a, [id]: d.answer ?? "" }));
-        setShown((s) => [...s, id]);
-        setError(null);
-      })
-      .catch(fail);
-  };
+  const list = useCallback(() => getPatientQuestions(patientId), [patientId]);
+  const ask = useCallback((q: string) => askPatient(patientId, q), [patientId]);
+  const read = useCallback((id: number) => getPatientQuestion(patientId, id), [patientId]);
+  const { items, text, setText, sending, error, details, shown, mine, question, send, toggle, refresh } = useQuestions({
+    list, ask, read, clinicianId, onSignOut, errors: ERRORS,
+  });
 
   return (
     <section aria-labelledby={heading}>
@@ -161,9 +67,9 @@ export function AskPatient({ patientId, clinicianId, onSignOut }: { patientId: s
                     </button>
                     <div id={region} hidden={!open}>
                       {open &&
-                        (answers[q.id] ? (
+                        (details[q.id]?.answer ? (
                           <>
-                            <pre className={styles.answer}>{answers[q.id]}</pre>
+                            <pre className={styles.answer}>{details[q.id]?.answer}</pre>
                             <p className={styles.meta}>Answered from the data as it was at {clock(q.requested_at)}.</p>
                           </>
                         ) : (

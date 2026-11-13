@@ -53,7 +53,7 @@ export const PIPELINE: readonly Stage[] = [
   {
     id: "agent", name: "Research agent", state: "research only, offline",
     in: "A fixed experiment list or one of three fixed kinds of question", out: "Ledger entries and answers in fixed sentences",
-    text: ["Run by hand on simulated trials: it picks the next experiment from a fixed list and answers three fixed kinds of question in fixed sentences, each with a chance control. An optional model planner, off unless set up and off in the recorded run, may only reorder that list.", "Every step goes to a ledger, and a proposal changes no file until a sign-off is recorded. It is not connected to the API, the rank or the arbiter. A worker in the repository can take a clinician's question from the API to the agent, but the API does not yet hand out questions and the dashboard has no page to ask one; the Research page shows recorded answers."],
+    text: ["Run by hand on simulated trials: it picks the next experiment from a fixed list and answers three fixed kinds of question in fixed sentences, each with a chance control. An optional model planner, off unless set up and off in the recorded run, may only reorder that list.", "Every step goes to a ledger, and a proposal changes no file until a sign-off is recorded. It is not connected to the rank or the arbiter, and the API never runs it. A worker in the repository takes a clinician's question from the API to the agent: the API stores the question and hands it to the worker, which runs beside the API only where someone starts it. The lab's Ask page sends a question and shows the answer; the Research page shows recorded answers."],
     evidence: "research/agent/ (worker.py, README), frontend/src/data/research-agent.json",
   },
   {

@@ -57,6 +57,9 @@ function lazyFixtureProvider(): ApiProvider {
     getPatientQuestions: (patientId) => fixtures().then((m) => m.fixtureProvider.getPatientQuestions(patientId)),
     getPatientQuestion: (patientId, questionId) =>
       fixtures().then((m) => m.fixtureProvider.getPatientQuestion(patientId, questionId)),
+    askLab: (question) => fixtures().then((m) => m.fixtureProvider.askLab(question)),
+    getLabQuestions: () => fixtures().then((m) => m.fixtureProvider.getLabQuestions()),
+    getLabQuestion: (id) => fixtures().then((m) => m.fixtureProvider.getLabQuestion(id)),
     getPatientHistory: (patientId) => fixtures().then((m) => m.fixtureProvider.getPatientHistory(patientId)),
     extractLabsFromFile: (file) =>
       fixtures().then((m) => m.fixtureProvider.extractLabsFromFile(file)),
@@ -88,6 +91,9 @@ export const getLabRun = provider.getLabRun;
 export const askPatient = provider.askPatient;
 export const getPatientQuestions = provider.getPatientQuestions;
 export const getPatientQuestion = provider.getPatientQuestion;
+export const askLab = provider.askLab;
+export const getLabQuestions = provider.getLabQuestions;
+export const getLabQuestion = provider.getLabQuestion;
 export const getPatientHistory = provider.getPatientHistory;
 
 /**
@@ -101,6 +107,8 @@ export const hasOverview = !USE_FIXTURES;
 export const hasLabRuns = !USE_FIXTURES;
 // Only the API stores patient questions; a worker beside it answers them.
 export const hasPatientQuestions = !USE_FIXTURES;
+// Only the API stores the lab's questions; a worker beside it answers them.
+export const hasLabQuestions = !USE_FIXTURES;
 // Only the API rebuilds a stay; each read is one audit row.
 export const hasHistory = !USE_FIXTURES;
 export const extractLabsFromFile = provider.extractLabsFromFile;

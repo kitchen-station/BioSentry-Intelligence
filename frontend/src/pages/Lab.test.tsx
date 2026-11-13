@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -12,7 +12,7 @@ import { Research } from "./Research";
 
 // Every write is a spy that fails if called; the one read the lab makes returns the fixture ward.
 const api = vi.hoisted(() => ({
-  getWard: vi.fn(), getLabRuns: vi.fn(), getLabRun: vi.fn(), hasLabRuns: false, requestLabRun: vi.fn(),
+  getWard: vi.fn(), getLabRuns: vi.fn(), getLabRun: vi.fn(), hasLabRuns: false, hasLabQuestions: false, askLab: vi.fn(), requestLabRun: vi.fn(),
   addNote: vi.fn(), deleteNote: vi.fn(), admitPatient: vi.fn(), enterLabResults: vi.fn(), recordVitals: vi.fn(),
   acknowledge: vi.fn(), extractLabsFromFile: vi.fn(), extractPatientFromFile: vi.fn(), signIn: vi.fn(), clearSession: vi.fn(),
 }));
@@ -20,7 +20,7 @@ vi.mock("../api", () => api);
 
 const WRITES = [
   api.addNote, api.deleteNote, api.admitPatient, api.enterLabResults, api.recordVitals,
-  api.acknowledge, api.extractLabsFromFile, api.extractPatientFromFile, api.signIn, api.clearSession, api.requestLabRun,
+  api.acknowledge, api.extractLabsFromFile, api.extractPatientFromFile, api.signIn, api.clearSession, api.requestLabRun, api.askLab,
 ];
 const session = { clinician_id: "md-santos", ward: "W4", role: "md" } as const;
 const none = () => {};
@@ -53,6 +53,15 @@ describe("lab index", () => {
     expect(href("The pipeline")).toBe("/lab/pipeline");
     expect(screen.queryByText("Outside the lab")).toBeNull();
     expect(screen.queryByRole("link", { name: "Open the ward simulator" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Ask the research agent" })).toBeNull();
+  });
+
+  it("links the Ask page first when the build has a server", () => {
+    api.hasLabQuestions = true;
+    lab();
+    api.hasLabQuestions = false;
+    const first = screen.getAllByRole("listitem")[0];
+    expect(within(first).getByRole("link", { name: "Ask the research agent" }).getAttribute("href")).toBe("/lab/ask");
   });
 
   it("links the ward simulator, with its warning, when the one-address image serves it", () => {

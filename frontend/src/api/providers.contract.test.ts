@@ -393,6 +393,12 @@ describe("the fixture provider", () => {
     }
   });
 
+  it("has no lab questions: they need the server", async () => {
+    for (const call of [() => fixtureProvider.askLab("q"), () => fixtureProvider.getLabQuestions(), () => fixtureProvider.getLabQuestion(1)]) {
+      await expect(call()).rejects.toThrow("Lab questions need the server");
+    }
+  });
+
   it("has no stay history: it needs the server", async () => {
     await expect(fixtureProvider.getPatientHistory("p-001")).rejects.toThrow("The stay history needs the server");
   });

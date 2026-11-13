@@ -27,6 +27,7 @@ import type {
   LiveWard,
   NewLabRun,
   NewPatientQuestion,
+  NewQuestion,
   NurseVitalsInput,
   PartialLabInput,
   PatientDetail,
@@ -34,6 +35,8 @@ import type {
   PatientHistory,
   PatientQuestionDetail,
   PatientQuestionItem,
+  QuestionDetail,
+  QuestionItem,
   VitalsRecorded,
   WardOverview,
   PatientStay,
@@ -83,6 +86,19 @@ export const httpProvider: ApiProvider = {
 
   getPatientQuestions(patientId: string): Promise<PatientQuestionItem[]> {
     return fetchJson<PatientQuestionItem[]>(`/patients/${encodeURIComponent(patientId)}/questions`);
+  },
+
+  askLab(question: string): Promise<QuestionItem> {
+    const body: NewQuestion = { question };
+    return postJson<QuestionItem>("/wards/W4/lab/questions", body);
+  },
+
+  getLabQuestions(): Promise<QuestionItem[]> {
+    return fetchJson<QuestionItem[]>("/wards/W4/lab/questions");
+  },
+
+  getLabQuestion(id: number): Promise<QuestionDetail> {
+    return fetchJson<QuestionDetail>(`/wards/W4/lab/questions/${id}`);
   },
 
   getPatientHistory(patientId: string): Promise<PatientHistory> {

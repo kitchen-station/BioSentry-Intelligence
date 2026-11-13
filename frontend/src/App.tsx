@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import type { Session } from "./types";
-import { restoreSession, clearSession } from "./api";
+import { restoreSession, clearSession, hasLabQuestions } from "./api";
 import { SignIn } from "./pages/SignIn";
 import { Ward } from "./pages/Ward";
 import { PatientDetail } from "./pages/PatientDetail";
@@ -9,6 +9,7 @@ import { Station } from "./pages/Station";
 import { Pipeline } from "./pages/Pipeline";
 import { Research } from "./pages/Research";
 import { Lab } from "./pages/Lab";
+import { Ask } from "./pages/Ask";
 import { Overview } from "./pages/Overview";
 
 // Per tab, gone when the tab closes. Only who is signed in is kept here, never a token: with the
@@ -113,6 +114,12 @@ export function App() {
         path="/lab"
         element={session ? <Lab session={session} onSignOut={signOut} /> : <ToSignIn gone={gone} />}
       />
+      {hasLabQuestions && (
+        <Route
+          path="/lab/ask"
+          element={session ? <Ask session={session} onSignOut={signOut} /> : <ToSignIn gone={gone} />}
+        />
+      )}
       <Route
         path="/lab/research"
         element={session ? <Research session={session} onSignOut={signOut} /> : <ToSignIn gone={gone} />}

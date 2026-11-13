@@ -24,6 +24,8 @@ import type {
   PatientQuestionDetail,
   PatientQuestionItem,
   PatientStay,
+  QuestionDetail,
+  QuestionItem,
   VitalsRecorded,
   WardOverview,
   WardResponse,
@@ -71,6 +73,10 @@ export interface ApiProvider {
   askPatient(patientId: string, question: string): Promise<PatientQuestionItem>;
   getPatientQuestions(patientId: string): Promise<PatientQuestionItem[]>;
   getPatientQuestion(patientId: string, questionId: number): Promise<PatientQuestionDetail>;
+  /** Asks the research agent one question that is not about a patient. It runs one of its own fixed experiments. */
+  askLab(question: string): Promise<QuestionItem>;
+  getLabQuestions(): Promise<QuestionItem[]>;
+  getLabQuestion(id: number): Promise<QuestionDetail>;
   /** The stay of one patient as runs and events, rebuilt from stored 15-minute sets. Each read is one audit row. */
   getPatientHistory(patientId: string): Promise<PatientHistory>;
   extractLabsFromFile(file: File): Promise<LabExtractionResult>;

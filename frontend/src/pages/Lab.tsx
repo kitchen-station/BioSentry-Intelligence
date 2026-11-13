@@ -1,10 +1,11 @@
 import { Link } from "react-router-dom";
 import type { Session } from "../types";
+import { hasLabQuestions } from "../api";
 import { LabFrame } from "../components/LabFrame";
 import { LabRuns } from "./LabRuns";
 import research from "./Research.module.css";
 
-/** The lab's front page. It writes nothing to the live ward; its one write is a request for a simulated run. */
+/** The lab's front page. It writes nothing to the live ward; its two writes are a request for a simulated run and a question for the research agent. */
 export function Lab({ session, onSignOut }: { session: Session; onSignOut: () => void }) {
   // shortcut: only the one-address image (VITE_API_URL=/api) serves /simulator/; upgrade to an explicit VITE_SIMULATOR_PATH when deploy/ changes.
   const simulatorServed = import.meta.env.VITE_API_URL === "/api";
@@ -13,6 +14,7 @@ export function Lab({ session, onSignOut }: { session: Session; onSignOut: () =>
       <main className={research.main}>
         <h1 className={research.title}>Simulation lab</h1>
         <ul>
+          {hasLabQuestions && <li><Link to="/lab/ask">Ask the research agent</Link></li>}
           <li><Link to="/lab/research">Research numbers</Link></li>
           <li><Link to="/lab/research#agent">The research agent&apos;s questions and answers</Link></li>
           <li><Link to="/lab/pipeline">The pipeline</Link></li>

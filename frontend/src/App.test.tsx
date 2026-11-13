@@ -15,7 +15,7 @@ import { App } from "./App";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const api = vi.hoisted(() => ({ restoreSession: vi.fn(() => true), clearSession: vi.fn() }));
+const api = vi.hoisted(() => ({ restoreSession: vi.fn(() => true), clearSession: vi.fn(), hasLabQuestions: true }));
 vi.mock("./api", () => api);
 
 // The pages are stand-ins: these tests are about the shell, not what each page shows.
@@ -67,6 +67,9 @@ vi.mock("./pages/PatientDetail", () => ({
 }));
 vi.mock("./pages/Lab", () => ({
   Lab: ({ session }: { session: Session }) => <p>lab page for {session.clinician_id}</p>,
+}));
+vi.mock("./pages/Ask", () => ({
+  Ask: ({ session }: { session: Session }) => <p>ask page for {session.clinician_id}</p>,
 }));
 vi.mock("./pages/Research", () => ({
   Research: ({ session }: { session: Session }) => <p>research page for {session.clinician_id}</p>,
@@ -201,6 +204,24 @@ describe("route guards", () => {
       expect(screen.getByText(`${words} for ${who.clinician_id}`)).toBeTruthy();
       unmount();
     }
+  });
+
+  it("shows the Ask page to a signed-in clinician and sends a signed-out visitor to sign-in", () => {
+    store(nurse);
+    const { unmount } = at("/lab/ask");
+    expect(screen.getByText("ask page for rn-reyes")).toBeTruthy();
+    unmount();
+    sessionStorage.clear();
+    at("/lab/ask");
+    expect(screen.getByText("sign-in page from /lab/ask")).toBeTruthy();
+  });
+
+  it("has no Ask route in the fixture build", () => {
+    api.hasLabQuestions = false;
+    store(nurse);
+    at("/lab/ask");
+    api.hasLabQuestions = true;
+    expect(screen.queryByText("ask page for rn-reyes")).toBeNull();
   });
 
   it.each([
