@@ -259,3 +259,48 @@ def test_a_tool_failure_is_exit_2_with_one_refused_line_and_the_step_is_still_wr
     step, = steps(cfg)
     assert step["calls"][0]["ok"] is False and "error" in step["calls"][0] and "result" not in step["calls"][0]
     assert ledger.read(cfg)[0]["type"] == "start"
+
+
+# --- answer(): the record the worker needs ---------------------------------------------------------------------
+
+KEYS = {"status", "text", "step", "template", "args", "result", "result_sha256", "numbers"}
+
+
+def test_answer_returns_the_record_and_ask_returns_its_text(cfg):
+    q = "What if we alerted at a NEWS2 total of 5 or more?"
+    got = ask.answer(cfg, q)
+    assert set(got) == KEYS and got["status"] == "answered" and got["step"] == "S-0001"
+    assert got["template"] == "news2_threshold" and got["args"]["rules"][1]["threshold"] == 5
+    assert len(got["result_sha256"]) == 64 and got["result"]["trials"] == 10 and got["numbers"][0] == "10"
+    assert ask.ask(cfg, q) == got["text"]
+    first, second = steps(cfg)
+    assert first["conclusion"] == second["conclusion"] == " ".join(got["text"].splitlines())
+    assert first["grounding"] == "ok" and first["calls"][0]["result_sha256"] == got["result_sha256"]
+
+
+def test_answer_no_template_runs_no_tool_and_writes_the_same_step(cfg, monkeypatch):
+    monkeypatch.setattr(tools, "call", lambda *a, **k: pytest.fail("a tool was called"))
+    got = ask.answer(cfg, "What is the capital of France?")
+    assert set(got) == KEYS and got["status"] == "no_template" and got["text"] == ask.REFUSAL
+    assert got["step"] == "S-0001" and all(got[k] is None for k in KEYS - {"status", "text", "step"})
+    step, = steps(cfg)
+    assert step["calls"] == [] and step["conclusion"] == "Refused: no template fits this question."
+
+
+def test_answer_ungrounded_keeps_the_experiment_and_writes_grounding_failed(cfg, monkeypatch):
+    monkeypatch.setattr(ask, "grounded", lambda *a: False)
+    got = ask.answer(cfg, "What if we alerted at a NEWS2 total of 5 or more?")
+    assert set(got) == KEYS and got["status"] == "ungrounded" and got["text"] == ask.REFUSAL
+    assert got["result"] is not None and got["numbers"]
+    step, = steps(cfg)
+    assert step["grounding"] == "failed"
+    assert step["conclusion"] == "Refused: a number in the answer is not in the tool result."
+
+
+def test_answer_raises_the_tool_error_after_its_step(tmp_path, monkeypatch):
+    monkeypatch.setattr(tools.evaluate, "_baseline_params", lambda: (DEFAULTS, "test"))
+    empty = cfg_for(tmp_path)
+    with pytest.raises(tools.ToolError):
+        ask.answer(empty, "What if we alerted at a NEWS2 total of 5 or more?")
+    step, = steps(empty)
+    assert step["calls"][0]["ok"] is False
