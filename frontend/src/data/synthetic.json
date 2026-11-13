@@ -4272,11 +4272,6 @@
           "label": "NEWS2",
           "live": true,
           "tier": "A"
-        },
-        {
-          "label": "Mechanism axes (demo)",
-          "live": false,
-          "tier": "B"
         }
       ],
       "trend": "rising",
@@ -4746,11 +4741,6 @@
           "label": "NEWS2",
           "live": true,
           "tier": "A"
-        },
-        {
-          "label": "Mechanism axes (demo)",
-          "live": false,
-          "tier": "B"
         }
       ],
       "trend": "rising",
@@ -5220,11 +5210,6 @@
           "label": "NEWS2",
           "live": true,
           "tier": "A"
-        },
-        {
-          "label": "Mechanism axes (demo)",
-          "live": false,
-          "tier": "B"
         }
       ],
       "trend": "stable",
@@ -5680,11 +5665,6 @@
           "label": "NEWS2",
           "live": true,
           "tier": "A"
-        },
-        {
-          "label": "Mechanism axes (demo)",
-          "live": false,
-          "tier": "B"
         }
       ],
       "trend": "insufficient",
@@ -6126,11 +6106,6 @@
           "label": "NEWS2",
           "live": true,
           "tier": "A"
-        },
-        {
-          "label": "Mechanism axes (demo)",
-          "live": false,
-          "tier": "B"
         }
       ],
       "trend": "stable",
@@ -6552,11 +6527,6 @@
           "label": "NEWS2",
           "live": true,
           "tier": "A"
-        },
-        {
-          "label": "Mechanism axes (demo)",
-          "live": false,
-          "tier": "B"
         }
       ],
       "trend": "stable",
@@ -6978,11 +6948,6 @@
           "label": "NEWS2",
           "live": true,
           "tier": "A"
-        },
-        {
-          "label": "Mechanism axes (demo)",
-          "live": false,
-          "tier": "B"
         }
       ],
       "trend": "stable",
@@ -7418,11 +7383,6 @@
           "label": "NEWS2",
           "live": true,
           "tier": "A"
-        },
-        {
-          "label": "Mechanism axes (demo)",
-          "live": false,
-          "tier": "B"
         }
       ],
       "trend": "stable",
@@ -7844,11 +7804,6 @@
           "label": "NEWS2",
           "live": true,
           "tier": "A"
-        },
-        {
-          "label": "Mechanism axes (demo)",
-          "live": false,
-          "tier": "B"
         }
       ],
       "trend": "stable",
@@ -8270,11 +8225,6 @@
           "label": "NEWS2",
           "live": true,
           "tier": "A"
-        },
-        {
-          "label": "Mechanism axes (demo)",
-          "live": false,
-          "tier": "B"
         }
       ],
       "trend": "stable",

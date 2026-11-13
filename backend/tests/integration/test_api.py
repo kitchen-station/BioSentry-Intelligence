@@ -1218,9 +1218,11 @@ def test_no_answer_carries_a_seeded_tier_b_or_tier_c_value(
         if method != "GET" or template in {p for _, p in PUBLIC_ROUTES}:
             continue
         for who in ("rn-manalo", "md-aquino"):
-            response = client.get(template.format(**PATH_VALUES), headers=as_(who))
-            if response.status_code == 200:
-                walked.add(template)
-                assert not _keys(response.json()) & SEEDED_KEYS, (template, who)
+            # p-004 is NOT RANKED: its routes are walked too, so the key cannot hide on that path.
+            for values in (PATH_VALUES, {**PATH_VALUES, "patient_id": "p-004"}):
+                response = client.get(template.format(**values), headers=as_(who))
+                if response.status_code == 200:
+                    walked.add(template)
+                    assert not _keys(response.json()) & SEEDED_KEYS, (template, who)
     assert {"/wards/{ward}/rows", "/patients/{patient_id}"} <= walked
     assert _keys({"a": [{"tier_c": 1}]}) & SEEDED_KEYS  # the walk can see a deep key
