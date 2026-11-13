@@ -240,7 +240,7 @@ export function Ward({ session, onSignOut }: Props) {
 
         {readOnly && (
           <p className={styles.notice}>
-            Read-only. Every view is recorded in the audit log.{" "}
+            Read-only. Views are recorded in the audit log.{" "}
             <button type="button" className={styles.noticeClose} onClick={refresh}>Refresh</button>
           </p>
         )}
@@ -292,7 +292,7 @@ export function Ward({ session, onSignOut }: Props) {
       </main>
 
       <footer className={styles.footer}>
-        Advisory only. BioSentry does not replace a monitor alarm. Every view is
+        Advisory only. BioSentry does not replace a monitor alarm. Views are
         logged for audit under {session.clinician_id}.
       </footer>
     </div>

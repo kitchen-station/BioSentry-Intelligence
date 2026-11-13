@@ -241,7 +241,7 @@ describe("an administrator's ward page (read only)", () => {
   it("shows the list and the read-only line, with no write control, alert or acknowledgement call", async () => {
     page(admin);
     expect(await screen.findByText(/Priority queue/)).toBeTruthy();
-    expect(screen.getByText(/Read-only\. Every view is recorded in the audit log\./)).toBeTruthy();
+    expect(screen.getByText(/Read-only\. Views are recorded in the audit log\./)).toBeTruthy();
     expect(screen.getByText(/Not ranked \(1\)/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Acknowledge" })).toBeNull();
     expect(screen.queryByRole("button", { name: /Record/ })).toBeNull();

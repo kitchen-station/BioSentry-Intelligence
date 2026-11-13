@@ -55,7 +55,7 @@ export function SessionMenu({ session, onSignOut }: Props) {
             {/* The same switch as the API build in api/index.ts; read here so the lab never reaches the api module. */}
             {import.meta.env.VITE_API_URL && !admin && (
               <p className={styles.notice}>
-                A ward administrator can see which beds you are assigned, counts of your actions from the last 24 hours, and every patient's page, including the notes you write.
+                A ward administrator can see which beds you are assigned, counts of your recorded actions from the last 24 hours, and every patient's page, including the notes you write.
               </p>
             )}
 

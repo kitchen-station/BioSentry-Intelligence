@@ -73,7 +73,7 @@ seeded before passphrases existed has none either: `make db-reset` seeds it agai
 count, and counts of each clinician's actions in the last 24 hours (by action and outcome; no patient and no
 time); the Overview shows no patient name. The admin also reads the ward list and each ranked patient's page, read
 only, with every patient on the ward whoever is assigned. The admin can read the notes of every patient on the
-ward, a NOT RANKED one too (it has no page for anyone). Every view is in the audit log under
+ward, a NOT RANKED one too (it has no page for anyone). Views are in the audit log (I7) under
 the admin's id and every write stays refused. This reverses the earlier rule that the admin saw no patient
 name. The role is granted only from a shell with database access, run from
 `backend/`: `uv run python -m biosentry.db.admin grant admin-<name>`, then
@@ -183,7 +183,7 @@ active one: the seeded fixture ward, or a simulated ward posted to `/sim/*`.
 **Built**:
 
 - The dashboard: ward list, patient detail and station views, on a fixture provider or the API.
-- The API: sign-in to a session token, server-side clinician scope, audit on every view, NEWS2 and the
+- The API: sign-in to a session token, server-side clinician scope, audit on every view (a repeat once a minute, I7), NEWS2 and the
   escalation arbiter computed on read, notes, labs, admission, nurse-recorded vitals,
   acknowledgements, and ingest from the ward simulation.
 
