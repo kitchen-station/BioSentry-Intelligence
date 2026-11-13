@@ -1,0 +1,93 @@
+BioSentry: NEWS2 alone as an alerting rule (offline research, simulated data)
+format version: 1
+sim commit: f7647c5
+node major: 25
+trial length: 30 simulated days
+simulator speed: 60x
+scenario sha256: 95052d021b73da3fa71cc62601a795264b8ffd1cf5c4bf2e6e3ba407f74698a8
+parity: 726031 cohort rows re-scored with the backend NEWS2, 0 mismatches
+tuning seeds (1 to 10), loaded and parity-checked but not scored here (the sweep tunes on them): none
+baseline policies: k=4.0, p=8, from chosen on seeds 1-10 (params.json); the *_no_temp rows are a sensitivity check (temperature left out, same k and p, not tuned)
+held-out seeds (11 to 30), the only ones scored: 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30
+held-out patients: 1873
+held-out patient-days (summary.json): 7565.8
+starting patients (admit minute 0) are left out of sensitivity and kept for alert burden;
+  one of them has a scripted worsening in the fixture that is not an episode
+episodes evaluated: 91
+episodes dropped: start after the trial ended: 7; start outside the patient's stay: 2; starting patient (admit minute 0): 0
+  evaluated episodes not cut short (the stay and trial cover the whole window): 79
+  evaluated episodes cut short by the end of the stay or trial (kept): 12
+  of those, the stay or trial ended before the episode was fully in: 9
+evaluated episodes with no cohort rows at all (counted as not detected): 0
+hypotensive episodes evaluated: 27; with no cuff reading carried by a bin inside the window (NEWS2 saw no new blood pressure): 17
+alert: a policy turns from not alerting to alerting; one open alert per patient; re-arms after 4 hours (16 bins) not alerting; a missing bin or NOT RANKED row is not alerting
+episode event: starts at episode_start, fully in at start + ramp; the window runs from episode_start to fully-in + 120 minutes
+  NEW alert: an alert fires inside the window. ALERTING in any bin: the policy is alerting in at least one bin of the window, new or already open
+lead time: fully-in minute minus the FIRST new alert in the window; positive is before fully in
+chance control: each evaluated episode's window (same offset from admission, same length) is laid on every admitted, non-starting patient of the same trial with no episode whose stay covers the whole window; no random draws; control windows: 4678
+confidence intervals: patient-level bootstrap, 1000 resamples, SplitMix64 generator seed 20261112, percentile 2.5 to 97.5; exposure per patient is the stay inside the trial; chance rates have no interval
+
+                                                                                  news2_chart_trigger         news2_total_ge_5            student                     student_checked             news2_or_student            news2_or_student_checked    student_no_temp             student_checked_no_temp     news2_or_student_no_temp    news2_or_student_checked_no_temp
+alerts per patient per 12-hour shift                                              0.414                       0.340                       0.413                       0.128                       0.525                       0.438                       0.409                       0.127                       0.512                       0.433
+  95% interval (patient-level bootstrap)                                          0.395 to 0.434              0.322 to 0.357              0.394 to 0.430              0.116 to 0.140              0.507 to 0.543              0.418 to 0.457              0.391 to 0.427              0.115 to 0.139              0.494 to 0.530              0.413 to 0.452
+alerts per 100 patient-days                                                       82.9                        68.1                        82.6                        25.5                        105.0                       87.6                        81.8                        25.5                        102.5                       86.6
+time in alert (patient-bins alerting / patient-bins)                              0.158 (115036/726031)       0.120 (86998/726031)        0.064 (46103/726031)        0.026 (18580/726031)        0.185 (134385/726031)       0.165 (120082/726031)       0.065 (46875/726031)        0.025 (18083/726031)        0.183 (132752/726031)       0.165 (119527/726031)
+episodes with a NEW alert in the window / evaluated                               0.363 (33/91)               0.396 (36/91)               0.560 (51/91)               0.571 (52/91)               0.440 (40/91)               0.429 (39/91)               0.560 (51/91)               0.549 (50/91)               0.440 (40/91)               0.429 (39/91)
+  95% interval (patient-level bootstrap)                                          0.260 to 0.459              0.289 to 0.500              0.460 to 0.663              0.464 to 0.667              0.337 to 0.537              0.323 to 0.525              0.460 to 0.663              0.444 to 0.645              0.338 to 0.538              0.323 to 0.525
+episodes ALERTING in any bin of the window / evaluated                            0.626 (57/91)               0.571 (52/91)               0.670 (61/91)               0.582 (53/91)               0.747 (68/91)               0.692 (63/91)               0.681 (62/91)               0.582 (53/91)               0.747 (68/91)               0.692 (63/91)
+  95% interval (patient-level bootstrap)                                          0.522 to 0.727              0.462 to 0.675              0.570 to 0.762              0.473 to 0.681              0.655 to 0.831              0.593 to 0.782              0.576 to 0.773              0.473 to 0.681              0.651 to 0.835              0.593 to 0.782
+episodes alerting in the window with no new alert (alert already open before it)  24                          16                          10                          1                           28                          24                          11                          3                           28                          24
+episodes with a NEW alert / episodes not cut short                                0.405 (32/79)               0.443 (35/79)               0.633 (50/79)               0.633 (50/79)               0.494 (39/79)               0.481 (38/79)               0.633 (50/79)               0.608 (48/79)               0.494 (39/79)               0.481 (38/79)
+episodes ALERTING in any bin / episodes not cut short                             0.684 (54/79)               0.620 (49/79)               0.734 (58/79)               0.633 (50/79)               0.823 (65/79)               0.759 (60/79)               0.747 (59/79)               0.633 (50/79)               0.823 (65/79)               0.759 (60/79)
+chance: control windows with a NEW alert / control windows                        0.226 (1058/4678)           0.185 (865/4678)            0.243 (1139/4678)           0.077 (362/4678)            0.285 (1332/4678)           0.240 (1124/4678)           0.242 (1130/4678)           0.077 (362/4678)            0.280 (1310/4678)           0.239 (1118/4678)
+chance: control windows ALERTING in any bin / control windows                     0.473 (2215/4678)           0.376 (1761/4678)           0.319 (1493/4678)           0.089 (415/4678)            0.580 (2712/4678)           0.491 (2299/4678)           0.329 (1540/4678)           0.091 (427/4678)            0.577 (2699/4678)           0.491 (2298/4678)
+excess over chance, NEW alert, all evaluated episodes                             +0.136                      +0.211                      +0.317                      +0.494                      +0.155                      +0.188                      +0.319                      +0.472                      +0.160                      +0.190
+excess over chance, NEW alert, episodes not cut short                             +0.179                      +0.258                      +0.389                      +0.556                      +0.209                      +0.241                      +0.391                      +0.530                      +0.214                      +0.242
+excess over chance, ALERTING in any bin, all evaluated episodes                   +0.153                      +0.195                      +0.351                      +0.494                      +0.168                      +0.201                      +0.352                      +0.491                      +0.170                      +0.201
+excess over chance, ALERTING in any bin, episodes not cut short                   +0.210                      +0.244                      +0.415                      +0.544                      +0.243                      +0.268                      +0.418                      +0.542                      +0.246                      +0.268
+missed episodes (no new alert) per 100 patient-days                               0.8                         0.7                         0.5                         0.5                         0.7                         0.7                         0.5                         0.5                         0.7                         0.7
+alerts per episode with a new alert (number needed to evaluate)                   190.0                       143.1                       122.5                       37.1                        198.6                       169.9                       121.3                       38.5                        193.8                       167.9
+lead time median, minutes (episodes with a new alert)                             47.2                        45.9                        59.5                        20.5                        66.0                        44.6                        48.8                        16.1                        66.0                        44.6
+lead time interquartile range, minutes                                            -6.8 to 458.5               -7.8 to 251.8               6.2 to 191.5                -7.3 to 122.6               7.7 to 260.2                -7.9 to 223.5               6.2 to 136.0                -6.7 to 115.0               10.7 to 321.2               -3.5 to 216.0
+abstention: patient-bins NOT RANKED / patient-bins                                0.087 (62942/726031)        0.087 (62942/726031)        0.087 (62942/726031)        0.087 (62942/726031)        0.087 (62942/726031)        0.087 (62942/726031)        0.087 (62942/726031)        0.087 (62942/726031)        0.087 (62942/726031)        0.087 (62942/726031)
+abstention: bins with no row / bins expected in the stays                         0.000 (57/726088)           0.000 (57/726088)           0.000 (57/726088)           0.000 (57/726088)           0.000 (57/726088)           0.000 (57/726088)           0.000 (57/726088)           0.000 (57/726088)           0.000 (57/726088)           0.000 (57/726088)
+abstention: NOT RANKED plus no row / bins expected                                0.087 (62999/726088)        0.087 (62999/726088)        0.087 (62999/726088)        0.087 (62999/726088)        0.087 (62999/726088)        0.087 (62999/726088)        0.087 (62999/726088)        0.087 (62999/726088)        0.087 (62999/726088)        0.087 (62999/726088)
+episodes whose start fell in a NOT RANKED or no-row bin                           7                           7                           7                           7                           7                           7                           7                           7                           7                           7
+new-alert sensitivity, respiratory episodes                                       0.478 (22/46)               0.565 (26/46)               0.761 (35/46)               0.848 (39/46)               0.587 (27/46)               0.587 (27/46)               0.717 (33/46)               0.804 (37/46)               0.543 (25/46)               0.587 (27/46)
+new-alert sensitivity, tachycardic episodes                                       0.500 (9/18)                0.500 (9/18)                0.611 (11/18)               0.722 (13/18)               0.500 (9/18)                0.556 (10/18)               0.667 (12/18)               0.722 (13/18)               0.556 (10/18)               0.556 (10/18)
+new-alert sensitivity, hypotensive episodes                                       0.074 (2/27)                0.037 (1/27)                0.185 (5/27)                0.000 (0/27)                0.148 (4/27)                0.074 (2/27)                0.222 (6/27)                0.000 (0/27)                0.185 (5/27)                0.074 (2/27)
+any-bin alerting, respiratory episodes                                            0.783 (36/46)               0.739 (34/46)               0.891 (41/46)               0.870 (40/46)               0.913 (42/46)               0.891 (41/46)               0.870 (40/46)               0.870 (40/46)               0.891 (41/46)               0.891 (41/46)
+any-bin alerting, tachycardic episodes                                            0.667 (12/18)               0.611 (11/18)               0.722 (13/18)               0.722 (13/18)               0.722 (13/18)               0.722 (13/18)               0.722 (13/18)               0.722 (13/18)               0.722 (13/18)               0.722 (13/18)
+any-bin alerting, hypotensive episodes                                            0.333 (9/27)                0.259 (7/27)                0.259 (7/27)                0.000 (0/27)                0.481 (13/27)               0.333 (9/27)                0.333 (9/27)                0.000 (0/27)                0.519 (14/27)               0.333 (9/27)
+
+synthetic, not validated: evaluated on the same simulator that generated the data
+
+confidence check (slice M3): split-conformal, one negative bin per calibration stay, alpha 0.01
+all: calibration calibration.json sha256 7815bd3885c794fafa38e8384d6837300c163738dbb6a0a7a126c4dca2484f11
+no_temp: calibration calibration_no_temp.json sha256 4a3de9544cce7e6cc838837bb2c1646261d85d1f41bef35f84135509fa0729bb
+
+[all] confidence check, alpha 0.01, held-out ward-v2 seeds 11-30
+calibration facts: n=3238 k=3207 (j=32) q=0.019854247570037842 t=0.006 alpha=0.01 onnx sha256 d1ae4e881732922024b08c6cf9c37adbd8b01c48bc8390ee22b28ab802ddfdbc
+binding
+1. achieved error: mean over 1632 held-out non-starting stays of the share of their negative scored bins with p > q: 0.0065, 95% stay-bootstrap interval 0.0057 to 0.0074, against alpha 0.01
+   context: the same share for the checked rule 0.0065 (0.0057 to 0.0074), for the student alone (p >= t) 0.0407 (0.0380 to 0.0440); pooled over bins: p > q 0.0068 (4072/599144), checked 0.0068 (4072/599144), student 0.0432 (25854/599144)
+   verdict: MET (rule: lower end <= alpha + d, d = 0.0035 from the calibration n)
+2. not sure (p >= t and p <= q): 0.0415 (27523/663089) of scored bins, 0.5970 (27523/46103) of the student's alerting bins
+3. alerting bins: student 46103, checked 18580, removed 27523 (0.597); new alerts: student 6247, checked 1930 (removing bins can split one alert in two, so removed can be negative)
+4. episodes (all evaluated) detected by the student but not by the checked rule: alerting in any bin of the window 8; caught early (a new alert in the window before fully in) 13
+4. episodes (not cut short) detected by the student but not by the checked rule: alerting in any bin of the window 8; caught early (a new alert in the window before fully in) 13
+   chance and excess over chance for both rows: see the table above
+   calibration file sha256 7815bd3885c794fafa38e8384d6837300c163738dbb6a0a7a126c4dca2484f11
+
+[no_temp] confidence check, alpha 0.01, held-out ward-v2 seeds 11-30
+calibration facts: n=3238 k=3207 (j=32) q=0.018539994955062866 t=0.006 alpha=0.01 onnx sha256 e6b6ae44c11aa38fc38a961eebaf3e3bd51b1b5812b9e200d31d8c04101869ee
+binding
+1. achieved error: mean over 1632 held-out non-starting stays of the share of their negative scored bins with p > q: 0.0067, 95% stay-bootstrap interval 0.0058 to 0.0076, against alpha 0.01
+   context: the same share for the checked rule 0.0067 (0.0058 to 0.0076), for the student alone (p >= t) 0.0417 (0.0388 to 0.0449); pooled over bins: p > q 0.0070 (4181/599144), checked 0.0070 (4181/599144), student 0.0439 (26323/599144)
+   verdict: MET (rule: lower end <= alpha + d, d = 0.0035 from the calibration n)
+2. not sure (p >= t and p <= q): 0.0434 (28792/663089) of scored bins, 0.6142 (28792/46875) of the student's alerting bins
+3. alerting bins: student 46875, checked 18083, removed 28792 (0.614); new alerts: student 6188, checked 1926 (removing bins can split one alert in two, so removed can be negative)
+4. episodes (all evaluated) detected by the student but not by the checked rule: alerting in any bin of the window 9; caught early (a new alert in the window before fully in) 13
+4. episodes (not cut short) detected by the student but not by the checked rule: alerting in any bin of the window 9; caught early (a new alert in the window before fully in) 13
+   chance and excess over chance for both rows: see the table above
+   calibration file sha256 4a3de9544cce7e6cc838837bb2c1646261d85d1f41bef35f84135509fa0729bb

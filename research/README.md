@@ -136,7 +136,8 @@ onnxruntime (`research/pyproject.toml`, `uv.lock`); nothing else in `research/` 
   stopping, every model choice, the threshold). Seeds 301-340 are reserved for conformal
   calibration: the loader opens only `manifest.json` and skips them. ward-v2 folders (seeds 1-60)
   are skipped the same way. Any other seed is refused (161-260 are read by no slice).
-- Held out: ward-v2 seeds 11-30, scored once by `evaluate_student`. It refuses ward-v2 seeds 1-10,
+- Held out: ward-v2 seeds 11-30, scored once by `evaluate_student` (by procedure; it was run once, on 2026-11-13, and its outputs are
+  `models/tier_c/student_vitals/held_out.txt` and `held_out.json`). It refuses ward-v2 seeds 1-10,
   which the student no longer uses. The training loader opens only `manifest.json` of a ward-v2 folder and skips it. ward-v2-train (31-60)
   is the reward loop's data.
 - 100 training trials (about 3 million scored bins) were chosen over 200 because of memory (8 GB
@@ -153,7 +154,9 @@ onnxruntime (`research/pyproject.toml`, `uv.lock`); nothing else in `research/` 
   rate, SpO2, temperature): the value; a missing flag; z from the patient's own baseline
   (`baseline_finding`, the detector's DEFAULTS, bins up to this one); a z-missing flag (set while
   the baseline forms, fewer than 24 valid bins). Then the NEWS2 total, on oxygen, consciousness not
-  A. Missing is missing: the number 0 and its flag; nothing is imputed. The no-temperature set drops
+  A. Missing is missing: the number 0 and its flag; nothing is imputed. In the training trials the input "consciousness not A" and the
+  value-missing flags were constant 0 (every scored bin is alert and has all four device vitals), so their standardised value is 0 and
+  the student ignores them in practice. The no-temperature set drops
   the four temperature inputs and uses the NEWS2 total minus its temperature points.
 - Trend inputs (student option; 16 more, 12 without temperature): per vital d1h = value(t) -
   value(t - 60 min) and d4h = value(t) - value(t - 240 min). The lag bin is any cohort row at that
@@ -185,7 +188,7 @@ onnxruntime (`research/pyproject.toml`, `uv.lock`); nothing else in `research/` 
   261-300. Stop after 3 epochs without a strictly lower value. The best epoch's weights are kept (a
   tie keeps the earlier epoch).
 - Soft targets for the students: the chosen teacher's logits on the training rows, clipped to
-  +-9.2102 (p between 1e-4 and 1-1e-4). This clip is for those targets only.
+  +-9.2102 (p between 1e-4 and 1-1e-4). This clip is used for the students' soft targets and for the recorded fidelity RMSE only.
 
 ### The student (per variant)
 
@@ -196,7 +199,7 @@ onnxruntime (`research/pyproject.toml`, `uv.lock`); nothing else in `research/` 
 - Loss: mean squared error on the teacher's clipped logits. No true label is used. Matching logits
   is the high-temperature limit of Hinton's soft-target loss, so a distillation temperature would
   only rescale the target. A probability-space target gives almost no gradient on negative bins at
-  0.2-0.3% prevalence. The last bias starts at the mean target logit.
+  about 0.3% of scored bins positive (0.2735% in training, 0.3143% on validation). The last bias starts at the mean target logit.
 - `nn.Adam`, learning rate 1e-3, weight decay 1e-5 on weights only, batch 4096, at most 8 epochs,
   early stopping on the validation log loss against the true labels, patience 2, best epoch kept.
   Seeds as for the teacher.
@@ -294,7 +297,7 @@ All are fitted on the same training rows and scored on validation seeds 261-300.
 - `evaluate_student` refits only the chosen teacher and student, each for exactly its recorded best
   epoch count (the weights after epoch k of a monitored fit are those of a k-epoch fit, so no
   validation row is read), and refuses on any mismatch of the weight sha256 or the ONNX sha256 with
-  `metadata.json` or the committed file. It also checks the MindIR files against `exports.json`.
+  `metadata.json` or the committed file. It first refuses if the sha256 of `metadata.json` differs from the one in `exports.json` (the file changed after training). It also checks the MindIR files against `exports.json`.
 - Pre-registered fallback if the two runs differ in bytes: `metadata.json` carries
   `byte_reproducible: false` (set with `--byte_reproducible false`), no claim of byte
   reproducibility is made, and the card states the measured largest p difference between the two
@@ -331,7 +334,7 @@ and ward-v2 folders are skipped after reading their manifest; other seeds are re
 
     python -m research.train_student <ward-v2-ext folders> [--out <dir>] [--cache <dir>] [--workers N] [--lite_rows <dir>] [--byte_reproducible true|false] [--run_log <file>] [--commit <sha>] [--run_id <text>]
     python -m research.train_student --data_url <dir of trial folders> --train_url <dir> [--cache <dir>] [--lite_rows <dir>]
-    python -m research.evaluate_student <ward-v2 seed-11..30 folders> <ward-v2-ext seed-61..160 folders> [--cache <dir>]
+    python -m research.evaluate_student <ward-v2 seed-11..30 folders> <ward-v2-ext seed-61..160 folders> [--cache <dir>] [--json <path>]
 
 - `--run_log <file>` (optional) writes one small JSON run log (created with its parent folders):
   `model`, `run_id`, `commit`, the framework and package versions, the settings, the data (seed
@@ -342,8 +345,8 @@ and ward-v2 folders are skipped after reading their manifest; other seeds are re
   numbers, the chosen models, thresholds and validation burden, and the budget cuts. Every wall-clock
   number is under one `time` key, so two runs give the same bytes once `time` is removed. The log is
   separate from `metadata.json` and is not hashed by `evaluate_student`. `--commit` and `--run_id`
-  (letters, digits, `.`, `_`, `-`, at most 64 characters) are recorded as given: research code
-  cannot call git.
+  are recorded as given: `--run_id` takes letters, digits, `.`, `_`, `-`, at most 64 characters; `--commit` takes printable text up to 128
+  characters. Research code cannot call git. `evaluate_student` writes its text and its `--json` file in the same single read.
 - `--out` defaults to `models/tier_c/student_vitals/`. `--cache` keeps per-trial features in a
   folder outside the repo, keyed by the sha256 of the trial's four files and a feature-code
   version. Progress lines (epoch number and seconds only) are printed as it runs; validation
@@ -568,7 +571,7 @@ Written before any calibration or held-out run. Nothing here is changed after a 
 
 What is controlled, in plain words: for a patient who is not starting to deteriorate, at most 1 in 100 of
 their 15-minute checks shows a supported alert, on average over patients. That bounds false alarms per
-patient. It does not bound the share of alerts that are true: positives are about 0.25% of bins, so even
+patient. It does not bound the share of alerts that are true: positives are about 0.3% of scored bins (0.2735% in training, 0.3143% on validation), so even
 when the target is met most supported alerts are still false. One-sided only, against the negative class:
 "quiet" means only that the student rule did not fire, and no confident-quiet claim is made (a two-sided
 Mondrian version was considered and rejected).
@@ -592,7 +595,7 @@ Method (all constants are in the code: `ALPHA = "0.01"`, `DRAW_SEED = 20261113`)
 - Quantile: with n drawn scores, j = floor(alpha (n + 1)) in exact `Fraction` arithmetic, k = n + 1 - j, q = the
   k-th smallest score; j = 0 gives q = +inf (stored as null), so nothing is supported. A bin is supported iff
   p > q (strict, so ties are conservative). Checked rule: alert iff p >= t and p > q; "not sure" iff p >= t and
-  p <= q; "quiet" iff p < t. A "not sure" bin never alerts. If q < t the check is not binding, and the output says so.
+  p <= q; "quiet" iff p < t. A "not sure" bin never alerts. The check is binding iff q is absent (null, +inf) or q >= t (the code's rule); if q < t it is not binding, and the output says so.
 - alpha = 0.01: below the old student's time in alert (about 2%) so it can bind, and far below NEWS2's (about 16%).
 
 What is reported on held-out, once. Rows `student`, `student_checked`, `news2_or_student`,
@@ -605,7 +608,7 @@ split an alert, so "removed" can be negative); (4) episodes the student detects 
 counted both as alerting in any bin of the window and as a new alert before fully in, for all evaluated episodes and
 for those not cut short; (5) n, k, q, t, alpha and the file's sha256. The text is also written to `heldout.txt`
 beside the calibration; a second held-out run is refused while that file exists (delete it only for a counting
-bug, and then show both outputs); the command also prints the output text's sha256 for the card. If the
+bug, and then show both outputs). It was run once, on 2026-11-13: its outputs are `models/tier_c/confidence_check/heldout.txt` and `heldout.json`, and the line is `heldout.txt sha256 a30cad7664c49dc4faa516ceaca335676bfc86a3bb9e0556ab3296a1d5da8abd`; the command also prints the output text's sha256 for the card. If the
 `research.evaluate` sanity guard (a policy with sensitivity 1.0 and no alerts outside the episode windows) ever
 refuses the real held-out run, nothing is written and the slice is parked.
 
@@ -616,13 +619,14 @@ not a defect. "conservative" is also printed when the upper end is < alpha - d.
 Commands (the `--model` folder defaults to `models/tier_c/student_vitals`, `--out` to `models/tier_c/confidence_check`):
 
     python -m research.confidence calibrate <ward-v2-ext folders of seeds 301-340>... [--model <dir>] [--out <dir>] [--cache <dir>] [--workers N] [--run_log <file> --run_id <text> --commit <sha>]
-    python -m research.confidence evaluate <ward-v2 folders of seeds 11-30>... [--model <dir>] [--out <dir>]
+    python -m research.confidence evaluate <ward-v2 folders of seeds 11-30>... [--model <dir>] [--out <dir>] [--json <path>]
 
 `calibrate` writes `calibration.json` (and `calibration_no_temp.json`) with a sibling `.sha256`. `--cache` is the
 feature cache of `research.student`. `--run_log` writes one small JSON (alpha, draw seed, seeds, n, j, k, q, t,
 binding, the ONNX sha256, package versions, at most 200 quantiles of the drawn scores; all wall-clock numbers under
-`time`; no path). `evaluate` refuses unless the file's sha256, ALPHA, the ONNX sha256 (against the file and
-`metadata.json`), t and the scenario hash all match. Both commands first run `evaluate_student`'s check of
+`time`; no path). `evaluate` refuses unless the file's sha256 (its `.sha256` sibling), ALPHA, the variant, days, speed, the exact
+set of fields, j, k and q (which must follow from n), the ONNX sha256 (against the file and
+`metadata.json`), t and the scenario hash all match. `evaluate` writes the text and the `--json` file in the same single read. Both commands first run `evaluate_student`'s check of
 `metadata.json` against `exports.json` and of each ONNX file against `metadata.json`, so an edited threshold is
 refused; an unexpected metadata shape is one refusal line, never a traceback. Exit 2 with one line on any refusal. Tests:
 `tests/test_confidence.py` (standard library) and `tests_ml/test_confidence_ml.py`.
@@ -683,6 +687,47 @@ commands, the run logs and the notebooks.
   `python training/notebooks/execute.py` runs them and saves their outputs. `tests_ml/test_notebooks.py` runs them
   headless in the ML gate (no extra flag) and fails on an error, an absolute path, a read under a trials folder, or an
   import of MindSpore, scikit-learn, onnxruntime or `research.student`.
+
+## Evaluation export (for the Analytics page)
+
+The page types no number. Each file it reads is made by a command, never by hand: the same inputs and the same
+`--date` give the same bytes. This repository owns two exported files (evaluation data contract v3.6): `evaluations.json`
+and `registry.json`. Standard library only; `registry` reads the cards and needs no trial data.
+
+```
+python -m research.evaluate <ward-v2 folders> --json held-evaluate.json
+python -m research.evaluate_student <folders as above> --json held-student.json
+python -m research.reward_loop --evaluate <ward-v2> --out models/tier_b/reward_policy --json held-reward.json
+python -m research.confidence evaluate <ward-v2 folders 11-30> --json held-confidence.json
+python -m research.export_evaluation evaluations --date YYYY-MM-DD --commit <40 hex> --source "<command line that made held-student.json>" --source "<command line that made held-confidence.json>" --held-out held-student.json --held-out held-confidence.json [--drop-rule <id>]... [--confidence held-confidence.json] --out frontend/src/data/evaluation/evaluations.json
+python -m research.export_evaluation registry --date YYYY-MM-DD --commit <40 hex> --out frontend/src/data/evaluation/registry.json
+```
+
+`--json` holds the same numbers as the printed table, from the same pass (full precision; the exporter rounds). The
+printed text does not change. The path is checked first: if it cannot be written, nothing is read or written. The file is written through a scratch file with a name nothing else has (an existing file is never touched), and a write error after the run is a one-line refusal with exit 2. Held-out
+seeds are read once per model. A text report is never a source of a number, so a result that exists only as text is
+absent from `rules` (the exporter says so in `notes`). A rule in two held-out files must have the same numbers; more
+than 30 rules need `--drop-rule`, which writes a line in `notes` naming each dropped row. `--source` is required for `evaluations` (once for each command line that made a held-out file). `--confidence` names the confidence check's held-out JSON (it may be a `--held-out` file too); its `confidence` block is copied with floats rounded to 4 decimals, with its repository path and sha256 (null, with a note, without it). `evaluations.json` has format `biosentry-evaluation/4`. The files refuse a banned word, a number with no plain spelling and a cap that is
+broken, and write nothing then.
+
+## Golden fixture for the wiring slice
+
+`research/tests/data/wiring/golden.json` is a committed golden file. The backend cannot import `research/`, so it
+tests its own feature builder, forward pass, confidence check and policy state machine against it, bin by bin.
+Make it again (ML venv, deterministic bytes): `python -m research.wiring_fixture --out research/tests/data/wiring/golden.json`.
+Shape, format `biosentry-wiring-golden/1`:
+
+- top level: `about`, `bin_minutes`, `files` (path, bytes, sha256 of each model, calibration and policy file), `constants` (t, q, policy params and form, baseline counts, lags), `feature_names`, `stays`, `summary`;
+- a stay: `id`, `source`, `admit_minute`, `bins`: every 15-minute boundary from the first row to the last (`minute` is the END of the bin; a gap has `row` null);
+- a bin: the stored `row`, `news2` (ranked, total, temperature points), `baseline_formed` per vital;
+- a scored bin: per variant `student` (float32 `features`, `p`, `check`) and `policy` (clipped `z`, `score`, `alerting`);
+- a NOT RANKED bin has `student` and `policy` null and `policy_run_reset` true.
+
+Stays: the toy trial and one synthetic 94-bin stay `synthetic-long`: gaps at bins 30 and 84, NOT RANKED bins (consciousness
+missing) at bins 45 and 78, new blood pressure readings at bins 54 and 74 and oxygen switched on at bin 72. Bins 30 and 45
+come while the policy runs are 0. Bins 78 and 84 come inside the alerting stretch, so both policies go alerting, reset, not
+alerting for p - 1 scored bins, alerting again; `summary.totals.resets_after_run` counts these per variant. The file holds what the research code computes on every scored bin. It does not apply the product's
+gates (nothing computed while the baseline forms; the 672-bin cap): `baseline_formed` lets the backend test its own.
 
 ## Real data (eICU-CRD Demo 2.0.1)
 

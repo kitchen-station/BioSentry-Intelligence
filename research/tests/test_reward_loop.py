@@ -607,6 +607,27 @@ def test_evaluate_scores_held_out_rows_from_the_policy_files_config(finished, tm
     assert out.rstrip().endswith("synthetic, not validated: evaluated on the same simulator that generated the data")
 
 
+def test_evaluate_json_holds_the_printed_numbers_and_leaves_the_text_alone(finished, tmp_path, capsys, monkeypatch):
+    from helpers import check_rules_against_text
+    root = tmp_path / "ward-v2"
+    root.mkdir()
+    for s in (11, 12):
+        _write_folder(root, s)
+    monkeypatch.setattr(evaluate, "_sanity", lambda *a: None)
+    assert go(finished, ["--evaluate", str(root)]) == 0
+    plain = capsys.readouterr().out
+    path = tmp_path / "held.json"
+    assert go(finished, ["--evaluate", str(root), "--json", str(path)]) == 0
+    assert capsys.readouterr().out == plain
+    obj = json.loads(path.read_text())
+    ids = [r["id"] for r in obj["rules"]]
+    assert "reward_final" in ids and "news2_or_reward_final_no_temp" in ids and obj["context"]["trials"] == 2
+    check_rules_against_text(obj["rules"], plain)
+    assert go(finished, ["--evaluate", str(root), "--json", str(tmp_path / "no" / "h.json")]) == 2
+    assert "--json" in capsys.readouterr().err
+    assert go(finished, ["--stop", "x", "--json", str(path)]) == 2
+
+
 def test_usage_errors(tmp_path, capsys):
     assert main(["--out", str(tmp_path)]) == 2
     assert main(["--out", str(tmp_path), "--round", "1", "--stop", "x"]) == 2

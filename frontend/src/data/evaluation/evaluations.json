@@ -1,0 +1,1019 @@
+{
+ "body": {
+  "confidence": {
+   "source": {
+    "path": "models/tier_c/confidence_check/heldout.json",
+    "sha256": "fcdb33af74c565a73f8572d004d23133f85e3558f651e92af6c7cd9ae533aa5d"
+   },
+   "variants": {
+    "all": {
+     "achieved_error": {
+      "hi": 0.0074,
+      "lo": 0.0057,
+      "mean": 0.0065
+     },
+     "alerting_bins": {
+      "checked": 18580,
+      "student": 46103
+     },
+     "alpha": "0.01",
+     "binding": true,
+     "bound": 0.0135,
+     "calibration_sha256": "7815bd3885c794fafa38e8384d6837300c163738dbb6a0a7a126c4dca2484f11",
+     "checked_share": {
+      "hi": 0.0074,
+      "lo": 0.0057,
+      "mean": 0.0065
+     },
+     "conservative": false,
+     "j": 32,
+     "k": 3207,
+     "lost": {
+      "all": {
+       "any": 8,
+       "early": 13
+      },
+      "not_cut_short": {
+       "any": 8,
+       "early": 13
+      }
+     },
+     "n_calibration": 3238,
+     "n_stays": 1632,
+     "new_alerts": {
+      "checked": 1930,
+      "student": 6247
+     },
+     "not_sure": {
+      "bins": 27523,
+      "of_scored_bins": 663089,
+      "of_student_alerting_bins": 46103
+     },
+     "onnx_sha256": "d1ae4e881732922024b08c6cf9c37adbd8b01c48bc8390ee22b28ab802ddfdbc",
+     "pooled": {
+      "above_q": 4072,
+      "checked": 4072,
+      "negative_bins": 599144,
+      "scored_bins": 663089,
+      "student": 25854
+     },
+     "q": 0.0199,
+     "spread": 0.0035,
+     "student_share": {
+      "hi": 0.044,
+      "lo": 0.038,
+      "mean": 0.0407
+     },
+     "t": 0.006,
+     "verdict": "MET"
+    },
+    "no_temp": {
+     "achieved_error": {
+      "hi": 0.0076,
+      "lo": 0.0058,
+      "mean": 0.0067
+     },
+     "alerting_bins": {
+      "checked": 18083,
+      "student": 46875
+     },
+     "alpha": "0.01",
+     "binding": true,
+     "bound": 0.0135,
+     "calibration_sha256": "4a3de9544cce7e6cc838837bb2c1646261d85d1f41bef35f84135509fa0729bb",
+     "checked_share": {
+      "hi": 0.0076,
+      "lo": 0.0058,
+      "mean": 0.0067
+     },
+     "conservative": false,
+     "j": 32,
+     "k": 3207,
+     "lost": {
+      "all": {
+       "any": 9,
+       "early": 13
+      },
+      "not_cut_short": {
+       "any": 9,
+       "early": 13
+      }
+     },
+     "n_calibration": 3238,
+     "n_stays": 1632,
+     "new_alerts": {
+      "checked": 1926,
+      "student": 6188
+     },
+     "not_sure": {
+      "bins": 28792,
+      "of_scored_bins": 663089,
+      "of_student_alerting_bins": 46875
+     },
+     "onnx_sha256": "e6b6ae44c11aa38fc38a961eebaf3e3bd51b1b5812b9e200d31d8c04101869ee",
+     "pooled": {
+      "above_q": 4181,
+      "checked": 4181,
+      "negative_bins": 599144,
+      "scored_bins": 663089,
+      "student": 26323
+     },
+     "q": 0.0185,
+     "spread": 0.0035,
+     "student_share": {
+      "hi": 0.0449,
+      "lo": 0.0388,
+      "mean": 0.0417
+     },
+     "t": 0.006,
+     "verdict": "MET"
+    }
+   }
+  },
+  "context": {
+   "bin_minutes": 15,
+   "ci": {
+    "generator_seed": 20261112,
+    "level_percent": 95,
+    "method": "patient-level bootstrap",
+    "resamples": 1000
+   },
+   "control_windows": 4678,
+   "episodes_evaluated": 91,
+   "episodes_not_cut_short": 79,
+   "patient_days": 7565.8,
+   "patients": 1873,
+   "shift_hours": 12,
+   "trials": 20,
+   "tuning": "Detector settings k=4.0 p=8 were chosen on seeds 1 to 10."
+  },
+  "rules": [
+   {
+    "adds_to": null,
+    "any_bin": {
+     "d": 91,
+     "hi": 0.727,
+     "lo": 0.522,
+     "n": 57,
+     "rate": 0.626
+    },
+    "any_bin_not_cut_short": {
+     "d": 79,
+     "n": 54,
+     "rate": 0.684
+    },
+    "chance_any": {
+     "d": 4678,
+     "n": 2215,
+     "rate": 0.473
+    },
+    "chance_new": {
+     "d": 4678,
+     "n": 1058,
+     "rate": 0.226
+    },
+    "excess_any_not_cut_short": 0.21,
+    "id": "news2_chart_trigger",
+    "lead": {
+     "median_minutes": 47.2,
+     "n": 33,
+     "q1_minutes": -6.8,
+     "q3_minutes": 458.5
+    },
+    "name": "NEWS2 chart trigger",
+    "new_alert": {
+     "d": 91,
+     "hi": 0.459,
+     "lo": 0.26,
+     "n": 33,
+     "rate": 0.363
+    },
+    "per_shift": {
+     "hi": 0.434,
+     "lo": 0.395,
+     "value": 0.414
+    },
+    "time_in_alert": {
+     "d": 726031,
+     "n": 115036,
+     "rate": 0.158
+    }
+   },
+   {
+    "adds_to": null,
+    "any_bin": {
+     "d": 91,
+     "hi": 0.675,
+     "lo": 0.462,
+     "n": 52,
+     "rate": 0.571
+    },
+    "any_bin_not_cut_short": {
+     "d": 79,
+     "n": 49,
+     "rate": 0.62
+    },
+    "chance_any": {
+     "d": 4678,
+     "n": 1761,
+     "rate": 0.376
+    },
+    "chance_new": {
+     "d": 4678,
+     "n": 865,
+     "rate": 0.185
+    },
+    "excess_any_not_cut_short": 0.244,
+    "id": "news2_total_ge_5",
+    "lead": {
+     "median_minutes": 45.9,
+     "n": 36,
+     "q1_minutes": -7.8,
+     "q3_minutes": 251.8
+    },
+    "name": "NEWS2 total of 5 or more",
+    "new_alert": {
+     "d": 91,
+     "hi": 0.5,
+     "lo": 0.289,
+     "n": 36,
+     "rate": 0.396
+    },
+    "per_shift": {
+     "hi": 0.357,
+     "lo": 0.322,
+     "value": 0.34
+    },
+    "time_in_alert": {
+     "d": 726031,
+     "n": 86998,
+     "rate": 0.12
+    }
+   },
+   {
+    "adds_to": null,
+    "any_bin": {
+     "d": 91,
+     "hi": 0.36,
+     "lo": 0.174,
+     "n": 24,
+     "rate": 0.264
+    },
+    "any_bin_not_cut_short": {
+     "d": 79,
+     "n": 22,
+     "rate": 0.278
+    },
+    "chance_any": {
+     "d": 4678,
+     "n": 150,
+     "rate": 0.032
+    },
+    "chance_new": {
+     "d": 4678,
+     "n": 117,
+     "rate": 0.025
+    },
+    "excess_any_not_cut_short": 0.246,
+    "id": "baseline_alone",
+    "lead": {
+     "median_minutes": -82.5,
+     "n": 24,
+     "q1_minutes": -102.0,
+     "q3_minutes": 40.7
+    },
+    "name": "Own baseline",
+    "new_alert": {
+     "d": 91,
+     "hi": 0.36,
+     "lo": 0.174,
+     "n": 24,
+     "rate": 0.264
+    },
+    "per_shift": {
+     "hi": 0.049,
+     "lo": 0.035,
+     "value": 0.042
+    },
+    "time_in_alert": {
+     "d": 726031,
+     "n": 8949,
+     "rate": 0.012
+    }
+   },
+   {
+    "adds_to": "news2",
+    "any_bin": {
+     "d": 91,
+     "hi": 0.758,
+     "lo": 0.558,
+     "n": 60,
+     "rate": 0.659
+    },
+    "any_bin_not_cut_short": {
+     "d": 79,
+     "n": 57,
+     "rate": 0.722
+    },
+    "chance_any": {
+     "d": 4678,
+     "n": 2274,
+     "rate": 0.486
+    },
+    "chance_new": {
+     "d": 4678,
+     "n": 1090,
+     "rate": 0.233
+    },
+    "excess_any_not_cut_short": 0.235,
+    "id": "news2_or_baseline",
+    "lead": {
+     "median_minutes": 39.6,
+     "n": 36,
+     "q1_minutes": -11.0,
+     "q3_minutes": 344.6
+    },
+    "name": "NEWS2 or own baseline",
+    "new_alert": {
+     "d": 91,
+     "hi": 0.5,
+     "lo": 0.291,
+     "n": 36,
+     "rate": 0.396
+    },
+    "per_shift": {
+     "hi": 0.444,
+     "lo": 0.407,
+     "value": 0.426
+    },
+    "time_in_alert": {
+     "d": 726031,
+     "n": 119550,
+     "rate": 0.165
+    }
+   },
+   {
+    "adds_to": null,
+    "any_bin": {
+     "d": 91,
+     "hi": 0.343,
+     "lo": 0.165,
+     "n": 23,
+     "rate": 0.253
+    },
+    "any_bin_not_cut_short": {
+     "d": 79,
+     "n": 21,
+     "rate": 0.266
+    },
+    "chance_any": {
+     "d": 4678,
+     "n": 115,
+     "rate": 0.025
+    },
+    "chance_new": {
+     "d": 4678,
+     "n": 83,
+     "rate": 0.018
+    },
+    "excess_any_not_cut_short": 0.241,
+    "id": "baseline_alone_no_temp",
+    "lead": {
+     "median_minutes": -85.3,
+     "n": 23,
+     "q1_minutes": -102.7,
+     "q3_minutes": 42.8
+    },
+    "name": "Own baseline (no temperature)",
+    "new_alert": {
+     "d": 91,
+     "hi": 0.343,
+     "lo": 0.165,
+     "n": 23,
+     "rate": 0.253
+    },
+    "per_shift": {
+     "hi": 0.038,
+     "lo": 0.026,
+     "value": 0.032
+    },
+    "time_in_alert": {
+     "d": 726031,
+     "n": 8233,
+     "rate": 0.011
+    }
+   },
+   {
+    "adds_to": "news2",
+    "any_bin": {
+     "d": 91,
+     "hi": 0.745,
+     "lo": 0.55,
+     "n": 59,
+     "rate": 0.648
+    },
+    "any_bin_not_cut_short": {
+     "d": 79,
+     "n": 56,
+     "rate": 0.709
+    },
+    "chance_any": {
+     "d": 4678,
+     "n": 2263,
+     "rate": 0.484
+    },
+    "chance_new": {
+     "d": 4678,
+     "n": 1084,
+     "rate": 0.232
+    },
+    "excess_any_not_cut_short": 0.225,
+    "id": "news2_or_baseline_no_temp",
+    "lead": {
+     "median_minutes": 44.6,
+     "n": 35,
+     "q1_minutes": -8.7,
+     "q3_minutes": 382.6
+    },
+    "name": "NEWS2 or own baseline (no temperature)",
+    "new_alert": {
+     "d": 91,
+     "hi": 0.489,
+     "lo": 0.277,
+     "n": 35,
+     "rate": 0.385
+    },
+    "per_shift": {
+     "hi": 0.442,
+     "lo": 0.405,
+     "value": 0.425
+    },
+    "time_in_alert": {
+     "d": 726031,
+     "n": 118981,
+     "rate": 0.164
+    }
+   },
+   {
+    "adds_to": null,
+    "any_bin": {
+     "d": 91,
+     "hi": 0.742,
+     "lo": 0.544,
+     "n": 59,
+     "rate": 0.648
+    },
+    "any_bin_not_cut_short": {
+     "d": 79,
+     "n": 56,
+     "rate": 0.709
+    },
+    "chance_any": {
+     "d": 4678,
+     "n": 1438,
+     "rate": 0.307
+    },
+    "chance_new": {
+     "d": 4678,
+     "n": 1094,
+     "rate": 0.234
+    },
+    "excess_any_not_cut_short": 0.401,
+    "id": "teacher",
+    "lead": {
+     "median_minutes": 49.6,
+     "n": 51,
+     "q1_minutes": 5.9,
+     "q3_minutes": 191.5
+    },
+    "name": "Teacher network",
+    "new_alert": {
+     "d": 91,
+     "hi": 0.659,
+     "lo": 0.462,
+     "n": 51,
+     "rate": 0.56
+    },
+    "per_shift": {
+     "hi": 0.408,
+     "lo": 0.374,
+     "value": 0.391
+    },
+    "time_in_alert": {
+     "d": 726031,
+     "n": 50211,
+     "rate": 0.069
+    }
+   },
+   {
+    "adds_to": null,
+    "any_bin": {
+     "d": 91,
+     "hi": 0.762,
+     "lo": 0.57,
+     "n": 61,
+     "rate": 0.67
+    },
+    "any_bin_not_cut_short": {
+     "d": 79,
+     "n": 58,
+     "rate": 0.734
+    },
+    "chance_any": {
+     "d": 4678,
+     "n": 1493,
+     "rate": 0.319
+    },
+    "chance_new": {
+     "d": 4678,
+     "n": 1139,
+     "rate": 0.243
+    },
+    "excess_any_not_cut_short": 0.415,
+    "id": "student",
+    "lead": {
+     "median_minutes": 59.5,
+     "n": 51,
+     "q1_minutes": 6.2,
+     "q3_minutes": 191.5
+    },
+    "name": "Student",
+    "new_alert": {
+     "d": 91,
+     "hi": 0.663,
+     "lo": 0.46,
+     "n": 51,
+     "rate": 0.56
+    },
+    "per_shift": {
+     "hi": 0.43,
+     "lo": 0.394,
+     "value": 0.413
+    },
+    "time_in_alert": {
+     "d": 726031,
+     "n": 46103,
+     "rate": 0.064
+    }
+   },
+   {
+    "adds_to": "news2",
+    "any_bin": {
+     "d": 91,
+     "hi": 0.831,
+     "lo": 0.655,
+     "n": 68,
+     "rate": 0.747
+    },
+    "any_bin_not_cut_short": {
+     "d": 79,
+     "n": 65,
+     "rate": 0.823
+    },
+    "chance_any": {
+     "d": 4678,
+     "n": 2712,
+     "rate": 0.58
+    },
+    "chance_new": {
+     "d": 4678,
+     "n": 1332,
+     "rate": 0.285
+    },
+    "excess_any_not_cut_short": 0.243,
+    "id": "news2_or_student",
+    "lead": {
+     "median_minutes": 66.0,
+     "n": 40,
+     "q1_minutes": 7.7,
+     "q3_minutes": 260.2
+    },
+    "name": "NEWS2 or student",
+    "new_alert": {
+     "d": 91,
+     "hi": 0.537,
+     "lo": 0.337,
+     "n": 40,
+     "rate": 0.44
+    },
+    "per_shift": {
+     "hi": 0.543,
+     "lo": 0.507,
+     "value": 0.525
+    },
+    "time_in_alert": {
+     "d": 726031,
+     "n": 134385,
+     "rate": 0.185
+    }
+   },
+   {
+    "adds_to": null,
+    "any_bin": {
+     "d": 91,
+     "hi": 0.795,
+     "lo": 0.602,
+     "n": 64,
+     "rate": 0.703
+    },
+    "any_bin_not_cut_short": {
+     "d": 79,
+     "n": 60,
+     "rate": 0.759
+    },
+    "chance_any": {
+     "d": 4678,
+     "n": 1671,
+     "rate": 0.357
+    },
+    "chance_new": {
+     "d": 4678,
+     "n": 1142,
+     "rate": 0.244
+    },
+    "excess_any_not_cut_short": 0.402,
+    "id": "teacher_no_temp",
+    "lead": {
+     "median_minutes": 28.4,
+     "n": 49,
+     "q1_minutes": 5.9,
+     "q3_minutes": 140.2
+    },
+    "name": "Teacher network (no temperature)",
+    "new_alert": {
+     "d": 91,
+     "hi": 0.638,
+     "lo": 0.432,
+     "n": 49,
+     "rate": 0.538
+    },
+    "per_shift": {
+     "hi": 0.441,
+     "lo": 0.406,
+     "value": 0.423
+    },
+    "time_in_alert": {
+     "d": 726031,
+     "n": 61163,
+     "rate": 0.084
+    }
+   },
+   {
+    "adds_to": null,
+    "any_bin": {
+     "d": 91,
+     "hi": 0.773,
+     "lo": 0.576,
+     "n": 62,
+     "rate": 0.681
+    },
+    "any_bin_not_cut_short": {
+     "d": 79,
+     "n": 59,
+     "rate": 0.747
+    },
+    "chance_any": {
+     "d": 4678,
+     "n": 1540,
+     "rate": 0.329
+    },
+    "chance_new": {
+     "d": 4678,
+     "n": 1130,
+     "rate": 0.242
+    },
+    "excess_any_not_cut_short": 0.418,
+    "id": "student_no_temp",
+    "lead": {
+     "median_minutes": 48.8,
+     "n": 51,
+     "q1_minutes": 6.2,
+     "q3_minutes": 136.0
+    },
+    "name": "Student (no temperature)",
+    "new_alert": {
+     "d": 91,
+     "hi": 0.663,
+     "lo": 0.46,
+     "n": 51,
+     "rate": 0.56
+    },
+    "per_shift": {
+     "hi": 0.427,
+     "lo": 0.391,
+     "value": 0.409
+    },
+    "time_in_alert": {
+     "d": 726031,
+     "n": 46875,
+     "rate": 0.065
+    }
+   },
+   {
+    "adds_to": "news2",
+    "any_bin": {
+     "d": 91,
+     "hi": 0.835,
+     "lo": 0.651,
+     "n": 68,
+     "rate": 0.747
+    },
+    "any_bin_not_cut_short": {
+     "d": 79,
+     "n": 65,
+     "rate": 0.823
+    },
+    "chance_any": {
+     "d": 4678,
+     "n": 2699,
+     "rate": 0.577
+    },
+    "chance_new": {
+     "d": 4678,
+     "n": 1310,
+     "rate": 0.28
+    },
+    "excess_any_not_cut_short": 0.246,
+    "id": "news2_or_student_no_temp",
+    "lead": {
+     "median_minutes": 66.0,
+     "n": 40,
+     "q1_minutes": 10.7,
+     "q3_minutes": 321.2
+    },
+    "name": "NEWS2 or student (no temperature)",
+    "new_alert": {
+     "d": 91,
+     "hi": 0.538,
+     "lo": 0.338,
+     "n": 40,
+     "rate": 0.44
+    },
+    "per_shift": {
+     "hi": 0.53,
+     "lo": 0.494,
+     "value": 0.512
+    },
+    "time_in_alert": {
+     "d": 726031,
+     "n": 132752,
+     "rate": 0.183
+    }
+   },
+   {
+    "adds_to": null,
+    "any_bin": {
+     "d": 91,
+     "hi": 0.681,
+     "lo": 0.473,
+     "n": 53,
+     "rate": 0.582
+    },
+    "any_bin_not_cut_short": {
+     "d": 79,
+     "n": 50,
+     "rate": 0.633
+    },
+    "chance_any": {
+     "d": 4678,
+     "n": 415,
+     "rate": 0.089
+    },
+    "chance_new": {
+     "d": 4678,
+     "n": 362,
+     "rate": 0.077
+    },
+    "excess_any_not_cut_short": 0.544,
+    "id": "student_checked",
+    "lead": {
+     "median_minutes": 20.5,
+     "n": 52,
+     "q1_minutes": -7.3,
+     "q3_minutes": 122.6
+    },
+    "name": "Checked student",
+    "new_alert": {
+     "d": 91,
+     "hi": 0.667,
+     "lo": 0.464,
+     "n": 52,
+     "rate": 0.571
+    },
+    "per_shift": {
+     "hi": 0.14,
+     "lo": 0.116,
+     "value": 0.128
+    },
+    "time_in_alert": {
+     "d": 726031,
+     "n": 18580,
+     "rate": 0.026
+    }
+   },
+   {
+    "adds_to": "news2",
+    "any_bin": {
+     "d": 91,
+     "hi": 0.782,
+     "lo": 0.593,
+     "n": 63,
+     "rate": 0.692
+    },
+    "any_bin_not_cut_short": {
+     "d": 79,
+     "n": 60,
+     "rate": 0.759
+    },
+    "chance_any": {
+     "d": 4678,
+     "n": 2299,
+     "rate": 0.491
+    },
+    "chance_new": {
+     "d": 4678,
+     "n": 1124,
+     "rate": 0.24
+    },
+    "excess_any_not_cut_short": 0.268,
+    "id": "news2_or_student_checked",
+    "lead": {
+     "median_minutes": 44.6,
+     "n": 39,
+     "q1_minutes": -7.9,
+     "q3_minutes": 223.5
+    },
+    "name": "NEWS2 or checked student",
+    "new_alert": {
+     "d": 91,
+     "hi": 0.525,
+     "lo": 0.323,
+     "n": 39,
+     "rate": 0.429
+    },
+    "per_shift": {
+     "hi": 0.457,
+     "lo": 0.418,
+     "value": 0.438
+    },
+    "time_in_alert": {
+     "d": 726031,
+     "n": 120082,
+     "rate": 0.165
+    }
+   },
+   {
+    "adds_to": null,
+    "any_bin": {
+     "d": 91,
+     "hi": 0.681,
+     "lo": 0.473,
+     "n": 53,
+     "rate": 0.582
+    },
+    "any_bin_not_cut_short": {
+     "d": 79,
+     "n": 50,
+     "rate": 0.633
+    },
+    "chance_any": {
+     "d": 4678,
+     "n": 427,
+     "rate": 0.091
+    },
+    "chance_new": {
+     "d": 4678,
+     "n": 362,
+     "rate": 0.077
+    },
+    "excess_any_not_cut_short": 0.542,
+    "id": "student_checked_no_temp",
+    "lead": {
+     "median_minutes": 16.1,
+     "n": 50,
+     "q1_minutes": -6.7,
+     "q3_minutes": 115.0
+    },
+    "name": "Checked student (no temperature)",
+    "new_alert": {
+     "d": 91,
+     "hi": 0.645,
+     "lo": 0.444,
+     "n": 50,
+     "rate": 0.549
+    },
+    "per_shift": {
+     "hi": 0.139,
+     "lo": 0.115,
+     "value": 0.127
+    },
+    "time_in_alert": {
+     "d": 726031,
+     "n": 18083,
+     "rate": 0.025
+    }
+   },
+   {
+    "adds_to": "news2",
+    "any_bin": {
+     "d": 91,
+     "hi": 0.782,
+     "lo": 0.593,
+     "n": 63,
+     "rate": 0.692
+    },
+    "any_bin_not_cut_short": {
+     "d": 79,
+     "n": 60,
+     "rate": 0.759
+    },
+    "chance_any": {
+     "d": 4678,
+     "n": 2298,
+     "rate": 0.491
+    },
+    "chance_new": {
+     "d": 4678,
+     "n": 1118,
+     "rate": 0.239
+    },
+    "excess_any_not_cut_short": 0.268,
+    "id": "news2_or_student_checked_no_temp",
+    "lead": {
+     "median_minutes": 44.6,
+     "n": 39,
+     "q1_minutes": -3.5,
+     "q3_minutes": 216.0
+    },
+    "name": "NEWS2 or checked student (no temperature)",
+    "new_alert": {
+     "d": 91,
+     "hi": 0.525,
+     "lo": 0.323,
+     "n": 39,
+     "rate": 0.429
+    },
+    "per_shift": {
+     "hi": 0.452,
+     "lo": 0.413,
+     "value": 0.433
+    },
+    "time_in_alert": {
+     "d": 726031,
+     "n": 119527,
+     "rate": 0.165
+    }
+   }
+  ]
+ },
+ "format": "biosentry-evaluation/4",
+ "notes": [
+  "The reward policy's rules are absent: its held-out result exists only as a text report, and a text report is never a source of a number.",
+  "6 rule rows appeared in more than one held-out file with the same values; each is kept once."
+ ],
+ "provenance": {
+  "commit": "e82cb9a9481e714a72a8241bf48366c6fc86f7b2",
+  "data": "ward-v2 simulator trials",
+  "date": "2026-11-13",
+  "exporter": {
+   "name": "research.export_evaluation",
+   "version": "1"
+  },
+  "repo": "kitchen-station/BioSentry-Intelligence",
+  "seeds": [
+   {
+    "role": "held out",
+    "seeds": [
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19,
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30
+    ]
+   }
+  ],
+  "source": [
+   "python -m research.evaluate_student $(for s in $(seq 11 30); do echo /data/trials/ward-v2/seed-$s; done) $(for s in $(seq 61 160); do echo /data/trials/ward-v2-ext/seed-$s; done) --cache /cache --json /out/held-student.json > /out/student.txt",
+   "cp /out/held-student.json models/tier_c/student_vitals/held_out.json; cp /out/student.txt models/tier_c/student_vitals/held_out.txt",
+   "python -m research.confidence evaluate $(for s in $(seq 11 30); do echo /data/trials/ward-v2/seed-$s; done) --json models/tier_c/confidence_check/heldout.json"
+  ],
+  "synthetic": true,
+  "validated": false
+ },
+ "section": "evaluations"
+}

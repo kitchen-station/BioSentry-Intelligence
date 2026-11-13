@@ -1125,6 +1125,7 @@ def _variant(tag: str, temp: bool, train, val, g: Grid, plan: Plan, work: Path, 
     _standardise(xv, mean, std)
     const = float(yt.mean())
     rl_fits, rl_refs, times = [], {}, {"fits": {}, "references": {}}
+    at: dict[int, int] = {}  # id of a fit dict -> its index in rl_fits (kept out of the dicts: metadata.json holds them)
 
     def note(name, kind, inputs, width, wd, f, params, ap):
         """The run log's deterministic record of one fit, and its wall times kept apart."""
@@ -1146,9 +1147,11 @@ def _variant(tag: str, temp: bool, train, val, g: Grid, plan: Plan, work: Path, 
         s = Student("teacher", mean, std, f.layers)
         ap = average_precision(yv, _sigmoid(_logits(f.layers, xv)))
         note(f"{tag} teacher decay {wd:g}", "teacher", "teacher", list(g.teacher_widths), wd, f, s.parameters, ap)
-        fits.append({"weight_decay": wd, "parameters": s.parameters, "best_epoch": f.best_epoch,
+        f_t = ({"weight_decay": wd, "parameters": s.parameters, "best_epoch": f.best_epoch,
                      "epochs_run": len(f.val_losses), "exact": min(f.val_losses), "val_log_loss": _round(min(f.val_losses)),
                      "val_log_loss_by_epoch": [_round(v) for v in f.val_losses], "student": s})
+        at[id(f_t)] = len(rl_fits) - 1
+        fits.append(f_t)
     chosen_t = pick(fits, _teacher_key)
     teacher = chosen_t["student"]
     soft = _soft(teacher, xt)
@@ -1190,11 +1193,13 @@ def _variant(tag: str, temp: bool, train, val, g: Grid, plan: Plan, work: Path, 
                 note(f"{tag} {'distilled' if loss == 'mse' else 'hard-label'} {kind} width {w}",
                      "distilled" if loss == "mse" else "hard_label", kind, w, g.student_decay, f, st.parameters,
                      stats["average_precision"])
-                bucket.append({"inputs": kind, "width": w, "weight_decay": g.student_decay, "loss": loss,
+                f_s = ({"inputs": kind, "width": w, "weight_decay": g.student_decay, "loss": loss,
                                "parameters": st.parameters, "best_epoch": f.best_epoch,
                                "epochs_run": len(f.val_losses),
                                "val_log_loss_by_epoch": [_round(v) for v in f.val_losses],
                                **stats, "student": st, "p": _sigmoid(z)})
+                at[id(f_s)] = len(rl_fits) - 1
+                bucket.append(f_s)
         del xs, xsv
     best_d, best_h = pick(distilled, _student_key), pick(hard, _student_key)
 
@@ -1234,7 +1239,8 @@ def _variant(tag: str, temp: bool, train, val, g: Grid, plan: Plan, work: Path, 
     res.teacher = teacher
     res.runlog = {"rows": {"training_rows": len(yt), "validation_rows": len(yv), "training_positives": int((yt == 1).sum()),
                            "validation_positives": int((yv == 1).sum())},
-                  "fits": rl_fits, "references": rl_refs}
+                  "fits": rl_fits, "references": rl_refs,
+                  "fit_index": {"teacher": at[id(chosen_t)], "student": None if chosen is None else at[id(chosen)]}}
     res.times = times
     public = lambda c: {k: v for k, v in c.items() if k not in ("student", "p", "exact")}  # noqa: E731
     sc = None if chosen is None else {k: chosen[k] for k in ("inputs", "width", "weight_decay", "loss", "best_epoch",

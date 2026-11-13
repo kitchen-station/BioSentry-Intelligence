@@ -16,6 +16,8 @@ and is not described here. Everything is synthetic and not validated.
 
 The full commands, options and the rules fixed before each run are in `research/README.md`. Held-out seeds
 (ward-v2 11-30) are scored once, at the end, and never by a notebook.
+The student's held-out result is in `models/tier_c/student_vitals/held_out.txt` and `held_out.json`.
+The confidence check's is in `models/tier_c/confidence_check/heldout.txt` and `heldout.json`.
 
 ## Run logs
 
@@ -33,7 +35,7 @@ no path.
 
 `training/notebooks/student_vitals.ipynb`, `reward_policy.ipynb`, `confidence_check.ipynb`. A notebook only
 reads the newest run log of its model and the committed result files, and draws them. It never trains, never
-opens a trial, never computes a new held-out number (it quotes the held-out text files written once). It uses
+opens a trial, never computes a new held-out number (it reads the held-out files written once). It uses
 paths from the repository root, no clock and no random numbers. They are committed with their outputs.
 
 Run them again with `python training/notebooks/execute.py [name ...]` in the research environment (needs

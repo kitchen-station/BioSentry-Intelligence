@@ -23,6 +23,11 @@ NAMES = ("reward_policy", "student_vitals", "confidence_check")
 LOGS = {"reward_policy": "reward_policy", "student_vitals": "student_vitals", "confidence_check": "confidence_check"}
 
 
+CC = REPO / "models" / "tier_c" / "confidence_check"
+SV = REPO / "models" / "tier_c" / "student_vitals"
+HELD_CC = json.loads((CC / "heldout.json").read_text())
+
+
 def committed_log(name: str) -> bool:
     return any((REPO / "training" / "runs" / LOGS[name]).glob("*.json"))
 
@@ -51,6 +56,12 @@ def texts(nb) -> str:
             out += [str(v) for k, v in o.get("data", {}).items() if k != "image/png"]
             out.append(o.get("evalue", ""))
     return "\n".join(out)
+
+
+def outputs(nb) -> str:
+    """Only what the cells printed or displayed (not their code)."""
+    return "\n".join("".join(o.get("text", "")) + "".join(str(v) for k, v in o.get("data", {}).items() if k != "image/png")
+                     for c in nb.cells for o in c.get("outputs", []))
 
 
 def figures(nb) -> int:
@@ -130,26 +141,38 @@ def test_the_student_notebook_runs_on_a_tiny_log(tmp_path, built, tfs, monkeypat
     assert figures(nb) == 6  # two loss figures, scores, gate, gap, parameters
     assert "run id m1-tiny, commit abc1234" in texts(nb) and "Reading (with temperature)" in texts(nb)
     assert "Reading (without temperature)" in texts(nb)
+    assert "No held-out file is in this repository" in outputs(nb)  # the tiny repository has no held_out.json
 
 
-def test_the_confidence_notebook_runs_on_a_tiny_log(tmp_path, patched, model):  # noqa: F811
+def confidence_repo(tmp_path, model, with_result: bool):
     repo = tmp_path / "repo"
     log = repo / "training" / "runs" / "confidence_check" / "m3-tiny.json"
     _calibrate(tmp_path, model, "cal", run_log=log, run_id="m3-tiny", commit="abc1234")
     out = repo / "models" / "tier_c" / "confidence_check"
     out.mkdir(parents=True)
-    (out / "heldout.txt").write_text(
-        "a table row that is not quoted\n[all] confidence check, alpha 0.01, held-out ward-v2 seeds 11-30\n"
-        "calibration facts: n=104 k=104 (j=1) q=0.5 t=0.1\nbinding\n"
-        "1. achieved error: 0.0100, 95% stay-bootstrap interval 0.0 to 0.02, against alpha 0.01\n"
-        "   verdict: MET\n2. not sure: 0.1\nanother table row\n")
+    if with_result:
+        shutil.copy(CC / "heldout.json", out / "heldout.json")
     folder = shaped(repo, "confidence_check")
-    nb = run(folder / "confidence_check.ipynb", folder)
+    return run(folder / "confidence_check.ipynb", folder)
+
+
+def test_the_confidence_notebook_runs_on_a_tiny_log(tmp_path, patched, model):  # noqa: F811
+    nb = confidence_repo(tmp_path, model, with_result=False)  # a repository without the held-out file
     plain(nb)
     text = texts(nb)
     assert figures(nb) == 1 and "run id m3-tiny, commit abc1234" in text and "n = 104" in text and "j = 1" in text
-    assert "1. achieved error: 0.0100" in text and "   verdict: MET" in text and "not quoted" not in text
+    shown = outputs(nb)
+    assert "No held-out file is in this repository" in shown and "verdict, as written" not in shown
     assert "not applicable (" in text  # the no-temperature variant has no usable threshold in this fixture
+
+
+def test_the_confidence_notebook_reads_the_held_out_json_when_it_exists(tmp_path, patched, model):  # noqa: F811
+    nb = confidence_repo(tmp_path, model, with_result=True)
+    plain(nb)
+    text = texts(nb)
+    assert "No held-out file is in this repository" not in outputs(nb)
+    for tag in HELD_CC["confidence"].values():
+        assert f"| verdict, as written | {tag['verdict']} |" in text and f"| alpha | {tag['alpha']} |" in text
 
 
 # --- the notebooks on the committed logs of the real runs ---
@@ -162,3 +185,46 @@ def test_the_committed_notebooks_run_on_the_committed_logs(name):
     assert figures(nb) >= 1
     saved = nbformat.read(str(BOOKS / f"{name}.ipynb"), as_version=4)
     assert all(c.execution_count for c in saved.cells if c.cell_type == "code") and figures(saved) == figures(nb)
+
+
+# --- every number a held-out cell states is in the committed result files ---
+
+def source_numbers(*files: Path) -> set[str]:
+    """The numbers written in the text reports, and every number leaf of the JSON in the usual roundings."""
+    out: set[str] = set()
+    for f in files:
+        out.update(re.findall(r"\d+(?:\.\d+)?", f.read_text()))
+    def walk(x):
+        if isinstance(x, dict):
+            for v in x.values():
+                walk(v)
+        elif isinstance(x, list):
+            for v in x:
+                walk(v)
+        elif isinstance(x, (int, float)) and not isinstance(x, bool):
+            out.update({str(x), *(f"{x:.{d}f}" for d in (1, 3, 4))})
+    for f in files:
+        if f.suffix == ".json":
+            walk(json.loads(f.read_text()))
+    return out
+
+
+@pytest.mark.parametrize("name, folder, files", [
+    ("student_vitals", SV, ("held_out.json", "held_out.txt")), ("confidence_check", CC, ("heldout.json", "heldout.txt"))])
+def test_every_number_in_the_held_out_cells_is_in_the_result_files(name, folder, files):
+    nb = nbformat.read(str(BOOKS / f"{name}.ipynb"), as_version=4)
+    start = next(i for i, c in enumerate(nb.cells) if c.cell_type == "markdown" and c.source.startswith("## The held-out result"))
+    known = source_numbers(*(folder / f for f in files))
+    shown = [c for c in nb.cells[start + 1:] if c.cell_type == "markdown" or c.cell_type == "code"]
+    stated = []
+    for c in shown:
+        if c.cell_type == "markdown":
+            stated.append(c.source)
+        else:
+            for o in c.get("outputs", []):
+                stated.append("".join(o.get("text", "")))
+                stated += [str(v) for k, v in o.get("data", {}).items() if k != "image/png"]
+    text = "\n".join(stated)
+    assert "scored once" in text and "No held-out file" not in text
+    missing = sorted(n for n in set(re.findall(r"\d+(?:\.\d+)?", text)) if n not in known)
+    assert not missing, missing

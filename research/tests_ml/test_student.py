@@ -678,6 +678,23 @@ def test_the_metadata_names_mindspore_and_records_the_grid_gates_and_counts(buil
     assert "second" not in (tmp_path / "exports.json").read_text()
 
 
+@pytest.mark.parametrize("shipped", ["distilled_student", "hard_label_mlp"])
+def test_the_run_log_points_at_the_chosen_fits_by_index(tmp_path, monkeypatch, tfs, shipped):
+    monkeypatch.setattr(student, "decide", lambda *a: shipped)
+    b = student.build(tfs[:2], tfs[2:], TINY)
+    monkeypatch.setattr(train_student, "GRID", TINY)
+    top = train_student.write_outputs(tmp_path, b, tfs[:2], tfs[2:], {"ward_v2": [], "calibration": [305]}, True)
+    log = train_student.run_log(top, b, "t", "c")
+    for v in log["variants"].values():
+        t, st = v["chosen"]["teacher"], v["chosen"]["student"]
+        ft, fs = v["fits"][t["fit_index"]], v["fits"][st["fit_index"]]
+        assert (ft["kind"], ft["weight_decay"]) == ("teacher", t["weight_decay"])
+        assert (fs["kind"], fs["inputs"], fs["width"], fs["weight_decay"]) == (
+            {"distilled_student": "distilled", "hard_label_mlp": "hard_label"}[shipped], st["inputs"], st["width"], st["weight_decay"])
+        assert ft["best_epoch"] == t["best_epoch"] and fs["best_epoch"] == st["best_epoch"]
+    assert "fit_index" not in (tmp_path / "metadata.json").read_text()
+
+
 def _patch_run(monkeypatch, tfs, grid=TINY):
     monkeypatch.setattr(train_student, "load_for_training",
                         lambda folders, cache=None, workers=None: (tfs[:2], tfs[2:], {"ward_v2": [], "calibration": [305]}))
@@ -1049,6 +1066,24 @@ def test_a_changed_byte_in_metadata_json_is_refused(tmp_path, monkeypatch, built
     held, tr = ext_folder(tmp_path, "h", 11), ext_folder(tmp_path, "t", 61)
     with pytest.raises(TrialError, match="metadata.json: sha256 differs"):
         evaluate_student.run([str(held), str(tr)], out=out, workers=1)
+
+
+def test_the_json_flag_writes_the_held_out_json_and_refuses_an_unwritable_path_first(tmp_path, monkeypatch, capsys):
+    calls = []
+
+    def fake(folders, out, cache, workers, result=None):
+        calls.append(result)
+        if result is not None:
+            result.update({"format": "biosentry-held-out/1", "rules": [], "context": {}})
+        return "the text\n"
+
+    monkeypatch.setattr(evaluate_student, "run", fake)
+    path = tmp_path / "held.json"
+    assert evaluate_student.main(["x", "--json", str(path)]) == 0 and calls[-1] == json.loads(path.read_text())
+    assert capsys.readouterr().out == "the text\n"
+    assert evaluate_student.main(["x"]) == 0 and calls[-1] is None and capsys.readouterr().out == "the text\n"
+    n = len(calls)
+    assert evaluate_student.main(["x", "--json", str(tmp_path / "no" / "h.json")]) == 2 and len(calls) == n
 
 
 def test_exact_mode_reads_no_validation_folder_but_the_fallback_does(tmp_path, monkeypatch, opened, built, tfs):

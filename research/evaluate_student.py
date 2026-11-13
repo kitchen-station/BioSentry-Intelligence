@@ -1,6 +1,6 @@
 """Held-out rows for the distilled vitals student (slice M1), next to NEWS2 and the baseline.
 
-    python -m research.evaluate_student <trial folder>... [--cache <dir>] [--workers N]
+    python -m research.evaluate_student <trial folder>... [--cache <dir>] [--workers N] [--json <held-out.json>]
 
 Give the ward-v2 folders of seeds 11 to 30 (scored once) and the ward-v2-ext folders of seeds 61
 to 160 (to refit on), and, when metadata.json says `byte_reproducible: false`, also the ward-v2-ext
@@ -112,7 +112,8 @@ def student_policies(train, val, meta: dict, out: Path) -> tuple[tuple, list[str
     return tuple(policies), notes
 
 
-def run(folders: list[str], out: Path = OUT, cache: str | None = None, workers: int | None = None) -> str:
+def run(folders: list[str], out: Path = OUT, cache: str | None = None, workers: int | None = None,
+        result: dict | None = None) -> str:
     train, held = load_for_evaluation(folders, cache, workers)
     if not held:
         raise TrialError("no ward-v2 folder of seeds 11 to 30 given")
@@ -136,7 +137,7 @@ def run(folders: list[str], out: Path = OUT, cache: str | None = None, workers: 
     params, _ = evaluate._baseline_params()
     policies = (POLICIES + baseline_policies(params.k, params.p)
                 + baseline_policies(params.k, params.p, "_no_temp", NO_TEMP) + extra)
-    text = evaluate.run(held, policies)
+    text = evaluate.run(held, policies, result)
     mode = ("refitted the chosen teacher and student and matched their weight and ONNX sha256 to metadata.json"
             if meta["byte_reproducible"] else
             "byte_reproducible is false: the committed files matched by sha256 and the committed ONNX re-scored "
@@ -148,8 +149,13 @@ def run(folders: list[str], out: Path = OUT, cache: str | None = None, workers: 
 
 def main(argv: list[str]) -> int:
     try:
+        argv, json_path = evaluate.pop_json(argv)
+        evaluate.check_json_path(json_path)  # before any trial is read
         a = _parser().parse_args(argv)
-        text = run(a.folders, Path(a.out) if a.out else OUT, a.cache, a.workers)
+        result: dict = {}
+        text = run(a.folders, Path(a.out) if a.out else OUT, a.cache, a.workers, result if json_path else None)
+        if json_path:
+            evaluate.write_json(json_path, result)
     except TrialError as e:
         print(f"refused: {e}", file=sys.stderr)
         return 2

@@ -41,7 +41,8 @@ WRITTEN_BY = {".mindir": "MindSpore export", ".onnx": "onnx.helper, built from t
 # Everything else under models/ must be a record: this rule. Anything that is neither is refused, so a
 # new model file cannot slip in without a line in MODEL_FILES.
 RECORD_SUFFIXES = {".md", ".txt", ".jsonl", ".sh", ".sha256"}
-RECORD_NAMES = {"metadata.json", "exports.json", "timing.json", "manifest.json"}
+RECORD_NAMES = {"metadata.json", "exports.json", "timing.json", "manifest.json",
+                "held_out.json", "heldout.json"}  # the one-time held-out results
 RECORD_FOLDERS = {"rounds", "generations"}  # generation records and the dropped rounds' policies
 
 

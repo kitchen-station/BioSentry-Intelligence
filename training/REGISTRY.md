@@ -34,5 +34,7 @@ Synthetic and not validated. The models table is generated from `models/manifest
 
 ## Language model
 
+The language model's own registry is `training/agent/REGISTRY.md`.
+
 <!-- language-model: filled by the research-agent session -->
 <!-- /language-model -->
