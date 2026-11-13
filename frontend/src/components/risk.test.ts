@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { band, obsDue, response, unacknowledged } from "./risk";
+import { band, driftResponse, obsDue, response, unacknowledged } from "./risk";
 
 const r = (score: number, ...texts: string[]) => ({
   score,
@@ -70,5 +70,27 @@ describe("unacknowledged high-risk alerts", () => {
     expect(unacknowledged(rows, new Map([["a", 9]])).map((x) => x.id)).toEqual(["b"]);
     expect(unacknowledged([row("a", 10)], new Map([["a", 9]])).map((x) => x.id)).toEqual(["a"]);
     expect(unacknowledged([row("a", 8)], new Map([["a", 9]]))).toEqual([]);
+  });
+});
+
+describe("an own-baseline drift reason", () => {
+  const drift = { text: "Drifting from own baseline: heart rate, 3 h (synthetic, not validated)", rule: "tier_b_finding" as const, pathway: "circulatory" };
+  const flagged = (id: string, score: number) => ({ id, score, escalation_reasons: [drift] });
+
+  it("gives the same band as without it", () => {
+    for (const score of [0, 4, 5, 7]) expect(band(flagged("a", score))).toBe(band(r(score)));
+  });
+
+  it("does not put a flagged row in the acknowledge strip", () => {
+    expect(unacknowledged([flagged("a", 4), flagged("b", 6), flagged("c", 8)], new Map()).map((x) => x.id)).toEqual(["c"]);
+  });
+
+  it("words the role line without a NEWS2 response", () => {
+    expect(driftResponse("rn", 2)).toBe("Not a NEWS2 trigger. NEWS2 response: nurse assessment");
+    expect(driftResponse("charge_rn", 2)).toBe(driftResponse("rn", 2));
+    expect(driftResponse("rn", 0)).toBe("Not a NEWS2 trigger. NEWS2 response: routine monitoring");
+    expect(driftResponse("charge_rn", 0)).toBe(driftResponse("rn", 0));
+    expect(driftResponse("md", 0)).toBe("Not a NEWS2 trigger. NEWS2 response: no medical review triggered");
+    expect(driftResponse("md", 3)).toBe(driftResponse("md", 0));
   });
 });

@@ -202,6 +202,7 @@ def unscored() -> dict[str, Any]:
         "last_update_s", "synthetic",
     )  # fmt: skip
     state = {key: row[key] for key in keys}
+    state["admitted_at"] = "2026-09-03T04:00:00Z"
     state["vital_history"] = {
         k: [{"time": "2026-09-03T06:30:00Z", "value": 97}]
         for k in ("heart_rate", "respiratory_rate", "spo2")
@@ -293,7 +294,7 @@ _BUILDERS: dict[type[BaseModel], Any] = {
         "patient_id": "p-001",
         "synthetic": True,
         "admission_known": True,
-        "label": "Research finding. Synthetic, not validated. Does not change the rank.",
+        "label": "Research finding. Synthetic, not validated. Breaks ties between equal NEWS2 totals below a trigger.",
         "params": {"window_bins": 24, "k": 2.0, "p": 3},
         "vitals": [
             {"vital": "spo2", "status": "forming", "bins_valid": 10, "bins_needed": 24},

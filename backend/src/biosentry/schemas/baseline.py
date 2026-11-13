@@ -19,7 +19,7 @@ from .base import Contract, Flag, NonNegInt, Num
 from .tiers import FindingDirection
 
 BaselineVital = Literal["heart_rate", "respiratory_rate", "spo2", "temperature"]
-BASELINE_LABEL: Final = "Research finding. Synthetic, not validated. Does not change the rank."
+BASELINE_LABEL: Final = "Research finding. Synthetic, not validated. Breaks ties between equal NEWS2 totals below a trigger."
 # Fixed text only: no stored free text can reach this response, and each string is capped.
 Short = Annotated[str, Field(max_length=32)]
 
@@ -63,14 +63,14 @@ class BaselineForming(Contract):
 class BaselineUnavailable(Contract):
     vital: BaselineVital
     status: Literal["unavailable"]
-    reason: Literal["no_history", "latest_bin_missing"]
+    reason: Literal["no_history", "latest_bin_missing", "patch_not_live"]
 
 
 class BaselineResponse(Contract):
     patient_id: Annotated[str, Field(max_length=64)]
     synthetic: Flag
     admission_known: Flag  # false: the window starts at the first stored bin, not at admission
-    label: Literal["Research finding. Synthetic, not validated. Does not change the rank."]
+    label: Literal["Research finding. Synthetic, not validated. Breaks ties between equal NEWS2 totals below a trigger."]
     params: BaselineUsed
     vitals: Annotated[
         list[

@@ -130,3 +130,4 @@ class UnscoredPatient(Contract):
     signal_quality: Percent | None
     last_update_s: NonNegNum | None
     synthetic: Flag
+    admitted_at: AwareDatetime | None  # None: the arrival is not known (I1)

@@ -1,10 +1,10 @@
 """The escalation arbiter: the only component allowed to change displayed priority.
 
-v1 implements two rules; the others are typed, inert hooks (README, "Design rules"):
+v1 implements three rules; the others are typed, inert hooks (README, "Design rules"):
 
   1. Tier A threshold met -> escalate unconditionally.            LIVE
   2. Tier C may raise, never below Tier A.                        inert (no Tier C yet)
-  3. Tier B significant finding -> raise and attach the pathway.  inert (no Tier B yet)
+  3. Tier B significant finding -> list it, attach the pathway.   LIVE (a tie-break, see below)
   4. Notes-layer concern or a "worried" pin -> raise, attach it.  inert (v2)
   5. Missing required input -> NOT RANKED, naming it. Never impute. LIVE
 
@@ -13,7 +13,9 @@ supplied, so a reader can see what was ignored. A tier that abstains contributes
 
 Rule 1 policy: NEWS2 chart 2 triggers. Any trigger (a single parameter at 3, a total of 5-6,
 a total of 7 or more) escalates; a total of 0-4 with no single 3 does not. Order within the
-ward is by trigger level, then NEWS2 total, then patient id (a deterministic tie-break).
+ward is by trigger level, then NEWS2 total, then a Tier B flag, then patient id. The flag only
+orders patients with no trigger and an equal total: it never moves a patient past a NEWS2 difference
+and never sets `escalated`. A learned policy hook (`PolicySignal`) is inert like the others.
 """
 
 from collections.abc import Iterable
@@ -30,6 +32,7 @@ from .scoring.tier_a import (
     Problem,
     Risk,
 )
+from .scoring.tier_b.baseline import Deviation
 from .scoring.tier_b.interface import Finding
 
 _LEVEL = {Risk.low: 0, Risk.low_medium: 1, Risk.medium: 2, Risk.high: 3}
@@ -47,6 +50,12 @@ _DEVICE = {
     "heart_rate": "Heart rate",
     "temperature": "Temperature",
 }
+_NAME = {
+    "heart_rate": "heart rate",
+    "respiratory_rate": "respiratory rate",
+    "spo2": "SpO2",
+    "temperature": "temperature",
+}
 _DEVICE_INSTRUCTION = "Check the patch is applied and the signal is verified, or enter the observations"
 _NO_DEVICE_INSTRUCTION = "Apply the patch and verify the signal, or enter the observations"
 
@@ -56,12 +65,17 @@ _NO_DEVICE_INSTRUCTION = "Apply the patch and verify the signal, or enter the ob
 
 @dataclass(frozen=True, slots=True)
 class TierBSignal:
-    findings: tuple[Finding, ...] | NotComputed  # rule 3
+    findings: tuple[tuple[Finding, Deviation], ...] | NotComputed  # rule 3
 
 
 @dataclass(frozen=True, slots=True)
 class TierCSignal:
     probability: Result[float]  # rule 2: may raise, never lower below Tier A
+
+
+@dataclass(frozen=True, slots=True)
+class PolicySignal:
+    alert: Result[bool]  # a learned alert policy: may not lower below Tier A
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,11 +114,14 @@ class Ranked:
     escalated: bool
     reasons: tuple[ArbiterReason, ...]  # why this patient is up, from implemented rules only
     inert: tuple[str, ...] = field(default=())  # hooks supplied but not yet live
+    flagged: bool = False  # a significant own-baseline finding
 
     @property
-    def sort_key(self) -> tuple[int, int, str]:
-        """Ascending order is display order: higher trigger level, higher total, then id."""
-        return (-_LEVEL[self.news2.risk], -self.news2.total, self.patient_id)
+    def sort_key(self) -> tuple[int, int, int, str]:
+        """Ascending order is display order: trigger level, total, then the flag (below a trigger
+        only), then id."""
+        level = _LEVEL[self.news2.risk]
+        return (-level, -self.news2.total, 0 if self.flagged and level == 0 else 1, self.patient_id)
 
     def escalation_reasons(self) -> list[EscalationReason]:
         return [EscalationReason(rule=r.rule, text=r.text, pathway=r.pathway) for r in self.reasons]
@@ -129,15 +146,15 @@ class WardRanking:
 
 
 def _inert(
-    tier_b: TierBSignal | None,
     tier_c: TierCSignal | None,
+    policy: PolicySignal | None,
     notes: NotesSignal | None,
     worried: WorriedPin | None,
     guarantees: Guarantees | None,
 ) -> tuple[str, ...]:
     supplied = (
         ("rule_2_tier_c", tier_c),
-        ("rule_3_tier_b", tier_b),
+        ("learned_policy", policy),
         ("rule_4_notes", notes),
         ("rule_4_worried", worried),
         ("guarantees", guarantees),
@@ -169,18 +186,25 @@ def _not_ranked_text(problems: tuple[InputProblem, ...]) -> tuple[str, str]:
     return ", ".join(parts), "; ".join(dict.fromkeys(steps))
 
 
+def _span(bins: int) -> str:
+    hours, minutes = divmod(bins * 15, 60)
+    parts = (f"{hours} h" if hours else "", f"{minutes} min" if minutes else "")
+    return " ".join(p for p in parts if p)
+
+
 def arbitrate(
     patient_id: str,
     tier_a: News2Result,
     *,
     tier_b: TierBSignal | None = None,
     tier_c: TierCSignal | None = None,
+    policy: PolicySignal | None = None,
     notes: NotesSignal | None = None,
     worried: WorriedPin | None = None,
     guarantees: Guarantees | None = None,
 ) -> Decision:
-    """One patient's decision. Only `tier_a` can change the outcome in v1."""
-    inert = _inert(tier_b, tier_c, notes, worried, guarantees)
+    """One patient's decision. Only `tier_a` and `tier_b` can change it in v1."""
+    inert = _inert(tier_c, policy, notes, worried, guarantees)
     if isinstance(tier_a, News2Abstained):
         reason, instruction = _not_ranked_text(tier_a.problems)
         return NotRanked(patient_id, tier_a.problems, reason, instruction, inert)
@@ -192,7 +216,16 @@ def arbitrate(
             reasons.append(ArbiterReason(EscalationRule.tier_a_threshold, tier_a.total_reason))
         if tier_a.trigger_reason is not None:
             reasons.append(ArbiterReason(EscalationRule.tier_a_threshold, tier_a.trigger_reason))
-    return Ranked(patient_id, tier_a, escalated, tuple(reasons), inert)
+    findings = () if tier_b is None or isinstance(tier_b.findings, NotComputed) else tier_b.findings
+    for finding, deviation in findings:
+        if finding.significant:
+            text = (
+                f"Drifting from own baseline: {_NAME[deviation.vital]},"
+                f" {_span(deviation.run_bins)} (synthetic, not validated)"
+            )
+            reasons.append(ArbiterReason(EscalationRule.tier_b_finding, text, finding.pathway))
+    flagged = any(r.rule is EscalationRule.tier_b_finding for r in reasons)
+    return Ranked(patient_id, tier_a, escalated, tuple(reasons), inert, flagged)
 
 
 def rank_ward(decisions: Iterable[Decision]) -> WardRanking:

@@ -515,6 +515,7 @@ class PostgresStore:
                     max(0.0, (run_now - sample).total_seconds()) if sample else None
                 ),
                 "synthetic": self.synthetic,
+                "admitted_at": self._when(p["admitted_at"]) if p["admitted_at"] else None,
             }
         )
 

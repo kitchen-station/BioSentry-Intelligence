@@ -14,7 +14,7 @@ import { formatClock } from "./format";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const LABEL = "Research finding. Synthetic, not validated. Does not change the rank.";
+const LABEL = "Research finding. Synthetic, not validated. Breaks ties between equal NEWS2 totals below a trigger.";
 const T0 = Date.parse("2026-11-12T10:00:00Z");
 const at = (minutesAgo: number) => new Date(T0 - minutesAgo * 60_000).toISOString();
 const day = (iso: string) => new Date(iso).toLocaleDateString([], { day: "numeric", month: "short" });
@@ -147,11 +147,13 @@ describe("BaselinePanel", () => {
     show(response([
       { vital: "temperature", status: "unavailable", reason: "no_history" },
       { vital: "spo2", status: "unavailable", reason: "latest_bin_missing" },
+      { vital: "heart_rate", status: "unavailable", reason: "patch_not_live" },
       { vital: "spo2", status: "unavailable", reason: "sensor_off" },
     ]));
-    expect(items().slice(0, 3).map((li) => li.textContent)).toEqual([
+    expect(items().slice(0, 4).map((li) => li.textContent)).toEqual([
       "Temperature · no history yet",
       "SpO2 · latest reading missing",
+      "Heart rate · not counted: no live patch reading",
       "Unrecognised finding",
     ]);
   });

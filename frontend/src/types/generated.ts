@@ -130,7 +130,7 @@ export interface components {
         readonly BaselineResponse: {
             readonly admission_known: boolean;
             /** @constant */
-            readonly label: "Research finding. Synthetic, not validated. Does not change the rank.";
+            readonly label: "Research finding. Synthetic, not validated. Breaks ties between equal NEWS2 totals below a trigger.";
             readonly params: components["schemas"]["BaselineUsed"];
             readonly patient_id: string;
             readonly synthetic: boolean;
@@ -139,7 +139,7 @@ export interface components {
         /** BaselineUnavailable */
         readonly BaselineUnavailable: {
             /** @enum {string} */
-            readonly reason: "no_history" | "latest_bin_missing";
+            readonly reason: "no_history" | "latest_bin_missing" | "patch_not_live";
             /** @constant */
             readonly status: "unavailable";
             /** @enum {string} */
@@ -682,6 +682,7 @@ export interface components {
          *     patient. `signal_quality` and `last_update_s` are null for a patient with no patch.
          */
         readonly UnscoredPatient: {
+            readonly admitted_at: string | null;
             readonly admitting_context: string;
             readonly age: number | null;
             readonly bed: string;

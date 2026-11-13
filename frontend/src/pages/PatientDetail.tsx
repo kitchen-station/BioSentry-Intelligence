@@ -6,7 +6,8 @@ import { BaselinePanel } from "../components/BaselinePanel";
 import { useBaseline } from "../components/useBaseline";
 import { CurrentVitals, VitalRow } from "../components/CurrentVitals";
 import { TrendChart } from "../components/TrendChart";
-import { band, response } from "../components/risk";
+import { patchInUse } from "../components/format";
+import { band, driftResponse, response } from "../components/risk";
 import { VitalsEntry } from "../components/VitalsEntry";
 import { standing } from "../components/vitalsDraft";
 import styles from "./PatientDetail.module.css";
@@ -55,7 +56,8 @@ const ROLE_LABEL: Record<SessionRole, string> = { rn: "RN", charge_rn: "Charge R
 export function PatientDetail({ session }: { session: Session }) {
   const role = session.role;
   const { id } = useParams<{ id: string }>();
-  const baseline = useBaseline(id);
+  const [saves, setSaves] = useState(0);
+  const baseline = useBaseline(id, saves);
   const [patient, setPatient] = useState<PatientDetailType | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [now, setNow] = useState(() => new Date());
@@ -100,6 +102,7 @@ export function PatientDetail({ session }: { session: Session }) {
     // A patient who is now NOT RANKED has no patient read: it would 404 and say "not found".
     if (!id) return;
     setRefreshFailed(false);
+    setSaves((n) => n + 1);
     if (recorded.ranked) {
       setUnranked(null);
       getPatient(id).then((p) => p && setPatient(p)).catch(() => setRefreshFailed(true));
@@ -134,6 +137,7 @@ export function PatientDetail({ session }: { session: Session }) {
   if (!patient) return null;
 
   const reasons = patient.escalation_reasons;
+  const signal = patchInUse(patient.vitals) ? patient.signal_quality : null;
 
   return (
     <div className={styles.page}>
@@ -143,7 +147,7 @@ export function PatientDetail({ session }: { session: Session }) {
           <Link to="/ward" className={styles.back}>&larr; Ward view</Link>
           <div className={styles.stripRight}>
             <span className={styles.stripSignal}>
-              {patient.signal_quality === null ? "No patch signal" : `Signal ${patient.signal_quality}%`}
+              {signal === null ? "No patch signal" : `Signal ${signal}%`}
             </span>
             <span className={styles.stripUpdate}>
               {now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
@@ -170,9 +174,15 @@ export function PatientDetail({ session }: { session: Session }) {
                 <span className={styles.responseText}>{response(band(patient), role)}</span>
               </div>
             )}
-            <div className={styles.summaryBlock} data-signal={patient.signal_quality === null ? "none" : patient.signal_quality > 90 ? "good" : "degraded"}>
+            {band(patient) === "low" && reasons.some((r) => r.rule === "tier_b_finding") && (
+              <div className={styles.summaryBlock} data-band="low" data-kind="response">
+                <span className={styles.summaryLabel}>Next step</span>
+                <span className={styles.responseText}>{driftResponse(role, patient.score)}</span>
+              </div>
+            )}
+            <div className={styles.summaryBlock} data-signal={signal === null ? "none" : signal > 90 ? "good" : "degraded"}>
               <span className={styles.summaryLabel}>Signal</span>
-              <span className={styles.summaryBig}>{patient.signal_quality === null ? "No patch" : `${patient.signal_quality}%`}</span>
+              <span className={styles.summaryBig}>{signal === null ? "No patch" : `${signal}%`}</span>
             </div>
             <div className={styles.reasonBlock}>
               <span className={styles.summaryLabel}>Why this patient is up</span>

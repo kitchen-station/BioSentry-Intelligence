@@ -23,8 +23,9 @@ gateway and edge server, cloud sync when the network allows) that cuts false ala
 each nurse and physician who to see next.
 
 The list is sorted by **NEWS2**, a published bedside early-warning score (Tier A). A patient
-who meets a NEWS2 trigger sits above one who does not. Tier B (mechanism findings) is demo
-content, not part of the scoring.
+who meets a NEWS2 trigger sits above one who does not. The own-baseline finding (Tier B) is listed as a
+reason and breaks ties between equal NEWS2 totals below a trigger; it never moves a patient past a NEWS2
+difference. Other Tier B findings are demo content.
 
 **What is here.** The dashboard (`frontend/`) and a slim API (`backend/`: FastAPI over PostgreSQL). The
 ML models and the training code were removed ahead of the Huawei overhaul and are in git history. The
@@ -91,7 +92,11 @@ answers 409 when the ward is not receiving data from a live sim run. `GET /sim/r
 (same key) hands them to the sim in the same way as the actions.
 `GET /patients/{id}/baseline` (bearer token, same visibility, 404 and audit as the patient route, action `view_baseline`)
 serves a research finding of how far each device vital sits from the patient's own baseline: derived,
-synthetic, not validated, display only; it changes no rank and stores nothing. The baseline is the first 24
+synthetic, not validated, the same finding the ward uses as a tie-break and a reason; it stores nothing.
+A vital whose live value is not from the patch, or whose patch has not sampled in the last 30 minutes,
+is `unavailable` (`patch_not_live`) and flags nothing. The detector runs on its code defaults (k 2.0,
+p 3), not the k 4.0, p 8 the research sweep chose in `models/tier_b/baseline/params.json`.
+The baseline is the first 24
 valid bins (6 hours) from admission when it is known, from the first stored bin when it is not (every patient
 present before the run), and from the oldest bin still kept once the 7-day prune or the 672-bin cap has dropped
 earlier ones, so a long stay is baselined on mid-stay data; the response says when the latest reading was
@@ -148,7 +153,8 @@ active one: the seeded fixture ward, or a simulated ward posted to `/sim/*`.
   acknowledgements, and ingest from the ward simulation.
 
 **Pending:** an identity provider in place of per-clinician passphrases (a clinician locked out by five
-bad attempts stays locked for 15 minutes, whoever made them), cloud sync, a hash-chained audit log, Tier B in the scoring, a
+bad attempts stays locked for 15 minutes, whoever made them), cloud sync, a hash-chained audit log, Tier B beyond the
+own-baseline tie-break, a
 signal-quality model, conformal abstention, distilled edge models, anything measured on real
 patients, a sensor pipeline (IoT Device Access), document extraction, and a plain-language
 explanation of each ranked alert for the nurse or physician.
@@ -178,11 +184,13 @@ applied to made-up patients.
   another tier's verdict.
 - **Escalation arbiter**, the only component that changes displayed priority:
   1. Tier A threshold met: escalate unconditionally.
-  2. Tier B significant finding: raise and attach the pathway.
+  2. Tier B significant finding: list it with the pathway; it breaks ties between equal NEWS2
+     totals below a trigger.
   3. Notes-layer concern: raise and attach the trigger phrase (v2).
   4. Missing required input: NOT RANKED, naming what is missing.
 
-  The fixture data follows rules 1 and 4.
+  The fixture data follows rules 1 and 4. Rule 2 runs only on stored history: no fixture or seeded
+  patient has a significant own-baseline change, so none shows a flag.
 - **Ward view** must be filtered server-side to the signed-in clinician's patients, on every
   call. The API does this from its care assignments; the fixture provider stands in when there is no API.
 - **Look:** follows the studio brand book (foundation v1), kept quiet for a clinical surface.

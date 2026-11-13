@@ -1,9 +1,9 @@
 import { Link } from "react-router-dom";
 import type { ScoreRow, SessionRole } from "../types";
-import { formatAge, formatBloodPressure, formatClock, nurseEntryText, STALE_AFTER_S } from "./format";
+import { formatAge, formatBloodPressure, formatClock, nurseEntryText, patchInUse, STALE_AFTER_S } from "./format";
 import { MeasurementDisplay } from "./MeasurementDisplay";
 import { news2Points } from "./news2";
-import { band, obsDue, response } from "./risk";
+import { band, driftResponse, obsDue, response } from "./risk";
 import { Sparkline } from "./Sparkline";
 import styles from "./WardRow.module.css";
 
@@ -41,6 +41,7 @@ export function WardRow({ row, role, now, ageOffsetS }: Props) {
   // Either figure can be null on a row ranked from nurse entries: never compute with a null.
   const age = row.last_update_s === null ? null : row.last_update_s + ageOffsetS;
   const nurse = nurseEntryText(row.vitals);
+  const patch = patchInUse(row.vitals);
   return (
     <Link to={`/patient/${row.id}`} className={styles.link}>
       <div className={styles.row} data-band={b}>
@@ -61,19 +62,22 @@ export function WardRow({ row, role, now, ageOffsetS }: Props) {
               {row.age ?? "--"}{row.sex ? ` ${row.sex}` : ""} &middot; Bed {row.bed}
             </span>
             {nurse !== null && <span className={styles.updateTag}>{nurse}</span>}
-            {row.signal_quality !== null && row.signal_quality <= 90 && (
+            {patch && row.signal_quality !== null && row.signal_quality <= 90 && (
               <span className={styles.signalLow}>Signal {row.signal_quality}%</span>
             )}
-            {age !== null ? (
+            {patch && age !== null ? (
               <span className={styles.updateTag} data-stale={age > STALE_AFTER_S || undefined}>
                 {age > STALE_AFTER_S ? "Stale · " : ""}{formatAge(Math.floor(age))}
               </span>
             ) : (
-              row.signal_quality === null && <span className={styles.updateTag}>No patch signal</span>
+              (!patch || row.signal_quality === null) && <span className={styles.updateTag}>No patch signal</span>
             )}
           </div>
           <div className={styles.context}>{row.admitting_context}</div>
           {b !== "low" && <div className={styles.response}>{response(b, role)}</div>}
+          {b === "low" && row.escalation_reasons.some((r) => r.rule === "tier_b_finding") && (
+            <div className={styles.response}>{driftResponse(role, row.score)}</div>
+          )}
           {row.escalation_reasons.length > 0 && (
             <div className={styles.reasonLine}>
               {row.escalation_reasons.map((r) => r.text).join(" · ")}
@@ -124,7 +128,7 @@ export function WardRow({ row, role, now, ageOffsetS }: Props) {
               ? `Labs ${row.labs.freshness_hours}h`
               : "No labs"}
           </div>
-          <ObsDue due={obsDue(row)} now={now} noPatch={age === null} />
+          <ObsDue due={obsDue(row)} now={now} noPatch={age === null || !patch} />
         </div>
       </div>
     </Link>

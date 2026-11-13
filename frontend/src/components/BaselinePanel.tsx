@@ -5,7 +5,7 @@ import type { BaselineState } from "./useBaseline";
 import styles from "./BaselinePanel.module.css";
 
 // Fixed here, not read from the response: a changed or empty server string cannot remove it.
-const LABEL = "Research finding. Synthetic, not validated. Does not change the rank.";
+const LABEL = "Research finding. Synthetic, not validated. Breaks ties between equal NEWS2 totals below a trigger.";
 const BIN_MIN = 15;
 // One missed bin on top of the page's usual stale threshold; age is counted from the bin's end.
 const STALE_AGE_S = BIN_MIN * 60 + STALE_AFTER_S;
@@ -27,6 +27,7 @@ const FLAGS_RISE: Record<string, boolean> = {
 const REASONS: Record<string, string> = {
   no_history: "no history yet",
   latest_bin_missing: "latest reading missing",
+  patch_not_live: "not counted: no live patch reading",
 };
 
 // The response is checked, not trusted: an odd shape becomes a plain line, never a blank page.

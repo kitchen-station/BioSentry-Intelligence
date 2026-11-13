@@ -30,6 +30,12 @@ export function response(b: Band, role: SessionRole): string {
   return RESPONSE[role === "md" ? "physician" : "nurse"][b];
 }
 
+/** Shown only on a flagged low-band row: a drift reason never earns a NEWS2 band or response. */
+export function driftResponse(role: SessionRole, score: number): string {
+  const step = role === "md" ? "no medical review triggered" : score === 0 ? "routine monitoring" : "nurse assessment";
+  return `Not a NEWS2 trigger. NEWS2 response: ${step}`;
+}
+
 // RCP 2017 Chart 3, minimum observation frequency per band. "low" splits: score 0 is 12-hourly,
 // 1-4 is 4-6-hourly (the stricter 4 h is used). High risk is continuous monitoring.
 const OBS_INTERVAL_MIN: Record<Exclude<Band, "high">, number> = { medium: 60, "low-medium": 60, low: 240 };
