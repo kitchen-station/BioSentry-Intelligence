@@ -16,16 +16,19 @@ shared ward: a different client cannot start a run while the newest is live, and
 that is no longer the newest is refused (both 409, nothing written). The sim reads what clinicians
 did (acknowledgements, vitals, notes without their text, admissions) from /sim/runs/{id}/actions,
 and what a clinician who may (an md or the charge nurse) asked of it from /sim/runs/{id}/commands.
+The Simulation lab stores a clinician's request for a simulated compare run and its result; a lab
+worker claims and reports through /sim/lab/* (ingest key). The API never runs anything.
 """
 
 import hashlib
+import re
 import secrets
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Path, Query, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -44,7 +47,10 @@ from biosentry.schemas import (
     BaselineResponse,
     ClinicalNote,
     LabPanel,
+    LabRunDetail,
+    LabRunItem,
     NewAcknowledgement,
+    NewLabRun,
     NewNote,
     NurseVitalsInput,
     PartialLabInput,
@@ -68,7 +74,8 @@ from biosentry.schemas.ingest import (
     NewCommand,
     NewRun,
 )
-from biosentry.services import ingest
+from biosentry.schemas.lab import LabJob, LabReport
+from biosentry.services import ingest, lab
 from biosentry.services.baseline import BaselineService
 from biosentry.services.overview import OverviewService
 from biosentry.services.patients import PatientService, RejectedError
@@ -87,6 +94,7 @@ WRITE_ACTIONS = {
     ("POST", "/patients/{patient_id}/vitals"): "record_vitals",
     ("POST", "/patients/{patient_id}/acknowledgement"): "acknowledge",
     ("POST", "/wards/{ward}/sim/commands"): "sim_command",
+    ("POST", "/wards/{ward}/lab/runs"): "lab_request",
 }
 # Every write route that has no body or is not in WRITE_ACTIONS, so an admin is refused on it too.
 REFUSED_ACTIONS = {
@@ -96,7 +104,7 @@ REFUSED_ACTIONS = {
     ("POST", "/extract/patient"): "extract_patient",
 }
 # Routes that are not behind a bearer token: sign-in, and the sim's ingest key. All but the sim's
-# two reads carry a body.
+# two reads and the lab claim carry a body.
 UNAUTHENTICATED_WRITES = {
     ("POST", "/session"),
     ("POST", "/sim/runs"),
@@ -104,7 +112,10 @@ UNAUTHENTICATED_WRITES = {
     ("POST", "/sim/runs/{run_id}/view"),
     ("GET", "/sim/runs/{run_id}/actions"),
     ("GET", "/sim/runs/{run_id}/commands"),
+    ("POST", "/sim/lab/claim"),
+    ("POST", "/sim/lab/runs/{lab_run_id}/report"),
 }
+LAB_RUN_ID = re.compile(r"[1-9][0-9]{0,18}")
 
 
 @dataclass(slots=True)
@@ -199,6 +210,9 @@ Writer = Annotated[str, Depends(writer)]
 def unprocessable(exc: RequestValidationError) -> JSONResponse:
     """FastAPI's 422 body without `input` and `ctx`: a rejected value (a PIN) is never echoed."""
     errors = [{k: v for k, v in e.items() if k not in ("input", "ctx")} for e in exc.errors()]
+    for e in errors:
+        if e["type"] == "union_tag_invalid":  # pydantic's message quotes the tag the caller sent
+            e["msg"] = "Input tag is not one of the expected tags"
     return JSONResponse(status_code=422, content={"detail": jsonable_encoder(errors)})
 
 
@@ -384,6 +398,46 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return Response(status_code=204)
 
+    @app.post("/wards/{ward}/lab/runs", response_model=LabRunItem, status_code=201)
+    def request_lab_run(ward: str, body: NewLabRun, ctx: Ctx, who: Writer) -> LabRunItem:
+        if ward != ctx.store.ward:
+            ctx.audit.append(who, "lab_request", ward, "not_found")
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        if not ctx.store.can_control(who):
+            ctx.audit.append(who, "lab_request", ward, "denied")
+            raise HTTPException(status_code=403, detail="Forbidden")
+        made = lab.create(ctx.store, ctx.audit, who, body)
+        if made is None:
+            raise HTTPException(status_code=429, detail="Lab run limit reached")
+        return made
+
+    def lab_reader(ctx: Context, who: str, action: str, ward: str) -> None:
+        """An admin reads no lab run (a row says who asked what): the same refusal as /live."""
+        if ctx.store.is_admin(who):
+            ctx.audit.append(who, action, ward, "denied")
+            raise HTTPException(status_code=403, detail="Forbidden")
+        if ward != ctx.store.ward:
+            ctx.audit.append(who, action, ward, "not_found")
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+
+    @app.get("/wards/{ward}/lab/runs", response_model=list[LabRunItem])
+    def lab_runs(ward: str, ctx: Ctx, who: Who) -> list[LabRunItem]:
+        lab_reader(ctx, who, "view_lab_runs", ward)
+        ctx.audit.append(who, "view_lab_runs", ward, "ok")
+        return lab.list_runs(ctx.store)
+
+    @app.get("/wards/{ward}/lab/runs/{lab_run_id}", response_model=LabRunDetail)
+    def lab_run(ward: str, lab_run_id: str, ctx: Ctx, who: Who) -> LabRunDetail:
+        lab_reader(ctx, who, "view_lab_run", ward)
+        found = None
+        if LAB_RUN_ID.fullmatch(lab_run_id) and int(lab_run_id) <= BIGINT_MAX:
+            found = lab.get_run(ctx.store, int(lab_run_id))
+        if found is None:  # malformed and unknown are one answer, and audited
+            ctx.audit.append(who, "view_lab_run", ward, "not_found")
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        ctx.audit.append(who, "view_lab_run", f"lab_run:{lab_run_id}", "ok")
+        return found
+
     @app.get("/patients", response_model=list[PatientSummary])
     def list_patients(ctx: Ctx, who: Who) -> list[PatientSummary]:
         return ctx.wards.summaries(who)
@@ -523,5 +577,35 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
         if found is None:
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return Commands.model_validate({"commands": found})
+
+    @app.post("/sim/lab/claim", response_model=LabJob)
+    def claim_lab_run(ctx: Ctx, _: Annotated[None, Depends(ingest_gate)]) -> LabJob | Response:
+        job = lab.claim(ctx.conn, clock())
+        if job is None:  # an empty poll writes no audit row: it records nothing
+            return Response(status_code=204)
+        ctx.audit.append(None, "lab_claim", f"lab_run:{job.id}", "ok")
+        return job
+
+    @app.post("/sim/lab/runs/{lab_run_id}/report", status_code=204)
+    def report_lab_run(
+        lab_run_id: Annotated[int, Path(ge=1, le=BIGINT_MAX)],
+        body: LabReport,
+        ctx: Ctx,
+        _: Annotated[None, Depends(ingest_gate)],
+    ) -> Response:
+        # An id of 0 or above the database's range answers 422, not 404. A worker reports only ids
+        # it claimed, so this never happens in normal use.
+        # shortcut: Starlette reads the whole body before the 512 KiB cap is checked. Only the
+        # ingest key reaches it, inside compose. Upgrade: a body size limit at the proxy.
+        result = lab.report(ctx.conn, lab_run_id, body, clock())
+        outcome: Outcome = "rejected" if result in ("not_running", "mismatch") else result
+        ctx.audit.append(None, "lab_report", f"lab_run:{lab_run_id}", outcome)
+        if result == "not_found":
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        if result == "not_running":
+            raise ingest.ConflictError("This lab run is not running")
+        if result == "mismatch":
+            raise RejectedError("The report does not match the request")
+        return Response(status_code=204)
 
     return app

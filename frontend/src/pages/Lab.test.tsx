@@ -12,7 +12,7 @@ import { Research } from "./Research";
 
 // Every write is a spy that fails if called; the one read the lab makes returns the fixture ward.
 const api = vi.hoisted(() => ({
-  getWard: vi.fn(),
+  getWard: vi.fn(), getLabRuns: vi.fn(), getLabRun: vi.fn(), hasLabRuns: false, requestLabRun: vi.fn(),
   addNote: vi.fn(), deleteNote: vi.fn(), admitPatient: vi.fn(), enterLabResults: vi.fn(), recordVitals: vi.fn(),
   acknowledge: vi.fn(), extractLabsFromFile: vi.fn(), extractPatientFromFile: vi.fn(), signIn: vi.fn(), clearSession: vi.fn(),
 }));
@@ -20,7 +20,7 @@ vi.mock("../api", () => api);
 
 const WRITES = [
   api.addNote, api.deleteNote, api.admitPatient, api.enterLabResults, api.recordVitals,
-  api.acknowledge, api.extractLabsFromFile, api.extractPatientFromFile, api.signIn, api.clearSession,
+  api.acknowledge, api.extractLabsFromFile, api.extractPatientFromFile, api.signIn, api.clearSession, api.requestLabRun,
 ];
 const session = { clinician_id: "md-santos", ward: "W4", role: "md" } as const;
 const none = () => {};
@@ -72,6 +72,13 @@ describe("lab index", () => {
     lab();
     expect(screen.queryByRole("link", { name: "Open the ward simulator" })).toBeNull();
   });
+
+  it("shows the simulated runs section, with its fixture line and no call", () => {
+    lab();
+    expect(screen.getByRole("heading", { name: "Simulated runs" })).toBeTruthy();
+    expect(screen.getByText("Simulated runs need the server.")).toBeTruthy();
+    expect(api.getLabRuns).toHaveBeenCalledTimes(0);
+  });
 });
 
 describe("the lab writes nothing to the ward", () => {
@@ -87,5 +94,22 @@ describe("the lab writes nothing to the ward", () => {
       lab();
     }
     for (const w of WRITES) expect(w).toHaveBeenCalledTimes(0);
+  });
+});
+
+describe("the lab with the lab-run capability on", () => {
+  it.each(["md", "charge_rn"] as const)("makes no request and no ward write on mount for %s", async (role) => {
+    api.hasLabRuns = true;
+    api.getLabRuns.mockResolvedValue([]);
+    render(
+      <MemoryRouter initialEntries={["/lab"]}>
+        <Routes>
+          <Route path="/lab" element={<Lab session={{ ...session, role }} onSignOut={none} />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("No simulated runs yet.")).toBeTruthy();
+    for (const w of WRITES) expect(w).toHaveBeenCalledTimes(0);
+    api.hasLabRuns = false;
   });
 });

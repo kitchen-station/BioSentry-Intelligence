@@ -1089,6 +1089,217 @@
         "title": "LabPanel",
         "type": "object"
       },
+      "LabRunDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline": {
+            "type": "string"
+          },
+          "change": {
+            "type": "string"
+          },
+          "claimed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "days": {
+            "type": "integer"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "type": "integer"
+          },
+          "kind": {
+            "const": "compare",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "w4",
+              "hospital"
+            ],
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "report": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "report_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requested_at": {
+            "type": "string"
+          },
+          "requested_by": {
+            "type": "string"
+          },
+          "seed": {
+            "type": "integer"
+          },
+          "state": {
+            "enum": [
+              "queued",
+              "running",
+              "done",
+              "failed",
+              "refused"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "requested_by",
+          "requested_at",
+          "mode",
+          "seed",
+          "days",
+          "baseline",
+          "change",
+          "state",
+          "claimed_at",
+          "finished_at",
+          "reason",
+          "report",
+          "report_text"
+        ],
+        "title": "LabRunDetail",
+        "type": "object"
+      },
+      "LabRunItem": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline": {
+            "type": "string"
+          },
+          "change": {
+            "type": "string"
+          },
+          "claimed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "days": {
+            "type": "integer"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "type": "integer"
+          },
+          "kind": {
+            "const": "compare",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "w4",
+              "hospital"
+            ],
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requested_at": {
+            "type": "string"
+          },
+          "requested_by": {
+            "type": "string"
+          },
+          "seed": {
+            "type": "integer"
+          },
+          "state": {
+            "enum": [
+              "queued",
+              "running",
+              "done",
+              "failed",
+              "refused"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "requested_by",
+          "requested_at",
+          "mode",
+          "seed",
+          "days",
+          "baseline",
+          "change",
+          "state",
+          "claimed_at",
+          "finished_at",
+          "reason"
+        ],
+        "title": "LabRunItem",
+        "type": "object"
+      },
       "LiveWard": {
         "additionalProperties": false,
         "description": "The stored LiveView as one clinician may see it. `shared` is null until a view is stored.",
@@ -1141,6 +1352,50 @@
           "reason"
         ],
         "title": "MeasurementAbsent",
+        "type": "object"
+      },
+      "NewLabRun": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline": {
+            "maxLength": 40,
+            "type": "string"
+          },
+          "change": {
+            "maxLength": 40,
+            "type": "string"
+          },
+          "days": {
+            "maximum": 30,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "kind": {
+            "const": "compare",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "w4",
+              "hospital"
+            ],
+            "type": "string"
+          },
+          "seed": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "mode",
+          "seed",
+          "days",
+          "baseline",
+          "change"
+        ],
+        "title": "NewLabRun",
         "type": "object"
       },
       "NewNote": {

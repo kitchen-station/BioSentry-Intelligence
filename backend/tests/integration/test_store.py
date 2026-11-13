@@ -528,7 +528,11 @@ def test_ingest_refuses_a_missing_or_wrong_key_and_writes_nothing(
 ) -> None:
     assert api.post("/sim/runs", new_run(), key=key).status_code == 403
     assert api.post("/sim/runs/1/batch", batch(), key=key).status_code == 403
+    assert api.post("/sim/lab/claim", None, key=key).status_code == 403
+    lab_done = {"state": "failed", "reason": "x"}
+    assert api.post("/sim/lab/runs/1/report", lab_done, key=key).status_code == 403
     assert len(api.sql("SELECT * FROM run")) == 1
+    assert api.sql("SELECT * FROM lab_run") == []
 
 
 def test_ingest_fails_closed_when_no_key_is_configured(database_url: str) -> None:
@@ -536,7 +540,11 @@ def test_ingest_fails_closed_when_no_key_is_configured(database_url: str) -> Non
     for key in (None, "", "anything"):
         assert api.post("/sim/runs", new_run(), key=key).status_code == 503
         assert api.post("/sim/runs/1/batch", batch(), key=key).status_code == 503
+        assert api.post("/sim/lab/claim", None, key=key).status_code == 503
+        lab_done = {"state": "failed", "reason": "x"}
+        assert api.post("/sim/lab/runs/1/report", lab_done, key=key).status_code == 503
     assert len(api.sql("SELECT * FROM run")) == 1
+    assert api.sql("SELECT * FROM lab_run") == []
 
 
 def test_ingest_refuses_an_unknown_clinician_and_writes_nothing(api: Api) -> None:

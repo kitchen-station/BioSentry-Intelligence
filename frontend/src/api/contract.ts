@@ -12,7 +12,10 @@ import type {
   ClinicalNote,
   LabExtractionResult,
   LabPanel,
+  LabRunDetail,
+  LabRunItem,
   LiveWard,
+  NewLabRun,
   NurseVitalsInput,
   PartialLabInput,
   PatientDetail,
@@ -57,6 +60,10 @@ export interface ApiProvider {
   /** The signed-in clinician's acknowledgements: the patient and the NEWS2 score they saw. */
   getAcknowledgements(): Promise<Acknowledgement[]>;
   acknowledge(patientId: string, score: number): Promise<void>;
+  /** Asks for one simulated compare run. Only an md or the charge nurse may; the lab worker runs it. */
+  requestLabRun(input: NewLabRun): Promise<LabRunItem>;
+  getLabRuns(): Promise<LabRunItem[]>;
+  getLabRun(id: number): Promise<LabRunDetail>;
   extractLabsFromFile(file: File): Promise<LabExtractionResult>;
   extractPatientFromFile(file: File): Promise<PatientExtractionResult>;
 }

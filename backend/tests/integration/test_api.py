@@ -1029,6 +1029,7 @@ def test_a_bad_body_is_answered_the_same_for_not_yours_and_nonexistent(
         ("POST", "/patients/p-001/notes", "add_note", {"author": "a"}),
         ("POST", "/patients/p-001/labs", "enter_labs", {"potassium": "high"}),
         ("POST", "/patients/p-004/vitals", "record_vitals", {}),
+        ("POST", "/wards/W4/lab/runs", "lab_request", {}),
     ],
 )
 def test_every_write_route_audits_a_body_that_fails_validation(
@@ -1066,8 +1067,16 @@ VALID_BODIES: dict[tuple[str, str], dict[str, Any]] = {
     ("POST", "/patients/{patient_id}/notes"): {"author": "a", "role": "RN", "content": "c"},
     ("POST", "/patients/{patient_id}/labs"): {"potassium": 4.0},
     ("POST", "/patients/{patient_id}/vitals"): {"systolic": 120, "diastolic": 80},
+    ("POST", "/wards/{ward}/lab/runs"): {
+        "kind": "compare",
+        "mode": "w4",
+        "seed": 4,
+        "days": 3,
+        "baseline": "news2_total_ge_5",
+        "change": "news2_chart_trigger",
+    },
 }
-PATH_VALUES = {"patient_id": "p-001", "note_id": "n-001", "ward": "W4"}
+PATH_VALUES = {"patient_id": "p-001", "note_id": "n-001", "ward": "W4", "lab_run_id": "1"}
 
 
 def _route_table(app: Any) -> list[tuple[str, str]]:

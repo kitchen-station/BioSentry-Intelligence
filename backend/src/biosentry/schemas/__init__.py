@@ -43,6 +43,7 @@ from .common import (
     Trend,
 )
 from .ingest import LiveWard
+from .lab import LabRunDetail, LabRunItem, NewLabRun
 from .overview import (
     OverviewActivity,
     OverviewClinician,
@@ -145,11 +146,14 @@ CONTRACT_MODELS: tuple[type[BaseModel], ...] = (
     OverviewSimStatus,
     OverviewSimCounts,
     WardOverview,
+    NewLabRun,
+    LabRunItem,
+    LabRunDetail,
 )
 
 # Inputs entered by a person: optional fields may be omitted and default to None.
 INPUT_MODELS: frozenset[type[BaseModel]] = frozenset(
-    {PartialLabInput, AdmitPatientInput, PartialAdmitPatientInput, NurseVitalsInput}
+    {PartialLabInput, AdmitPatientInput, PartialAdmitPatientInput, NurseVitalsInput, NewLabRun}
 )
 
 __all__ = [
@@ -177,9 +181,12 @@ __all__ = [
     "FlagMeasurement",
     "LabExtractionResult",
     "LabPanel",
+    "LabRunDetail",
+    "LabRunItem",
     "LiveWard",
     "MeasurementAbsent",
     "NewAcknowledgement",
+    "NewLabRun",
     "NewNote",
     "NumberMeasurement",
     "NurseVitalsInput",

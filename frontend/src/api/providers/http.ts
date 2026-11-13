@@ -22,7 +22,10 @@ import type {
   ClinicalNote,
   LabExtractionResult,
   LabPanel,
+  LabRunDetail,
+  LabRunItem,
   LiveWard,
+  NewLabRun,
   NurseVitalsInput,
   PartialLabInput,
   PatientDetail,
@@ -55,6 +58,18 @@ export const httpProvider: ApiProvider = {
 
   getOverview(): Promise<WardOverview> {
     return fetchJson<WardOverview>("/wards/W4/overview");
+  },
+
+  requestLabRun(input: NewLabRun): Promise<LabRunItem> {
+    return postJson<LabRunItem>("/wards/W4/lab/runs", input);
+  },
+
+  getLabRuns(): Promise<LabRunItem[]> {
+    return fetchJson<LabRunItem[]>("/wards/W4/lab/runs");
+  },
+
+  getLabRun(id: number): Promise<LabRunDetail> {
+    return fetchJson<LabRunDetail>(`/wards/W4/lab/runs/${id}`);
   },
 
   async getPatient(id: string): Promise<PatientDetail | null> {
