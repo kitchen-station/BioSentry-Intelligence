@@ -315,9 +315,12 @@ def run_experiment(template: str, args: dict) -> bool:
     Config.from_env reads the real environment, so tests pass their own function."""
     try:
         result, _ = tools.call(Config.from_env(), "evaluate_rules", args)
+    except tools.ToolError:
+        return False
+    try:
         answer, used = ask.build(template, args, result)
         return ask.grounded(answer, used, args, result)
-    except (tools.ToolError, KeyError, TypeError, IndexError):
+    except Exception:  # noqa: BLE001  (any failure of the check is not a pass)
         return False
 
 

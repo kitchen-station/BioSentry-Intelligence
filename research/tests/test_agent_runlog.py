@@ -363,3 +363,26 @@ def test_an_incomplete_run_writes_no_scores(made, tmp_path, capsys):
     with pytest.raises(SystemExit) as stop:
         runlog.scores_file(doc, made.q, lambda template, args: pytest.fail("no experiment may run"))
     assert stop.value.code == 2 and "incomplete" in capsys.readouterr().err
+
+
+def test_the_real_experiment_runner_asks_the_tool_what_ask_would_and_passes_a_grounded_answer(tmp_path, monkeypatch):
+    from test_agent_ask import cfg as _unused  # noqa: F401
+    from biosentry.domain.scoring.tier_b.baseline import DEFAULTS
+    from research.agent import ask, ledger, tools
+    from test_agent_tools import cfg_for, toy_trials
+
+    monkeypatch.setattr(tools.evaluate, "_baseline_params", lambda: (DEFAULTS, "test"))
+    cfg = cfg_for(tmp_path)
+    toy_trials(cfg, range(1, 11))
+    cfg.models.mkdir()
+    question = "What if we alerted at a NEWS2 total of 5 or more?"
+    ask.ask(cfg, question)  # what ask builds is in its ledger step
+    asked = ledger.read(cfg)[1]["calls"][0]["args"]
+    seen, real = [], tools.call
+    monkeypatch.setattr(tools, "call", lambda c, name, args, *a, **k: seen.append((name, args)) or real(c, name, args, *a, **k))
+    monkeypatch.setattr(runlog.Config, "from_env", classmethod(lambda cls, env=None: cfg))
+    args = {"dataset": "ward-v2", "seeds": list(range(1, 11)), "window": "early",
+            "rules": ask._rules("news2_threshold", 5, question)}
+    assert runlog.run_experiment("news2_threshold", args) is True
+    assert seen == [("evaluate_rules", asked)] and asked == args
+    assert runlog.run_experiment("alerts_per_nurse", {**args, "rules": [{"rule": "bogus"}]}) is False  # a tool error

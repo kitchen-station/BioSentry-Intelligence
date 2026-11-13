@@ -105,7 +105,7 @@ def test_a_stored_conclusion_that_was_altered_is_refused(cfg, tmp_path, capsys):
     sid = ledger.begin_step(cfg, "ask", Q1, start["plan"])
     ledger.add_step(cfg, sid, step["calls"], step["conclusion"].replace("20 of 20", "19 of 20"), grounding="ok")
     assert export(cfg, tmp_path) == 2
-    assert f"{sid}: the stored answer does not match" in capsys.readouterr().err and not (tmp_path / "out.json").exists()
+    assert f"({sid}): the stored answer does not match" in capsys.readouterr().err and not (tmp_path / "out.json").exists()
 
 
 def test_a_failed_tool_leaves_the_question_out_and_a_failed_grounding_is_a_refusal(cfg, tmp_path):  # noqa: F811
@@ -224,3 +224,132 @@ def test_a_result_over_256_kb_is_refused(cfg, tmp_path, monkeypatch, capsys):  #
 def test_without_commit_git_is_asked_and_a_failure_is_refused(cfg, tmp_path, monkeypatch, capsys):  # noqa: F811
     monkeypatch.setattr(exporting.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(OSError()))
     assert export(cfg, tmp_path, commit=False) == 2 and "give --commit" in capsys.readouterr().err
+
+
+# --- a ledger file is untrusted input -------------------------------------------------------------------
+
+def chained(tmp_path, records):
+    """Write a ledger whose hash chain is VALID but whose fields can be bad: the point is that the chain check
+    passes and the export itself must refuse the bad field, in one line, with no traceback."""
+    prev, lines = ledger.ZERO, []
+    for seq, rec in enumerate(records, 1):
+        line = ledger._dump({**rec, "seq": seq, "prev": prev})
+        lines.append(line)
+        prev = ledger._sha(line)
+    path = tmp_path / "crafted.jsonl"
+    path.write_bytes(b"\n".join(lines) + b"\n")
+    return path
+
+
+def base(cfg):  # noqa: F811
+    ask.ask(cfg, Q1)
+    start, step = ledger.read(cfg)
+    return {k: v for k, v in start.items() if k not in ("seq", "prev")}, {k: v for k, v in step.items() if k not in ("seq", "prev")}
+
+
+def crafted_export(cfg, tmp_path, records, capsys):  # noqa: F811
+    code = export(cfg, tmp_path, "--ledger", str(chained(tmp_path, records)))
+    err = capsys.readouterr().err
+    assert code == 2 and err.startswith("refused: ") and len(err.splitlines()) == 1 and "Traceback" not in err
+    assert not (tmp_path / "out.json").exists()
+    return err
+
+
+def without(rec, key):
+    return {k: v for k, v in rec.items() if k != key}
+
+
+def test_a_crafted_ledger_with_a_valid_chain_is_refused_not_a_traceback(cfg, tmp_path, capsys):  # noqa: F811
+    start, step = base(cfg)
+    prop = {"type": "proposal", "id": "P-0003", "action": "adopt_reward_policy", "step": "S-0001", "files": [], "at": "x"}
+    appr = {"type": "approval", "proposal": "P-0003", "by": "Ada Lovelace", "at": "2026-11-13T01:02:03Z"}
+    good_tail = [{**prop, "id": "P-0001", "step": "S-0001"}]
+    cases = {
+        "start without at": ([without(start, "at"), step], "at"),
+        "start at is bad": ([{**start, "at": "yesterday"}, step], "at"),
+        "question is not a string": ([{**start, "question": 7}, step], "question"),
+        "ok step without conclusion": ([start, without(step, "conclusion")], "conclusion"),
+        "calls is a string": ([start, {**step, "calls": "x"}], "calls"),
+        "calls holds a non-dict": ([start, {**step, "calls": [1]}], "calls"),
+        "result is empty": ([start, {**step, "calls": [{**step["calls"][0], "result": {}}]}], "does not match"),
+        "result is a string": ([start, {**step, "calls": [{**step["calls"][0], "result": "x"}]}], "does not match"),
+        "args is a list": ([start, {**step, "calls": [{**step["calls"][0], "args": []}]}], "does not match"),
+        "template is unknown": ([{**start, "plan": {**start["plan"], "rule": "evil"}}, step], "template"),
+        "proposal step is a list": ([start, step, {**prop, "id": "P-0001", "step": ["S-0001"]}], "step"),
+        "proposal step is unknown": ([start, step, {**prop, "id": "P-0001", "step": "S-0099"}], "step"),
+        "proposal action is bad": ([start, step, {**prop, "id": "P-0001", "action": "rm -rf"}], "action"),
+        "proposal id is bad": ([start, step, {**prop, "id": "x"}], "id"),
+        "approval without at": ([start, step, {**prop, "id": "P-0001"}, without(appr, "at") | {"proposal": "P-0001"}], "at"),
+        "approval at is bad": ([start, step, {**prop, "id": "P-0001"}, {**appr, "proposal": "P-0001", "at": "soon"}], "at"),
+        "approval by is not a string": ([start, step, {**prop, "id": "P-0001"}, {**appr, "proposal": "P-0001", "by": 5}], "by"),
+    }
+    assert good_tail  # the proposal shape above is the one the ledger writer makes
+    for name, (records, word) in cases.items():
+        err = crafted_export(cfg, tmp_path, records, capsys)
+        assert word in err and "seq " in err, name
+
+
+def test_a_question_with_a_newline_and_an_escape_cannot_reach_the_output(cfg, tmp_path, capsys):  # noqa: F811
+    start, step = base(cfg)
+    bad = {**start, "question": "line one\nline two \x1b[31m red\x07"}
+    assert export(cfg, tmp_path, "--ledger", str(chained(tmp_path, [bad, step]))) == 0
+    q, = load(tmp_path / "out.json")["body"]["questions"]
+    assert q["question"] == "line one?line two ?[31m red?"
+    assert "\x1b" not in (tmp_path / "out.json").read_text()
+
+
+def test_an_overlong_question_is_cut_at_500(cfg, tmp_path):  # noqa: F811
+    start, step = base(cfg)
+    assert export(cfg, tmp_path, "--ledger", str(chained(tmp_path, [{**start, "question": "q" * 900}, step]))) == 0
+    assert len(load(tmp_path / "out.json")["body"]["questions"][0]["question"]) == 500
+
+
+def test_a_crafted_proposal_that_is_valid_is_exported_cleaned(cfg, tmp_path):  # noqa: F811
+    start, step = base(cfg)
+    step = {**step, "conclusion": step["conclusion"]}
+    prop = {"type": "proposal", "id": "P-0001", "action": "set_baseline_params", "step": "S-0001", "files": []}
+    appr = {"type": "approval", "proposal": "P-0001", "by": "Ada\nLovelace", "at": "2026-11-13T01:02:03Z"}
+    assert export(cfg, tmp_path, "--ledger", str(chained(tmp_path, [start, step, prop, appr]))) == 0
+    p, = load(tmp_path / "out.json")["body"]["proposals"]
+    assert (p["approved_by"], p["approved_at"], p["state"]) == ("Ada?Lovelace", "2026-11-13T01:02:03Z", "approved")
+
+
+@pytest.mark.parametrize("change", [
+    lambda s: s["scores"].update(question_set="a\nb"),
+    lambda s: s["scores"].update(question_set="a\x1bb"),
+    lambda s: s["scores"]["runs"][0].update(model="m\nx"),
+    lambda s: s["scores"]["runs"][1].update(model="m\x07"),
+    lambda s: s["scores"]["runs"][1].update(model="m" * 201),
+    lambda s: s.update(notes=["fine", "bad\nnote"]),
+    lambda s: s.update(notes=["bad\x1b"]),
+])
+def test_scores_with_control_characters_or_a_long_model_are_refused(cfg, tmp_path, change):  # noqa: F811
+    s = good_scores()
+    change(s)
+    assert export(cfg, tmp_path, "--scores", write(tmp_path, s)) == 2 and not (tmp_path / "out.json").exists()
+
+
+def test_scores_that_are_not_utf8_or_are_too_big_are_refused(cfg, tmp_path, capsys):  # noqa: F811
+    (tmp_path / "s.json").write_bytes(b'{"scores": "\xff\xfe"}')
+    assert export(cfg, tmp_path, "--scores", str(tmp_path / "s.json")) == 2
+    (tmp_path / "big.json").write_text(json.dumps({**good_scores(), "pad": "x" * 70000}))
+    assert export(cfg, tmp_path, "--scores", str(tmp_path / "big.json")) == 2
+    assert "64 KiB" in capsys.readouterr().err
+
+
+def test_a_symlinked_temp_file_or_out_is_refused_and_nothing_is_written_through_it(cfg, tmp_path, capsys):  # noqa: F811
+    target = cfg.models / "keep.txt"
+    before = target.read_bytes()
+    (tmp_path / "out.json.tmp").symlink_to(target)
+    assert export(cfg, tmp_path) == 2
+    assert target.read_bytes() == before and not (tmp_path / "out.json").exists()
+    capsys.readouterr()
+    (tmp_path / "out.json.tmp").unlink()
+    (tmp_path / "out.json.tmp").write_text("old")  # an existing temp file is refused too
+    assert export(cfg, tmp_path) == 2 and "temp file" in capsys.readouterr().err
+    (tmp_path / "out.json.tmp").unlink()
+    assert target.read_bytes() == before
+    (tmp_path / "other.txt").write_text("other")
+    (tmp_path / "link.json").symlink_to(tmp_path / "other.txt")  # outside the models folder, still refused
+    assert export(cfg, tmp_path, name="link.json") == 2 and "symlink" in capsys.readouterr().err
+    assert (tmp_path / "other.txt").read_text() == "other"

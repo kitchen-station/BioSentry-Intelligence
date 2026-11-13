@@ -21,6 +21,7 @@ MAX_QUESTIONS, MAX_PROPOSALS, MAX_NOTES, MAX_SOURCES, MAX_TEXT = 200, 50, 10, 10
 TEMPLATES = ("news2_threshold", "baseline_vs_news2", "alerts_per_nurse")
 BANNED = ("AI predicts deterioration", "reinforcement learning", "self-learning", "conformal guarantee",
           "fewer false alarms than NEWS2")
+MAX_SCORES = 64 * 1024
 RUN_KEYS = ("label", "model", "answered", "refused", "grounding_passed", "correct_template")
 
 
@@ -41,74 +42,120 @@ def check_scores(doc: object) -> tuple[dict, list[str]]:
     s, notes = doc["scores"], doc["notes"]
     if not isinstance(s, dict) or set(s) != {"question_set", "n", "runs"}:
         raise AgentError("scores file: scores needs exactly question_set, n and runs")
-    if type(s["question_set"]) is not str or len(s["question_set"]) > MAX_TEXT or not _int(s["n"]):
+    if type(s["question_set"]) is not str or len(s["question_set"]) > MAX_TEXT or not _int(s["n"]) \
+            or not _plain(s["question_set"]):
         raise AgentError("scores file: question_set must be a string of at most 300 characters and n an integer")
     runs = s["runs"]
     if not isinstance(runs, list) or len(runs) != 2:
         raise AgentError("scores file: runs must hold exactly two runs")
     for run, label in zip(runs, ("before", "after")):
         if not isinstance(run, dict) or set(run) != set(RUN_KEYS) or run["label"] != label \
-                or type(run["model"]) is not str or not all(_int(run[k]) for k in RUN_KEYS[2:]):
+                or type(run["model"]) is not str or len(run["model"]) > 200 or not _plain(run["model"]) or not all(_int(run[k]) for k in RUN_KEYS[2:]):
             raise AgentError(f"scores file: the {label} run is malformed")
         if run["answered"] + run["refused"] != s["n"] or run["grounding_passed"] > run["answered"] \
                 or run["correct_template"] > run["answered"]:
             raise AgentError(f"scores file: the {label} counts do not add up")
-    if not isinstance(notes, list) or not all(type(n) is str and len(n) <= MAX_TEXT for n in notes):
+    if not isinstance(notes, list) or not all(type(n) is str and len(n) <= MAX_TEXT and _plain(n) for n in notes):
         raise AgentError("scores file: notes must be a list of strings of at most 300 characters")
     return s, notes
+
+
+STAMP = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z")
+STEP_ID, PROPOSAL_ID = re.compile(r"S-[0-9]{4}"), re.compile(r"P-[0-9]{4}")
+ACTIONS = ("set_baseline_params", "adopt_reward_policy")
+STATES = ("proposed", "approved", "applied")
+
+
+def _field(rec: dict, key: str, kind: type, pattern=None):
+    """A field of an untrusted record: the exact type, and a full match when a pattern is given."""
+    v = rec.get(key)
+    if type(v) is not kind or (pattern is not None and not pattern.fullmatch(v)):
+        raise AgentError(f"seq {rec.get('seq')}: {key} is missing or malformed")
+    return v
+
+
+def _plain(text: str) -> bool:
+    return ledger.clean(text, len(text)) == text
+
+
+def _guard(rec: dict, work):
+    """Run the per-record work; any failure on a crafted record is one refusal that names its seq."""
+    try:
+        return work()
+    except AgentError:
+        raise
+    except Exception:  # noqa: BLE001  (the ledger file is untrusted input)
+        raise AgentError(f"seq {rec.get('seq')}: the record is malformed") from None
+
+
+def _question(start: dict, steps: dict) -> dict | None:
+    step = steps.get(_field(start, "id", str, STEP_ID))
+    at, plan = _field(start, "at", str, STAMP), _field(start, "plan", dict)
+    calls = _field(step, "calls", list) if step else None
+    if calls and not all(type(c) is dict for c in calls):
+        raise AgentError(f"seq {step.get('seq')}: calls is malformed")
+    if step is None or (calls and calls[0].get("ok") is False):
+        return None
+    q = {"id": start["id"], "asked_at": at, "question": ledger.clean(_field(start, "question", str), 500),
+         "template": "none", "status": "refused", "answer": ask.REFUSAL.splitlines(), "numbers": []}
+    if calls:
+        q["template"] = plan.get("rule")
+        if q["template"] not in TEMPLATES:
+            raise AgentError(f"seq {start['seq']}: the template is not one of the three")
+        if step.get("grounding") == "ok":
+            answer, used = _rebuild(step, q["template"], calls[0])
+            q.update(status="answered", answer=answer.splitlines(), numbers=used)
+        elif step.get("grounding") != "failed":
+            raise AgentError(f"seq {step['seq']}: the step has no grounding mark")
+    return q
 
 
 def _questions(records: list[dict]) -> tuple[list[dict], int]:
     steps = {r["id"]: r for r in records if r["type"] == "step"}
     out, left = [], 0
-    for start in (r for r in records if r["type"] == "start" and r["kind"] == "ask"):
-        step = steps.get(start["id"])
-        calls = step["calls"] if step else None
-        if step is None or (calls and calls[0].get("ok") is False):
+    for start in (r for r in records if r["type"] == "start" and r.get("kind") == "ask"):
+        q = _guard(start, lambda: _question(start, steps))
+        if q is None:
             left += 1
-            continue
-        plan = start["plan"]
-        q = {"id": start["id"], "asked_at": start["at"], "question": start.get("question", ""), "template": "none",
-             "status": "refused", "answer": ask.REFUSAL.splitlines(), "numbers": []}
-        if calls:
-            q["template"] = plan.get("rule") if isinstance(plan, dict) else None
-            if q["template"] not in TEMPLATES:
-                raise AgentError(f"{start['id']}: the template is not one of the three")
-            if step.get("grounding") == "ok":
-                answer, used = _rebuild(start["id"], q["template"], calls[0], step["conclusion"])
-                q.update(status="answered", answer=answer.splitlines(), numbers=used)
-            elif step.get("grounding") != "failed":
-                raise AgentError(f"{start['id']}: the step has no grounding mark")
-        out.append(q)
+        else:
+            out.append(q)
     return out, left
 
 
-def _rebuild(sid: str, template: str, call: dict, stored: str) -> tuple[str, list[str]]:
+def _rebuild(step: dict, template: str, call: dict) -> tuple[str, list[str]]:
     """The answer from the stored call. It must be grounded and equal to what the ledger kept."""
+    stored = _field(step, "conclusion", str)
     try:
         args, result = call["args"], call["result"]
         answer, used = ask.build(template, args, result)
         ok = ask.grounded(answer, used, args, result) and stored == ledger.clean(" ".join(answer.splitlines()), 2000)
-    except (KeyError, TypeError, IndexError, AttributeError):
+    except Exception:  # noqa: BLE001  (a crafted result can break build in any way)
         ok = False
     if not ok:
-        raise AgentError(f"{sid}: the stored answer does not match the stored tool result")
+        raise AgentError(f"seq {step['seq']} ({step['id']}): the stored answer does not match the stored tool result")
     return answer, used
+
+
+def _proposal(r: dict, records: list[dict], steps: dict) -> dict:
+    step = steps.get(_field(r, "step", str, STEP_ID))
+    if step is None:
+        raise AgentError(f"seq {r['seq']}: its step is not in the ledger")
+    pid = _field(r, "id", str, PROPOSAL_ID)
+    if r.get("action") not in ACTIONS:
+        raise AgentError(f"seq {r['seq']}: action is not allowed")
+    approval = next((x for x in records if x["type"] == "approval" and x["proposal"] == pid and x["seq"] > r["seq"]), None)
+    state = ledger.status(records, pid)
+    if state not in STATES:
+        raise AgentError(f"seq {r['seq']}: the state is not known")
+    return {"id": pid, "action": r["action"],
+            "step": r["step"], "conclusion": ledger.clean(_field(step, "conclusion", str), 2000), "state": state,
+            "approved_by": ledger.clean(_field(approval, "by", str), 200) if approval else None,
+            "approved_at": _field(approval, "at", str, STAMP) if approval else None}
 
 
 def _proposals(records: list[dict]) -> list[dict]:
     steps = {r["id"]: r for r in records if r["type"] == "step"}
-    out = []
-    for r in (r for r in records if r["type"] == "proposal"):
-        if r["step"] not in steps:
-            raise AgentError(f"{r['id']}: its step is not in the ledger")
-        approval = next((x for x in records if x["type"] == "approval" and x["proposal"] == r["id"]
-                         and x["seq"] > r["seq"]), None)
-        out.append({"id": r["id"], "action": r["action"], "step": r["step"],
-                    "conclusion": steps[r["step"]]["conclusion"], "state": ledger.status(records, r["id"]),
-                    "approved_by": approval["by"] if approval else None,
-                    "approved_at": approval["at"] if approval else None})
-    return out
+    return [_guard(r, lambda: _proposal(r, records, steps)) for r in records if r["type"] == "proposal"]
 
 
 def _strings(obj: object):
@@ -204,7 +251,11 @@ def run(cfg: Config, args: list[str]) -> str:
     scores = None
     if a.scores:
         try:
-            scores = check_scores(json.loads(Path(a.scores).read_text()))
+            with open(a.scores, "rb") as f:
+                raw = f.read(MAX_SCORES + 1)
+            if len(raw) > MAX_SCORES:
+                raise AgentError("scores file: larger than 64 KiB")
+            scores = check_scores(json.loads(raw.decode("utf-8")))
         except (OSError, ValueError, RecursionError):
             raise AgentError("scores file: cannot read it as JSON") from None
     if a.ledger:
@@ -217,9 +268,19 @@ def run(cfg: Config, args: list[str]) -> str:
     text = json.dumps(doc, indent=1, sort_keys=True, ensure_ascii=False) + "\n"
     if len(text.encode()) > MAX_FILE:
         raise AgentError("the export is larger than 256 KB")
+    raw = Path(a.out).expanduser()  # not resolved: a symlink must be seen
+    tmp = ledger.export_path(cfg, str(raw.with_name(raw.name + ".tmp")))  # resolved, so where it leads is checked
+    if raw.is_symlink():
+        raise AgentError("--out is a symlink")
     try:
-        tmp = out.with_name(out.name + ".tmp")
-        tmp.write_text(text, encoding="utf-8")
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644)
+    except FileExistsError:
+        raise AgentError("the temp file already exists; remove it") from None
+    except OSError:
+        raise AgentError("cannot write the export file") from None
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
         os.replace(tmp, out)
     except OSError:
         raise AgentError("cannot write the export file") from None
