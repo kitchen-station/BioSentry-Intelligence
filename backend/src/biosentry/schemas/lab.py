@@ -1,6 +1,6 @@
 """Bodies of the Simulation lab (contract-d7): a clinician's request, the job the lab worker claims,
-the worker's report, and what a clinician reads back. Every value of a request comes from the fixed
-lists below, so a request holds no path, no free text and no patient."""
+the worker's report, and what a clinician reads back. Every value of a request is a
+fixed-list name or an integer in range, so a request holds no path, no free text and no patient."""
 
 import re
 from typing import Annotated, Any, Literal, Self

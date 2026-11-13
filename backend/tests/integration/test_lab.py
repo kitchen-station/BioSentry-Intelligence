@@ -559,6 +559,15 @@ def test_a_report_that_breaks_the_shape_or_a_cap_changes_nothing(api: Api, body:
     assert report(api, "not an object").status_code == 422
 
 
+def test_a_report_with_an_unknown_state_is_refused_without_echoing_it(api: Api) -> None:
+    running(api)
+    response = report(api, {"state": "SECRET-ECHO-zzz", "reason": "x"})
+    assert response.status_code == 422
+    assert "SECRET-ECHO-zzz" not in response.text
+    assert "Input tag is not one of the expected tags" in response.text
+    assert runs(api)[0]["state"] == "running"
+
+
 def test_the_largest_allowed_report_is_accepted(api: Api) -> None:
     running(api)
     pad = "x" * 100

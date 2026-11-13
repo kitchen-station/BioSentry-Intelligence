@@ -66,7 +66,8 @@ def test_the_api_never_starts_a_process() -> None:
 
 
 def test_nothing_that_ranks_a_patient_reads_a_lab_run() -> None:
-    ranking = [SRC / "services" / n for n in ("ward.py", "scoring.py", "patients.py")]
+    names = ("ward.py", "scoring.py", "patients.py", "baseline.py")
+    ranking = [SRC / "services" / n for n in names] + [SRC / "repositories" / "postgres.py"]
     ranking += list((SRC / "domain").rglob("*.py"))
     assert len(ranking) > 5
     pattern = re.compile(r"lab_run|biosentry\.(services|schemas)\.lab\b|import[^\n]*\blab\b")

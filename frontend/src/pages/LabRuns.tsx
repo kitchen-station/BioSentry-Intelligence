@@ -156,7 +156,7 @@ export function LabRuns({ role, onSignOut }: { role: SessionRole; onSignOut: () 
       ) : (
         <>
           <p>
-            Ask the simulator to run one simulated ward twice from the same seed, with one change, and read what differs. On W4
+            Ask the simulator for two arms from the same seed that differ in one change, and read what differs. On W4
             both arms have the same patients; in hospital mode they are partly paired, and the result says how far. It never
             touches the ward that is running now. Synthetic, not validated.
           </p>

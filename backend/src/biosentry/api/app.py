@@ -210,6 +210,9 @@ Writer = Annotated[str, Depends(writer)]
 def unprocessable(exc: RequestValidationError) -> JSONResponse:
     """FastAPI's 422 body without `input` and `ctx`: a rejected value (a PIN) is never echoed."""
     errors = [{k: v for k, v in e.items() if k not in ("input", "ctx")} for e in exc.errors()]
+    for e in errors:
+        if e["type"] == "union_tag_invalid":  # pydantic's message quotes the tag the caller sent
+            e["msg"] = "Input tag is not one of the expected tags"
     return JSONResponse(status_code=422, content={"detail": jsonable_encoder(errors)})
 
 
