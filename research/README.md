@@ -1043,9 +1043,11 @@ folder). The model needs the optional MindSpore environment of `research/agent_t
 Python than the worker's, `BIOSENTRY_AGENT_TUNED_PYTHON` names its interpreter; unset, the worker's own Python
 runs the model. The model's process imports nothing of the agent or the backend.
 
-The model can only pick one of the three fixed experiments, or nothing. The guard in `tasks.guard_question`
-decides: the answer must be exactly a template and the number written in the question. Where the guard
-refuses, the rules answer as before. No answer can change a setting. The guard cannot check that the model
+The keyword rules answer first, as before. The worker asks the model only where the rules are silent, so a
+question the rules answer never waits for the model (an owner decision, 2026-11-13). The model can only pick
+one of the three fixed experiments, or nothing. The guard in `tasks.guard_question` decides: the answer must
+be exactly a template and the number written in the question. Where the guard refuses, the answer is the
+fixed refusal, as before. On the blind held-out questions 7 of 78 reach the model. No answer can change a setting. The guard cannot check that the model
 chose the right experiment. Where the keyword matcher is silent, a wrong pick among the three fixed
 experiments can pass, and the doctor gets an answer about another experiment. The record says
 `agent.ask: "tuned-model"` and the adapter's sha256.
@@ -1069,3 +1071,30 @@ link is refused; a link higher in the path is not looked at. On any mismatch the
 log names the listed file, and the rules answer every question. Not caught: a file that is swapped after the
 check and before the model loads it. Mount the folders read-only. The start line says
 `model mode: on` or `model mode: off`.
+
+## The patient agent (`python -m research.patient_agent worker`)
+
+The patient agent answers a clinician's question about ONE patient, from that patient's own data only. The card
+is `research/patient_agent/card.md`. It has four kinds of question: `own_baseline`, `recent_change`, `why_rank` and
+`active_alerts`. The job's `patient` object follows contract-patient-ask (format 1).
+
+A keyword matcher picks the kind. No model chooses anything. `guard` in `patient_agent/ask.py` is for a later
+tuned model and is not wired. The answer is fixed sentences filled from the data. Text from the data is quoted, cut at
+a space at or before 300 characters, and never read as an instruction. A text that holds a character outside a small
+allowed set is not shown at all, because cleaning it could change a number. Every number in the answer is checked against the data.
+The agent never gives treatment advice, never predicts and uses no outside knowledge. A question is
+refused as about another patient, a bed or the ward when the question says so with a listed word; otherwise the
+answer is about this patient only and says so in its first line, "For this patient only:". A question it cannot answer gets a fixed
+refusal. A required field that is missing makes the job `failed`.
+
+The worker reuses the question worker's `Worker` class: the same transport (no redirect, no proxy), retries,
+handled-id set and key rules. It claims `POST {base}/sim/lab/claim?kind=patient_question` and accepts a claim
+response of up to 524288 bytes. It reads `BIOSENTRY_API_URL`, `BIOSENTRY_INGEST_KEY` and, optionally,
+`BIOSENTRY_AGENT_COMMIT`. It needs no trials folder and no agent home.
+
+Nothing in this repository starts this worker, and the API routes it calls are not on `main` yet. Do not
+start it until the API serves `?kind=patient_question` on the claim. It stops after a job of another kind.
+
+The data lives in memory for one job. The worker writes no file. A log line holds a job id and a state only. The
+`done` record holds the kind, the arguments, the numbers and `data_sha256`, the hash of the patient object as
+received (the contract's canonical JSON, NaN refused). It holds no copy of the data. A refusal and a failure carry one fixed reason, and never an exception text.

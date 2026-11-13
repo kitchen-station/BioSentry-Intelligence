@@ -16,6 +16,8 @@ import sys
 import time
 from pathlib import Path
 
+from research.agent import ask
+
 from . import tasks
 
 LOAD_SECONDS = 300
@@ -178,7 +180,9 @@ class Router:
                 return o["output"]
 
     def route(self, question: str) -> tuple[str, int | None] | None:
-        if not self.on or tasks.refuses(question):  # refused text never reaches the model
+        # refused text never reaches the model, and where the keyword rules answer the model is not asked at all:
+        # the guard would make the rules win there anyway, so asking would only cost the wait
+        if not self.on or tasks.refuses(question) or ask.match(question) != (None, None):
             return None
         try:
             if self.proc is None:

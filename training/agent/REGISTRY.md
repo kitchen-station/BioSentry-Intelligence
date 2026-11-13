@@ -27,7 +27,8 @@ code is `research/agent_tuning/`; the run-log tool's notes are in `training/agen
   it, and no laptop CPU run of it was found. The licence was read on 2026-11-13; the model
   itself was not downloaded or run. openPangu-2.0-Pro and openPangu-2.0-Flash are served on
   the China site's MaaS only (not on the international list); whether their weights are open was
-  not checked.
+  not checked. Section 12 is newer research and corrects two points here: the licence text does not
+  restrict commercial use, and openPangu-2.0-Flash and 2.0-Pro are listed with open weights.
 - **Fine-tuned here:** `Qwen/Qwen2.5-0.5B-Instruct` (Alibaba Cloud, Apache-2.0, 0.49 billion
   parameters). It is not a reasoning model, it is not gated, it is the smallest strong instruct
   model found, and MindSpore tooling lists its family as supported.
@@ -146,7 +147,7 @@ Open-weight status of the hosted targets:
 | File | `adapter_model.safetensors`, 2,175,168 bytes, sha256 `6f9ceb056616416e512df99542b6b85bc543bb9c6a4a18d6d48029dd48801670` |
 | Where | `~/Desktop/Projects/biosentry-data/agent-tuning/run1/adapter-step200/` (outside the repository; not uploaded anywhere) |
 | Release copy | `adapter-step200-release/` beside it, made by `python -m research.agent_tuning.upload_adapter prepare`: the same weights, and `adapter_config.json` with the base model's public name in place of a local path (899 bytes, sha256 `d117ed827f99cee837c9cea76c8b6ce5847e481dcaa08b89f8acb8a289a3aaaf`). `research/agent_tuning/weights.json` holds the sha256 of every base file and adapter file |
-| Storage now | a private Hugging Face model repository (free). Prepared and not run: `upload_adapter upload` was never called, no repository exists, nothing is uploaded. Only the adapter, its config, its sha256 file and a card go there (2.1 MB). The base model is public at its publisher and is not stored again |
+| Storage now | a private Hugging Face model repository (free). The repository is `Aellaecieee/biosentry-agent-adapter`. `upload_adapter upload` was run once, on 2026-11-13, after the owner logged in on this machine and asked for it. The orchestrator session ran it from `main` on the release copy, and reported the script's line "uploaded to the private repository: adapter_config.json, adapter_model.safetensors, SHA256SUMS.txt, README.md" and that the repository reports private. This session did not run the upload and did not check the repository. Only the adapter, its config, its sha256 file and a card go there (2.1 MB). The base model is public at its publisher and is not stored again |
 | Storage, final plan | a Huawei Cloud OBS bucket, when a paid Huawei Cloud account exists |
 | On the server | the question worker reads read-only local copies and checks each by sha256 at start (`research/agent_tuning/SERVER.md`). Nothing is on the server yet |
 | Weights, measured from the file | all 48 `lora_B` tensors are non-zero, mean absolute value 0.00224 (they start at zero) |
@@ -254,3 +255,79 @@ What "trained with MindSpore" means on the MindNLP route: you write ordinary Hug
 - Any published MindNLP CPU or macOS LoRA run, and whether mindnlp 0.5.1 is pinned to a specific transformers version (requires_dist gives only a lower bound).
 - Whether `import mindnlp` conflicts with a real `torch` installed in the same environment.
 - Competition credits, payment-method requirement for Huawei Cloud trials.
+
+## 12. openPangu as the agents' base model: research only (2026-11-13)
+
+Asked for by the owner (decision `orchestrator-1`): short research now, Qwen stays for the demo, no
+migration yet. A separate read-only agent did it. No weights were downloaded, no account was made and
+no licence was accepted by a click. Nothing was run. This section is newer than the openPangu lines in
+sections 1 to 3 and 11, and where they differ, this section is right.
+
+**Recommendation: stay on Qwen for the demo, and write Huawei's model as the final plan. After
+16 November a side-by-side is worth about one day.** The first step is a one-hour load test, with no
+training.
+
+### The licence
+
+Text read: the `LICENSE` files of four `ascend-tribe` repositories on GitCode, 2026-11-13
+([Embedded-1B](https://raw.gitcode.com/ascend-tribe/openpangu-embedded-1b-model/raw/main/LICENSE),
+[Embedded-1B-V1.1](https://raw.gitcode.com/ascend-tribe/openPangu-Embedded-1B-V1.1/raw/main/LICENSE),
+Embedded-7B, Ultra-MoE-718B). They are the same "OpenPangu Model License Agreement Version 1.0".
+[openPangu-2.0-Flash](https://raw.gitcode.com/ascend-tribe/openPangu-2.0-Flash/raw/main/LICENSE) uses
+Version 2.0, which adds an end of the licence on a patent or copyright suit (3.2) and lets Huawei
+update the agreement (10). **[verified]** for all of that.
+
+| Point | What the Version 1.0 text says | Mark |
+|---|---|---|
+| Fine-tuning | Clause 2 lets you use, reproduce, change and distribute the model. Clause 1.2 counts works based on the model as a "Derivative Model" | **[verified]** the text. That a LoRA adapter is a Derivative Model is our reading: **[unverified]** |
+| Sharing an adapter | Allowed. Clause 4.1: include a copy of the agreement and keep the origin notices | **[verified]** the text. Whether sharing inside a team counts as distribution is not said: **[unverified]**, so include the notices anyway |
+| Competition entry and demo | Nothing forbids them. Clause 4.2 applies when a product or service is made available to third parties; a demo to judges counts | **[verified]** the text; how it applies is our reading |
+| Territory | Clause 3: no use, directly or indirectly, within the European Union | **[verified]** the text. What "indirectly" means for a hosted demo is **[unverified]** and not legal advice: keep the server and the users outside the EU, and do not publish an open link |
+| Notices | Clause 4.2: "Powered by openPangu" and the trademark line on pages and documents. Clause 7: you indemnify Huawei | **[verified]** |
+| Commercial use | No clause restricts it; the grant is no-charge and royalty-free with no field-of-use limit | **[verified]**. This corrects section 11, which said the text does not say |
+| Getting the weights | The Hugging Face repository `openpangu/openPangu-Embedded-1B-V1.1` reports `gated: false`: no click-through. The preamble says use itself accepts the licence | **[verified]** (Hugging Face API, 2026-11-13). The Hugging Face organisation is not marked verified; it mirrors GitCode: **[unverified]** that it is official. An anonymous request for the weights on GitCode got HTTP 403: **[unverified]** whether a login is needed |
+
+### The models
+
+Sizes from the Hugging Face API for the `openpangu` account, 2026-11-13 **[verified]**: Embedded-1B and
+1B-V1.1 (1.39 billion parameters, 2.78 GB), Embedded-7B-V1.1 (8.0 billion, 16.1 GB), R-7B-2512 and VL-7B
+(8.8 billion, 17.6 GB), 7B-Diffusion-Base (32 GB), R-72B (154 GB), 2.0-Flash (200 GB), 2.0-Pro
+(1.08 TB), Ultra-MoE-718B-V1.1 (1.47 TB).
+
+Only **openPangu-Embedded-1B-V1.1** is small enough to tune on a CPU-only laptop.
+
+| Fact | Value | Mark |
+|---|---|---|
+| Size | 1.39 billion parameters (2.8 times Qwen2.5-0.5B), one 2.78 GB safetensors file | **[verified]** |
+| Context | 32k tokens; 26 layers, hidden size 1536, vocabulary 153k | **[verified]** (`config.json`, README_EN) |
+| Loading | a custom class, so it needs `trust_remote_code` | **[verified]** (`config.json`) |
+| **Blocker** | the official modeling file runs `import torch_npu` with no guard. On a laptop CPU it fails unless a local copy is patched | **[verified]** (`modeling_openpangu_dense.py`) |
+| Tokenizer and template | a SentencePiece tokenizer with custom code; its own role tags; it always adds a system turn | **[verified]** |
+| Thinking mode | the card calls it a fast-thinking model and gives only non-thinking scores; it shows no switch | **[verified]** the card. That the 1B has only a no-think mode: **[unverified]** (search snippet) |
+| Languages | not stated; the benchmarks are Chinese and English | **[unverified]** (our inference) |
+| Frameworks on the card | PyTorch 2.1 with torch-npu on Ascend hardware (CANN 8.1), vllm_ascend, MindIE. MindSpore and MindNLP are not named | **[verified]** |
+| MindNLP | the MindNLP 0.5 branch has no openPangu code (only the old PanGu-alpha) | **[verified]** (GitHub tree, 2026-11-13). Whether MindSpore 2.7 through MindNLP 0.5 loads it on CPU is **unknown**: it needs a try |
+
+### What a switch would cost
+
+An estimate, not a measurement. It scales our own Qwen figures by 2.8 for the parameter count.
+
+| Step | Hours |
+|---|---|
+| Environment and loading (a patched local copy of the model code, the custom code under MindNLP, the chat template, the data format) | 3 to 10 |
+| One LoRA run like the Qwen one (127 minutes for 200 steps, times 2.8). About 12 with one failed first run | about 6 |
+| The blind held-out evaluation again (about 3 hours for Qwen, times 2.8) | 8.5 to 10 |
+| Paperwork: card, registry, the licence copy, the "Powered by openPangu" and trademark lines, the EU note | 1 to 2 |
+| **Total** | **about 19 to 34, mostly unattended** |
+
+The biggest unknown is whether MindNLP 0.5 can run the custom code on CPU at all. If it cannot, the run
+moves to plain PyTorch, and the model is no longer trained on MindSpore.
+
+### Before anyone uses the model
+
+- Using the model accepts the licence. That step is the owner's.
+- The owner confirms that no team member and no demo host is in the European Union.
+- No weights are downloaded before the orchestrator is told.
+
+Not checked: any load or training run; ModelScope; GGUF conversion; the technical report; the Chinese
+README; a legal reading of "indirectly within the European Union".

@@ -81,7 +81,8 @@ second worker would need its own 6 GB. The rest of the stack shares the other ha
 ## Storage of the weights
 
 - Now: the adapter goes to a private Hugging Face model repository, which is free.
-  `python -m research.agent_tuning.upload_adapter` prepares and uploads it. It was prepared and not
-  run: nothing is uploaded.
+  `python -m research.agent_tuning.upload_adapter` prepares and uploads it. The upload was run once, on
+  2026-11-13, at the owner's request: the repository is `Aellaecieee/biosentry-agent-adapter`. Nothing is
+  on the server yet.
 - Final plan: a Huawei Cloud OBS bucket, when a paid Huawei Cloud account exists.
 - On the server: read-only local copies, checked by sha256 at every start.
