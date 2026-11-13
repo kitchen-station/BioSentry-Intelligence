@@ -93,7 +93,7 @@ afterEach(() => {
 });
 
 const expectLabEntry = () => {
-  expect(screen.getAllByRole("link", { name: "Simulation lab" })).toHaveLength(1);
+  expect(screen.queryByRole("link", { name: "Simulation lab" })).toBeNull(); // in the menu, not the bar
   expect(screen.getAllByText("Simulated patients until a hospital is connected.")).toHaveLength(1);
 };
 
@@ -102,7 +102,8 @@ describe("PatientDetail", () => {
     page("rn");
     await loaded();
     expect(screen.getAllByText("Simulated patients until a hospital is connected.")).toHaveLength(1);
-    expect(screen.getByRole("link", { name: "Simulation lab" }).getAttribute("href")).toBe("/lab");
+    expect(screen.getByRole("link", { name: "Ward" }).getAttribute("aria-current")).toBeNull();
+    expect(screen.getByRole("link", { name: "← Ward view" })).toBeTruthy();
     expect(screen.getByRole("button", { name: /rn-manalo/ })).toBeTruthy();
   });
 

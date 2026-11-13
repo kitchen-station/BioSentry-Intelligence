@@ -16,6 +16,17 @@
   text-decoration: none;
 }
 
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+
+.place[aria-current="page"] {
+  font-weight: 600;
+  text-decoration: underline;
+}
+
 .place:hover {
   text-decoration: underline;
 }

@@ -88,7 +88,7 @@ describe("the lab writes nothing to the ward", () => {
     for (const name of ["Research numbers", "The pipeline"]) {
       await userEvent.click(screen.getByRole("link", { name }));
       expect(await screen.findByRole("heading", { level: 1, name })).toBeTruthy();
-      await userEvent.click(screen.getByRole("link", { name: "Back to the ward" }));
+      await userEvent.click(screen.getByRole("link", { name: "Ward" }));
       expect(screen.getByText("the ward")).toBeTruthy();
       cleanup();
       lab();
