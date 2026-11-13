@@ -10,6 +10,7 @@ import json
 import math
 import os
 import re
+import resource
 import signal
 import subprocess
 import sys
@@ -37,6 +38,7 @@ MAX_RESULT = 64 * 1024
 CAPS = {"list_trials": 600, "evaluate_rules": 600, "sweep_baseline": 1800, "compare_runs": 600}
 REWARD_TIMEOUT = 3600
 LOG_TAIL = 4096
+MAX_CHILD_FILE = 16 * 1024 * 1024  # any one file the reward loop writes, its log included
 MAX_GENERATIONS = 64
 MAX_GENERATION_BYTES = 256 * 1024
 TIMED_OUT = -1
@@ -234,7 +236,10 @@ def _policies(cfg: Config, rules: list[dict]) -> list[Policy]:
             out.append(alone if kind == "baseline_alone" else either)
         else:
             nt = r["no_temperature"]
-            path = cfg.home / "runs" / r["run"] / "reward_policy" / (reward_loop.NO_TEMP_DIR if nt else "")
+            home = cfg.home.resolve()
+            path = (home / "runs" / r["run"] / "reward_policy" / (reward_loop.NO_TEMP_DIR if nt else "")).resolve()
+            if not path.is_relative_to(home):
+                raise ToolError(f"{r['run']}: outside the agent home")
             name = f"reward_{r['run']}{'_no_temp' if nt else ''}"
             alone, either = reward_policy.policies(name, reward_loop.read_policy(path / "policy.json", not nt))
             out.append(alone if kind == "reward_policy" else either)
@@ -265,6 +270,8 @@ def evaluate_rules(cfg: Config, dataset: str, seeds: list[int], rules: list[dict
     for seed in seeds:
         folder = _folder(cfg, dataset, seed)
         trial = load_trial(folder)
+        if trial.seed != seed:  # the manifest changed between the check and the load
+            raise ToolError(f"{dataset}/{folder.name}: seed changed while reading")
         check_parity(trial)
         evaluate.score_trial(trial, tuple(policies), pool, 0 if window == "early" else events.TAIL_MINUTES)
         baseline_policy.clear_cache()
@@ -299,13 +306,18 @@ def evaluate_rules(cfg: Config, dataset: str, seeds: list[int], rules: list[dict
 
 # --- 3. run_reward_round --------------------------------------------------------------------------
 
+def _limit_files() -> None:
+    resource.setrlimit(resource.RLIMIT_FSIZE, (MAX_CHILD_FILE, MAX_CHILD_FILE))
+
+
 def _run(argv: list[str], log_path: Path, timeout: int) -> int:
     # The model key must not reach the child.
     env = {k: v for k, v in os.environ.items() if not k.startswith("BIOSENTRY_AGENT_")}
     with open(log_path, "wb") as log:
         try:
             return subprocess.run(argv, stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                                  timeout=timeout, cwd=REPO, env=env, shell=False).returncode
+                                  timeout=timeout, cwd=REPO, env=env, shell=False,
+                                  preexec_fn=_limit_files).returncode
         except subprocess.TimeoutExpired:
             return TIMED_OUT
 
@@ -352,10 +364,15 @@ class RewardRound:
 
 def run_reward_round(cfg: Config, run_dir: Path, train_dataset: str, validate_dataset: str,
                      no_temperature: bool = False) -> RewardRound:
+    roots = [_dir(cfg, train_dataset), _dir(cfg, validate_dataset)]
+    for root, dataset in zip(roots, (train_dataset, validate_dataset)):
+        for p in sorted(root.iterdir()) if root.is_dir() else []:
+            if p.name.startswith("seed-"):
+                _dir(cfg, dataset, p.name)  # the loop opens these itself: none may leave the trial root
     run_dir.mkdir(parents=True, exist_ok=True)
     out = run_dir / "reward_policy"
-    argv = [sys.executable, "-m", "research.reward_loop", "--train", str(_dir(cfg, train_dataset)),
-            "--validate", str(_dir(cfg, validate_dataset)), "--out", str(out)]
+    argv = [sys.executable, "-m", "research.reward_loop", "--train", str(roots[0]),
+            "--validate", str(roots[1]), "--out", str(out)]
     if no_temperature:
         argv.append("--no-temperature")
     log = run_dir / "loop.log"
@@ -366,7 +383,10 @@ def run_reward_round(cfg: Config, run_dir: Path, train_dataset: str, validate_da
     folder = out / reward_loop.NO_TEMP_DIR if no_temperature else out
     params = reward_loop.read_policy(folder / "policy.json", not no_temperature)  # checks its sha256
     raw = (folder / "policy.json").read_bytes()
-    body = json.loads(raw)
+    try:
+        body = json.loads(raw)
+    except ValueError:  # read_policy just parsed it, so the file changed in between
+        raise ToolError("policy.json: changed while reading") from None
     chosen = body.get("chosen_generation")
     return RewardRound(code, no_temperature, _generations(folder),
                        chosen if type(chosen) is int else None, params.as_dict(),
@@ -400,6 +420,8 @@ def sweep_baseline(cfg: Config, run_dir: Path, dataset: str, seeds: list[int]) -
     return Sweep({"k": best.k, "p": best.p}, ref, row, len(rows), hashlib.sha256(data).hexdigest())
 
 
+# shortcut: the in-process cap below is a signal, so called code that catches every exception could
+# outlive it (none in research/ does today), upgrade by running these tools in a child process
 # --- 5. compare_runs ------------------------------------------------------------------------------
 
 @dataclass
@@ -455,8 +477,9 @@ def call(cfg: Config, name: str, args: dict, run_dir: Path | None = None) -> tup
     args = validate(name, args)
     extra = {}
     if name in WRITES:
-        if run_dir is None or not Path(run_dir).resolve().is_relative_to(cfg.home.resolve()):
-            raise ToolError(f"{name}: the run folder must be inside the agent home")
+        runs = (cfg.home / "runs").resolve()
+        if run_dir is None or Path(run_dir).resolve().parent != runs or not re.fullmatch(r"S-[0-9]{4}", Path(run_dir).name):
+            raise ToolError(f"{name}: the run folder must be runs/S-NNNN inside the agent home")
         extra["run_dir"] = Path(run_dir)
     try:
         with _cap(CAPS.get(name)):

@@ -24,9 +24,10 @@ class Config:
     model_key: str | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
-        home = self.home.resolve()
-        if home.is_relative_to(self.models.resolve()) or home.is_relative_to(REPO):
-            raise AgentError("the agent home must not be inside the models folder or the repository")
+        home, models = self.home.resolve(), self.models.resolve()
+        if home.is_relative_to(models) or models.is_relative_to(home) or home.is_relative_to(REPO):
+            raise AgentError("the agent home must not be inside the models folder or the repository, "
+                             "and the models folder must not be inside the agent home")
 
     @property
     def model_on(self) -> bool:

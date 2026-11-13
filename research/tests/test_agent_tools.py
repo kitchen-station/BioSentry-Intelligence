@@ -1,3 +1,4 @@
+import dataclasses
 import hashlib
 import json
 import os
@@ -59,6 +60,8 @@ def test_config_refuses_a_home_inside_the_models_folder_or_the_repository(tmp_pa
         Config(trials=tmp_path, home=tmp_path / "models" / "agent", models=tmp_path / "models")
     with pytest.raises(AgentError, match="agent home"):
         Config(trials=tmp_path, home=REPO / "research" / "agent-home", models=tmp_path / "models")
+    with pytest.raises(AgentError, match="models folder must not be inside"):
+        Config(trials=tmp_path, home=tmp_path / "home", models=tmp_path / "home" / "models")
 
 
 def test_config_from_env_needs_https_and_never_shows_the_key(tmp_path):
@@ -238,7 +241,28 @@ def test_a_reward_policy_rule_reads_the_policy_from_the_agent_home(toy):
     rules = [CHART, {"rule": "news2_or_reward_policy", "run": "S-0001", "no_temperature": False}]
     result, _ = call(toy, "evaluate_rules", with_(EVAL, rules=rules))
     assert result["rules"][1]["name"] == "news2_or_reward_S-0001"
-    assert result["rules"][1]["alerts"] >= 7  # an OR with the chart trigger never has fewer alerts
+    # No toy patient has the 24 bins a baseline needs, so the policy alone never alerts and the OR
+    # is the chart trigger exactly: 7 alerts, caught 2 of 2.
+    assert (result["rules"][1]["alerts"], result["rules"][1]["caught"]) == (7, [2, 2])
+    alone, _ = call(toy, "evaluate_rules", with_(EVAL, rules=[{"rule": "reward_policy", "run": "S-0001", "no_temperature": False}]))
+    assert (alone["rules"][0]["name"], alone["rules"][0]["alerts"]) == ("reward_S-0001", 0)
+
+
+def test_a_run_folder_symlinked_out_of_the_agent_home_is_refused(toy, tmp_path):
+    make_run(toy)
+    (tmp_path / "away").mkdir()
+    (toy.home / "runs" / "S-0001").rename(tmp_path / "away" / "S-0001")
+    (toy.home / "runs" / "S-0001").symlink_to(tmp_path / "away" / "S-0001")
+    rules = [{"rule": "reward_policy", "run": "S-0001", "no_temperature": False}]
+    with pytest.raises(ToolError, match="outside the agent home"):
+        call(toy, "evaluate_rules", with_(EVAL, rules=rules))
+
+
+def test_a_seed_that_changes_between_the_check_and_the_load_is_refused(toy, monkeypatch):
+    real = tools.load_trial
+    monkeypatch.setattr(tools, "load_trial", lambda folder: dataclasses.replace(real(folder), seed=12))
+    with pytest.raises(ToolError, match="seed changed while reading"):
+        call(toy, "evaluate_rules", EVAL)
 
 
 def test_a_tampered_policy_is_refused_when_a_rule_reads_it(toy):
@@ -318,10 +342,31 @@ def test_a_failed_round_is_a_result_with_nothing_chosen(tmp_path, monkeypatch):
 
 
 def test_a_write_tool_needs_a_run_folder_inside_the_agent_home(tmp_path, monkeypatch):
-    fake_runner(monkeypatch)
-    for run_dir in (None, tmp_path / "elsewhere"):
+    seen = fake_runner(monkeypatch)
+    home = tmp_path / "home"
+    for run_dir in (None, tmp_path / "elsewhere", home, home / "runs", home / "runs" / "x", home / "runs" / "S-0001" / "deep"):
         with pytest.raises(ToolError, match="inside the agent home"):
             call(cfg_for(tmp_path), "run_reward_round", ROUND, run_dir)
+    assert seen == []
+
+
+def test_a_seed_folder_that_leaves_the_trial_root_stops_the_reward_round(tmp_path, monkeypatch):
+    seen = fake_runner(monkeypatch)
+    cfg = cfg_for(tmp_path)
+    (tmp_path / "away").mkdir()
+    (cfg.trials / "ward-v2").mkdir(parents=True)
+    (cfg.trials / "ward-v2" / "seed-08").symlink_to(tmp_path / "away")
+    with pytest.raises(ToolError, match="outside the trial root"):
+        call(cfg, "run_reward_round", ROUND, tmp_path / "home" / "runs" / "S-0001")
+    assert seen == []
+
+
+def test_the_child_cannot_write_a_file_past_the_cap(tmp_path, monkeypatch):
+    monkeypatch.setattr(tools, "MAX_CHILD_FILE", 64 * 1024)
+    log = tmp_path / "loop.log"
+    code = tools._run([sys.executable, "-c", "import sys; sys.stdout.write('x' * 1_000_000)"], log, 60)
+    assert code != 0 and log.stat().st_size <= 64 * 1024
+    assert tools._run([sys.executable, "-c", "print('ok')"], log, 60) == 0 and log.read_text() == "ok\n"
 
 
 def test_the_child_process_does_not_see_the_model_key(tmp_path, monkeypatch):
