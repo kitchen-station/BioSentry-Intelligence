@@ -1,11 +1,12 @@
 #!/bin/sh
-# Bring the team stack up on the VPS (deploy/README.md has the whole order). Safe to re-run.
+# Bring the team stack up on the server (deploy/README.md has the whole order). Safe to re-run.
 #
 #   checks Docker (with compose), git, Tailscale and openssl are installed
 #   -> makes deploy/.env, mode 600, if it does not exist (random Postgres password and ingest key,
 #      never printed; an existing one is kept, and its mode put right)
 #   -> clones the ward simulator beside this repository (SIM_DIR), or updates it if it is there
-#   -> builds the images and starts the stack, waiting until it is healthy.
+#   -> builds the images (the API, the ward runner, and the web server with the two pages) and starts
+#      the stack, waiting until it is healthy.
 #
 # Do not delete deploy/.env while the database volume exists: the volume keeps the password it was
 # first created with.
@@ -53,5 +54,5 @@ else
 fi
 
 docker compose up -d --build --wait
-echo "up: the API answers on this host at 127.0.0.1:8000 and nowhere else."
-echo "next: tailscale serve --bg --https=443 http://127.0.0.1:8000, then set each clinician's passphrase."
+echo "up: the team's address answers on this host at 127.0.0.1:8080 (the API alone at 127.0.0.1:8000) and nowhere else."
+echo "next: sudo tailscale serve --bg --https=443 http://127.0.0.1:8080, then set each clinician's passphrase."
