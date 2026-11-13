@@ -50,6 +50,9 @@ function lazyFixtureProvider(): ApiProvider {
     getAcknowledgements: () => fixtures().then((m) => m.fixtureProvider.getAcknowledgements()),
     acknowledge: (patientId, score) =>
       fixtures().then((m) => m.fixtureProvider.acknowledge(patientId, score)),
+    requestLabRun: (input) => fixtures().then((m) => m.fixtureProvider.requestLabRun(input)),
+    getLabRuns: () => fixtures().then((m) => m.fixtureProvider.getLabRuns()),
+    getLabRun: (id) => fixtures().then((m) => m.fixtureProvider.getLabRun(id)),
     extractLabsFromFile: (file) =>
       fixtures().then((m) => m.fixtureProvider.extractLabsFromFile(file)),
     extractPatientFromFile: (file) =>
@@ -74,6 +77,9 @@ export const enterLabResults = provider.enterLabResults;
 export const recordVitals = provider.recordVitals;
 export const getAcknowledgements = provider.getAcknowledgements;
 export const acknowledge = provider.acknowledge;
+export const requestLabRun = provider.requestLabRun;
+export const getLabRuns = provider.getLabRuns;
+export const getLabRun = provider.getLabRun;
 
 /**
  * Whether this build can record nurse-entered vitals. Only the API re-ranks (D4: the frontend
@@ -82,6 +88,8 @@ export const acknowledge = provider.acknowledge;
 export const canRecordVitals = !USE_FIXTURES;
 /** Whether this build can show the admin overview. Only the API knows who is assigned and what was done. */
 export const hasOverview = !USE_FIXTURES;
+// Only the API stores lab runs; a worker beside it runs them.
+export const hasLabRuns = !USE_FIXTURES;
 export const extractLabsFromFile = provider.extractLabsFromFile;
 export const extractPatientFromFile = provider.extractPatientFromFile;
 

@@ -140,6 +140,11 @@ schemas. Every target is in the [Makefile](Makefile).
 - **Simulation lab:** one link in the top bar of every signed-in page. Research numbers, the pipeline and the research
   agent's findings, under a label that it is not the ward. The one-address deployment also links the ward
   simulator from there.
+  A physician or the charge nurse can ask for a simulated run: the simulator's compare runs the same patients twice
+  with one change, on a lab copy, never on the ward that is running. A lab worker beside the ward runner runs it; the
+  API only stores the request and the result. Results are synthetic and not validated, and nothing in them changes a
+  rank. Each clinician has one at a time and 10 a day; the ward has 5 waiting at most. No lab worker is deployed yet,
+  so a request fails after an hour until one is.
 
 ## What the database stores
 
@@ -154,7 +159,7 @@ active one: the seeded fixture ward, or a simulated ward posted to `/sim/*`.
   source, tier, time and quality (a value, or the reason there is none), 15-minute vital bins (a gap
   is NULL), notes (soft-deleted), acknowledgements, sessions (the token hashed, 12 hours), the
   audit log (ids and outcomes only, sign-in attempts included, never a passphrase; the database refuses UPDATE, DELETE, TRUNCATE and a repeated sequence number, but not a user who can drop its triggers or the table), and the
-  sim's event feed. A patient row is one stay: `admitted_at` (NULL when the arrival is not known), `left_at`
+  sim's event feed, and lab runs (`lab_run`): a clinician's request for a simulated run and its result. A patient row is one stay: `admitted_at` (NULL when the arrival is not known), `left_at`
   and `outcome`. Someone who has left drops out of every live view and stays in the history.
 - **Pruned:** when a sim batch moves its run into a new sim hour, that run's vital bins older than
   `BIOSENTRY_RETENTION_DAYS` days of sim time (7 when unset) are deleted, and so are its observations

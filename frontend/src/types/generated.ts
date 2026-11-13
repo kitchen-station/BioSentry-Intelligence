@@ -276,6 +276,48 @@ export interface components {
             /** @description x10^9/L */
             readonly wbc: components["schemas"]["NumberMeasurement"] | null;
         };
+        /** LabRunDetail */
+        readonly LabRunDetail: {
+            readonly baseline: string;
+            readonly change: string;
+            readonly claimed_at: string | null;
+            readonly days: number;
+            readonly finished_at: string | null;
+            readonly id: number;
+            /** @constant */
+            readonly kind: "compare";
+            /** @enum {string} */
+            readonly mode: "w4" | "hospital";
+            readonly reason: string | null;
+            readonly report: {
+                readonly [key: string]: unknown;
+            } | null;
+            readonly report_text: string | null;
+            readonly requested_at: string;
+            readonly requested_by: string;
+            readonly seed: number;
+            /** @enum {string} */
+            readonly state: "queued" | "running" | "done" | "failed" | "refused";
+        };
+        /** LabRunItem */
+        readonly LabRunItem: {
+            readonly baseline: string;
+            readonly change: string;
+            readonly claimed_at: string | null;
+            readonly days: number;
+            readonly finished_at: string | null;
+            readonly id: number;
+            /** @constant */
+            readonly kind: "compare";
+            /** @enum {string} */
+            readonly mode: "w4" | "hospital";
+            readonly reason: string | null;
+            readonly requested_at: string;
+            readonly requested_by: string;
+            readonly seed: number;
+            /** @enum {string} */
+            readonly state: "queued" | "running" | "done" | "failed" | "refused";
+        };
         /**
          * LiveWard
          * @description The stored LiveView as one clinician may see it. `shared` is null until a view is stored.
@@ -295,6 +337,17 @@ export interface components {
             /** @constant */
             readonly present: false;
             readonly reason: string;
+        };
+        /** NewLabRun */
+        readonly NewLabRun: {
+            readonly baseline: string;
+            readonly change: string;
+            readonly days: number;
+            /** @constant */
+            readonly kind: "compare";
+            /** @enum {string} */
+            readonly mode: "w4" | "hospital";
+            readonly seed: number;
         };
         /**
          * NewNote
@@ -858,8 +911,11 @@ export type FlagPresent = components['schemas']['FlagPresent'];
 export type JsonValue = components['schemas']['JsonValue'];
 export type LabExtractionResult = components['schemas']['LabExtractionResult'];
 export type LabPanel = components['schemas']['LabPanel'];
+export type LabRunDetail = components['schemas']['LabRunDetail'];
+export type LabRunItem = components['schemas']['LabRunItem'];
 export type LiveWard = components['schemas']['LiveWard'];
 export type MeasurementAbsent = components['schemas']['MeasurementAbsent'];
+export type NewLabRun = components['schemas']['NewLabRun'];
 export type NewNote = components['schemas']['NewNote'];
 export type NumberMeasurement = components['schemas']['NumberMeasurement'];
 export type NumberPresent = components['schemas']['NumberPresent'];

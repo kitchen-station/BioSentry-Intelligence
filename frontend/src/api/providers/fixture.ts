@@ -22,6 +22,9 @@ export const fixtureProvider: ApiProvider = {
   // No simulator behind the fixture, so no live view.
   getLiveWard: () => Promise.resolve(null),
   getOverview: () => Promise.reject(new Error("The overview needs the API")),
+  requestLabRun: () => Promise.reject(new Error("Simulated runs need the server")),
+  getLabRuns: () => Promise.reject(new Error("Simulated runs need the server")),
+  getLabRun: () => Promise.reject(new Error("Simulated runs need the server")),
   admitPatient: fixtures.admitPatient,
   enterLabResults: fixtures.enterLabResults,
   getAcknowledgements: fixtures.getAcknowledgements,

@@ -49,12 +49,30 @@ describe("lab modules", () => {
     expect(roots).toContain("./Pipeline.tsx");
   });
 
-  it("reach the api only through getWard in Pipeline", () => {
+  it("reach the api only through getWard in Pipeline and the lab-run calls in LabRuns", () => {
     const users = Object.fromEntries(
       reached(roots).map((p) => [p, apiStatements(sources[p])] as const).filter(([, s]) => s.length > 0),
     );
     // SessionMenu imports nothing from the api today. Its clearSession would only drop the local token and send no request.
-    expect(users).toEqual({ "./Pipeline.tsx": ['import { getWard } from "../api"'] });
+    expect(users).toEqual({
+      "./Pipeline.tsx": ['import { getWard } from "../api"'],
+      "./LabRuns.tsx": ['import { ApiError, getLabRun, getLabRuns, hasLabRuns, requestLabRun } from "../api"'],
+    });
+  });
+
+  it("the lab-run calls touch only the lab paths", () => {
+    const http = all["../api/providers/http.ts"];
+    const index = all["../api/index.ts"];
+    for (const name of ["requestLabRun", "getLabRuns", "getLabRun"]) {
+      const from = http.indexOf(`  ${name}(`);
+      expect(from, name).toBeGreaterThanOrEqual(0);
+      const body = http.slice(from, http.indexOf("\n  },", from));
+      const paths = [...body.matchAll(/["'`](\/[^"'`]*)["'`]/g)].map((m) => m[1]);
+      expect(paths.length, name).toBeGreaterThan(0);
+      for (const path of paths) expect(path, name).toMatch(/^\/wards\/W4\/lab\/runs(\/\$\{id\})?$/);
+      expect(body, name).not.toMatch(/\/sim\/|\/patients|\/rows|\/live|\/acknowledg/);
+      expect(index, name).toContain(`export const ${name} = provider.${name};`);
+    }
   });
 
   it("send no request of their own", () => {

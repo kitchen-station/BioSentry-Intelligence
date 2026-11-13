@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import type { Session } from "../types";
 import { LabFrame } from "../components/LabFrame";
+import { LabRuns } from "./LabRuns";
 import research from "./Research.module.css";
 
 /** The lab's front page. It reads nothing from the ward and writes nothing. */
@@ -16,6 +17,7 @@ export function Lab({ session, onSignOut }: { session: Session; onSignOut: () =>
           <li><Link to="/lab/research#agent">The research agent&apos;s questions and answers</Link></li>
           <li><Link to="/lab/pipeline">The pipeline</Link></li>
         </ul>
+        <LabRuns role={session.role} />
         {simulatorServed && (
           <section aria-labelledby="outside">
             <h2 id="outside" className={research.heading}>Outside the lab</h2>
