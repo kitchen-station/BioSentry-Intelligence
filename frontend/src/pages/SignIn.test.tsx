@@ -239,6 +239,26 @@ describe("with the API", () => {
     expect(api.signIn).toHaveBeenLastCalledWith("rn-reyes", "second try");
   });
 
+  it("signs in and goes to the overview when the server answers admin for a nurse card", async () => {
+    api.signIn.mockResolvedValue("admin");
+    const onSignIn = await toPassphrase();
+    await type("a long passphrase");
+    await click("Continue");
+    expect(await screen.findByText("at /overview")).toBeTruthy();
+    expect(onSignIn).toHaveBeenCalledWith({ clinician_id: "rn-reyes", ward: "W4", role: "admin" });
+    expect(screen.queryByText("Choose destination")).toBeNull();
+  });
+
+  it("labels the destination step with the server's role, not the card's", async () => {
+    api.signIn.mockResolvedValue("charge_rn");
+    await toPassphrase();
+    await type("a long passphrase");
+    await click("Continue");
+    await screen.findByText("Choose destination");
+    expect(screen.getByText(/Charge Nurse/)).toBeTruthy();
+    expect(screen.queryByText(/Staff Nurse/)).toBeNull();
+  });
+
   describe("administration", () => {
     const toAdmin = async () => {
       const onSignIn = page();

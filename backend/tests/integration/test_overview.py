@@ -1,6 +1,7 @@
 """The admin role: the read-only ward overview, a write refused on every route, no role that a
 route can change, and the command that grants and revokes an admin."""
 
+import asyncio
 import io
 import json
 import runpy
@@ -11,7 +12,9 @@ from typing import Any
 import psycopg
 import pytest
 from conftest import dump_database
+from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
+from starlette.requests import Request
 from test_api import PATH_VALUES, PUBLIC_ROUTES, VALID_BODIES, _route_table
 from test_store import DATA, NOW, Api, api, new_run, sim_patient  # noqa: F401 (api: fixture)
 
@@ -26,7 +29,7 @@ from biosentry.repositories.postgres import PostgresStore, connect
 from biosentry.schemas import WardOverview
 from biosentry.services.ward import WardService
 
-ADMIN = "admin-ops"
+ADMIN = "admin-santos"
 IDS = [r["id"] for r in DATA["ranked"]] + [a["id"] for a in DATA["abstained"]]
 FORBIDDEN_KEYS = {"name", "age", "sex", "vitals", "notes", "admitting_context", "labs"}
 
@@ -100,14 +103,14 @@ def test_the_admin_sees_every_patient_on_the_ward_and_one_audit_row_is_written(a
     assert api.sql("SELECT role FROM audit_log WHERE action = 'view_overview'") == [
         {"role": "admin"}
     ]
-    assert sorted(p.id for p in body.patients) == sorted(IDS) and len(IDS) == 12
+    assert len(body.patients) == len(IDS) == 12
     store = PostgresStore(connect(api.url), api.wall)
     ranked, abstained = WardService(store, AuditLog(store.conn, api.wall, store.role_of)).compute(
         store.on_ward()
     )
-    assert [(p.id, p.state, p.score) for p in body.patients] == [
-        *((r.id, "ranked", r.score) for r in ranked),
-        *((a.id, "not_ranked", None) for a in abstained),
+    assert [(p.bed, p.state, p.score) for p in body.patients] == [
+        *((r.bed, "ranked", r.score) for r in ranked),
+        *((a.bed, "not_ranked", None) for a in abstained),
     ]
     assert all(p.reason for p in body.patients if p.state == "not_ranked")
     assert all("rn-manalo" in p.care for p in body.patients)  # the charge nurse is on every one
@@ -135,21 +138,63 @@ def test_a_patient_who_has_left_is_not_on_the_overview(api: Api) -> None:
     add_admin(api)
     write(api, "UPDATE patient SET left_at = %s, outcome = 'discharged' WHERE id = 'p-001'", NOW)
     body = overview(api).json()
-    assert "p-001" not in [p["id"] for p in body["patients"]]
+    assert len(body["patients"]) == 11
     assert all("p-001" not in json.dumps(c) for c in body["clinicians"])
 
 
-def test_the_shared_view_is_served_without_patient_entries(api: Api) -> None:
-    add_admin(api)
-    assert overview(api).json()["shared"] is None
+def set_view(api: Api, shared: Any) -> None:
     write(
         api,
         "UPDATE run SET live_view = %s::jsonb WHERE id = (SELECT max(id) FROM run)",
-        json.dumps({"shared": {"clock": "08:00"}, "patients": [{"id": "p-001", "note": "x"}]}),
+        json.dumps({"shared": shared, "patients": [{"id": "p-001", "note": "x"}]}),
     )
-    body = overview(api).json()
-    assert body["shared"] == {"clock": "08:00"}
-    assert "patients" not in body["shared"] and "note" not in json.dumps(body)
+
+
+GOOD = {"clockS": 90, "speed": 10, "ended": False,
+        "counts": {"received": 5, "rejected": 1, "abstained": 2}}
+
+
+def test_sim_is_null_without_a_view_and_carries_exactly_four_keys_otherwise(api: Api) -> None:
+    add_admin(api)
+    assert overview(api).json()["sim"] is None
+    set_view(api, {**GOOD, "secret": "MARKER-9c1d", "counts": {**GOOD["counts"], "x": "MARKER-9c1d"}})
+    response = overview(api)
+    assert response.json()["sim"] == GOOD
+    assert set(response.json()["sim"]) == {"clockS", "speed", "ended", "counts"}
+    assert "MARKER-9c1d" not in response.text and "shared" not in response.json()
+    assert "p-001" not in response.text
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        None,
+        "text",
+        {k: v for k, v in GOOD.items() if k != "speed"},
+        {k: v for k, v in GOOD.items() if k != "counts"},
+        {**GOOD, "counts": "none"},
+        {**GOOD, "counts": {"received": 1, "rejected": 0}},
+        {**GOOD, "clockS": "90"},
+        {**GOOD, "clockS": -1},
+        {**GOOD, "speed": 5},
+        {**GOOD, "ended": 1},
+        {**GOOD, "clockS": True},
+        {**GOOD, "speed": True},
+        {**GOOD, "speed": "10"},
+        {**GOOD, "counts": {**GOOD["counts"], "rejected": -1}},
+        {**GOOD, "counts": {**GOOD["counts"], "received": 1.5}},
+    ],
+)
+def test_sim_is_null_when_the_stored_view_is_not_as_read(api: Api, bad: Any) -> None:
+    add_admin(api)
+    set_view(api, bad)
+    assert overview(api).json()["sim"] is None
+
+
+def test_sim_is_null_when_the_view_has_no_shared_key(api: Api) -> None:
+    add_admin(api)
+    write(api, "UPDATE run SET live_view = '{}'::jsonb WHERE id = (SELECT max(id) FROM run)")
+    assert overview(api).json()["sim"] is None
 
 
 # --- Activity ------------------------------------------------------------------------------
@@ -167,42 +212,96 @@ def log(api: Api, who: str | None, role: str | None, action: str, at: Any = NOW)
     )
 
 
-def test_activity_is_the_last_ten_per_clinician_in_the_last_day_without_sign_ins(
-    api: Api,
-) -> None:
+def log_row(api: Api, who: str | None, role: str | None, action: str, outcome: str, at: Any) -> None:
+    write(
+        api,
+        "INSERT INTO audit_log (at, clinician_id, role, action, resource, outcome)"
+        " VALUES (%s, %s, %s, %s, 'p-001', %s)",
+        at,
+        who,
+        role,
+        action,
+        outcome,
+    )
+
+
+def test_activity_is_counts_per_clinician_action_and_outcome(api: Api) -> None:
     add_admin(api)
-    for i in range(12):
-        log(api, "rn-reyes", "rn", f"act{i}")
-    log(api, "rn-reyes", "rn", "old", NOW - timedelta(hours=25))
-    log(api, "md-santos", "md", "sign_in")
-    log(api, "md-santos", "md", "authenticate")
-    log(api, "md-santos", "md", "view_ward")
-    log(api, None, None, "view_ward")
-    log(api, "rn-manalo", "charge_rn", "view_ward")
+    for outcome in ("ok", "ok", "not_found"):
+        log_row(api, "rn-reyes", "rn", "view_patient", outcome, NOW)
+    log_row(api, "rn-reyes", "rn", "view_ward", "ok", NOW)
+    log_row(api, "md-santos", "md", "view_ward", "ok", NOW)
+    log_row(api, "rn-manalo", "charge_rn", "view_ward", "ok", NOW)
     activity = overview(api).json()["activity"]
-    reyes = [a["action"] for a in activity if a["clinician_id"] == "rn-reyes"]
-    assert reyes == [f"act{i}" for i in range(11, 1, -1)]  # newest first, ten of twelve
-    assert [a["action"] for a in activity if a["clinician_id"] == "md-santos"] == ["view_ward"]
-    assert {a["clinician_id"] for a in activity} == {"rn-reyes", "md-santos", "rn-manalo"}
-    assert [a["clinician_id"] for a in activity] == sorted(a["clinician_id"] for a in activity)
-    assert all(set(a) == {"seq", "at", "clinician_id", "action", "resource", "outcome"} for a in activity)
-    assert activity[0]["at"].endswith("Z")
+    assert activity == [
+        {"clinician_id": "md-santos", "action": "view_ward", "outcome": "ok", "count": 1},
+        {"clinician_id": "rn-manalo", "action": "view_ward", "outcome": "ok", "count": 1},
+        {"clinician_id": "rn-reyes", "action": "view_patient", "outcome": "not_found", "count": 1},
+        {"clinician_id": "rn-reyes", "action": "view_patient", "outcome": "ok", "count": 2},
+        {"clinician_id": "rn-reyes", "action": "view_ward", "outcome": "ok", "count": 1},
+    ]
 
 
-def test_a_note_never_reaches_the_overview_and_typed_text_in_a_failed_row_is_hidden(
-    api: Api,
+def test_old_sign_in_admin_and_grant_rows_are_not_counted(
+    cli: Api, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    add_admin(cli)
+    log_row(cli, "rn-reyes", "rn", "view_ward", "ok", NOW - timedelta(hours=25))
+    log_row(cli, "md-santos", "md", "sign_in", "ok", NOW)
+    log_row(cli, "md-santos", "md", "authenticate", "denied", NOW)
+    log_row(cli, None, None, "view_ward", "ok", NOW)
+    log_row(cli, ADMIN, "admin", "view_ward", "ok", NOW)
+    assert admin_module.main(["grant", "admin-rivera"]) == 0
+    assert admin_module.main(["revoke", "admin-rivera"]) == 0
+    capsys.readouterr()
+    assert overview(cli).json()["activity"] == []
+
+
+def test_the_overview_has_no_patient_id_no_note_and_no_row_keys(api: Api) -> None:
     add_admin(api)
     pid = DATA["clinicians"]["rn-reyes"]["patients"][0]
     note = {"author": "a", "role": "RN", "content": "MARKER-7f3a"}
     headers = api.as_("rn-reyes")
     assert api.client.post(f"/patients/{pid}/notes", json=note, headers=headers).status_code == 201
+    assert api.client.get(f"/patients/{pid}", headers=headers).status_code == 200
     assert api.client.get("/patients/Juan%20Cruz", headers=headers).status_code == 404
     response = overview(api)
     assert "MARKER-7f3a" not in response.text and "Juan Cruz" not in response.text
-    seen = [(a["action"], a["resource"], a["outcome"]) for a in response.json()["activity"]]
-    assert ("add_note", pid, "ok") in seen
-    assert ("view_patient", "-", "not_found") in seen
+    seen = {(a["action"], a["outcome"]) for a in response.json()["activity"]}
+    assert {("add_note", "ok"), ("view_patient", "ok"), ("view_patient", "not_found")} <= seen
+
+    def values(v: Any) -> list[Any]:
+        if isinstance(v, dict):
+            return [x for e in v.values() for x in values(e)]
+        if isinstance(v, list):
+            return [x for e in v for x in values(e)]
+        return [v]
+
+    assert not set(IDS) & set(values(response.json()))
+    body = response.json()
+    # The clinicians list names clinician ids (key `id`); no patient or activity row has one.
+    assert keys([body["patients"], body["activity"]]) & {"id", "seq", "at", "resource"} == set()
+    assert keys(body) & {"seq", "at", "resource"} == set()
+    for p in [*DATA["ranked"], *DATA["abstained"]]:
+        assert p["name"] not in response.text
+
+
+def test_a_validation_error_on_a_route_outside_the_table_does_not_raise_for_an_admin(
+    api: Api,
+) -> None:
+    headers = add_admin(api)
+    app = api.client.app
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/nowhere",
+        "headers": [(b"authorization", headers["Authorization"].encode())],
+        "path_params": {},
+    }
+    handler = app.exception_handlers[RequestValidationError]
+    response = asyncio.run(handler(Request(scope), RequestValidationError([])))
+    assert response.status_code == 422
+    assert audit_of(api, ADMIN) == []
 
 
 # --- The admin writes nothing --------------------------------------------------------------
@@ -293,11 +392,11 @@ def test_the_database_refuses_a_role_change_and_an_admin_on_a_patient(api: Api) 
     add_admin(api)
     for statement in (
         "UPDATE clinician SET role = 'admin' WHERE id = 'rn-reyes'",
-        "UPDATE clinician SET role = 'rn' WHERE id = 'admin-ops'",
+        "UPDATE clinician SET role = 'rn' WHERE id = 'admin-santos'",
         "INSERT INTO clinician (id, role) VALUES ('x-1', 'boss')",
         "INSERT INTO care_assignment (run_id, patient_id, clinician_id)"
-        " SELECT run_id, id, 'admin-ops' FROM patient LIMIT 1",
-        "UPDATE care_assignment SET clinician_id = 'admin-ops' WHERE clinician_id = 'rn-reyes'",
+        " SELECT run_id, id, 'admin-santos' FROM patient LIMIT 1",
+        "UPDATE care_assignment SET clinician_id = 'admin-santos' WHERE clinician_id = 'rn-reyes'",
     ):
         with pytest.raises(psycopg.errors.CheckViolation):
             api.sql(statement)
@@ -344,6 +443,10 @@ def test_grant_makes_an_admin_who_cannot_sign_in_until_a_passphrase_is_set(
 ) -> None:
     assert admin_module.main(["grant", ADMIN]) == 0
     assert "granted" in capsys.readouterr().out
+    assert cli.sql("SELECT clinician_id, role, action, resource, outcome FROM audit_log") == [
+        {"clinician_id": None, "role": None, "action": "grant_admin", "resource": ADMIN,
+         "outcome": "ok"}
+    ]
     assert cli.sql("SELECT role, passphrase_hash FROM clinician WHERE id = %s", ADMIN) == [
         {"role": "admin", "passphrase_hash": None}
     ]
@@ -384,6 +487,9 @@ def test_revoke_deletes_the_sessions_and_the_row_and_keeps_the_audit_rows(cli: A
     assert cli.sql(
         "SELECT 1 FROM audit_log WHERE clinician_id = %s AND action = 'view_overview'", ADMIN
     )
+    assert cli.sql(
+        "SELECT clinician_id, role, resource, outcome FROM audit_log WHERE action = 'revoke_admin'"
+    ) == [{"clinician_id": None, "role": None, "resource": ADMIN, "outcome": "ok"}]
 
 
 def test_revoke_only_touches_an_admin(cli: Api) -> None:

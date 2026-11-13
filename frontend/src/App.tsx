@@ -96,9 +96,7 @@ export function App() {
       <Route
         path="/overview"
         element={
-          session?.role === "admin"
-            ? <Overview session={session} onSignOut={signOut} />
-            : session ? <p>Not available for this account.</p> : <ToSignIn />
+          session ? <Overview session={session} onSignOut={signOut} /> : <ToSignIn />
         }
       />
       <Route

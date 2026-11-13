@@ -4,6 +4,9 @@ ALTER TABLE clinician DROP CONSTRAINT clinician_role_check;
 ALTER TABLE clinician ADD CONSTRAINT clinician_role_check
   CHECK (role IN ('rn', 'md', 'charge_rn', 'admin'));
 
+-- The overview counts the last day of audit rows on every view.
+CREATE INDEX audit_log_at ON audit_log (at);
+
 -- An admin is not a carer: never assigned to a patient, whoever tries.
 CREATE FUNCTION care_assignment_not_admin() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN

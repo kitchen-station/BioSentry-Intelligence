@@ -6,12 +6,16 @@
 `grant` adds a new clinician whose id starts `admin-`; it never promotes an existing clinician,
 who would keep their patients. The admin cannot sign in until `db.passphrase` sets a passphrase.
 `revoke` deletes the admin and their sessions and keeps their audit rows.
+One admin id per person (for example `admin-santos`), never shared. An id is not granted again
+after a revoke for a different person: the audit rows keep the id.
+Each command writes one audit row in the same transaction, with no clinician (nobody is signed in).
 BIOSENTRY_DATABASE_URL names the database.
 """
 
 import argparse
 import re
 
+from biosentry.core.audit import AuditLog, utc_now
 from biosentry.core.config import Settings
 from biosentry.repositories.postgres import ADMIN_ROLE, connect, transaction
 
@@ -34,6 +38,9 @@ def main(argv: list[str] | None = None) -> int:
             ).rowcount
             if not made:
                 raise SystemExit("that id already exists")
+            AuditLog(conn, utc_now, lambda _: None).append(
+                None, "grant_admin", args.admin_id, "ok"
+            )
             print(
                 f"admin {args.admin_id} granted. It cannot sign in until a passphrase is set:"
                 f" python -m biosentry.db.passphrase {args.admin_id}"
@@ -49,6 +56,9 @@ def main(argv: list[str] | None = None) -> int:
             ).rowcount
             if not gone:
                 raise SystemExit("no such admin")
+            AuditLog(conn, utc_now, lambda _: None).append(
+                None, "revoke_admin", args.admin_id, "ok"
+            )
             print(f"admin {args.admin_id} revoked")
     return 0
 

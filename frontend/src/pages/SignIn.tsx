@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError, clearSession, signIn, usesServer } from "../api";
 import type { Session, SessionRole } from "../types";
+import { ROLE_LABELS } from "../components/SessionMenu";
 import ch from "../components/Crosshair.module.css";
 import styles from "./SignIn.module.css";
 
@@ -143,6 +144,11 @@ export function SignIn({ onSignIn }: Props) {
       }
       const role = await signIn(selected!.id, passphrase);
       // The server's role wins over the card's.
+      if (role === "admin") {
+        onSignIn({ clinician_id: selected!.id, ward: selected!.ward, role });
+        navigate("/overview");
+        return;
+      }
       if (role) setSelected({ ...selected!, sessionRole: role });
       setPhase("destination");
     } catch (failure) {
@@ -340,7 +346,7 @@ export function SignIn({ onSignIn }: Props) {
             <div className={styles.selectedInfo}>
               <span className={styles.selectedName}>{selected.label}</span>
               <span className={styles.selectedDetail}>
-                {selected.role} &middot; Ward {selected.ward}
+                {ROLE_LABELS[selected.sessionRole]} &middot; Ward {selected.ward}
               </span>
             </div>
 

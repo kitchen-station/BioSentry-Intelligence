@@ -214,10 +214,10 @@ describe("route guards", () => {
     expect(screen.getByText("overview page for admin-ruiz")).toBeTruthy();
   });
 
-  it("tells any other role the overview is not available, and a signed-out visitor to sign in", () => {
+  it("hands any other role to the overview page, which refuses it, and a signed-out visitor to sign in", () => {
     store(nurse);
     at("/overview");
-    expect(screen.getByText("Not available for this account.")).toBeTruthy();
+    expect(screen.getByText("overview page for rn-reyes")).toBeTruthy();
     cleanup();
     sessionStorage.clear();
     at("/overview");

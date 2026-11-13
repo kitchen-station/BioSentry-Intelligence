@@ -69,12 +69,16 @@ cannot sign in: set one with `make db-passphrase id=rn-manalo` (it prompts twice
 stdin; at least 12 characters; it writes to the database `BIOSENTRY_DATABASE_URL` names). A database
 seeded before passphrases existed has none either: `make db-reset` seeds it again.
 
-**Admin (ward overview).** An admin sees every patient's bed and state, who is assigned, and the last day of each
-clinician's activity (ids and outcomes). The role is granted only from a shell with database access, run from
+**Admin (ward overview).** An admin sees every bed and its state, who is assigned, each clinician's patient
+count, and counts of each clinician's actions in the last 24 hours (by action and outcome; no patient and no
+time). No patient names or ids are shown. The role is granted only from a shell with database access, run from
 `backend/`: `uv run python -m biosentry.db.admin grant admin-<name>`, then
 `uv run python -m biosentry.db.passphrase admin-<name>`. Revoke with
 `uv run python -m biosentry.db.admin revoke admin-<name>`. No route can grant or change a role. An admin cannot
-write anything and is never assigned to a patient. Clinicians should be told that their activity is visible to an admin.
+write anything and is never assigned to a patient. One admin id per person (for example `admin-santos`), never
+shared. Granting and revoking each write an audit row. Clinicians are told in their own menu that an
+administrator can see these counts. Only someone with database access can see who opened the overview: the
+admin's own views are in the audit log, and no route shows them to anyone else.
 
 `make db-down` stops the database (the data stays in a Docker volume). The API reaches it through
 `BIOSENTRY_DATABASE_URL`, which defaults to the dev database in `compose.yaml` (its password is for
@@ -121,14 +125,15 @@ schemas. Every target is in the [Makefile](Makefile).
   for a clinician within 15 minutes lock that clinician out for the rest of the 15 minutes) and audits
   every attempt. The token is kept in memory only, so a reload returns to sign-in. The public demo (no
   API) checks nothing and says so. It lands on the ward, marked as simulated patients until a hospital
-  is connected.
+  is connected. An administrator types their id under "Administration" (API builds only) and lands on the
+  Overview.
 - **Ward:** patients in priority order, each with its score and why. A patient the system
   cannot score is listed as NOT RANKED, with the reason and what to record to fix it.
 - **Patient detail:** the score and what drives it, vitals and labs with where each value
   came from, notes, and trend charts (patch data only).
 - **Overview:** for an admin only, read only, from the "Administration" entry at sign-in (shown when the
-  dashboard talks to the API). Every patient's bed, id and state, who is assigned, each clinician's patient
-  count and recent activity, and the simulator status. It reads again on Refresh, never on a timer, because every
+  dashboard talks to the API). Every bed and its state, who is assigned, each clinician's patient
+  count, counts of their actions in the last 24 hours, and the simulator status. It reads again on Refresh, never on a timer, because every
   view is recorded in the audit log. An admin lands here and has no ward or station.
 - **Station:** admit a patient, enter lab results, upload a document (extraction is a
   placeholder), or see patient flow: who came and went, length of stay and 14 days of bed use.

@@ -191,6 +191,8 @@ def writer(ctx: Ctx, request: Request, who: Who) -> str:
     return who
 
 
+# One known order exception: a path with a NUL byte is refused as 404 `request not_found` in
+# `clinician`, before this admin check, and writes nothing.
 Writer = Annotated[str, Depends(writer)]
 
 
@@ -276,7 +278,8 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
         ctx = open_ctx()
         try:
             who = identify(ctx, request.headers.get("authorization"))
-            refuse_admin(ctx, who, request)  # an admin's bad body is refused, not explained
+            if key in REFUSED_ACTIONS:  # an admin's bad body is refused, not explained
+                refuse_admin(ctx, who, request)
             action = WRITE_ACTIONS.get(key)
             if action is not None:  # ids and outcome only: the rejected values are never logged
                 resource = str(request.path_params.get("patient_id", "-"))

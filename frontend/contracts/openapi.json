@@ -1316,33 +1316,27 @@
       },
       "OverviewActivity": {
         "additionalProperties": false,
+        "description": "How many times a clinician did one action with one outcome in the last day. Counts, not\nrows: a row would show which patient a named clinician opened and when. Oversight needs\nvolume and failures.",
         "properties": {
           "action": {
-            "type": "string"
-          },
-          "at": {
             "type": "string"
           },
           "clinician_id": {
             "type": "string"
           },
+          "count": {
+            "minimum": 1,
+            "type": "integer"
+          },
           "outcome": {
             "type": "string"
-          },
-          "resource": {
-            "type": "string"
-          },
-          "seq": {
-            "type": "integer"
           }
         },
         "required": [
-          "seq",
-          "at",
           "clinician_id",
           "action",
-          "resource",
-          "outcome"
+          "outcome",
+          "count"
         ],
         "title": "OverviewActivity",
         "type": "object"
@@ -1380,9 +1374,6 @@
             },
             "type": "array"
           },
-          "id": {
-            "type": "string"
-          },
           "reason": {
             "anyOf": [
               {
@@ -1415,7 +1406,6 @@
           }
         },
         "required": [
-          "id",
           "bed",
           "state",
           "score",
@@ -1424,6 +1414,63 @@
           "synthetic"
         ],
         "title": "OverviewPatient",
+        "type": "object"
+      },
+      "OverviewSimCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "abstained": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "received": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "rejected": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "received",
+          "rejected",
+          "abstained"
+        ],
+        "title": "OverviewSimCounts",
+        "type": "object"
+      },
+      "OverviewSimStatus": {
+        "additionalProperties": false,
+        "description": "Only what the status line reads from the sim's shared view; nothing else is copied.",
+        "properties": {
+          "clockS": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/OverviewSimCounts"
+          },
+          "ended": {
+            "type": "boolean"
+          },
+          "speed": {
+            "enum": [
+              0,
+              1,
+              10,
+              60
+            ],
+            "type": "integer"
+          }
+        },
+        "required": [
+          "clockS",
+          "speed",
+          "ended",
+          "counts"
+        ],
+        "title": "OverviewSimStatus",
         "type": "object"
       },
       "PartialAdmitPatientInput": {
@@ -3305,13 +3352,10 @@
           "receiving_data": {
             "type": "boolean"
           },
-          "shared": {
+          "sim": {
             "anyOf": [
               {
-                "additionalProperties": {
-                  "$ref": "#/components/schemas/JsonValue"
-                },
-                "type": "object"
+                "$ref": "#/components/schemas/OverviewSimStatus"
               },
               {
                 "type": "null"
@@ -3330,7 +3374,7 @@
           "as_of",
           "receiving_data",
           "synthetic",
-          "shared",
+          "sim",
           "patients",
           "clinicians",
           "activity"

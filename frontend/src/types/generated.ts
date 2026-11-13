@@ -346,14 +346,17 @@ export interface components {
             /** @default null */
             readonly temperature?: number | null;
         };
-        /** OverviewActivity */
+        /**
+         * OverviewActivity
+         * @description How many times a clinician did one action with one outcome in the last day. Counts, not
+         *     rows: a row would show which patient a named clinician opened and when. Oversight needs
+         *     volume and failures.
+         */
         readonly OverviewActivity: {
             readonly action: string;
-            readonly at: string;
             readonly clinician_id: string;
+            readonly count: number;
             readonly outcome: string;
-            readonly resource: string;
-            readonly seq: number;
         };
         /** OverviewClinician */
         readonly OverviewClinician: {
@@ -365,12 +368,28 @@ export interface components {
         readonly OverviewPatient: {
             readonly bed: string;
             readonly care: readonly string[];
-            readonly id: string;
             readonly reason: string | null;
             readonly score: number | null;
             /** @enum {string} */
             readonly state: "ranked" | "not_ranked";
             readonly synthetic: boolean;
+        };
+        /** OverviewSimCounts */
+        readonly OverviewSimCounts: {
+            readonly abstained: number;
+            readonly received: number;
+            readonly rejected: number;
+        };
+        /**
+         * OverviewSimStatus
+         * @description Only what the status line reads from the sim's shared view; nothing else is copied.
+         */
+        readonly OverviewSimStatus: {
+            readonly clockS: number;
+            readonly counts: components["schemas"]["OverviewSimCounts"];
+            readonly ended: boolean;
+            /** @enum {integer} */
+            readonly speed: 0 | 1 | 10 | 60;
         };
         /**
          * PartialAdmitPatientInput
@@ -791,9 +810,7 @@ export interface components {
             readonly clinicians: readonly components["schemas"]["OverviewClinician"][];
             readonly patients: readonly components["schemas"]["OverviewPatient"][];
             readonly receiving_data: boolean;
-            readonly shared: {
-                readonly [key: string]: components["schemas"]["JsonValue"];
-            } | null;
+            readonly sim: components["schemas"]["OverviewSimStatus"] | null;
             readonly synthetic: boolean;
             readonly ward: string;
         };
@@ -850,6 +867,8 @@ export type NurseVitalsInput = components['schemas']['NurseVitalsInput'];
 export type OverviewActivity = components['schemas']['OverviewActivity'];
 export type OverviewClinician = components['schemas']['OverviewClinician'];
 export type OverviewPatient = components['schemas']['OverviewPatient'];
+export type OverviewSimCounts = components['schemas']['OverviewSimCounts'];
+export type OverviewSimStatus = components['schemas']['OverviewSimStatus'];
 export type PartialAdmitPatientInput = components['schemas']['PartialAdmitPatientInput'];
 export type PartialLabInput = components['schemas']['PartialLabInput'];
 export type PatientDetail = components['schemas']['PatientDetail'];

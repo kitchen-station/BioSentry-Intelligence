@@ -90,19 +90,16 @@ class AuditLog:
     def for_clinician(self, clinician_id: str) -> tuple[AuditRecord, ...]:
         return self.records(clinician_id)
 
-    def recent(self, since: datetime, per_clinician: int) -> list[dict[str, Any]]:
-        """What nurses and physicians did after `since`, the newest `per_clinician` each, by
-        clinician id then newest first. Sign-in rows are left out (they are logged under the id
-        that was tried, not the person who tried). `resource` is "-" unless the outcome is ok:
-        on the other rows it is whatever the caller typed."""
-        # shortcut: no index on audit_log (at), the window query scans the table; add an index on
-        # (at) when the log passes about a million rows.
+    def recent(self, since: datetime) -> list[dict[str, Any]]:
+        """What nurses and physicians did after `since`, as counts per clinician, action and
+        outcome, by clinician id, action, outcome. Counts, not rows: a row would show which
+        patient a named clinician opened and when, and oversight needs volume and failures.
+        Sign-in rows are left out (they are logged under the id that was tried, not the person
+        who tried), and so is any row without a clinician role."""
         return self._conn.execute(
-            "SELECT seq, at, clinician_id, action, outcome,"
-            " CASE WHEN outcome = 'ok' THEN resource ELSE '-' END AS resource FROM ("
-            " SELECT *, row_number() OVER (PARTITION BY clinician_id ORDER BY seq DESC) AS n"
-            " FROM audit_log WHERE at > %s AND role IN ('rn', 'md', 'charge_rn')"
-            " AND action NOT IN ('sign_in', 'authenticate')) t"
-            " WHERE n <= %s ORDER BY clinician_id, seq DESC",
-            (whole(since), per_clinician),
+            "SELECT clinician_id, action, outcome, count(*) AS count FROM audit_log"
+            " WHERE at > %s AND role IN ('rn', 'md', 'charge_rn')"
+            " AND action NOT IN ('sign_in', 'authenticate')"
+            " GROUP BY clinician_id, action, outcome ORDER BY clinician_id, action, outcome",
+            (whole(since),),
         ).fetchall()

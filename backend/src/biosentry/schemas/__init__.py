@@ -43,7 +43,14 @@ from .common import (
     Trend,
 )
 from .ingest import LiveWard
-from .overview import OverviewActivity, OverviewClinician, OverviewPatient, WardOverview
+from .overview import (
+    OverviewActivity,
+    OverviewClinician,
+    OverviewPatient,
+    OverviewSimCounts,
+    OverviewSimStatus,
+    WardOverview,
+)
 from .records import (
     Acknowledgement,
     ClinicalNote,
@@ -135,6 +142,8 @@ CONTRACT_MODELS: tuple[type[BaseModel], ...] = (
     OverviewPatient,
     OverviewClinician,
     OverviewActivity,
+    OverviewSimStatus,
+    OverviewSimCounts,
     WardOverview,
 )
 
@@ -177,6 +186,8 @@ __all__ = [
     "OverviewActivity",
     "OverviewClinician",
     "OverviewPatient",
+    "OverviewSimCounts",
+    "OverviewSimStatus",
     "PartialAdmitPatientInput",
     "PartialLabInput",
     "PatientDetail",

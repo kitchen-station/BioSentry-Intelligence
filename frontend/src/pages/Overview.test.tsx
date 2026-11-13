@@ -10,7 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api/client";
-import type { WardOverview } from "../types";
+import type { Session, WardOverview } from "../types";
 import { Overview } from "./Overview";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -32,10 +32,10 @@ const overview = (over: Partial<WardOverview> = {}): WardOverview => ({
   as_of: "2026-11-13T08:30:00Z",
   receiving_data: true,
   synthetic: true,
-  shared: { clockS: 87_000, speed: 10, ended: false, counts: { received: 5, rejected: 0, abstained: 1 } },
+  sim: { clockS: 87_000, speed: 10, ended: false, counts: { received: 5, rejected: 0, abstained: 1 } },
   patients: [
-    { id: "p-001", bed: "W4-01", state: "ranked", score: 7, reason: null, care: ["md-santos", "rn-manalo", "rn-reyes"], synthetic: true },
-    { id: "p-002", bed: "W4-02", state: "not_ranked", score: null, reason: "heart rate missing", care: ["rn-manalo"], synthetic: false },
+    { bed: "W4-01", state: "ranked", score: 7, reason: null, care: ["md-santos", "rn-manalo", "rn-reyes"], synthetic: true },
+    { bed: "W4-02", state: "not_ranked", score: null, reason: "heart rate missing", care: ["rn-manalo"], synthetic: false },
   ],
   clinicians: [
     { id: "md-santos", role: "md", patients: 1 },
@@ -43,17 +43,17 @@ const overview = (over: Partial<WardOverview> = {}): WardOverview => ({
     { id: "rn-reyes", role: "rn", patients: 1 },
   ],
   activity: [
-    { seq: 9, at: "2026-11-13T08:00:00Z", clinician_id: "rn-reyes", action: "add_note", resource: "p-001", outcome: "ok" },
-    { seq: 7, at: "2026-11-13T07:00:00Z", clinician_id: "rn-reyes", action: "view_patient", resource: "-", outcome: "not_found" },
-    { seq: 8, at: "2026-11-13T07:30:00Z", clinician_id: "md-santos", action: "acknowledge", resource: "p-001", outcome: "ok" },
+    { clinician_id: "rn-reyes", action: "view_patient", outcome: "ok", count: 12 },
+    { clinician_id: "rn-reyes", action: "view_patient", outcome: "not_found", count: 1 },
+    { clinician_id: "md-santos", action: "acknowledge", outcome: "ok", count: 3 },
   ],
   ...over,
 });
 
-const show = () =>
+const show = (who: Session = session, onSignOut: () => void = () => {}) =>
   render(
     <MemoryRouter>
-      <Overview session={session} onSignOut={() => {}} />
+      <Overview session={who} onSignOut={onSignOut} />
     </MemoryRouter>,
   );
 
@@ -87,7 +87,8 @@ describe("Overview", () => {
     expect(first).toContain("NEWS2 7");
     expect(first).toContain("rn-reyes");
     expect(first).toContain("md-santos");
-    expect(first).not.toContain("rn-manalo"); // the charge nurse is left out of the row
+    expect(first).not.toContain("rn-manalo"); // the charge nurse is on every patient: said once below
+    expect(first).not.toContain("p-001");
     expect(rows[2].textContent).toContain("NOT RANKED: heart rate missing");
     expect(rows[2].textContent).not.toContain("Synthetic");
     expect(rows[2].textContent).toContain("None");
@@ -96,7 +97,7 @@ describe("Overview", () => {
 
   it("omits the charge nurse line when there is none, and the simulator line when it has no shape", async () => {
     api.getOverview.mockResolvedValue(
-      overview({ shared: null, receiving_data: false, patients: [], clinicians: [], activity: [] }),
+      overview({ sim: null, receiving_data: false, patients: [], clinicians: [], activity: [] }),
     );
     show();
     expect(await screen.findByText("Not receiving data")).toBeTruthy();
@@ -108,8 +109,10 @@ describe("Overview", () => {
   it("lists clinicians and groups activity by clinician", async () => {
     show();
     expect(await screen.findByRole("heading", { name: "rn-reyes", level: 3 })).toBeTruthy();
-    expect(screen.getByText("2026-11-13 08:00 UTC add_note p-001 ok")).toBeTruthy();
-    expect(screen.getByText("2026-11-13 07:00 UTC view_patient - not_found")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Activity in the last 24 hours" })).toBeTruthy();
+    expect(screen.getByText(/Activity is shown for oversight, not performance review\. Counts only/)).toBeTruthy();
+    expect(screen.getByText("view_patient ok: 12")).toBeTruthy();
+    expect(screen.getByText("view_patient not_found: 1")).toBeTruthy();
     expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(2);
     expect(screen.getByText("charge_rn")).toBeTruthy();
   });
@@ -137,13 +140,85 @@ describe("Overview", () => {
     expect(screen.queryByRole("table")).toBeNull();
   });
 
-  it("says any other failure plainly and keeps what it had", async () => {
+  it("says any other failure plainly and keeps nothing stale", async () => {
     show();
     await screen.findByText(AS_OF);
     api.getOverview.mockRejectedValue(new TypeError("Failed to fetch"));
     await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
     expect((await screen.findByRole("alert")).textContent).toMatch(/could not be loaded/);
-    expect(screen.getAllByRole("table")).toHaveLength(2);
+    expect(screen.queryByRole("table")).toBeNull();
+  });
+
+  it("clears the old data when a refresh is refused with 403", async () => {
+    show();
+    await screen.findByText(AS_OF);
+    api.getOverview.mockRejectedValue(new ApiError(403, "Forbidden", {}));
+    await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("Not available for this account.");
+    expect(screen.queryByRole("table")).toBeNull();
+  });
+
+  it("clears the old data and signs out when a refresh finds the session ended", async () => {
+    const out = vi.fn();
+    show(session, out);
+    await screen.findByText(AS_OF);
+    expect(out).not.toHaveBeenCalled();
+    api.getOverview.mockRejectedValue(new ApiError(401, "Unauthorized", {}));
+    await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("Your session has ended. Sign in again.");
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(out).toHaveBeenCalledOnce();
+  });
+
+  it.each([{}, "not an overview"])("shows no tables for a malformed body %j", async (body) => {
+    api.getOverview.mockResolvedValue(body);
+    show();
+    expect((await screen.findByRole("alert")).textContent).toBe("The overview could not be loaded. Try Refresh.");
+    expect(screen.queryByRole("table")).toBeNull();
+  });
+
+  it("names the charge nurse in the row unless the charge nurse is on every patient", async () => {
+    api.getOverview.mockResolvedValue(
+      overview({ patients: [{ bed: "W4-01", state: "ranked", score: 1, reason: null, care: ["rn-manalo"], synthetic: false },
+        { bed: "W4-02", state: "ranked", score: 1, reason: null, care: ["rn-reyes"], synthetic: false }] }),
+    );
+    show();
+    await screen.findByText(AS_OF);
+    const rows = within(screen.getAllByRole("table")[0]).getAllByRole("row");
+    expect(rows[1].textContent).toContain("rn-manalo");
+    expect(screen.queryByText(/charge nurse is assigned/)).toBeNull();
+  });
+
+  it("shows a care id that is not a listed clinician, and None for an unassigned patient", async () => {
+    api.getOverview.mockResolvedValue(
+      overview({ patients: [{ bed: "W4-01", state: "ranked", score: 1, reason: null, care: ["rn-ghost"], synthetic: false },
+        { bed: "W4-02", state: "ranked", score: 1, reason: null, care: [], synthetic: false }] }),
+    );
+    show();
+    await screen.findByText(AS_OF);
+    const rows = within(screen.getAllByRole("table")[0]).getAllByRole("row");
+    expect(rows[1].textContent).toContain("rn-ghost");
+    expect(rows[2].textContent).toContain("None");
+  });
+
+  it("tells a non-admin it is not available, sends no request and keeps the menu", () => {
+    show({ clinician_id: "rn-reyes", ward: "W4", role: "rn" });
+    expect(screen.getByText("Not available for this account.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /rn-reyes/ })).toBeTruthy();
+    expect(api.getOverview).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Refresh" })).toBeNull();
+  });
+
+  it("labels its scrolling tables, marks header columns and sets the title", async () => {
+    show();
+    await screen.findByText(AS_OF);
+    expect(document.title).toBe("Ward overview \u00b7 BioSentry");
+    const regions = screen.getAllByRole("region").filter((r) => r.hasAttribute("tabindex"));
+    expect(regions.map((r) => r.getAttribute("aria-labelledby"))).toEqual(["patients", "clinicians"]);
+    expect(regions.every((r) => r.getAttribute("tabindex") === "0")).toBe(true);
+    expect(screen.getAllByRole("columnheader").every((h) => h.getAttribute("scope") === "col")).toBe(true);
+    cleanup();
+    expect(document.title).toBe("BioSentry");
   });
 
   it("needs the API: the demo says so and asks for nothing", () => {

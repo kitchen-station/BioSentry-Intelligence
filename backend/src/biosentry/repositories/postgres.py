@@ -345,6 +345,8 @@ class PostgresStore:
 
     def clinicians(self) -> list[tuple[str, str]]:
         """Every clinician but an admin, as (id, role), by id."""
+        # shortcut: one ward per database today, so every clinician belongs to it; scope by
+        # ward when clinicians carry one.
         rows = self.conn.execute(
             "SELECT id, role FROM clinician WHERE role <> %s ORDER BY id", (ADMIN_ROLE,)
         )

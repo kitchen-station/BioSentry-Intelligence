@@ -7,7 +7,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Session } from "../types";
 import { SessionMenu } from "./SessionMenu";
 
@@ -31,7 +31,10 @@ const menu = (session: Session, path = "/somewhere") => {
 };
 const open = (id: string) => userEvent.click(screen.getByRole("button", { name: new RegExp(id) }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllEnvs();
+});
 
 describe("SessionMenu", () => {
   it("toggles open and closed from the trigger", async () => {
@@ -124,5 +127,26 @@ describe("SessionMenu", () => {
     expect(screen.queryByRole("link", { name: "Back to the ward" })).toBeNull();
     await userEvent.click(screen.getByRole("link", { name: "Back to the overview" }));
     expect(screen.getByText("at /overview")).toBeTruthy();
+  });
+
+  beforeEach(() => vi.stubEnv("VITE_API_URL", "http://api.test"));
+
+  const NOTICE = "A ward administrator can see counts of your actions from the last 24 hours.";
+
+  it.each(["rn", "md", "charge_rn"] as const)("tells a %s on an API build that an administrator sees counts", async (role) => {
+    menu({ clinician_id: "x-1", ward: "W4", role });
+    await open("x-1");
+    expect(screen.getByText(NOTICE)).toBeTruthy();
+  });
+
+  it("does not show the notice to an admin or on the fixture build", async () => {
+    menu({ clinician_id: "admin-ruiz", ward: "W4", role: "admin" });
+    await open("admin-ruiz");
+    expect(screen.queryByText(NOTICE)).toBeNull();
+    cleanup();
+    vi.stubEnv("VITE_API_URL", "");
+    menu({ clinician_id: "rn-reyes", ward: "W4", role: "rn" });
+    await open("rn-reyes");
+    expect(screen.queryByText(NOTICE)).toBeNull();
   });
 });

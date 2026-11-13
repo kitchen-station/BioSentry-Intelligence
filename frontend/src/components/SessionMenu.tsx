@@ -8,7 +8,8 @@ interface Props {
   onSignOut: () => void;
 }
 
-const ROLE_LABELS: Record<string, string> = {
+// The same switch as the API build in api/index.ts; read here so the lab never reaches the api module.
+export const ROLE_LABELS: Record<string, string> = {
   rn: "Staff Nurse",
   md: "Attending Physician",
   charge_rn: "Charge Nurse",
@@ -44,6 +45,10 @@ export function SessionMenu({ session, onSignOut }: Props) {
               <span className={styles.role}>{ROLE_LABELS[session.role] ?? session.role}</span>
               <span className={styles.ward}>Ward {session.ward}</span>
             </div>
+
+            {import.meta.env.VITE_API_URL && !admin && (
+              <p className={styles.notice}>A ward administrator can see counts of your actions from the last 24 hours.</p>
+            )}
 
             <div className={styles.divider} />
 
