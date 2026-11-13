@@ -10,7 +10,7 @@ from biosentry.schemas import CONTRACT_MODELS, INPUT_MODELS
 from samples import sample
 
 # Optional-by-design string fields on output models (TS `detail?:` / `pathway?:`).
-OPTIONAL_OUTPUT_FIELDS = {("TierBFinding", "detail"), ("EscalationReason", "pathway")}
+OPTIONAL_OUTPUT_FIELDS = {("EscalationReason", "pathway")}
 
 IDS = [m.__name__ for m in CONTRACT_MODELS]
 

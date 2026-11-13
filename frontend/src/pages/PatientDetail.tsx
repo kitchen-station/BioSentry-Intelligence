@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useParams, Link } from "react-router-dom";
-import type { ClinicalNote, PatientDetail as PatientDetailType, Session, SessionRole, TierBFinding, VitalsRecorded } from "../types";
+import type { ClinicalNote, PatientDetail as PatientDetailType, Session, SessionRole, VitalsRecorded } from "../types";
 import { getPatient, getNotes, addNote, canRecordVitals } from "../api";
 import { SessionMenu } from "../components/SessionMenu";
 import { SimulatedNote } from "../components/LabFrame";
@@ -16,39 +16,6 @@ import { standing } from "../components/vitalsDraft";
 import styles from "./PatientDetail.module.css";
 
 // --- Shared sub-components ---
-
-const DIRECTION_CHAR: Record<string, string> = {
-  rising: "\u2191",
-  falling: "\u2193",
-  stable: "\u2192",
-  new: "\u25C6",
-};
-
-// Tier B: a single mechanism finding row with its own value and units.
-// Detail is always shown (density over minimalism).
-function FindingRow({ finding }: { finding: TierBFinding }) {
-  return (
-    <div className={`${styles.findingRow} ${finding.significant ? styles.findingSignificant : ""}`}>
-      <span className={styles.findingLabel}>{finding.label}</span>
-      <span className={styles.findingValue}>
-        {finding.value}
-        {finding.direction && (
-          <span className={styles.findingDirection}>
-            {" "}{DIRECTION_CHAR[finding.direction] ?? ""}
-          </span>
-        )}
-        <span className={styles.findingSource}>{finding.source}</span>
-      </span>
-      {finding.detail && (
-        <span className={styles.findingDetail}>{finding.detail}</span>
-      )}
-    </div>
-  );
-}
-
-const DEVICE_AXES = new Set(["af", "rr", "pi"]);
-const LAB_SUBSTRATE = new Set(["trop", "k-mg", "kdigo", "lactate"]);
-const SECONDARY_AXES = new Set(["hrv"]);
 
 type Drawer = "notes" | "charts" | null;
 
@@ -359,44 +326,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
 
           <div className={styles.panel}>
             <p className={styles.panelEyebrow}>Tier B &mdash; Mechanism findings</p>
-            {patient.tier_b ? (
-              <div className={styles.findingsGrid}>
-                {(() => {
-                  const findings = patient.tier_b.findings;
-                  const device = findings.filter((f) => DEVICE_AXES.has(f.id));
-                  const lab = findings.filter((f) => LAB_SUBSTRATE.has(f.id));
-                  const secondary = findings.filter((f) => SECONDARY_AXES.has(f.id));
-                  const other = findings.filter(
-                    (f) => !DEVICE_AXES.has(f.id) && !LAB_SUBSTRATE.has(f.id) && !SECONDARY_AXES.has(f.id),
-                  );
-                  return (
-                    <>
-                      {device.length > 0 && (
-                        <div className={styles.findingsGroup}>
-                          <span className={styles.findingsGroupLabel}>Device axes</span>
-                          {device.map((f) => <FindingRow key={f.id} finding={f} />)}
-                        </div>
-                      )}
-                      {lab.length > 0 && (
-                        <div className={styles.findingsGroup}>
-                          <span className={styles.findingsGroupLabel}>Lab substrate</span>
-                          {lab.map((f) => <FindingRow key={f.id} finding={f} />)}
-                        </div>
-                      )}
-                      {secondary.length > 0 && (
-                        <div className={styles.findingsGroup}>
-                          <span className={styles.findingsGroupLabel}>Secondary</span>
-                          {secondary.map((f) => <FindingRow key={f.id} finding={f} />)}
-                        </div>
-                      )}
-                      {other.length > 0 && other.map((f) => <FindingRow key={f.id} finding={f} />)}
-                    </>
-                  );
-                })()}
-              </div>
-            ) : (
-              <p className={styles.pending}>Other mechanism findings: not yet implemented</p>
-            )}
+            <p className={styles.pending}>Other mechanism findings: not yet implemented</p>
             <BaselinePanel baseline={baseline} />
           </div>
 

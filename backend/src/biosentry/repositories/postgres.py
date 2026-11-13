@@ -188,18 +188,16 @@ _PATIENT = (
     "signal_quality",
     "last_sample_at",
     "admission",
-    "tier_b",
-    "tier_c",
     "story",
     "admitted_at",
 )
 
 
-_JSON = ("admission", "tier_b", "tier_c")
+_JSON = ("admission",)
 
 
 def insert_patient(conn: Conn, run_id: int, patient_id: str, p: dict[str, Any]) -> None:
-    """`admission`, `tier_b` and `tier_c` are JSON-ready values (dicts), not strings."""
+    """`admission` is a JSON-ready value (a dict), not a string."""
     conn.execute(
         f"INSERT INTO patient (run_id, id, {', '.join(_PATIENT)})"
         f" VALUES (%s, %s, {', '.join(['%s'] * len(_PATIENT))})",
@@ -541,8 +539,6 @@ class PostgresStore:
                     for v in HISTORY_VITALS
                 },
                 "labs": labs,
-                "tier_b": p["tier_b"],
-                "tier_c": p["tier_c"],
                 "signal_quality": p["signal_quality"],
                 "last_update_s": (
                     max(0.0, (run_now - sample).total_seconds()) if sample else None

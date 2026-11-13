@@ -143,7 +143,11 @@ def test_ranks_are_contiguous_and_follow_the_arbiter_within_the_callers_set(
 ) -> None:
     ward = WardResponse.model_validate(client.get("/wards/W4/rows", headers=as_(who)).json())
     assert [r.rank for r in ward.ranked] == list(range(1, len(ward.ranked) + 1))
-    rows = [ScoreRow.model_validate(r) for r in DATA["ranked"] if r["id"] in CLINICIANS[who]]
+    rows = [
+        ScoreRow.model_validate({k: v for k, v in r.items() if k not in {"tier_b", "tier_c"}})
+        for r in DATA["ranked"]
+        if r["id"] in CLINICIANS[who]
+    ]  # the fixture file keeps demo tier keys the schema no longer has
     expected = rank_ward(arbitrate(r.id, score_news2(inputs_from_vitals(r.vitals))) for r in rows)
     assert [r.id for r in ward.ranked] == [d.patient_id for _, d in expected.ranked]
 
@@ -1186,3 +1190,37 @@ def test_the_api_serves_every_route_the_http_provider_calls(database_url: str) -
     normalised = {(m, p.replace("/wards/W4/", "/wards/{}/")) for m, p in frontend}
     missing = normalised - _app_routes(database_url)
     assert missing == set()
+
+
+# --- No seeded demo model output in any answer --------------------------------------------
+
+# Keys of the removed seeded Tier B findings and Tier C block: no model computes them (I1).
+SEEDED_KEYS = {
+    "tier_b", "tier_c", "risk_probability", "forecast_window", "scored_seconds_ago",
+    "attributions", "findings",
+}  # fmt: skip
+
+
+def _keys(value: Any) -> set[str]:
+    if isinstance(value, dict):
+        return set(value) | {k for v in value.values() for k in _keys(v)}
+    if isinstance(value, list):
+        return {k for v in value for k in _keys(v)}
+    return set()
+
+
+def test_no_answer_carries_a_seeded_tier_b_or_tier_c_value(
+    app_and_client: tuple[Any, TestClient],
+) -> None:
+    app, client = app_and_client
+    walked = set()
+    for method, template in _route_table(app):
+        if method != "GET" or template in {p for _, p in PUBLIC_ROUTES}:
+            continue
+        for who in ("rn-manalo", "md-aquino"):
+            response = client.get(template.format(**PATH_VALUES), headers=as_(who))
+            if response.status_code == 200:
+                walked.add(template)
+                assert not _keys(response.json()) & SEEDED_KEYS, (template, who)
+    assert {"/wards/{ward}/rows", "/patients/{patient_id}"} <= walked
+    assert _keys({"a": [{"tier_c": 1}]}) & SEEDED_KEYS  # the walk can see a deep key

@@ -103,8 +103,6 @@ def seed(conn: Conn, fixture: Path = DEFAULT_DATASET, dev_passphrase: bool = Fal
                     "last_sample_at": (
                         None if age is None else whole(as_of - timedelta(seconds=age))
                     ),
-                    "tier_b": p["tier_b"] or None,
-                    "tier_c": p["tier_c"] or None,
                     "story": raw["labels"][pid]["story"],
                 },
             )
