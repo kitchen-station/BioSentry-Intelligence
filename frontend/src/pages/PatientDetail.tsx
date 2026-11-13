@@ -7,6 +7,7 @@ import { Flip } from "../components/Flip";
 import { SessionMenu } from "../components/SessionMenu";
 import { SimulatedNote } from "../components/LabFrame";
 import { BaselinePanel, isComputed, isObj, num } from "../components/BaselinePanel";
+import { ResearchModels } from "../components/ResearchModels";
 import { useBaseline, type BaselineState } from "../components/useBaseline";
 import { CurrentVitals, VitalRow } from "../components/CurrentVitals";
 import { TrendChart } from "../components/TrendChart";
@@ -428,6 +429,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
             <p className={styles.panelEyebrow}>Tier B &mdash; Mechanism findings</p>
             <p className={styles.pending}>Other mechanism findings: not yet implemented</p>
             <BaselinePanel baseline={baseline} />
+            <ResearchModels models={patient.models} />
           </div>
 
         </div>

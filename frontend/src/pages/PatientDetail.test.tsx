@@ -518,7 +518,7 @@ describe("PatientDetail own-baseline reason and patch display", () => {
     page();
     await loaded();
     expect(screen.getByText("Sorted on NEWS2 only")).toBeTruthy();
-    expect(screen.queryByText(/Research models/)).toBeNull();
+    expect(screen.queryByText(/rank unchanged/)).toBeNull();
   });
 
   it("shows no signal figure when all four values are nurse-typed", async () => {
@@ -866,6 +866,42 @@ describe("PatientDetail follows the ward's speed", () => {
     expect(api.getPatient).toHaveBeenCalledTimes(1);
     expect(api.getLiveWard).not.toHaveBeenCalled();
     expect(screen.queryByRole("group", { name: "Ward clock" })).toBeNull();
+  });
+});
+
+describe("PatientDetail research models panel", () => {
+  it("sits after the own-baseline panel and asks for nothing extra", async () => {
+    api.getBaseline.mockResolvedValue(baseline);
+    page();
+    await loaded();
+    const own = await screen.findByRole("region", { name: "Change from own baseline" });
+    const models = screen.getByRole("region", { name: "Research models" });
+    expect(own.compareDocumentPosition(models) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(own.parentElement).toBe(models.parentElement);
+    expect(api.getPatient).toHaveBeenCalledOnce();
+    expect(api.getBaseline).toHaveBeenCalledOnce();
+    expect(api.getNotes).toHaveBeenCalledOnce();
+  });
+
+  it("shows the fixture words, also for an admin, and keeps the summary line", async () => {
+    api.getPatient.mockResolvedValue({
+      ...base,
+      escalation_reasons: [{ rule: "prediction_model_flag", text: "Prediction model flag (synthetic, not validated)", pathway: null }],
+    } as Detail);
+    page("admin");
+    await loaded();
+    const region = screen.getByRole("region", { name: "Research models" });
+    expect(within(region).getAllByText(/Not computed: the patient's own baseline is still forming/)).toHaveLength(2);
+    expect(screen.getByText("Research models · rank unchanged")).toBeTruthy();
+  });
+
+  it("shows no panel when the server sends no models", async () => {
+    const old: Record<string, unknown> = { ...base };
+    delete old.models;
+    api.getPatient.mockResolvedValue(old);
+    page();
+    await loaded();
+    expect(screen.queryByRole("region", { name: "Research models" })).toBeNull();
   });
 });
 
