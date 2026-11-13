@@ -2,10 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useParams, Link } from "react-router-dom";
 import type { ClinicalNote, PatientDetail as PatientDetailType, Session, SessionRole, VitalsRecorded } from "../types";
-import { getPatient, getNotes, addNote, canRecordVitals, usesServer } from "../api";
+import { getPatient, getNotes, addNote, canRecordVitals, hasPatientQuestions, usesServer } from "../api";
 import { Flip } from "../components/Flip";
 import { SessionMenu } from "../components/SessionMenu";
 import { SimulatedNote } from "../components/LabFrame";
+import { AskPatient } from "../components/AskPatient";
 import { BaselinePanel, isComputed, isObj, num } from "../components/BaselinePanel";
 import { ResearchModels } from "../components/ResearchModels";
 import { useBaseline, type BaselineState } from "../components/useBaseline";
@@ -464,6 +465,12 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
               </p>
             )}
           </div>
+
+          {hasPatientQuestions && !readOnly && (
+            <div className={styles.panel}>
+              <AskPatient key={patient.id} patientId={patient.id} clinicianId={session.clinician_id} onSignOut={onSignOut} />
+            </div>
+          )}
 
           <div className={styles.panel}>
             <p className={styles.panelEyebrow}>

@@ -26,10 +26,13 @@ import type {
   LabRunItem,
   LiveWard,
   NewLabRun,
+  NewPatientQuestion,
   NurseVitalsInput,
   PartialLabInput,
   PatientDetail,
   PatientExtractionResult,
+  PatientQuestionDetail,
+  PatientQuestionItem,
   VitalsRecorded,
   WardOverview,
   PatientStay,
@@ -70,6 +73,19 @@ export const httpProvider: ApiProvider = {
 
   getLabRun(id: number): Promise<LabRunDetail> {
     return fetchJson<LabRunDetail>(`/wards/W4/lab/runs/${id}`);
+  },
+
+  askPatient(patientId: string, question: string): Promise<PatientQuestionItem> {
+    const body: NewPatientQuestion = { question };
+    return postJson<PatientQuestionItem>(`/patients/${encodeURIComponent(patientId)}/questions`, body);
+  },
+
+  getPatientQuestions(patientId: string): Promise<PatientQuestionItem[]> {
+    return fetchJson<PatientQuestionItem[]>(`/patients/${encodeURIComponent(patientId)}/questions`);
+  },
+
+  getPatientQuestion(patientId: string, questionId: number): Promise<PatientQuestionDetail> {
+    return fetchJson<PatientQuestionDetail>(`/patients/${encodeURIComponent(patientId)}/questions/${questionId}`);
   },
 
   async getPatient(id: string): Promise<PatientDetail | null> {

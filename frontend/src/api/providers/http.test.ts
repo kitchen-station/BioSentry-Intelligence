@@ -227,3 +227,15 @@ describe("httpProvider lab runs", () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual(input);
   });
 });
+
+describe("httpProvider patient questions", () => {
+  it("asks, lists and reads only the question paths of one patient", async () => {
+    fetchMock.mockImplementation(async () => reply(200, {}));
+    await httpProvider.askPatient("p-001", "Why is the rate up?");
+    await httpProvider.getPatientQuestions("p-001");
+    await httpProvider.getPatientQuestion("p-001", 7);
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual(["/patients/p-001/questions", "/patients/p-001/questions", "/patients/p-001/questions/7"]);
+    expect(fetchMock.mock.calls[0][1].method).toBe("POST");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ question: "Why is the rate up?" });
+  });
+});

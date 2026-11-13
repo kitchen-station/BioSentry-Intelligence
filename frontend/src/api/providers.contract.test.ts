@@ -387,6 +387,12 @@ describe("the fixture provider", () => {
     }
   });
 
+  it("has no patient questions: they need the server", async () => {
+    for (const call of [() => fixtureProvider.askPatient("p-001", "q"), () => fixtureProvider.getPatientQuestions("p-001"), () => fixtureProvider.getPatientQuestion("p-001", 1)]) {
+      await expect(call()).rejects.toThrow("Patient questions need the server");
+    }
+  });
+
   it("has no overview: it needs the API", async () => {
     await expect(fixtureProvider.getOverview()).rejects.toThrow("The overview needs the API");
   });

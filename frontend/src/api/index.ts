@@ -53,6 +53,10 @@ function lazyFixtureProvider(): ApiProvider {
     requestLabRun: (input) => fixtures().then((m) => m.fixtureProvider.requestLabRun(input)),
     getLabRuns: () => fixtures().then((m) => m.fixtureProvider.getLabRuns()),
     getLabRun: (id) => fixtures().then((m) => m.fixtureProvider.getLabRun(id)),
+    askPatient: (patientId, question) => fixtures().then((m) => m.fixtureProvider.askPatient(patientId, question)),
+    getPatientQuestions: (patientId) => fixtures().then((m) => m.fixtureProvider.getPatientQuestions(patientId)),
+    getPatientQuestion: (patientId, questionId) =>
+      fixtures().then((m) => m.fixtureProvider.getPatientQuestion(patientId, questionId)),
     extractLabsFromFile: (file) =>
       fixtures().then((m) => m.fixtureProvider.extractLabsFromFile(file)),
     extractPatientFromFile: (file) =>
@@ -80,6 +84,9 @@ export const acknowledge = provider.acknowledge;
 export const requestLabRun = provider.requestLabRun;
 export const getLabRuns = provider.getLabRuns;
 export const getLabRun = provider.getLabRun;
+export const askPatient = provider.askPatient;
+export const getPatientQuestions = provider.getPatientQuestions;
+export const getPatientQuestion = provider.getPatientQuestion;
 
 /**
  * Whether this build can record nurse-entered vitals. Only the API re-ranks (D4: the frontend
@@ -90,6 +97,8 @@ export const canRecordVitals = !USE_FIXTURES;
 export const hasOverview = !USE_FIXTURES;
 // Only the API stores lab runs; a worker beside it runs them.
 export const hasLabRuns = !USE_FIXTURES;
+// Only the API stores patient questions; a worker beside it answers them.
+export const hasPatientQuestions = !USE_FIXTURES;
 export const extractLabsFromFile = provider.extractLabsFromFile;
 export const extractPatientFromFile = provider.extractPatientFromFile;
 

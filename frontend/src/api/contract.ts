@@ -20,6 +20,8 @@ import type {
   PartialLabInput,
   PatientDetail,
   PatientExtractionResult,
+  PatientQuestionDetail,
+  PatientQuestionItem,
   PatientStay,
   VitalsRecorded,
   WardOverview,
@@ -64,6 +66,10 @@ export interface ApiProvider {
   requestLabRun(input: NewLabRun): Promise<LabRunItem>;
   getLabRuns(): Promise<LabRunItem[]>;
   getLabRun(id: number): Promise<LabRunDetail>;
+  /** Asks the agent one question about one patient. It answers by code from a frozen copy of the patient's data. */
+  askPatient(patientId: string, question: string): Promise<PatientQuestionItem>;
+  getPatientQuestions(patientId: string): Promise<PatientQuestionItem[]>;
+  getPatientQuestion(patientId: string, questionId: number): Promise<PatientQuestionDetail>;
   extractLabsFromFile(file: File): Promise<LabExtractionResult>;
   extractPatientFromFile(file: File): Promise<PatientExtractionResult>;
 }

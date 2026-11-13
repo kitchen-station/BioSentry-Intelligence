@@ -27,6 +27,10 @@ const api = vi.hoisted(() => ({
   addNote: vi.fn(),
   canRecordVitals: false,
   recordVitals: vi.fn(),
+  hasPatientQuestions: false,
+  askPatient: vi.fn(),
+  getPatientQuestions: vi.fn(),
+  getPatientQuestion: vi.fn(),
 }));
 vi.mock("../api", () => api);
 
@@ -902,6 +906,70 @@ describe("PatientDetail research models panel", () => {
     page();
     await loaded();
     expect(screen.queryByRole("region", { name: "Research models" })).toBeNull();
+  });
+});
+
+describe("PatientDetail: ask about this patient", () => {
+  const asked = {
+    id: 4, requested_by: "rn-manalo", requested_at: "2026-11-13T09:30:00Z", question: "Why is the rate up?", state: "done" as const,
+    reason: null, claimed_at: null, finished_at: null,
+  };
+  beforeEach(() => {
+    api.hasPatientQuestions = true;
+    api.getPatientQuestions.mockResolvedValue([asked]);
+    api.getPatientQuestion.mockResolvedValue({ ...asked, answer: "the answer", report: null });
+  });
+  afterEach(() => {
+    api.hasPatientQuestions = false;
+  });
+
+  it("sits after Current vitals and before Labs", async () => {
+    page("rn");
+    await loaded();
+    const heading = await screen.findByRole("heading", { level: 2, name: "Ask about this patient" });
+    const vitals = screen.getByText("Current vitals");
+    const labs = screen.getByText(/^Labs/);
+    expect(vitals.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(heading.compareDocumentPosition(labs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(api.getPatientQuestions).toHaveBeenCalledWith("p-001");
+  });
+
+  it("is absent, with no call, for an admin and in the demo build", async () => {
+    page("admin");
+    await loaded();
+    expect(screen.queryByText("Ask about this patient")).toBeNull();
+    cleanup();
+    api.hasPatientQuestions = false;
+    page("rn");
+    await loaded();
+    expect(screen.queryByText("Ask about this patient")).toBeNull();
+    expect(api.getPatientQuestions).not.toHaveBeenCalled();
+    expect(api.getPatientQuestion).not.toHaveBeenCalled();
+  });
+
+  it("is not remounted by the page's own refresh: the typed text and the open answer stay", async () => {
+    api.usesServer = true;
+    api.getLiveWard.mockResolvedValue(null);
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      page("rn");
+      await loaded();
+      await user.click(await screen.findByRole("button", { name: "Show answer" }));
+      await user.type(screen.getByLabelText(/Your question/), "typed");
+      expect(api.getPatient).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_100);
+      });
+      expect(api.getPatient.mock.calls.length).toBeGreaterThan(1);
+      expect((screen.getByLabelText(/Your question/) as HTMLInputElement).value).toBe("typed");
+      expect(screen.getByText("the answer")).toBeTruthy();
+      expect(api.getPatientQuestion).toHaveBeenCalledTimes(1);
+      expect(api.getPatientQuestions).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+      api.usesServer = false;
+    }
   });
 });
 
