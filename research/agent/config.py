@@ -40,6 +40,9 @@ class Config:
         url = env.get("BIOSENTRY_AGENT_MODEL_URL") or None
         if url and (not url.startswith("https://") or not urlparse(url).hostname):
             raise AgentError("BIOSENTRY_AGENT_MODEL_URL must be an https:// URL")
+        key = env.get("BIOSENTRY_AGENT_MODEL_KEY") or None
+        if key and len(key) < 16:  # the checks that keep the key out of the ledger look for runs of 8 characters
+            raise AgentError("BIOSENTRY_AGENT_MODEL_KEY is shorter than 16 characters")
         sim = env.get("BIOSENTRY_AGENT_SIM")
         return cls(
             trials=path("BIOSENTRY_AGENT_TRIALS", DATA / "trials"),
@@ -48,5 +51,5 @@ class Config:
             sim=Path(sim).expanduser() if sim else None,
             model_url=url,
             model_name=env.get("BIOSENTRY_AGENT_MODEL_NAME") or None,
-            model_key=env.get("BIOSENTRY_AGENT_MODEL_KEY") or None,
+            model_key=key,
         )

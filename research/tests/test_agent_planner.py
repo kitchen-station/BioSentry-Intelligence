@@ -165,10 +165,10 @@ def sweep_result(chosen=None):
 
 
 @pytest.mark.parametrize("installed, held, words", [
-    (None, True, "differs from what is installed"),
+    (None, True, "the sweep chose k 2.0, p 3 and no params.json is installed"),
     (b'{"k": 2.0, "p": 3}', False, "already installed"),
-    (b'{"k": 2.5, "p": 3}', True, "differs"),
-    (b'{"k": 2.0, "p": 4}', True, "differs"),
+    (b'{"k": 2.5, "p": 3}', True, "the installed params.json has k 2.5, p 3"),
+    (b'{"k": 2.0, "p": 4}', True, "the installed params.json has k 2.0, p 4"),
     (b'[1, 2]', False, "cannot be read"),
     (b'{"k": "2", "p": 3}', False, "cannot be read"),
     (b'{"k": 2.0, "p": 3.0}', False, "cannot be read"),
@@ -487,7 +487,7 @@ def test_a_run_with_the_model_on_uses_the_models_pick_and_never_prints_the_key(c
     assert cli.main(["run"], env_for(cfg, model=True)) == 0
     out = capsys.readouterr()
     assert "planner: model (api.example.com)" in out.out
-    assert "proposal P-0001 pending: set_baseline_params, 1 files" in out.out
+    assert "proposal P-0001 pending: set_baseline_params, 1 file. A person" in out.out
     assert KEY not in out.out + out.err and KEY not in (cfg.home / "ledger.jsonl").read_text()
     assert tree_hash(cfg.models) == before
     sent(monkeypatch, OSError("HTTP Error 500"))

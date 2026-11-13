@@ -66,11 +66,13 @@ def test_config_refuses_a_home_inside_the_models_folder_or_the_repository(tmp_pa
 
 def test_config_from_env_needs_https_and_never_shows_the_key(tmp_path):
     env = {"BIOSENTRY_AGENT_HOME": str(tmp_path / "h"), "BIOSENTRY_AGENT_MODEL_URL": "http://x.example/v1",
-           "BIOSENTRY_AGENT_MODEL_NAME": "m", "BIOSENTRY_AGENT_MODEL_KEY": "sk-secret-123"}
+           "BIOSENTRY_AGENT_MODEL_NAME": "m", "BIOSENTRY_AGENT_MODEL_KEY": "sk-secret-123456789"}
     with pytest.raises(AgentError, match="https"):
         Config.from_env(env)
     cfg = Config.from_env({**env, "BIOSENTRY_AGENT_MODEL_URL": "https://x.example/v1"})
-    assert cfg.model_on and "sk-secret-123" not in repr(cfg)
+    assert cfg.model_on and "sk-secret-123456789" not in repr(cfg)
+    with pytest.raises(AgentError, match="shorter than 16"):
+        Config.from_env({**env, "BIOSENTRY_AGENT_MODEL_URL": "https://x.example/v1", "BIOSENTRY_AGENT_MODEL_KEY": "short"})
     assert not Config.from_env({"BIOSENTRY_AGENT_HOME": str(tmp_path / "h")}).model_on
 
 

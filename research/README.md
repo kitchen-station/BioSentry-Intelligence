@@ -424,8 +424,8 @@ The model API is off unless all three of these are set:
 - `BIOSENTRY_AGENT_MODEL_URL`: the full chat-completions address of an OpenAI-compatible service.
   It must start with `https://`.
 - `BIOSENTRY_AGENT_MODEL_NAME`: the model's name on that service.
-- `BIOSENTRY_AGENT_MODEL_KEY`: the key. It is sent only in the `Authorization` header, and is
-  never printed or written to the ledger.
+- `BIOSENTRY_AGENT_MODEL_KEY`: the key, at least 16 characters. It is sent only in the
+  `Authorization` header, and is never printed or written to the ledger.
 
 The intended target is an open-weight model on Huawei Cloud's model service (ModelArts Studio,
 MaaS). Checked in its documentation on 2026-11-13: the international site serves its

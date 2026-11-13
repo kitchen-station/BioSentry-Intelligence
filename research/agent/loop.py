@@ -105,7 +105,7 @@ def _judge_sweep(cfg: Config, r: dict, sid: str):
     try:
         data = ledger.installed(cfg, "tier_b/baseline/params.json")
         if data is None:
-            same = False
+            same, was = False, "no params.json is installed"
         else:
             try:
                 old = json.loads(data)
@@ -115,13 +115,14 @@ def _judge_sweep(cfg: Config, r: dict, sid: str):
                 return ("No proposal: the installed params.json cannot be read as an object with a numeric k "
                         f"and an integer p. {note}"), None
             same = (old["k"], old["p"]) == (k, p)
+            was = f"the installed params.json has k {old['k']}, p {old['p']}"
     except LedgerError as e:
         return f"No proposal: the installed params.json cannot be read ({e}). {note}", None
     if same:
         return f"No proposal: the chosen k {k}, p {p} is what is already installed. {note}", None
     evidence = {"chosen": r["chosen"], "row": r["row"], "chart": r["chart"], "settings_tried": r["settings_tried"],
                 "params_sha256": r["params_sha256"], "note": note}
-    return (f"Proposal rule held: chosen k {k}, p {p} differs from what is installed. {note}",
+    return (f"Proposal rule held: the sweep chose k {k}, p {p} and {was}. {note}",
             ("set_baseline_params", f"runs/{sid}", False, evidence))
 
 
@@ -171,6 +172,7 @@ def run_round(cfg: Config, planner) -> list[str]:
         else:
             files = next(r for r in ledger.read(cfg) if r["type"] == "proposal" and r["id"] == pid)["files"]
             return lines + [f"conclusion: {conclusion}",
-                            f"proposal {pid} pending: {proposal[0]}, {len(files)} files. A person signs off with: "
+                            f"proposal {pid} pending: {proposal[0]}, {len(files)} file{'' if len(files) == 1 else 's'}. "
+                            "A person signs off with: "
                             + APPROVE.format(id=pid)]
     return lines + [f"conclusion: {conclusion}"]
