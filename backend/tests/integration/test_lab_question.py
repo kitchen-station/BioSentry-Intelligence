@@ -147,6 +147,17 @@ def test_the_list_is_the_newest_twenty_of_the_ward(api: Api) -> None:
     assert [r["id"] for r in qlist(api, RN).json()] == list(range(21, 1, -1))
 
 
+def test_a_row_of_another_ward_is_not_listed_not_read_and_not_counted(api: Api) -> None:
+    write(api, "INSERT INTO lab_run (ward, requested_by, requested_at, kind, question, state)"
+               " SELECT 'W9', 'rn-reyes', %s, 'question', 'q', 'queued' FROM generate_series(1, 5)",
+          api.wall.now)  # fmt: skip
+    assert qlist(api, RN).json() == []
+    response = qone(api, RN, 1)
+    assert (response.status_code, response.json()) == (404, {"detail": "Not found"})
+    assert qput(api, MD).status_code == 201  # five queued on W9 do not fill this ward's queue
+    assert [r["id"] for r in qlist(api, RN).json()] == [6]
+
+
 # --- the question ------------------------------------------------------------------------------
 
 
@@ -452,6 +463,13 @@ def test_a_queued_question_fails_after_an_hour_and_a_running_one_after_twenty_mi
     assert (seen["state"], seen["reason"]) == ("failed", "the worker did not report within 20 minutes")
 
 
+def test_asking_again_after_a_timeout_needs_no_read_first(api: Api) -> None:
+    assert qput(api, MD).status_code == 201
+    api.wall.now += timedelta(hours=1, seconds=30)
+    assert qput(api, MD).status_code == 201  # the ask itself times the old row out
+    assert [r["state"] for r in rows(api)] == ["failed", "queued"]
+
+
 # --- privacy -----------------------------------------------------------------------------------
 
 
@@ -459,7 +477,7 @@ def test_the_question_and_the_answer_are_in_no_audit_row_and_no_log(
     api: Api, caplog: pytest.LogCaptureFixture
 ) -> None:
     caplog.set_level(logging.DEBUG)
-    marker, reply = "MARKER-QUESTION-5521", "MARKER-ANSWER-9035"
+    marker, reply, why = "MARKER-QUESTION-5521", "MARKER-ANSWER-9035", "MARKER-REASON-7731"
     assert qput(api, MD, marker).status_code == 201
     qlist(api, MD)
     qone(api, MD, 1)
@@ -467,11 +485,12 @@ def test_the_question_and_the_answer_are_in_no_audit_row_and_no_log(
     assert post_report(api, answered(reply)).status_code == 204
     qput(api, MD, marker)
     qclaim(api)
-    post_report(api, {"state": "refused", "reason": "Refused: nope"}, 2)
+    assert post_report(api, {"state": "refused", "reason": why}, 2).status_code == 204
+    assert qone(api, MD, 2).json()["reason"] == why
     qput(api, MD, marker + "\n")  # a refused body
     qone(api, MD, 1)
     dump = json.dumps(api.sql("SELECT * FROM audit_log"), default=str)
-    for text in (marker, reply):
+    for text in (marker, reply, why):
         assert text not in dump and text not in caplog.text
 
 
