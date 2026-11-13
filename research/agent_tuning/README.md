@@ -7,7 +7,8 @@ of model and the results, is `models/agent/card.md`.
 The two tasks (one JSON object is the whole answer):
 
 - Planner: the exact messages `research.agent.planner.ModelPlanner` sends; the answer is
-  `{"tool", "args", "reason"}`, the rule planner's pick.
+  `{"tool", "args", "reason"}`, the rule planner's pick. This task is close to trivial: the label is
+  always the first open experiment in the message, and three in four examples have only one.
 - Question: a fixed system line and a doctor's question; the answer is
   `{"template": ..., "threshold": ...}` or `{"refuse": true}`.
 
@@ -21,10 +22,19 @@ The two tasks (one JSON object is the whole answer):
 
   1,500 training and 400 held-out examples; same inputs, same bytes. A planner structure or a
   question frame is in one file only. Refusals: off-topic, change the product, approve or write,
-  one patient, treatment advice, held-out or real data, prompt injection.
-- `score.py`: the five metric groups, fixed before any model was run.
+  one patient, treatment advice, held-out or real data, prompt injection, and a threshold that
+  cannot be told (two values, a range). The held-out question frames are `heldout_frames.json`.
+  They were written by someone who had not seen the matcher or the guard, and are never edited to
+  pass a check. A training question whose words overlap a held-out question by 0.8 or more is
+  dropped (22 were), so the held-out text does decide which training questions are kept.
+- `score.py`: the metric groups, fixed before any model was run.
 
       python -m research.agent_tuning.score --data <heldout.jsonl> --outputs <outputs.jsonl> [--task T] [--per-group N]
+      python -m research.agent_tuning.score --data <heldout.jsonl> --baseline matcher|perfect [--task T] [--per-group N]
+
+  `--baseline matcher` scores the keyword matcher `research.agent.ask.match`, the thing a model has
+  to beat. `--baseline perfect` scores the labels themselves: what is left after the guard is the
+  most any model could get.
 
 ## The optional environment (not needed by anything else)
 
@@ -42,7 +52,10 @@ On Linux MindSpore also needs the system package `libgomp1`.
       <env>/bin/python research/agent_tuning/run_model.py --model <dir> [--adapter <dir>] --data <file> --out <file> [--task T] [--per-group N]
 
 - `train_lora.py`: LoRA fine-tuning. `--data_url` and `--train_url` are the ModelArts
-  training-job argument names, so the same file runs as a job there.
+  training-job argument names and `--device` picks the MindSpore target. It is prepared for a
+  ModelArts job, not run as one: a job still needs a MindSpore image for its hardware (these pins
+  are the CPU build), local or mounted paths for the two folders, and this folder as its start
+  folder.
 
       <env>/bin/python research/agent_tuning/train_lora.py --data_url <dir with train.jsonl> --train_url <out dir> --model <dir> [--per-group N]
 
@@ -55,8 +68,16 @@ weights came from and their sha256.
 - On a laptop CPU the MindSpore backend is slow: about 12 seconds per question example and about
   50 seconds per planner example in training, about 3 seconds per generated token. The card says
   what was run here and what is left for a ModelArts job.
-- The guard's word lists were written with the held-out refusal frames in view, so "after the
-  guards" on refusals is zero by construction. The model's own refusal accuracy is the honest
-  number for new wording.
+- The guard refuses about half of the held-out answerable questions whatever the model says
+  (they lack a word it requires, or use one it refuses), and where the keyword matcher answers,
+  the matcher wins. So the most any model can get after the guard is well under 100%; the
+  `perfect` baseline prints it.
+- Five phrases in the refusal list ("from tomorrow", "on all wards", "live system", "bay", "man")
+  also appear in held-out refusal frames and in no training question. They came from the same
+  example sentences that were given to the frame writer, so they are not independent; they are
+  the only thing stopping three held-out questions.
+- An order worded as a question can still run a simulation when it has a what-if phrase ("what
+  if we set it to 7 and make it stick"). Nothing is changed by any question; only a simulated
+  experiment runs.
 - A model that passes the guard can still pick the wrong template for a good question. That runs
   one of the three fixed experiments on simulated tuning trials, nothing else.

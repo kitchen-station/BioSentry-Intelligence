@@ -453,3 +453,20 @@ def test_a_half_written_last_line_of_the_outputs_is_skipped(small, tmp_path, mon
     monkeypatch.setattr(sys, "argv", ["score", "--data", str(path), "--outputs", str(outs), "--json", str(tmp_path / "s.json")])
     score.main()
     assert json.loads((tmp_path / "s.json").read_text())["both"]["valid_json"] == 3
+
+
+def test_the_perfect_baseline_shows_the_ceiling_the_guard_leaves(full, tmp_path, monkeypatch, capsys):
+    path = full[0] / "heldout.jsonl"
+    monkeypatch.setattr(sys, "argv", ["score", "--data", str(path), "--baseline", "perfect", "--task", "question",
+                                      "--json", str(tmp_path / "r.json")])
+    score.main()
+    q = json.loads((tmp_path / "r.json").read_text())["question"]
+    held = [e for e in lines(path) if e["task"] == "question"]
+    answerable = [e for e in held if "refuse" not in e["label"]]
+    assert (q["exact"], q["exact_of"], q["refused_ok"], q["negatives"]) == (len(answerable), len(answerable), 120, 120)
+    # acted on = the answerable questions the guard lets a right answer through for; the rest are its refusals
+    passes = sum(tasks.guard_question(e["expected"], e["question"]) != (None, None) for e in answerable)
+    assert 0 < passes < len(answerable)
+    assert (q["answerable_acted_right"], q["answerable_acted_wrong"], q["answerable_guard_refused"]) == (
+        passes, 0, len(answerable) - passes)
+    assert (q["refusal_acted"], q["refusal_guard_refused"]) == (0, 120)

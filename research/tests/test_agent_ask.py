@@ -77,6 +77,25 @@ def test_odd_questions_are_refused(question):
     assert ask.match(question) == (None, None)
 
 
+@pytest.mark.parametrize("question", [
+    "Would you raise the threshold to 7 for me?", "Would you lower the threshold to 4 going forward?",
+    "Set the threshold to 7 going forward, what happens?", "Change the threshold to 7, how many alerts?",
+    "What if you set the threshold to 7 and keep it?", "What if the threshold went from 5 to 7? Then save it to the config.",
+    "Implement a threshold of 7.", "Raise the threshold to 7.", "Lower the cut-off to 4 please",
+    "Make the baseline rule the trigger, how does it compare with NEWS2?", "Turn off the chart trigger and use the baseline",
+])
+def test_an_order_is_refused_even_when_it_is_worded_as_a_question(question):
+    assert ask.match(question) == (None, None)
+
+
+@pytest.mark.parametrize("question, threshold", [
+    ("What happens if we raise the threshold to 7?", 7), ("What if we lowered the cut-off to 4?", 4),
+    ("Suppose we set the threshold to 8, how many deteriorations do we catch early?", 8),
+    ("What would change if we move the threshold to 6?", 6)])
+def test_a_what_if_about_the_same_change_runs(question, threshold):
+    assert ask.match(question) == ("news2_threshold", threshold)
+
+
 @pytest.mark.parametrize("question, threshold", [
     ("Would alerting at NEWS2 5 catch more deteriorations?", 5), ("What if we alerted when NEWS2 reaches 6?", 6),
     ("What about a threshold of 20?", 20), ("NEWS2 >= 3?", 3),

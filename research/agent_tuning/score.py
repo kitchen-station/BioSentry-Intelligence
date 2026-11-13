@@ -4,7 +4,7 @@ An outputs line is {"id": ..., "output": "..."}; a missing id counts as an empty
 `--per-group N` and `--task` cut the data file to the same subsample `run_model.py` ran (the first
 N examples of each group in file order), so a reduced run is scored on exactly what it answered.
 Five groups, per task and together: valid JSON, exact accuracy, refusal accuracy, outside the allowed
-shapes, and what is left after the guards. `--baseline matcher` scores the keyword matcher itself
+shapes, and what is left after the guards. `--baseline perfect` scores the labels themselves, which shows the ceiling the guards leave. `--baseline matcher` scores the keyword matcher itself
 on the questions, with no outputs file.
 """
 
@@ -134,15 +134,19 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--data", required=True, type=Path)
     ap.add_argument("--outputs", type=Path)
-    ap.add_argument("--baseline", choices=("matcher",))
+    ap.add_argument("--baseline", choices=("matcher", "perfect"))
     ap.add_argument("--json", type=Path)
     ap.add_argument("--per-group", type=int)
     ap.add_argument("--task", choices=("planner", "question"))
     a = ap.parse_args()
     if bool(a.outputs) == bool(a.baseline):
         ap.error("give exactly one of --outputs and --baseline")
-    examples = read(a.data, a.per_group, "question" if a.baseline else a.task)
-    result = score(examples, matcher_outputs(examples) if a.baseline else _outputs(a.outputs))
+    examples = read(a.data, a.per_group, "question" if a.baseline == "matcher" else a.task)
+    if a.baseline == "perfect":  # every answer is the label: what is left after the guards is the ceiling
+        outputs = {e["id"]: e["expected"] for e in examples}
+    else:
+        outputs = matcher_outputs(examples) if a.baseline else _outputs(a.outputs)
+    result = score(examples, outputs)
     print(render(result))
     if a.json:
         a.json.write_text(json.dumps(result, indent=1) + "\n")

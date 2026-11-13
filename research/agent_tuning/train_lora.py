@@ -3,8 +3,8 @@
     python research/agent_tuning/train_lora.py --data_url <dir with train.jsonl> --train_url <out dir> \
         --model <dir> [--per-group N] [--epochs 1] [--lr 2e-4] [--max_len 1536] [--device CPU]
 
-`--data_url` and `--train_url` are the ModelArts training-job argument names, so the same file
-runs there with its paths. LoRA r 8, alpha 16, dropout 0.05 on the attention query and value
+`--data_url` and `--train_url` are the ModelArts training-job argument names. Prepared for a
+job there, not run as one (see README.md). LoRA r 8, alpha 16, dropout 0.05 on the attention query and value
 projections. The loss is on the answer tokens only. Batch size 1. Fixed seed. The adapter is
 saved to `<train_url>/adapter` every 50 steps and at the end; `log.jsonl` has the loss per step.
 An example longer than --max_len stops the run before it starts (a cut example has no answer left

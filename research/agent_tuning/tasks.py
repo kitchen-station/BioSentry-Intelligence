@@ -17,12 +17,7 @@ QUESTION_SYSTEM = (
     '(alerts per nurse per 12-hour shift), "threshold": <the whole number 1 to 20 written in the question, '
     'or null>} or {"refuse": true}. Refuse everything else.')
 
-# Added on top of ask's own lists. The verbs refuse an order to change something, not a what-if question.
-_EXTRA = re.compile(
-    r"\b(change|set|update|raise|lower|increase|decrease|reduce|switch|enable|disable|adjust|replace|make|put|"
-    r"turn|move|bump|tweak|alter|amend|push)\s+(the|our|it|this|that|all|every|to|up|down|off|on)\b")
-_WHAT_IF = re.compile(r"\b(what if|what happens|what would|would|how (would|many|much|does)|if we|if the|suppose|compare)\b")
-_ALWAYS = re.compile(r"\b(go ahead|sign off|activate|admin|developer mode|jailbreak|you are now|pretend|forget|new task)\b|system:")
+# On top of ask's own lists (which hold the order rule): the question must be about the alert rules at all.
 _TOPIC = re.compile(r"news ?2|nurs\w*|alerts?\b|alerting|alarms?|baseline|threshold|cut-?\s?off|trigger|"
                     r"deteriorat\w*|early warning|usual values|their usual")
 
@@ -79,8 +74,7 @@ def refuses(question: str) -> bool:
     low = question.lower()
     got = ask.read(question)
     # baseline and threshold words together fit no template
-    return (got is None or bool(got[1] and got[2]) or bool(_ALWAYS.search(low)) or not _TOPIC.search(low)
-            or bool(_EXTRA.search(low) and not _WHAT_IF.search(low)))
+    return got is None or bool(got[1] and got[2]) or not _TOPIC.search(low)
 
 
 def guard_question(text: str, question: str) -> tuple[str | None, int | None]:

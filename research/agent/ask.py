@@ -68,11 +68,20 @@ def _odd_digit(text: str) -> bool:
     return any(c.isnumeric() and c not in "0123456789" for c in text)
 
 
+# An order to change something is refused; a what-if question about the same change runs.
+_ORDER = re.compile(
+    r"\b(change|set|update|raise|lower|increase|decrease|reduce|switch|enable|disable|adjust|replace|make|put|"
+    r"turn|move|bump|tweak|alter|amend|push)\s+(the|our|it|this|that|all|every|to|up|down|off|on)\b")
+_WHAT_IF = re.compile(r"\b(what if|what happens|what would|how would|suppose|if we)\b")
+_ALWAYS = re.compile(r"\b(go ahead|sign off|activate|admin|developer mode|jailbreak|you are now|pretend|forget|new task|"
+                     r"going forward|rollout|sav(e|ed|ing)|keep it|implement\w*|config\w*)\b|system:")
+
+
 def read(question: str) -> tuple[str, bool, bool, int | None] | None:
     """(lower-case text, baseline words, threshold words, the one usable whole number 1 to 20 or None).
-    None when the refusal list, the digit rules or the number rules refuse the question."""
+    None when the refusal list, the order rule, the digit rules or the number rules refuse the question."""
     t = question[:MAX_QUESTION].lower()
-    if _NEVER.search(t) or _odd_digit(t):
+    if _NEVER.search(t) or _ALWAYS.search(t) or _odd_digit(t) or (_ORDER.search(t) and not _WHAT_IF.search(t)):
         return None
     plain = re.sub(r"news ?2|12[- ]hour", " ", t)
     base, thresh = _baseline(t), bool(_THRESHOLD.search(plain))
