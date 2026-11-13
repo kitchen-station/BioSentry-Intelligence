@@ -34,8 +34,9 @@
 	}
 
 	# The API. It checks the clinician's token itself; this only passes the request on. The ingest
-	# door (/sim/*) is for the ward runner, which reaches the API inside compose and never through
-	# here: from this address it does not exist.
+	# door (/sim/*, which includes the lab worker's /sim/lab/*) is for the ward runner and the lab
+	# worker, which reach the API inside compose and never through here: from this address it does
+	# not exist.
 	handle_path /api/* {
 		@ingest path /sim /sim/*
 		respond @ingest 404

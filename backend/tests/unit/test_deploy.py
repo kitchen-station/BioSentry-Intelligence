@@ -1,7 +1,8 @@
 """The deployment files: what the server's stack publishes (the API and the web server on the host's
-loopback, the database and the ward simulator nothing), pinned images, secrets that have no defaults, the
-web server that hides the ingest door, and the two scripts, run here with a stand-in for docker (the real
-stack was built, run, backed up and restored by hand; see deploy/README.md)."""
+loopback, the database, the ward simulator and the lab worker nothing), pinned images, secrets that
+have no defaults, the web server that hides the ingest door, and the two scripts, run here with a
+stand-in for docker (the real stack was built, run, backed up and restored by hand; see
+deploy/README.md)."""
 
 import os
 import re
@@ -29,9 +30,15 @@ def _code(path: Path) -> list[str]:
 
 
 def _sim() -> list[str]:
-    """The code lines of the `sim` service: up to the `web` service that follows it."""
+    """The code lines of the `sim` service: up to the `lab` service that follows it."""
     code = _code(DEPLOY / "compose.yaml")
-    return code[code.index("sim:") : code.index("web:")]
+    return code[code.index("sim:") : code.index("lab:")]
+
+
+def _lab() -> list[str]:
+    """The code lines of the `lab` service: up to the `web` service that follows it."""
+    code = _code(DEPLOY / "compose.yaml")
+    return code[code.index("lab:") : code.index("web:")]
 
 
 def _web() -> list[str]:
@@ -43,6 +50,13 @@ def _web() -> list[str]:
 def test_the_database_publishes_nothing_and_the_api_only_the_hosts_loopback() -> None:
     code = _code(DEPLOY / "compose.yaml")
     assert code.count("ports:") == 2  # only the API and the web server publish anything
+    # No other spelling of a risky key anywhere (one line, quoted, or with a comment after it).
+    risky = (
+        r"""^['"]?(ports|expose|privileged|cap_add|devices|pid|ipc|userns_mode|network_mode|user"""
+        r"""|entrypoint|<<)['"]?\s*:"""
+    )
+    assert [ln for ln in code if re.match(risky, ln)] == ["ports:", "ports:"]
+    assert [ln for ln in code if re.match(r"""^['"]?volumes['"]?\s*:""", ln)] == ["volumes:"] * 3
     published = [code[i + 1] for i, ln in enumerate(code) if ln == "ports:"]
     assert published == [  # both on the host's loopback; the variables move the host port only
         '- "127.0.0.1:${API_PORT:-8000}:8000"',
@@ -54,19 +68,28 @@ def test_the_database_publishes_nothing_and_the_api_only_the_hosts_loopback() ->
     assert [ln for ln in code if re.search(mapping, ln)] == published
     assert "0.0.0.0" not in "\n".join(code)
     assert "network_mode: host" not in code  # no service runs on the host's network
-    assert code.count("network: host") == 3  # only the three builds (the API, the simulator, the web) do
+    # Only the four builds (the API, the simulator, the lab worker, the web) do.
+    assert code.count("network: host") == 4
     assert code.index("network: host") < code.index("restart: unless-stopped", code.index("build:"))
     postgres = code[code.index("postgres:") : code.index("api:")]
     assert "networks: [backend]" in postgres and "ports:" not in postgres
-    assert any(ln.startswith("internal: true") for ln in code)  # the database's network
     # Only the top-level block is spelt `networks:` alone: a service names its networks as `[..]`,
-    # so the _sim and _web slices end where they should and cannot hide one.
+    # so the _sim, _lab and _web slices end where they should and cannot hide one.
     assert code.count("networks:") == 1
+    # The two networks the file makes are both internal: the database's, and the lab worker's.
+    made = code[code.index("networks:") + 1 : code.index("volumes:", code.index("networks:"))]
+    assert [ln.split(" #")[0] for ln in made] == ["backend:", "internal: true", "labnet:", "internal: true"]
+    # Who is on which: the database alone with the API, the lab worker alone with the API.
+    assert [ln for ln in code if ln.startswith("networks: [")] == [
+        "networks: [backend]",
+        "networks: [default, backend, labnet]",
+        "networks: [labnet]",
+    ]
 
 
 def test_the_stack_restarts_waits_for_a_healthy_database_and_keeps_the_data_in_a_volume() -> None:
     text = "\n".join(_code(DEPLOY / "compose.yaml"))
-    assert text.count("restart: unless-stopped") == 4
+    assert text.count("restart: unless-stopped") == 5
     assert "condition: service_healthy" in text
     assert "pgdata:/var/lib/postgresql" in text and text.endswith("volumes:\npgdata:\nsimstate:")
     assert "BIOSENTRY_ENV: production" in text
@@ -94,6 +117,33 @@ def test_the_ward_simulator_publishes_nothing_and_waits_for_a_healthy_api() -> N
     assert "WARD_STATE_FILE: /state/ward-state.json" in sim
     assert sim[sim.index("volumes:") + 1] == "- simstate:/state"
     assert not any("POSTGRES" in ln or "DATABASE" in ln for ln in sim)
+
+
+def test_the_lab_worker_publishes_nothing_reaches_only_the_api_and_can_write_only_in_memory() -> None:
+    # The whole service, line for line. A key this list does not have (a port, a volume, a capability,
+    # a user, a second network), in any YAML spelling or with a comment after it, fails here.
+    assert _lab() == [
+        "lab:",
+        "build:",
+        "context: ${SIM_DIR:-../../biosentry-ward-sim}",  # the image the runner is built from
+        "network: host",
+        'command: ["node", "dist/lab/lab-worker.js"]',
+        "restart: unless-stopped",
+        "depends_on:",
+        "api:",
+        "condition: service_healthy",
+        "environment:",  # the API's address inside compose and the key, no default; no proxy variable
+        "BIOSENTRY_API_URL: http://api:8000",
+        "BIOSENTRY_INGEST_KEY: ${BIOSENTRY_INGEST_KEY:?set BIOSENTRY_INGEST_KEY in deploy/.env}",
+        "networks: [labnet]",  # one internal network, shared with the API alone
+        "read_only: true",
+        'tmpfs: ["/tmp:size=64m"]',  # the one place it writes, in memory and capped
+        "cap_drop: [ALL]",
+        'security_opt: ["no-new-privileges:true"]',
+        "mem_limit: 1g",  # a run that goes wrong cannot take the database's memory
+        "pids_limit: 128",
+        "cpus: 2",
+    ]
 
 
 def test_the_web_server_publishes_only_the_hosts_loopback_and_holds_no_secret() -> None:
