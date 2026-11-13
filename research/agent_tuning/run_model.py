@@ -5,10 +5,13 @@
 
 Greedy decoding. At most 200 new tokens for the planner task and 40 for the question task. A run
 that stops can be started again: ids already in --out are skipped. Score with
-`python -m research.agent_tuning.score`.
+`python -m research.agent_tuning.score`. Beside --out it writes `<out>.meta.json`: the sha256 of
+the adapter file that was loaded (or null), of the data file, and the settings, so the answers
+can be tied to one checkpoint.
 """
 
 import argparse
+import hashlib
 import json
 import time
 from pathlib import Path
@@ -35,6 +38,15 @@ def main() -> None:
         lines = complete_lines(a.out)
         done = {json.loads(line)["id"] for line in lines}
         a.out.write_text("".join(line + "\n" for line in lines))  # drop a half-written last line before appending
+    adapter_file = Path(a.adapter) / "adapter_model.safetensors" if a.adapter else None
+    meta = {"adapter_sha256": hashlib.sha256(adapter_file.read_bytes()).hexdigest() if adapter_file else None,
+            "adapter_folder": Path(a.adapter).name if a.adapter else None,
+            "data_sha256": hashlib.sha256(a.data.read_bytes()).hexdigest(), "task": a.task, "per_group": a.per_group,
+            "examples": len(examples), "max_new_tokens": MAX_NEW, "decoding": "greedy"}
+    meta_path = a.out.with_name(a.out.name + ".meta.json")
+    if meta_path.exists() and json.loads(meta_path.read_text()) != meta:
+        raise SystemExit("refused: --out was started with another adapter, data file or setting")
+    meta_path.write_text(json.dumps(meta, indent=1, sort_keys=True) + "\n")
     tok, model = load(a.model, torch, a.adapter)
     model.eval()
     with open(a.out, "a") as out:
