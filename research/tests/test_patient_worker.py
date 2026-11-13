@@ -276,3 +276,21 @@ def test_a_ranked_patient_with_a_null_baseline_gets_a_fixed_sentence_not_a_failu
     del p["baseline"]  # a missing key is not the contract's null: it stays a failure
     out = worker.report_for({**SAMPLE, "question": "show the baseline", "patient": p}, None)
     assert out == {"state": "failed", "reason": "the agent stopped with an error"}
+
+
+@pytest.mark.parametrize("q", ["what is this patient's baseline heart rate", "show the baseline", "why is this patient at this rank",
+                               "what changed in the last 6 hours", "which alerts are active"])
+def test_a_key_the_worker_does_not_know_changes_the_hash_and_nothing_else(q):
+    # The API will add keys to `patient` (a baseline band, provenance fields). The worker ignores them and hashes what it got.
+    p = json.loads(json.dumps(SAMPLE["patient"]))
+    for e in p["baseline"]["vitals"]:
+        e["band_low"], e["band_high"] = 99.9, 111.1
+    for v in p["detail"]["vitals"].values():
+        v["provenance"].update(variant=None, file_sha256=None, run_id=None)
+    p["new_top"], p["detail"]["new_key"], p["baseline"]["new_key"] = "x", {"a": [1, 2]}, 5
+    old = worker.report_for({**SAMPLE, "question": q}, None)
+    new = worker.report_for({**SAMPLE, "question": q, "patient": p}, None)
+    a, b = json.loads(old["record_json"]), json.loads(new["record_json"])
+    assert new["state"] == "done" and new["answer"] == old["answer"]
+    assert b["data_sha256"] == worker.data_sha256(p) != a["data_sha256"]
+    assert {**b, "data_sha256": ""} == {**a, "data_sha256": ""}
