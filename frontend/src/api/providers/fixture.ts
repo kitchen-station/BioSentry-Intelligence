@@ -28,6 +28,7 @@ export const fixtureProvider: ApiProvider = {
   askPatient: () => Promise.reject(new Error("Patient questions need the server")),
   getPatientQuestions: () => Promise.reject(new Error("Patient questions need the server")),
   getPatientQuestion: () => Promise.reject(new Error("Patient questions need the server")),
+  getPatientHistory: () => Promise.reject(new Error("The stay history needs the server")),
   admitPatient: fixtures.admitPatient,
   enterLabResults: fixtures.enterLabResults,
   getAcknowledgements: fixtures.getAcknowledgements,

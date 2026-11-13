@@ -228,6 +228,14 @@ describe("httpProvider lab runs", () => {
   });
 });
 
+describe("httpProvider stay history", () => {
+  it("reads only the history path of one patient", async () => {
+    fetchMock.mockImplementation(async () => reply(200, {}));
+    await httpProvider.getPatientHistory("p-001");
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual(["/patients/p-001/history"]);
+  });
+});
+
 describe("httpProvider patient questions", () => {
   it("asks, lists and reads only the question paths of one patient", async () => {
     fetchMock.mockImplementation(async () => reply(200, {}));

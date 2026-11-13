@@ -20,6 +20,7 @@ import type {
   PartialLabInput,
   PatientDetail,
   PatientExtractionResult,
+  PatientHistory,
   PatientQuestionDetail,
   PatientQuestionItem,
   PatientStay,
@@ -70,6 +71,8 @@ export interface ApiProvider {
   askPatient(patientId: string, question: string): Promise<PatientQuestionItem>;
   getPatientQuestions(patientId: string): Promise<PatientQuestionItem[]>;
   getPatientQuestion(patientId: string, questionId: number): Promise<PatientQuestionDetail>;
+  /** The stay of one patient as runs and events, rebuilt from stored 15-minute sets. Each read is one audit row. */
+  getPatientHistory(patientId: string): Promise<PatientHistory>;
   extractLabsFromFile(file: File): Promise<LabExtractionResult>;
   extractPatientFromFile(file: File): Promise<PatientExtractionResult>;
 }

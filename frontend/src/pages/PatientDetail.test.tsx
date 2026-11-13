@@ -27,6 +27,8 @@ const api = vi.hoisted(() => ({
   addNote: vi.fn(),
   canRecordVitals: false,
   recordVitals: vi.fn(),
+  hasHistory: false,
+  getPatientHistory: vi.fn(),
   hasPatientQuestions: false,
   askPatient: vi.fn(),
   getPatientQuestions: vi.fn(),
@@ -966,6 +968,73 @@ describe("PatientDetail: ask about this patient", () => {
       expect(screen.getByText("the answer")).toBeTruthy();
       expect(api.getPatientQuestion).toHaveBeenCalledTimes(1);
       expect(api.getPatientQuestions).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+      api.usesServer = false;
+    }
+  });
+});
+
+describe("PatientDetail: stay panel", () => {
+  const stay = {
+    bins: 4, events: [{ at: "2026-11-13T09:00:00Z", by: null, kind: "admitted", note_id: null, role: null, score: null, source: "patient" }],
+    events_cut: false, grid_from: "2026-11-13T09:00:00Z", grid_to: "2026-11-13T10:00:00Z", label: "Rebuilt.", patient_id: "p-001",
+    runs: [], runs_cut: false, synthetic: true, unavailable: null,
+  };
+  beforeEach(() => {
+    api.hasHistory = true;
+    api.getPatientHistory.mockResolvedValue(stay);
+  });
+  afterEach(() => {
+    api.hasHistory = false;
+  });
+
+  it("sits after Current vitals and before Ask about this patient, for an admin too, and reads nothing while closed", async () => {
+    api.hasPatientQuestions = true;
+    api.getPatientQuestions.mockResolvedValue([]);
+    try {
+      page("rn");
+      await loaded();
+      const summary = await screen.findByText("Stay");
+      const vitals = screen.getByText("Current vitals");
+      const ask = await screen.findByRole("heading", { level: 2, name: "Ask about this patient" });
+      expect(vitals.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(summary.compareDocumentPosition(ask) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(api.getPatientHistory).not.toHaveBeenCalled();
+      cleanup();
+      page("admin");
+      await loaded();
+      expect(await screen.findByText("Stay")).toBeTruthy();
+    } finally {
+      api.hasPatientQuestions = false;
+    }
+  });
+
+  it("is absent, with no call, in the demo build", async () => {
+    api.hasHistory = false;
+    page("rn");
+    await loaded();
+    expect(screen.queryByText("Stay")).toBeNull();
+    expect(api.getPatientHistory).not.toHaveBeenCalled();
+  });
+
+  it("is not remounted by the page's own refresh and causes no read", async () => {
+    api.usesServer = true;
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      page("rn");
+      await loaded();
+      await user.click(await screen.findByText("Stay"));
+      await screen.findByText(/^Admitted \d/);
+      expect(api.getPatientHistory).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_100);
+      });
+      expect(api.getPatient.mock.calls.length).toBeGreaterThan(1);
+      expect((screen.getByText("Stay").closest("details") as HTMLDetailsElement).open).toBe(true);
+      expect(screen.getByText(/^Admitted \d/)).toBeTruthy();
+      expect(api.getPatientHistory).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
       api.usesServer = false;

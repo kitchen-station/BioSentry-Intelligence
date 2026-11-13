@@ -31,6 +31,7 @@ import type {
   PartialLabInput,
   PatientDetail,
   PatientExtractionResult,
+  PatientHistory,
   PatientQuestionDetail,
   PatientQuestionItem,
   VitalsRecorded,
@@ -82,6 +83,10 @@ export const httpProvider: ApiProvider = {
 
   getPatientQuestions(patientId: string): Promise<PatientQuestionItem[]> {
     return fetchJson<PatientQuestionItem[]>(`/patients/${encodeURIComponent(patientId)}/questions`);
+  },
+
+  getPatientHistory(patientId: string): Promise<PatientHistory> {
+    return fetchJson<PatientHistory>(`/patients/${encodeURIComponent(patientId)}/history`);
   },
 
   getPatientQuestion(patientId: string, questionId: number): Promise<PatientQuestionDetail> {
