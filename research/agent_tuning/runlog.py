@@ -5,7 +5,7 @@
         --model-licence Apache-2.0 --eval untuned=<dir or prefix> --eval tuned=<dir or prefix> \
         --question-per-group 6 --planner-per-group 3 --hardware "<text>" --commit <sha> \
         [--log <file>] [--adapter <dir>] [--control-log <file>] [--stopped "<reason>"] [--device CPU] \
-        --out training/agent/runs/run1.json
+        [--scores-out <file>] --out training/agent/runs/run1.json
 
 Reads: `run.json`, `log.jsonl` (and `run-end.json`, `adapter/`) in the run dir; `train.jsonl`,
 `heldout.jsonl`, `manifest.json` in the data dir; `SHA256SUMS.txt` in the weights dir. An --eval value
@@ -14,6 +14,8 @@ two files. An answers file that is missing or short is recorded as incomplete; n
 Each answers file that exists needs the `<name>.meta.json` that run_model.py writes beside it, and
 its adapter hash, data hash, task, per-group and example count must match, or nothing is written
 (exit 2). `--control-log` is the frozen run's log: its loss is stored next to the trained loss.
+`--scores-out` also writes the before and after counts for `python -m research.agent export --scores`. It runs
+each distinct experiment once on the tuning seeds (needs the trials, like `ask`) and refuses if a run is incomplete.
 Same inputs, same bytes: sorted keys, no clock (times come from the run files). Standard library only.
 """
 
@@ -27,6 +29,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from research.agent import ask, tools
+from research.agent.config import AgentError, Config
 from research.agent_tuning import score, tasks
 from research.agent_tuning.common import complete_lines, group, read
 
@@ -299,6 +303,56 @@ def build(run_id: str, train_url: Path, data_url: Path, model: Path, model_name:
     }
 
 
+SCORE_NOTES = [
+    "The scores are on the blind held-out question subsample, not on research/agent/eval_questions.json. "
+    "One run each, greedy decoding, no error bars.",
+    "grounding_passed counts the answered questions whose numbers passed the code check against the tool result. "
+    "That check is code and is the same before and after tuning."]
+
+
+def run_experiment(template: str, args: dict) -> bool:
+    """One real experiment on the tuning seeds, then the same code check `ask` uses. A tool error is not a pass.
+    Config.from_env reads the real environment, so tests pass their own function."""
+    try:
+        result, _ = tools.call(Config.from_env(), "evaluate_rules", args)
+        answer, used = ask.build(template, args, result)
+        return ask.grounded(answer, used, args, result)
+    except (tools.ToolError, KeyError, TypeError, IndexError):
+        return False
+
+
+def scores_file(doc: dict, q: list[dict], experiment=run_experiment) -> dict:
+    """{"scores", "notes"} for the export. Counts come from the answers after the guard."""
+    ex = {r["id"]: r for r in doc["examples"]}
+    if not all(doc["evaluations"]["question"][k]["complete"] for k in ("untuned", "tuned")):
+        refuse("a question run is incomplete, so no scores file is written")
+    adapter, base = doc["adapter"]["adapter_model.safetensors"]["sha256"], doc["base_model"]["name"]
+    cache: dict[str, bool] = {}
+    runs = []
+    for label, key, model in (("before", "untuned_output", base), ("after", "tuned_output", f"{base} + LoRA adapter {(adapter or '')[:12]}")):
+        answered = correct = passed = 0
+        for e in q:
+            template, threshold = tasks.guard_question(ex[e["id"]][key], e["question"])
+            if template is None:
+                continue
+            answered += 1
+            correct += e["label"] == {"template": template, "threshold": threshold}
+            args = {"dataset": "ward-v2", "seeds": list(range(1, 11)), "window": "early",
+                    "rules": ask._rules(template, threshold, e["question"])}
+            k = json.dumps(args, sort_keys=True)
+            if k not in cache:
+                cache[k] = experiment(template, args)
+                print(f"experiment {len(cache)}: {template} {'passed' if cache[k] else 'not passed'}", file=sys.stderr, flush=True)
+            passed += cache[k]
+        runs.append({"label": label, "model": model, "answered": answered, "refused": len(q) - answered,
+                     "grounding_passed": passed, "correct_template": correct})
+    sub = doc["data"]["held_out_subsample"]
+    held = doc["data"]["files"]["heldout.jsonl"]["sha256"][:12]
+    return {"scores": {"question_set": f"blind held-out questions, first {sub['question_per_group']} of each group "
+                                       f"({len(q)} questions; heldout.jsonl sha256 {held})",
+                       "n": len(q), "runs": runs}, "notes": SCORE_NOTES}
+
+
 def dump(doc: dict) -> bytes:
     data = (json.dumps(doc, sort_keys=True, separators=(",", ":")) + "\n").encode()
     if len(data) > MAX_BYTES:
@@ -326,6 +380,7 @@ def main() -> None:
     ap.add_argument("--adapter", type=Path)
     ap.add_argument("--control-log", type=Path)
     ap.add_argument("--stopped")
+    ap.add_argument("--scores-out", type=Path)
     ap.add_argument("--out", required=True, type=Path)
     a = ap.parse_args()
     evals = dict(e.split("=", 1) for e in a.eval)
@@ -338,6 +393,13 @@ def main() -> None:
     a.out.parent.mkdir(parents=True, exist_ok=True)
     a.out.write_bytes(data)
     print(f"wrote {a.out.name}: {len(data)} bytes, {len(doc['steps'])} steps, {len(doc['examples'])} examples")
+    if a.scores_out:
+        try:
+            scores = scores_file(doc, read(a.data_url / "heldout.jsonl", a.question_per_group, "question"))
+        except AgentError as e:
+            refuse(str(e))
+        a.scores_out.parent.mkdir(parents=True, exist_ok=True)
+        a.scores_out.write_text(json.dumps(scores, indent=1, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

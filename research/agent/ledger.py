@@ -89,18 +89,24 @@ def _check(data: bytes) -> tuple[list[dict], str]:
     return records, prev
 
 
-def read(cfg: Config) -> list[dict]:
+def read_path(path: Path) -> tuple[list[dict], bytes]:
+    """The records and the bytes read, with every check of `read`. A missing file is an empty ledger."""
     try:
-        fd = os.open(cfg.home / LEDGER, os.O_RDONLY | os.O_NOFOLLOW)
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
     except FileNotFoundError:
-        return []
+        return [], b""
     except OSError:
         raise LedgerError("cannot read the ledger") from None
     try:
         fcntl.flock(fd, fcntl.LOCK_SH)
-        return _check(_slurp(fd))[0]
+        data = _slurp(fd)
+        return _check(data)[0], data
     finally:
         os.close(fd)
+
+
+def read(cfg: Config) -> list[dict]:
+    return read_path(cfg.home / LEDGER)[0]
 
 
 # shortcut: the last line has no later record to vouch for it, so editing only that line is not
@@ -164,64 +170,13 @@ def add_fallback(cfg: Config, reason: str, host: str, shown: str = "") -> dict:
     return _append(cfg, "planner_fallback", {"reason": reason, "host": clean(host, 100), "shown": clean(shown, 200)})
 
 
-# --- a read-only view for a page that shows the record ---------------------------------------------------
-
-EXPORT_VERSION = 1
-LAST_LINE = "Simulated patients. Not validated. A person decides."
-
-
-def export(records: list[dict]) -> dict:
-    """The questions, the rounds and the proposals as plain data. Text fields are what people typed
-    or what the tools returned: a page must show them as text, never run or trust them."""
-    steps = {r["id"]: r for r in records if r["type"] == "step"}
-    questions, rounds = [], []
-    for start in (r for r in records if r["type"] == "start"):
-        step = steps.get(start["id"])
-        plan = start["plan"] if isinstance(start["plan"], dict) else {}
-        call = ((step or {}).get("calls") or [{}])[0]
-        base = {"id": start["id"], "started_at": start["at"], "finished_at": step["at"] if step else None}
-        if start["kind"] == "ask":
-            args = plan.get("args") if isinstance(plan.get("args"), dict) else {}
-            threshold = next((x.get("threshold") for x in args.get("rules", []) if isinstance(x, dict) and "threshold" in x), None)
-            answered = bool(step) and step.get("grounding") == "ok"
-            questions.append({**base, "question": start.get("question", ""),
-                              "experiment": plan.get("rule") if plan.get("tool") else None, "threshold": threshold,
-                              "answered": answered, "tool_failed": call.get("ok") is False,
-                              "grounding": step.get("grounding") if step else None,
-                              "answer": step["conclusion"] if answered else None})
-        else:
-            rounds.append({**base, "experiment": plan.get("experiment"), "planner": plan.get("planner"),
-                           "rule": plan.get("rule"), "tool": plan.get("tool"),
-                           "ok": call.get("ok") if step else None, "conclusion": step["conclusion"] if step else None})
-    proposals = []
-    for r in (r for r in records if r["type"] == "proposal"):
-        after = [x for x in records if x.get("proposal") == r["id"] and x["seq"] > r["seq"]]
-        approval = next((x for x in after if x["type"] == "approval"), None)
-        applied = next((x for x in after if x["type"] == "applied"), None)
-        proposals.append({"id": r["id"], "action": r["action"], "step": r["step"], "proposed_at": r["at"],
-                          "state": status(records, r["id"]), "files": len(r["files"]),
-                          "conclusion": (steps.get(r["step"]) or {}).get("conclusion"),
-                          "approved_by": approval["by"] if approval else None,
-                          "approved_at": approval["at"] if approval else None,
-                          "applied_at": applied["at"] if applied else None})
-    return {"format_version": EXPORT_VERSION, "synthetic": True, "validated": False, "note": LAST_LINE,
-            "ledger_records": len(records), "questions": questions, "rounds": rounds, "proposals": proposals}
-
-
-def write_export(cfg: Config, path: str) -> dict:
-    """Reads the ledger and writes one JSON file. Never inside the models folder."""
+def export_path(cfg: Config, path: str) -> Path:
+    """Where an export may be written: never inside the models folder."""
     out = Path(path).expanduser().resolve()
     models = cfg.models.resolve()
     if out == models or models in out.parents:
         raise LedgerError("export does not write inside the models folder")
-    data = export(read(cfg))
-    try:
-        tmp = out.with_name(out.name + ".tmp")
-        tmp.write_text(json.dumps(data, indent=1, ensure_ascii=False) + "\n")
-        os.replace(tmp, out)
-    except OSError:
-        raise LedgerError("cannot write the export file") from None
-    return data
+    return out
 
 
 # --- proposals ----------------------------------------------------------------------------------------

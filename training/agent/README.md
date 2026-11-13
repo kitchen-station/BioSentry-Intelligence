@@ -28,6 +28,9 @@ are mounted read-only; `--eval` takes a folder or a path prefix for `<name>-ques
         --question-per-group 6 --planner-per-group 3 --hardware "<text>" --commit <sha> \
         --out training/agent/runs/<id>.json
 
+Add `--scores-out <file>` to write the before and after counts for `python -m research.agent export --scores`.
+It runs each distinct experiment once on the tuning seeds, so it needs the trials, like `ask`.
+
 For the stopped run add `--train_url /run1 --log /run1/log-to-step200.jsonl --adapter /run1/adapter-step200
 --control-log /run0/log.jsonl --stopped "<reason>"`, with the first full run's folder
 (`run0-learned-nothing`) mounted read-only at `/run0`. Each answers file needs the `.meta.json` that
