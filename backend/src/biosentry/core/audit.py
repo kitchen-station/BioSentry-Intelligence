@@ -67,8 +67,10 @@ class AuditLog:
     def append_view(self, clinician_id: str, action: str, resource: str) -> None:
         """An ok read. A timer-driven read (REPEATED_VIEWS) already recorded for this clinician
         on this resource within VIEW_ROW_EVERY is not recorded again; the data is served anyway."""
+        now = self._clock()
+        # `until`: a row stamped after now (the host clock stepped back) must not hide this read.
         if action in REPEATED_VIEWS and self.count(
-            action, resource, "ok", self._clock() - VIEW_ROW_EVERY, clinician_id
+            action, resource, "ok", now - VIEW_ROW_EVERY, clinician_id, now
         ):
             return
         self.append(clinician_id, action, resource, "ok")
@@ -80,14 +82,17 @@ class AuditLog:
         outcome: Outcome,
         since: datetime,
         clinician_id: str | None = None,
+        until: datetime | None = None,
     ) -> int:
-        """How many records of this action on this resource with this outcome came after `since`;
-        only this clinician's when one is given."""
+        """How many records of this action on this resource with this outcome came after `since`
+        (and at or before `until`, when given); only this clinician's when one is given."""
+        end = whole(until) if until else None
         row = self._conn.execute(
             "SELECT count(*) AS n FROM audit_log"
             " WHERE action = %s AND resource = %s AND outcome = %s AND at > %s"
-            " AND (%s::text IS NULL OR clinician_id = %s)",
-            (action, resource, outcome, whole(since), clinician_id, clinician_id),
+            " AND (%s::text IS NULL OR clinician_id = %s)"
+            " AND (%s::timestamptz IS NULL OR at <= %s)",
+            (action, resource, outcome, whole(since), clinician_id, clinician_id, end, end),
         ).fetchone()
         assert row is not None
         return int(row["n"])

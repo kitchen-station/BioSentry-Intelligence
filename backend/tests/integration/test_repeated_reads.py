@@ -8,7 +8,8 @@ import pytest
 from test_overview import ADMIN, add_admin, audit_of
 from test_store import CLINICIANS, Api, api  # noqa: F401 (api: fixture)
 
-from biosentry.core.audit import REPEATED_VIEWS, VIEW_ROW_EVERY
+from biosentry.core.audit import REPEATED_VIEWS, VIEW_ROW_EVERY, AuditLog
+from biosentry.repositories.postgres import connect
 
 RN, MD = "rn-manalo", "md-aquino"
 PID = "p-003"  # md-aquino's patient
@@ -127,3 +128,22 @@ def test_a_sign_in_is_never_limited(api: Api) -> None:
         body = {"clinician_id": MD, "passphrase": DEV_PASSPHRASE}
         assert api.client.post("/session", json=body).status_code == 200
     assert len(api.sql("SELECT 1 FROM audit_log WHERE action = 'sign_in' AND clinician_id = %s", MD)) == 2
+
+
+def test_a_not_found_row_in_the_last_minute_does_not_hide_the_next_ok_read(api: Api) -> None:
+    with connect(api.url) as conn:
+        log = AuditLog(conn, api.wall, lambda _: "md")
+        log.append(MD, "view_patient", PID, "not_found")
+        log.append_view(MD, "view_patient", PID)
+        log.append_view(MD, "view_patient", PID)
+    assert [r["outcome"] for r in rows(api, MD, "view_patient")] == ["not_found", "ok"]
+
+
+def test_a_row_stamped_after_now_does_not_hide_a_read(api: Api) -> None:
+    with connect(api.url) as conn:
+        log = AuditLog(conn, api.wall, lambda _: "charge_rn")
+        log.append_view(RN, "view_ward", "W4")
+        api.wall.now -= timedelta(minutes=5)  # the host clock steps back
+        log.append_view(RN, "view_ward", "W4")
+        log.append_view(RN, "view_ward", "W4")  # the same minute again: still one row for it
+    assert len(rows(api, RN, "view_ward")) == 2
