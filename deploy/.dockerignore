@@ -1,0 +1,3 @@
+# The web image copies only the Caddyfile from here. Never send deploy/.env to a build.
+*
+!Caddyfile

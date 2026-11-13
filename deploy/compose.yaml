@@ -1,12 +1,13 @@
-# The team deployment on one VPS: PostgreSQL, the API and the ward simulator. Run from this directory or with
+# The team deployment on one server: PostgreSQL, the API, the ward simulator and the web server that
+# carries the two browser apps. Run from this directory or with
 # `-f deploy/compose.yaml`; deploy/setup.sh does it. Secrets come from deploy/.env (git-ignored,
 # made by setup.sh): a missing one stops compose with an error, there are no defaults.
 #
 # Nothing here listens on the public interface. PostgreSQL publishes no port at all and sits on an
-# internal network. The API is published on the host's loopback only (127.0.0.1:8000): teammates
-# reach it through `tailscale serve` on the host. Keep both ports closed in the VPS firewall too:
-# a port Docker publishes on 0.0.0.0 goes around ufw, which is why this one is bound to loopback
-# and the other is not published.
+# internal network. The web server and the API are published on the host's loopback only
+# (127.0.0.1:8080 and 127.0.0.1:8000): teammates reach the web server through `tailscale serve` on
+# the host. Keep these ports closed in the server's firewall too: a port Docker publishes on 0.0.0.0
+# goes around ufw, which is why two are bound to loopback and the third is not published.
 name: biosentry-deploy
 
 services:
@@ -47,7 +48,8 @@ services:
       # Days of sim time a run keeps its bins and superseded observations; empty keeps the default, 7.
       BIOSENTRY_RETENTION_DAYS: ${BIOSENTRY_RETENTION_DAYS:-}
     ports:
-      - "127.0.0.1:8000:8000"
+      # Loopback only. API_PORT moves the host side when 8000 is taken (a second stack on one machine).
+      - "127.0.0.1:${API_PORT:-8000}:8000"
     # `default` is what lets the published port work; `backend` (internal) is how it reaches the database.
     networks: [default, backend]
     healthcheck:
@@ -82,6 +84,41 @@ services:
       WARD_STATE_FILE: /state/ward-state.json
     volumes:
       - simstate:/state
+
+  # The address the team opens: the dashboard at /, the full ward simulator at /simulator/ and the API at /api,
+  # from one small web server (web.Dockerfile, Caddyfile). The pages call the API on their own address,
+  # so there is no cross-origin request and no API address to bake into them. Like the api it is
+  # published on the host's loopback only (WEB_PORT moves the host side); `tailscale serve` on the
+  # host is what lets the team in. It holds no secret and has no route to the database, and it
+  # answers 404 for /api/sim/*: the ingest door is not reachable from here.
+  web:
+    build:
+      context: .
+      dockerfile: web.Dockerfile
+      additional_contexts:
+        frontend: ../frontend
+        sim: ${SIM_DIR:-../../biosentry-ward-sim}
+      # The build only (npm ci), on the host's network, for the reason the api's build is.
+      network: host
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8080}:8080"
+    read_only: true
+    # The one place caddy may write (its instance id and locks), in memory.
+    tmpfs: [/tmp]
+    environment:
+      XDG_DATA_HOME: /tmp
+      XDG_CONFIG_HOME: /tmp
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
 
 networks:
   backend:
