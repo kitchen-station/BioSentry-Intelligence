@@ -249,6 +249,39 @@ def test_writes_are_audited(app_and_client: tuple[Any, TestClient]) -> None:
     assert actions == ["add_note", "enter_labs", "delete_note"]
 
 
+def test_a_note_carries_the_signed_in_author_and_only_that_author_deletes_it(
+    app_and_client: tuple[Any, TestClient],
+) -> None:
+    _, client = app_and_client
+    author, other = as_("rn-manalo"), None
+    for candidate in ("rn-delacruz", "rn-reyes", "md-santos", "md-aquino"):
+        if client.get("/patients/p-001", headers=as_(candidate)).status_code == 200:
+            other = as_(candidate)
+            break
+    assert other is not None  # the patient is shared with one more clinician
+    forged = {"author": "Dr. Santos", "role": "MD", "content": "c"}
+    note = client.post("/patients/p-001/notes", headers=author, json=forged).json()
+    assert (note["author"], note["role"]) == ("rn-manalo", "Charge RN")  # the body's are ignored
+    url = f"/patients/p-001/notes/{note['id']}"
+    assert client.delete(url, headers=other).status_code == 404  # not their note
+    listed = client.get("/patients/p-001/notes", headers=author).json()
+    assert note["id"] in [n["id"] for n in listed]  # still there
+    assert client.delete(url, headers=author).status_code == 204
+    assert client.delete(url, headers=author).status_code == 404  # gone: nothing to delete
+    outcomes = [r.outcome for r in trail(app_and_client) if r.action == "delete_note"]
+    assert outcomes == ["not_found", "ok", "not_found"]
+
+
+def test_free_text_longer_than_its_limit_is_refused(client: TestClient) -> None:
+    h = as_("rn-manalo")
+    long_note = {"author": "a", "role": "RN", "content": "x" * 4001}
+    assert client.post("/patients/p-001/notes", headers=h, json=long_note).status_code == 422
+    at_limit = {"author": "a", "role": "RN", "content": "x" * 4000}
+    assert client.post("/patients/p-001/notes", headers=h, json=at_limit).status_code == 201
+    long_name = {"author": "a" * 201, "role": "RN", "content": "c"}
+    assert client.post("/patients/p-001/notes", headers=h, json=long_name).status_code == 422
+
+
 def test_my_audit_returns_only_my_own_trail(client: TestClient) -> None:
     client.get("/patients", headers=as_("md-aquino"))
     client.get("/patients", headers=as_("rn-manalo"))
