@@ -28,8 +28,10 @@ do other things. The boundary is the code that reads every answer:
   `grounded`). The model never writes that answer.
 - No model output can propose, approve or apply a change. Those are code rules and typed commands.
 
-Read every figure below with that in mind: a wrong model answer costs a fall-back or a refusal,
-not a wrong action.
+Read every figure below with that in mind. Most wrong model answers cost a fall-back or a
+refusal. The guard cannot check that the model chose the right experiment: where the keyword
+matcher is silent, a wrong choice among the three fixed experiments can pass, and the doctor then
+gets an answer about another experiment. No model answer can change a setting.
 
 ## What was run here
 
@@ -99,6 +101,9 @@ How to read it:
   refused, and acts on the same 2. Both wrong answers and both refusal questions acted on are the
   matcher's. The matcher row in the table is 13, not 14, because the tuning guard refuses one
   question that the matcher answers right.
+- Neither model had a wrong experiment run. That is this run, not a property of the guard. On 7
+  of the 30 answerable questions the matcher is silent and one wrong choice of experiment would
+  pass the guard.
 - The planner result is weak evidence: the task is close to copying (see Limits), and 9 examples
   is very few.
 
