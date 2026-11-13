@@ -231,7 +231,7 @@ export function SignIn({ onSignIn }: Props) {
                 >
                   <div className={ch.inner} />
                   <span className={styles.roleTitle}>Administration</span>
-                  <span className={styles.roleDesc}>Ward overview, read only</span>
+                  <span className={styles.roleDesc}>Every patient on the ward, read only</span>
                 </button>
               )}
             </div>
