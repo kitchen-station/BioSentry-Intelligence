@@ -1068,13 +1068,39 @@ def test_an_absent_device_row_does_not_erase_a_valid_nurse_value(api: Api) -> No
     assert hr_of(api).data.value == 100
 
 
-def test_an_expired_nurse_value_over_a_present_device_value_serves_the_device_value(
+def test_an_expired_nurse_value_does_not_fall_back_to_an_older_device_value(api: Api) -> None:
+    start(api)
+    record_hr(api)  # newer than the device row at minute -2; the patch does not sample again
+    api.wall.now += HOUR12 + timedelta(seconds=1)
+    m = hr_of(api)
+    assert (m.data.reason, m.provenance.source.value) == ("out_of_date", "nurse")
+
+
+def test_an_expired_nurse_value_under_a_patch_that_still_samples_serves_the_device_value(
     api: Api,
 ) -> None:
-    start(api)
+    run_id = start(api)
     record_hr(api)
-    api.wall.now += HOUR12 + timedelta(seconds=1)
+    at(api, 13 * 60)  # the patch sampled again, its unchanged heart rate sends no row
+    empty = batch(minute=13 * 60, observations=[])
+    assert api.post(f"/sim/runs/{run_id}/batch", empty).status_code == 204
     assert hr_of(api).data.value == 118
+
+
+def test_a_nurse_value_a_newer_device_value_replaced_does_not_come_back(api: Api) -> None:
+    run_id = start(api)
+    record_hr(api)
+    at(api, 5)
+    batch_5 = batch(minute=5, observations=[obs("s-1", "heart_rate", 5, num=130)])
+    assert api.post(f"/sim/runs/{run_id}/batch", batch_5).status_code == 204
+    assert hr_of(api).data.value == 130
+    at(api, 10)  # the patch drops out: the older nurse value, still inside 12 hours, stays replaced
+    gone = obs("s-1", "heart_rate", 10, absent_reason="No usable reading for 5 min")
+    patient = {"id": "s-1", "trend": "stable", "signal_quality": 0, "last_sample_minute": 5}
+    body = batch(minute=10, observations=[gone], patients=[patient])
+    assert api.post(f"/sim/runs/{run_id}/batch", body).status_code == 204
+    m = hr_of(api)
+    assert (m.data.reason, m.provenance.source.value) == ("No usable reading for 5 min", "device")
 
 
 def test_an_expired_nurse_value_then_a_newer_absent_device_row_serves_the_device_reason(

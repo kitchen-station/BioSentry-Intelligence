@@ -10,7 +10,7 @@ export interface Stage {
   decides?: true;
 }
 
-/** The eight stages in order, with their state on commit 53f7106. Change one line when a state changes. */
+/** The eight stages in order, with their state when this file was last changed. Change one line when a state changes. */
 export const PIPELINE: readonly Stage[] = [
   {
     id: "news2", name: "NEWS2", state: "live in the ranking", tier: "A",

@@ -63,7 +63,7 @@ export function VitalsEntryForm(props: VitalsEntryFormProps) {
       <p className={styles.sub}>
         Enter what you measured. A field left as &ldquo;Not recorded&rdquo; stays as it is; nothing
         is filled in for you. The first four values are for when there is no patch, or the patch
-        gives no reading. A value typed here counts for 12 hours.
+        gives no reading. Each of those four counts for 12 hours, or until the patch samples again.
       </p>
 
       <fieldset className={styles.group} disabled={busy}>

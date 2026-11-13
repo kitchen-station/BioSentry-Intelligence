@@ -1,9 +1,10 @@
 """The PostgreSQL store behind the API: the active run's patients, observations, notes and sessions.
 
 Every patient is read as one `UnscoredPatient`: the patient row, the latest observation per code
-(ties broken by the highest id) and the 15-minute bins. Scores, ranks, reasons and the ranked /
-NOT RANKED split are never stored: the services compute them on every read with the real news2()
-and arbiter, so a recorded value re-ranks the patient immediately.
+(ties broken by the highest id; for the four device vitals a valid nurse value can count
+instead, see `_newest_device_or_nurse`) and the 15-minute bins. Scores, ranks, reasons and the
+ranked / NOT RANKED split are never stored: the services compute them on every read with the
+real news2() and arbiter, so a recorded value re-ranks the patient immediately.
 
 One connection per request (sync handlers run in the threadpool). Writers that compute an id as
 max + 1 take `pg_advisory_xact_lock(run_id)` first, so they take turns per run. The active run is
@@ -405,24 +406,37 @@ class PostgresStore:
     def _newest_device_or_nurse(
         self, rows: list[dict[str, Any]], sample: datetime | None
     ) -> dict[str, Any]:
-        """The row that counts for a device vital: a valid nurse value, else the device's row."""
-        nurse = next((r for r in rows if r["source"] == "nurse" and r["absent_reason"] is None), None)
-        other = next((r for r in rows if r is not nurse), None)
+        """The row that counts for a device vital: a valid nurse value, else the device's row.
+
+        `rows` holds the newest row of each kind for one code: a nurse value, another value, an
+        absent row.
+        """
+
+        def key(r: dict[str, Any]) -> tuple[datetime, int]:
+            return (r["observed_at"], r["id"])
+
+        nurse = next(
+            (r for r in rows if r["source"] == "nurse" and r["absent_reason"] is None), None
+        )
+        others = [r for r in rows if r is not nurse]
+        other = max(others, key=key) if others else None
         if nurse is None:
             assert other is not None
             return other
-        newer = other is None or (nurse["observed_at"], nurse["id"]) > (
-            other["observed_at"],
-            other["id"],
-        )
+        newer = other is None or key(nurse) > key(other)
+        # A device value written after the nurse value replaced it for good, even if the patch
+        # then drops out: the nurse value does not come back.
+        replaced = any(r["absent_reason"] is None and key(r) > key(nurse) for r in others)
         valid = self.run_now - nurse["observed_at"] <= NURSE_VALID
         # sampled_since: the simulator sends a device row only on change, so an unchanged live
         # value keeps an old time. A later sample means the patch is live.
         sampled_since = sample is not None and sample > nurse["observed_at"]
         other_has_value = other is not None and other["absent_reason"] is None
-        if valid and (not other_has_value or (newer and not sampled_since)):
+        if valid and not replaced and (not other_has_value or not sampled_since):
             return nurse
-        if other_has_value:
+        # An older device value counts again only while the patch is sampling: an expired nurse
+        # value never falls back to a still older reading.
+        if other_has_value and (not newer or sampled_since):
             assert other is not None
             return other
         if newer:
@@ -441,7 +455,7 @@ class PostgresStore:
         by_code: dict[str, list[dict[str, Any]]] = defaultdict(list)
         for r in self.conn.execute(
             "SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY code,"
-            " (source = 'nurse' AND absent_reason IS NULL)"
+            " (source = 'nurse'), (absent_reason IS NULL)"
             " ORDER BY observed_at DESC, id DESC) AS n FROM observation"
             " WHERE run_id = %s AND patient_id = %s) AS latest WHERE n = 1",
             (self.run_id, patient_id),
