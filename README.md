@@ -113,6 +113,8 @@ present before the run), and from the oldest bin still kept once the 7-day prune
 earlier ones, so a long stay is baselined on mid-stay data; the response says when the latest reading was
 taken (`latest_at`), where the baseline starts (`baseline_from`) and whether admission is known.
 
+`VITE_ANALYTICS_URL`, when set to a path on the same site (for example `/simulator/#analytics`), adds an Analytics link to the top bar; any other value hides it.
+
 `make check` runs lint, types and tests for both halves; the API tests need the database, so run
 `make db-up` first (each test works in its own copy of a seeded database and drops it). `make db-reset`
 drops every table and seeds again. `make contract` regenerates `frontend/src/types/generated.ts` from the Pydantic
@@ -137,7 +139,8 @@ schemas. Every target is in the [Makefile](Makefile).
   view is recorded in the audit log. An admin lands here and has no ward or station.
 - **Station:** admit a patient, enter lab results, upload a document (extraction is a
   placeholder), or see patient flow: who came and went, length of stay and 14 days of bed use.
-- **Simulation lab:** one link in the top bar of every signed-in page. Research numbers, the pipeline and the research
+  A physician or the charge nurse switches between Ward and Station in the top bar.
+- **Simulation lab:** in the session menu of every signed-in page. Research numbers, the pipeline and the research
   agent's findings, under a label that it is not the ward. The one-address deployment also links the ward
   simulator from there.
   A physician or the charge nurse can ask for a simulated run: the simulator's compare runs two arms from one seed that differ in one change (partly paired in hospital mode), apart from the ward that is running. A lab worker beside the ward runner runs it; the

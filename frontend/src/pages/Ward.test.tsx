@@ -44,7 +44,7 @@ const ward = (): WardResponse => ({
 const session: Session = { clinician_id: "rn-manalo", ward: "W4", role: "charge_rn" };
 const page = () =>
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={["/ward"]}>
       <Ward session={session} onSignOut={() => undefined} />
     </MemoryRouter>,
   );
@@ -62,15 +62,15 @@ afterEach(() => {
 });
 
 const expectLabEntry = () => {
-  expect(screen.getAllByRole("link", { name: "Simulation lab" })).toHaveLength(1);
+  expect(screen.queryByRole("link", { name: "Simulation lab" })).toBeNull(); // in the menu, not the bar
   expect(screen.getAllByText("Simulated patients until a hospital is connected.")).toHaveLength(1);
 };
 
 describe("the simulated note", () => {
-  it("says the patients are simulated, once, with the lab entry in the bar", async () => {
+  it("says the patients are simulated, once, with the current Ward link in the bar", async () => {
     page();
     expect(await screen.findAllByText("Simulated patients until a hospital is connected.")).toHaveLength(1);
-    expect(screen.getByRole("link", { name: "Simulation lab" }).getAttribute("href")).toBe("/lab");
+    expect(screen.getByRole("link", { name: "Ward" }).getAttribute("aria-current")).toBe("page");
   });
 });
 
