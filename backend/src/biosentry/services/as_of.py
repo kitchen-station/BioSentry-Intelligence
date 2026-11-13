@@ -56,7 +56,7 @@ def news2_as_of(
         spo2=device["spo2"],
         spo2_scale=None if scale is None else _SCALES.get(int(scale.num or 0)),
         supplemental_o2=None if o2 is None else bool(o2.num),
-        systolic_bp=None if bp is None else float(int(bp.num or 0)),
+        systolic_bp=None if bp is None or bp.num is None else float(int(bp.num)),
         heart_rate=device["heart_rate"],
         consciousness=None if level is None else Acvpu.__members__.get(level.txt or ""),
         temperature=device["temperature"],

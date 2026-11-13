@@ -587,7 +587,8 @@ class PostgresStore:
         self, windows: Iterable[tuple[str, datetime, datetime]]
     ) -> dict[str, list[StoredObservation]]:
         """For each (patient, from, to) in served time, in ONE statement: every row of the four
-        charted and the four device codes with from <= observed_at <= to, plus, for each charted
+        charted codes and every nurse-typed row of the four device codes with
+        from <= observed_at <= to (a device's own rows are not needed: the bins hold them), plus, for each charted
         code, the newest row before `from` (the as-of rule has no age limit). Per patient, oldest
         first by (observed_at, id). Served by `observation_latest`."""
         wins = sorted(windows)
@@ -603,6 +604,7 @@ class PostgresStore:
             " AS w(patient_id, lo, hi))"
             f" SELECT {cols} FROM w JOIN observation o ON o.run_id = %(run)s"
             " AND o.patient_id = w.patient_id AND o.code = ANY(%(all)s)"
+            " AND (o.code = ANY(%(charted)s) OR o.source = 'nurse')"
             " AND o.observed_at >= w.lo AND o.observed_at <= w.hi"
             f" UNION ALL SELECT {cols} FROM w CROSS JOIN unnest(%(charted)s::text[]) AS c(code)"
             f" CROSS JOIN LATERAL (SELECT {cols} FROM observation o WHERE o.run_id = %(run)s"

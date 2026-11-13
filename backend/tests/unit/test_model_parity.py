@@ -117,4 +117,4 @@ def test_the_gates_on_the_same_stays_use_the_files_baseline_formed() -> None:
                 computed += 1
             if stay["id"] != "synthetic-long":
                 assert not isinstance(got.probability, Computed)  # the toy stays never compute
-    assert computed > 0
+    assert computed == 67  # the bins of the long stay past its gates; the four short stays never compute

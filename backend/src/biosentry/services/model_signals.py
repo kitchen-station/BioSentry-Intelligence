@@ -34,7 +34,7 @@ from biosentry.repositories.postgres import NURSE_VALID, PostgresStore, StoredOb
 from biosentry.schemas import Provenance, ProvenanceSource, QualityLevel, Tier, UnscoredPatient, VitalHistory
 
 from .as_of import news2_as_of
-from .models import FileProvenance, LoadedModels
+from .models import WIRED_VARIANT, FileProvenance, LoadedModels
 from .scoring import BIN, MAX_BINS, counted, grid
 
 T = TypeVar("T")
@@ -51,7 +51,6 @@ FEATURES = "feature out of range"
 STUDENT_ID = "tier_c/student_vitals"
 CHECK_ID = "tier_c/confidence_check"
 POLICY_ID = "tier_b/reward_policy"
-VARIANT = "all"
 
 
 def bin_window(bin_at: datetime) -> tuple[datetime, datetime]:
@@ -157,7 +156,7 @@ def observation_window(prep: Prepared, models: LoadedModels) -> tuple[datetime, 
     """The stored observations the rebuild needs, per patient: from 12 hours before the end of the earliest
     bin of the policy's window to the end of the current bin."""
     p = models.policy.params.p if isinstance(models.policy, Policy) else 1
-    end = prep.at(prep.last)
+    end = bin_window(prep.at(prep.last))[1]
     return end - (p - 1) * BIN - NURSE_VALID, end
 
 
@@ -169,7 +168,7 @@ def _computed(value: T, model_id: str, tier: Tier, file: FileProvenance, prep: P
     # coverage 1.0: the bin has all four device values, or it would not have been scored.
     window = Window((start - prep.start).total_seconds(), (end - prep.start).total_seconds(), 1.0)
     return (Computed(value, provenance, window),
-            ModelProvenance(model_id, VARIANT, file.path, file.sha256, file.run_id, run_id, start, end))
+            ModelProvenance(model_id, WIRED_VARIANT, file.path, file.sha256, file.run_id, run_id, start, end))
 
 
 def signals(
@@ -184,7 +183,7 @@ def signals(
     """The three results at the last stored bin. `rows` are this patient's stored observations from
     `observation_window`."""
     t = prep.last
-    now = news2_as_of(prep.device(t), rows, prep.at(t), earlier=False)
+    now = news2_as_of(prep.device(t), rows, bin_window(prep.at(t))[1], earlier=False)
     assert now is not None  # only an earlier bin can be "not stored"
     if not isinstance(now.result, News2Score):
         return _none(NOT_RANKED)
@@ -236,7 +235,7 @@ def _alerting(
         return NotComputed(IMPOSSIBLE_BASELINE)
     t = prep.last
     ks = range(max(0, t - pol.params.p + 1), t + 1)
-    rebuilt = {k: news2_as_of(prep.device(k), rows, prep.at(k), earlier=True) for k in ks if k < t}
+    rebuilt = {k: news2_as_of(prep.device(k), rows, bin_window(prep.at(k))[1], earlier=True) for k in ks if k < t}
     if any(r is None for r in rebuilt.values()):
         return NotComputed(EARLIER)
     results = {k: r.result for k, r in rebuilt.items() if r is not None} | {t: current}

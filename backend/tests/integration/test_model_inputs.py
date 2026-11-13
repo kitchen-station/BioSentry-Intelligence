@@ -85,6 +85,9 @@ def test_a_run_posted_as_the_simulator_builds_it_stores_temperature_for_the_whol
 def test_the_two_batched_queries_return_what_the_rule_needs_in_one_statement_each(api: Api) -> None:
     pids = ["q-1", "q-2", "q-3"]
     patients = [stay(p, 30 + i, first=15 * (i + 1)) for i, p in enumerate(pids)]
+    # An older run with the same ids, with charted rows inside and just before each window: never read.
+    older = [obs(p, "blood_pressure", m, "nurse", num=90, num2=50) for p in pids for m in (-6, 10, 50, 250)]
+    start(api, patients=[{**stay(p, 5), "observations": [*stay(p, 5)["observations"], *(o for o in older if o["patient_id"] == p)]} for p in pids])
     start(api, patients=patients)
     run_id = api.sql("SELECT max(id) AS i FROM run")[0]["i"]
     later = batch(minute=60, patients=[], bins=[], events=[], observations=[
@@ -107,11 +110,12 @@ def test_the_two_batched_queries_return_what_the_rule_needs_in_one_statement_eac
     counting.sql.clear()
     got = store.observations_between(windows)
     assert len(counting.sql) == 1
-    everything = api.sql("SELECT patient_id, code, observed_at, id FROM observation WHERE run_id = %s", run_id)
+    everything = api.sql("SELECT patient_id, code, source, observed_at, id FROM observation WHERE run_id = %s", run_id)
     codes = {"blood_pressure", "consciousness", "supplemental_o2", "spo2_scale", *VITALS}
     for p, lo, hi in windows:
         lo, hi = lo - store.shift, hi - store.shift
-        mine = [r for r in everything if r["patient_id"] == p and r["code"] in codes]
+        mine = [r for r in everything if r["patient_id"] == p and r["code"] in codes
+                and (r["code"] not in VITALS or r["source"] == "nurse")]  # a device's own rows are not read
         want = {r["id"] for r in mine if lo <= r["observed_at"] <= hi}
         for code in codes - set(VITALS):
             before = [r for r in mine if r["code"] == code and r["observed_at"] < lo]
