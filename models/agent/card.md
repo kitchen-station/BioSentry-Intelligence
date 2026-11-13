@@ -4,7 +4,7 @@
 |---|---|
 | id | `agent` |
 | what it is for | one narrow job for `research/agent/`: pick the next experiment as one JSON tool call, or route a doctor's question to one of three fixed experiments or refuse |
-| status | optional, and off unless two environment values are set. `research/agent/` runs with no model at all (rule planner, keyword matcher). With the values set, the question worker asks the tuned model first and the guard decides; where the guard refuses, the keyword matcher answers as before (`research/README.md`, "Model mode"). Nothing here touches the rank or the arbiter |
+| status | optional, and off unless two environment values are set. `research/agent/` runs with no model at all (rule planner, keyword matcher). With the values set, the keyword matcher answers first, as before. Only where the matcher is silent does the question worker ask the tuned model, and the guard decides (`research/README.md`, "Model mode"). The owner decided on 2026-11-13 to use this mode on the Ask page. It is not running anywhere yet: no weights are on the server. Nothing here touches the rank or the arbiter |
 | storage | now: a private Hugging Face model repository (free), adapter only; prepared, nothing uploaded yet. Final plan: a Huawei Cloud OBS bucket, when a paid account exists. On the server the worker reads read-only local copies, checked by sha256 (`research/agent_tuning/SERVER.md`) |
 | model that was tuned | `Qwen/Qwen2.5-0.5B-Instruct`, Apache-2.0, 0.49 billion parameters. Fallback `Qwen/Qwen3-0.6B`, Apache-2.0, not downloaded |
 | hosted target | `deepseek-v4-flash` on Huawei Cloud MaaS (CN-Hong Kong). Open weights, MIT. Never called: there is no Huawei Cloud account yet |
@@ -101,7 +101,9 @@ How to read it:
   questions, and acts on 2 refusal questions. The matcher alone gives 14 right, 2 wrong and 14
   refused, and acts on the same 2. Both wrong answers and both refusal questions acted on are the
   matcher's. The matcher row in the table is 13, not 14, because the tuning guard refuses one
-  question that the matcher answers right.
+  question that the matcher answers right. The worker now asks the matcher first and the model
+  only where the matcher is silent. That order gives the same counts, because the guard makes the
+  matcher win wherever it answers.
 - Neither model had a wrong experiment run. That is this run, not a property of the guard. On 7
   of the 30 answerable questions the matcher is silent and one wrong choice of experiment would
   pass the guard.

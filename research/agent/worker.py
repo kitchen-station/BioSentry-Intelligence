@@ -57,13 +57,13 @@ def default_opener() -> urllib.request.OpenerDirector:
     return urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect)
 
 
-def read_capped(response, clock, deadline: float) -> bytes:
-    """At most 64 KiB + 1 byte, read in chunks; TimeoutError when the total deadline passes (slow-loris)."""
+def read_capped(response, clock, deadline: float, cap: int = MAX_RESPONSE) -> bytes:
+    """At most `cap` + 1 byte (64 KiB by default), read in chunks; TimeoutError when the total deadline passes (slow-loris)."""
     data = b""
-    while len(data) <= MAX_RESPONSE:
+    while len(data) <= cap:
         if clock() > deadline:
             raise TimeoutError
-        chunk = response.read(min(4096, MAX_RESPONSE + 1 - len(data)))
+        chunk = response.read(min(4096, cap + 1 - len(data)))
         if not chunk:
             break
         data += chunk
@@ -71,13 +71,13 @@ def read_capped(response, clock, deadline: float) -> bytes:
 
 
 def urllib_transport(method: str, url: str, headers: dict, body: bytes, timeout: float,
-                     clock=time.monotonic) -> tuple[int, bytes]:
+                     clock=time.monotonic, cap: int = MAX_RESPONSE) -> tuple[int, bytes]:
     """(status, at most 64 KiB + 1 byte of body). Network errors propagate; the caller never prints them."""
     request = urllib.request.Request(url, data=body, headers=headers, method=method)
     deadline = clock() + TOTAL_TIMEOUT
     try:
         with default_opener().open(request, timeout=timeout) as response:
-            return response.status, read_capped(response, clock, deadline)
+            return response.status, read_capped(response, clock, deadline, cap)
     except urllib.error.HTTPError as e:
         e.close()
         return e.code, b""
@@ -168,6 +168,9 @@ def report_for(cfg: Config, job: dict, commit: str | None, route=None, adapter_s
 
 
 class Worker:
+    KIND = "question"  # the job kind this worker claims
+    MAX_CLAIM = MAX_RESPONSE  # the largest claim response it accepts
+
     def __init__(self, cfg, base, key, commit, transport, sleep, clock, log, route=None, adapter_sha=None):
         self.cfg, self.base, self.commit = cfg, base, commit
         self.route, self.adapter_sha = route, adapter_sha
@@ -191,14 +194,14 @@ class Worker:
 
     def claim(self):
         """('job', dict) | ('idle',) | ('unreachable',) | ('denied',)"""
-        status, data = self._send(f"{self.base}/sim/lab/claim?kind=question", b"", {})
+        status, data = self._send(f"{self.base}/sim/lab/claim?kind={self.KIND}", b"", {})
         if status in (403, 503):
             self._state("denied")
             return ("denied",)
         if status == 204:
             self._state("connected")
             return ("idle",)
-        if status == 200 and len(data) <= MAX_RESPONSE:
+        if status == 200 and len(data) <= self.MAX_CLAIM:
             try:
                 job = json.loads(data.decode("utf-8"))
             except (ValueError, RecursionError):
@@ -223,6 +226,12 @@ class Worker:
             self.sleep(RETRY_WAITS[attempt])
         return False
 
+    def check(self, job: dict) -> str | None:
+        return check_job(job)
+
+    def report(self, job: dict) -> dict:
+        return report_for(self.cfg, job, self.commit, self.route, self.adapter_sha)
+
     def handle(self, job: dict) -> bool:
         """Run one claimed job and report it. False when the job had no usable id."""
         jid = job.get("id")
@@ -235,12 +244,12 @@ class Worker:
         self.handled[jid] = None
         if len(self.handled) > HANDLED_KEEP:
             del self.handled[next(iter(self.handled))]
-        reason = check_job(job)
-        body = {"state": "refused", "reason": reason} if reason else report_for(self.cfg, job, self.commit, self.route, self.adapter_sha)
+        reason = self.check(job)
+        body = {"state": "refused", "reason": reason} if reason else self.report(job)
         state = body["state"] if self.deliver(jid, body) else "report not delivered"
         self.log(f"job {jid}: {state}")
         if reason == R_KIND:  # an API that ignores ?kind=question would hand out compare runs: stop, never claim again
-            raise AgentError("the API gave a job of another kind, so it does not serve ?kind=question; the worker stops")
+            raise AgentError(f"the API gave a job of another kind, so it does not serve ?kind={self.KIND}; the worker stops")
         return True
 
     def loop(self, once: bool = False, max_polls: int | None = None) -> None:

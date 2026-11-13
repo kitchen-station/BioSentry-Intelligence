@@ -10,9 +10,10 @@ from research.agent_tuning import route as route_mod
 from research.agent_tuning import serve, tasks
 from research.agent_tuning.route import Router
 
-Q = "What if we alerted at a NEWS2 total of 5 or more?"
+Q = "Is the personal trend rule quicker than the standard early warning chart?"  # the keyword rules are silent on it
+RULES_Q = "What if we alerted at a NEWS2 total of 5 or more?"  # the keyword rules answer it
 READY = b'{"ready": true}\n'
-GOOD = json.dumps({"template": "news2_threshold", "threshold": 5})
+GOOD = json.dumps({"template": "baseline_vs_news2", "threshold": None})
 SECRET = "ZZSECRET-output"
 
 
@@ -99,7 +100,7 @@ def make(weights, *procs, **kw):
 
 def test_a_passing_answer_is_used(weights):
     r, spawn, log = make(weights, Proc(READY + line(GOOD), hang=True))
-    assert r.route(Q) == ("news2_threshold", 5) and r.adapter_sha256 == weights[1]["adapter"]["files"][
+    assert r.route(Q) == ("baseline_vs_news2", None) and r.adapter_sha256 == weights[1]["adapter"]["files"][
         "adapter_model.safetensors"]
     assert json.loads(spawn.made[0].stdin.sent) == {"id": 1, "messages": tasks.question_example(Q, None)["messages"]}
     r.close()
@@ -114,7 +115,7 @@ def test_the_child_is_reused_for_the_next_question(weights):
 
 @pytest.mark.parametrize("output", [
     '{"template": "news2_threshold", "threshold": 7}',  # a number that is not in the question
-    '{"template": "baseline_vs_news2", "threshold": null}',  # the keyword matcher has another answer
+    '{"template": "news2_threshold", "threshold": null}',  # a threshold experiment with no number
     '{"refuse": true}',
 ])
 def test_an_answer_the_guard_rejects_gives_none_and_the_child_stays(weights, output):
@@ -204,7 +205,7 @@ def test_an_unlisted_file_an_empty_list_and_a_linked_folder_turn_it_off(weights)
 
 def test_noise_before_the_answer_is_ignored(weights):
     r, _, _ = make(weights, Proc(b"loading\n[1, 2]\n" + READY + b"warn\n" + line(GOOD, 1), hang=True))
-    assert r.route(Q) == ("news2_threshold", 5)
+    assert r.route(Q) == ("baseline_vs_news2", None)
     r.close()
 
 
@@ -222,6 +223,11 @@ def test_a_success_resets_the_count(weights):
     r.next_id = 2  # the third child answers id 3, then ends
     assert r.route(Q) and r.failures == 0
     assert r.route(Q) is None and r.failures == 1 and r.on
+
+
+def test_a_question_the_rules_answer_never_waits_for_the_model(weights):
+    r, spawn, log = make(weights, Proc(READY, hang=True))  # a child that would never answer
+    assert r.route(RULES_Q) is None and not spawn.calls and r.failures == 0 and log == []
 
 
 def test_a_refused_question_never_reaches_the_child(weights):
