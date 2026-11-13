@@ -7,7 +7,7 @@
 import { act, cleanup, fireEvent, render, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
-import { Flip, useMoveOnReorder } from "./Flip";
+import { Flip, FLIP_MS, MOVE_MS, useMoveOnReorder } from "./Flip";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -121,6 +121,11 @@ describe("the agreed motion in the CSS", () => {
   it("holds the numbers, the names and the reduced-motion rules", () => {
     expect(tokens).toContain("--flip-ms: 320ms");
     expect(tokens).toContain("--move-ms: 420ms");
+    // The timers in the code are the same numbers as the CSS: neither may drift from the other.
+    expect(tokens).toContain(`--flip-ms: ${FLIP_MS}ms`);
+    expect(tokens).toContain(`--move-ms: ${MOVE_MS}ms`);
+    expect(css).toMatch(/\.flip-old \{[^}]*white-space: nowrap/);
+    expect(css).toMatch(/\.flip \{[^}]*display: inline-block/);
     expect(tokens).toContain("--flip-ease: cubic-bezier(0.2, 0.8, 0.2, 1)");
     expect(css).toContain("perspective: 400px");
     expect(css).toContain("backface-visibility: hidden");
@@ -178,6 +183,14 @@ describe("useMoveOnReorder", () => {
     expect(els.get("a")?.style.transform).toBe("");
     act(() => void vi.advanceTimersByTime(470));
     expect(els.get("a")?.style.transition).toBe("");
+  });
+
+  it("does not move any row when the order is the same and every row shifted (a banner opened above)", () => {
+    const { els, hook } = mount(["a", "b"]);
+    top = { a: 80, b: 130 };
+    hook.rerender({ keys: ["a", "b"] });
+    for (const k of ["a", "b"]) expect(els.get(k)?.style.transform).toBe("");
+    expect(frames).toHaveLength(0);
   });
 
   it("does not move a row that kept its place, nor a new row", () => {

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import styles from "./Flip.module.css";
 
-const FLIP_MS = 320; // the same as --flip-ms in index.css
+export const FLIP_MS = 320; // the same as --flip-ms in index.css: a test holds the two together
 const GAP_MS = 400; // one flip for an element in any 400 ms
-const MOVE_MS = 420; // the same as --move-ms in index.css
+export const MOVE_MS = 420; // the same as --move-ms in index.css
 
 const reduced = () => !!window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
 
@@ -32,8 +32,9 @@ export function Flip({ children, still = false }: { children: ReactNode; still?:
     if (at - lastFlip.current < GAP_MS) return; // inside 400 ms: swap in place, no new flip
     lastFlip.current = at;
     setOld(before);
+    clearTimeout(timer.current);
     timer.current = setTimeout(end, FLIP_MS); // in case animationend never comes
-  });
+  }, [children, still, end]); // children: the text is read from the page after each render that could change it
   useEffect(() => () => clearTimeout(timer.current), []);
 
   return (
@@ -84,6 +85,7 @@ export function useMoveOnReorder(keys: readonly string[]): (key: string) => (el:
       if (same || from === undefined || from === top || reduced()) continue;
       el.style.transition = "none";
       el.style.transform = `translateY(${from - top}px)`;
+      void el.offsetHeight; // the browser must take the old place in before the transition starts
       requestAnimationFrame(() => {
         el.style.transition = "transform var(--move-ms) var(--flip-ease)";
         el.style.transform = "";

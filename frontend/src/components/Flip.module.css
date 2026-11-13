@@ -6,6 +6,7 @@
 }
 
 .flip {
+  display: inline-block; /* a transform does nothing on an inline box */
   backface-visibility: hidden;
   animation: flip-in var(--flip-ms) var(--flip-ease);
 }
@@ -14,6 +15,7 @@
 .flip-old {
   position: absolute;
   inset: 0;
+  white-space: nowrap; /* a long old value must not wrap down over the row below */
   backface-visibility: hidden;
   pointer-events: none;
   animation: flip-out var(--flip-ms) var(--flip-ease) forwards;
