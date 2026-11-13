@@ -7,7 +7,7 @@
 | status | optional and not wired in. `research/agent/` runs with no model at all (rule planner, keyword matcher). Nothing here touches the API, the rank or the arbiter. The tuned adapter is not loaded by any product code |
 | model that was tuned | `Qwen/Qwen2.5-0.5B-Instruct`, Apache-2.0, 0.49 billion parameters. Fallback `Qwen/Qwen3-0.6B`, Apache-2.0, not downloaded |
 | hosted target | `deepseek-v4-flash` on Huawei Cloud MaaS (CN-Hong Kong). Open weights, MIT. Never called: there is no Huawei Cloud account yet |
-| framework | MindSpore 2.7.0 as the backend, through MindNLP 0.5.1. No other framework trained anything |
+| framework | MindSpore 2.7.0 as the backend, through MindNLP (pinned as `mindnlp==0.5.1`; the installed library reports itself as 0.5.0rc2). No other framework trained anything |
 | data | generated from our own rule planner and question frames. No patient data of any kind |
 | code | `research/agent_tuning/` |
 | full record | `training/agent/REGISTRY.md` (every model considered, weights, adapter, data, sources). The run log and the notebook come in the next pull request, with the held-out numbers |

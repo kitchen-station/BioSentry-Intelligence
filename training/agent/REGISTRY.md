@@ -16,21 +16,25 @@ code is `research/agent_tuning/`; the run-log tool's notes are in `training/agen
   distillations) always write their reasoning before the answer and have no switch to turn that
   off, which breaks an answer that must be one JSON object. Its current open model,
   DeepSeek-V4-Flash, has 284 billion parameters and cannot be tuned on a laptop.
-- **Why not Huawei's own open-weight model?** Huawei publishes openPangu-Embedded-1B with open
-  weights. It was considered and not chosen. Its licence is Huawei's own (not Apache or MIT): it
-  allows use, changes and redistribution at no charge, asks for a "Powered by openPangu" notice,
-  forbids use "within the European Union", and does not say whether commercial use is allowed.
-  The model is built for Ascend hardware and its card asks for `trust_remote_code`; MindNLP does
-  not list it, and no laptop CPU run of it was found. The licence was read on 2026-11-13; the
-  model itself was not downloaded or run. openPangu-2.0-Pro and openPangu-2.0-Flash are served on
+- **Why not Huawei's own open-weight model?** openPangu-Embedded-1B is published with open
+  weights in the `ascend-tribe` repository on GitCode, under a licence that names Huawei
+  Technologies Co., Ltd. as the licensor (that the repository is Huawei's official one was not
+  confirmed). It was considered and not chosen. Its licence is Huawei's own (not Apache or MIT):
+  it allows use, changes and redistribution at no charge, asks for a "Powered by openPangu"
+  notice, forbids use "within the European Union", and does not say whether commercial use is
+  allowed. A third-party copy of its card says it is built for Ascend hardware and needs
+  `trust_remote_code` (unverified: the card itself could not be opened). MindNLP does not list
+  it, and no laptop CPU run of it was found. The licence was read on 2026-11-13; the model
+  itself was not downloaded or run. openPangu-2.0-Pro and openPangu-2.0-Flash are served on
   the China site's MaaS only (not on the international list); whether their weights are open was
   not checked.
 - **Fine-tuned here:** `Qwen/Qwen2.5-0.5B-Instruct` (Alibaba Cloud, Apache-2.0, 0.49 billion
   parameters). It is not a reasoning model, it is not gated, it is the smallest strong instruct
   model found, and MindSpore tooling lists its family as supported.
 - **Fallback:** `Qwen/Qwen3-0.6B` (Apache-2.0), with thinking switched off. Not downloaded.
-- **Framework:** MindSpore 2.7.0 as the backend, through MindNLP 0.5.1 (which makes Hugging Face
-  `transformers` and `peft` run on MindSpore operators). No other framework did any training.
+- **Framework:** MindSpore 2.7.0 as the backend, through MindNLP (pinned as `mindnlp==0.5.1`; the installed
+  library reports itself as 0.5.0rc2), which makes Hugging Face `transformers` and `peft` run on
+  MindSpore operators. No other framework did any training.
 
 ## 2. Every open-weight model considered
 
@@ -246,4 +250,3 @@ What "trained with MindSpore" means on the MindNLP route: you write ordinary Hug
 - Any published MindNLP CPU or macOS LoRA run, and whether mindnlp 0.5.1 is pinned to a specific transformers version (requires_dist gives only a lower bound).
 - Whether `import mindnlp` conflicts with a real `torch` installed in the same environment.
 - Competition credits, payment-method requirement for Huawei Cloud trials.
-- All memory and time figures in the compute note are my estimates.

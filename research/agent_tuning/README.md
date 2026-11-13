@@ -1,8 +1,9 @@
 # agent_tuning: making a small open model do only the agent's job
 
 Optional. `research/agent/` runs with no model at all. This folder teaches a small open-weight
-model the two narrow answers the agent can use, and measures it. The model card, with the choice
-of model and the results, is `models/agent/card.md`.
+model the two narrow answers the agent can use, and measures it. The model card is `models/agent/card.md`; the
+choice of model and every source are in `training/agent/REGISTRY.md`. No model score is in the
+repository yet: the held-out evaluation was still running when this was written.
 
 The two tasks (one JSON object is the whole answer):
 
@@ -65,8 +66,9 @@ weights came from and their sha256.
 
 ## Limits
 
-- On a laptop CPU the MindSpore backend is slow: about 12 seconds per question example and about
-  50 seconds per planner example in training, about 3 seconds per generated token. The card says
+- On a laptop CPU the MindSpore backend is slow: in the run that was kept, on a shared laptop, a
+  question step took 22 seconds on average and a planner step 99 seconds; a generated token takes
+  about 3 seconds. The card says
   what was run here and what is left for a ModelArts job.
 - The guard refuses about half of the held-out answerable questions whatever the model says
   (they lack a word it requires, or use one it refuses), and where the keyword matcher answers,
