@@ -84,6 +84,8 @@ admin's own views are in the audit log, and no route shows them to anyone else.
 `BIOSENTRY_DATABASE_URL`, which defaults to the dev database in `compose.yaml` (its password is for
 that local container only).
 
+`npm run export:pipeline -- --date YYYY-MM-DD` (in `frontend/`) writes `frontend/src/data/evaluation/pipeline.json` from `src/data/pipeline.ts`; never edit that file by hand. A test fails when the file does not match a fresh export, and the Analytics page of the ward simulator reads it.
+
 `VITE_API_URL` is read when the dashboard is built or started: set, it talks to the API and carries
 no dataset; unset, it uses the fixture. The API allows the dashboard on `localhost` and `127.0.0.1`,
 ports 5173 and 5174 (the ward sim on 5180 and 5181). The ward sim posts to `/sim/*` with the header
