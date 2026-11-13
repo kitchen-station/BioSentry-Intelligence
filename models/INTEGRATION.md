@@ -486,9 +486,8 @@ A gap resets the run but the bin after it is still scored: with `s >= theta` its
 t - 2 to t without): each must be a stored, scored bin with a formed baseline and `s >= theta`. The product
 computes it from those bins on every read and stores nothing (ruling 5). An earlier bin's scored status is rebuilt
 on read by running `score_news2` on that bin's stored inputs; scores stay unstored. Where it cannot be rebuilt, the
-policy is not computed for that bin (ruling 6). The dashboard session checks first whether earlier bins' NEWS2
-inputs can be rebuilt at all; if they cannot, the policy is NOT shipped as "always not computed": the question goes
-back to the orchestrator first.
+policy is not computed for that bin (ruling 6). Earlier bins are rebuilt as ruling 17 states (section 8.4 (b)); a
+bin scored on a nurse-typed device vital is not rebuilt and the policy is not computed there.
 
 ### 5.3 What `PolicySignal` receives
 
@@ -785,7 +784,7 @@ library (`struct` for the float32 step included), and the baseline is already th
    `biosentry-wiring-golden/1`, written by `python -m research.wiring_fixture`; its reference is the
    `research/README.md` section "Golden fixture for the wiring slice"; question 1 below). It holds research values
    with no product gates, so the backend applies its own gates on top: every toy bin is
-   `NotComputed("baseline forming")` in the backend (the toy stays are at most 14 bins; ruling 10), and on the
+   `NotComputed("baseline forming")` in the backend (the toy stays have at most 14 stored rows; ruling 10), and on the
    94-bin stay every bin from the formed baseline on must match the fixture's features, p, check and policy
    values.
 4. Policy parity: on the same stays, the backend's states against
@@ -1053,8 +1052,8 @@ recorded; a missing or bad model file means not computed, never a default.
     reading is older is NOT RANKED and breaks the policy's run. The product's rule decides what counts as scored;
     the difference from research only removes flags, and the document lists it with the other by-design
     differences.
-    What it means given the code (a fact corrected after the ruling was given; the coordinating session has been
-    told): The 12-hour rule (`NURSE_VALID`, `repositories/postgres.py`, used in `_newest_device_or_nurse`) covers only a
+    What it means given the code (a fact corrected after the ruling was given; the coordinating session was told
+    and accepted this meaning on 2026-11-13: the result for such a bin is not computed, not "NOT RANKED"): The 12-hour rule (`NURSE_VALID`, `repositories/postgres.py`, used in `_newest_device_or_nurse`) covers only a
     nurse-typed DEVICE vital (heart rate, respiratory rate, SpO2, temperature). Blood pressure, consciousness, oxygen
     and the SpO2 scale never expire in the live read: `read` takes the newest stored row by (`observed_at`, `id`) for
     every code that is not a device vital. So: blood pressure, consciousness, oxygen and scale are rebuilt
