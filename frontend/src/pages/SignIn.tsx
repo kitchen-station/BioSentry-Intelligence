@@ -112,9 +112,9 @@ export function SignIn({ onSignIn }: Props) {
       role: profile.sessionRole,
     });
     const back =
-      typeof from === "string" && from.startsWith("/") && from !== "/" && !from.startsWith("//") && !from.includes("\\") &&
+      typeof from === "string" && from.startsWith("/") && from !== "/" && !from.startsWith("//") && !from.includes("\\") && !/\s/.test(from) &&
       (who === undefined || who === profile.id);
-    navigate(back ? from : path);
+    navigate(back ? from : path, { replace: true }); // consumes this entry and the return page it holds
   };
 
   const handlePickDepartment = (dept: Department) => {
@@ -143,14 +143,14 @@ export function SignIn({ onSignIn }: Props) {
           return;
         }
         onSignIn({ clinician_id: adminId, ward: "W4", role });
-        navigate("/overview");
+        navigate("/overview", { replace: true });
         return;
       }
       const role = await signIn(selected!.id, passphrase);
       // The server's role wins over the card's.
       if (role === "admin") {
         onSignIn({ clinician_id: selected!.id, ward: selected!.ward, role });
-        navigate("/overview");
+        navigate("/overview", { replace: true });
         return;
       }
       if (role) setSelected({ ...selected!, sessionRole: role });

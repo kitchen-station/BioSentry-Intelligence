@@ -406,6 +406,20 @@ describe("simulated runs: the timer", () => {
     expect(screen.getByText("Done")).toBeTruthy();
   });
 
+  it("Refresh does not start a read while one is in flight", async () => {
+    let finish: (v: LabRunItem[]) => void = () => {};
+    api.getLabRuns.mockResolvedValueOnce(open).mockReturnValueOnce(new Promise((r) => { finish = r; })).mockResolvedValue(open);
+    await start();
+    await tick(5_000);
+    expect(api.getLabRuns).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(api.getLabRuns).toHaveBeenCalledTimes(2);
+    finish(open);
+    await tick(0);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(api.getLabRuns).toHaveBeenCalledTimes(3);
+  });
+
   it("stops after a failed timed read and shows the error; Refresh starts it again", async () => {
     api.getLabRuns.mockResolvedValueOnce(open).mockRejectedValueOnce(new Error("x")).mockResolvedValue(open);
     await start();

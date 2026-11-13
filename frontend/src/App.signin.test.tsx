@@ -2,7 +2,7 @@
 /** App with the real sign-in page and the real session menu: where the next sign-in lands. */
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Session } from "./types";
 import { SessionMenu } from "./components/SessionMenu";
@@ -67,8 +67,15 @@ const start = (path: string) =>
   render(
     <MemoryRouter initialEntries={[path]}>
       <App />
+      <Back />
     </MemoryRouter>,
   );
+
+// The browser's Back button: a stub inside the router that goes one entry back in its history.
+function Back() {
+  const navigate = useNavigate();
+  return <button type="button" onClick={() => navigate(-1)}>history back</button>;
+}
 
 describe("where a sign-in lands", () => {
   const physician = { clinician_id: "md-santos", ward: "W4", role: "md" };
@@ -128,5 +135,21 @@ describe("where a sign-in lands", () => {
     start("/patient/p-001");
     await nurse(/Nurse de la Cruz/, /Ward Monitor/)();
     expect(await screen.findByText("patient page for rn-delacruz")).toBeTruthy();
+  });
+
+  it("Back never reaches an old sign-in entry that holds the last person's return page", async () => {
+    start("/lab"); // a deep link with no session: sign-in is shown with { from: "/lab" }
+    await click(/^Physician/);
+    await click(/Dr\. Santos/);
+    await click("Continue");
+    await click(/Ward Monitor/);
+    expect(await screen.findByText("lab page for md-santos")).toBeTruthy();
+    await click("history back");
+    expect(screen.queryByText(/sign-in page|Choose destination|I am a/)).toBeNull(); // the sign-in entry is gone
+    await signOut();
+    await click("history back"); // /lab, signed out: replaced by sign-in with no state
+    await click("history back");
+    await nurse(/Nurse de la Cruz/, /Ward Monitor/)();
+    expect(await screen.findByText("ward page for rn-delacruz")).toBeTruthy();
   });
 });

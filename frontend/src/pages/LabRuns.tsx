@@ -200,7 +200,7 @@ export function LabRuns({ role, onSignOut }: { role: SessionRole; onSignOut: () 
           )}
 
           {error && <p role="alert" className={overview.warn}>{error}</p>}
-          <button type="button" className={overview.refresh} onClick={() => void load("The runs could not be read. Try Refresh.")}>
+          <button type="button" className={overview.refresh} onClick={() => { if (!reading.current) void load("The runs could not be read. Try Refresh."); }}>
             Refresh
           </button>
           {runs && runs.length === 0 && <p>No simulated runs yet.</p>}

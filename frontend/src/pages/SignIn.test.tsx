@@ -134,7 +134,7 @@ describe("SignIn", () => {
     expect(screen.getByText("at /ward")).toBeTruthy();
   });
 
-  it.each([["//evil.example"], ["/\\evil.example"]])("ignores a return target that could leave the site (%s)", async (from) => {
+  it.each([["//evil.example"], ["/\\evil.example"], ["/\t/evil.example"], ["/a b"]])("ignores a return target that could leave the site (%s)", async (from) => {
     page(from);
     await click(/Nurse/);
     await click(/Nurse Reyes/);
