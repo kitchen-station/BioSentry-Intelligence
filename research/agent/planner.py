@@ -115,7 +115,8 @@ def open_experiments(state: dict) -> list[Plan]:
         done = by(first)
         if not done:
             out.append(_plan(first))
-        elif done[-1].get("chosen_generation") is not None and done[-1]["id"] not in {r["checked"] for r in by(check)}:
+        elif done[-1].get("chosen_generation") is not None and done[-1]["id"] not in {
+                r["checked"] for r in by(check) if r["ok"]}:  # a check that failed is tried again
             out.append(_plan(check, done[-1]["id"]))
     if not by(E5):
         out.append(_plan(E5))
@@ -166,6 +167,8 @@ def _pick(raw: bytes, opens: list[Plan]) -> Plan:
         content = json.loads(raw)["choices"][0]["message"]["content"]
     except (ValueError, KeyError, IndexError, TypeError, RecursionError):
         raise _Reject("bad_envelope") from None
+    if type(content) is not str:
+        raise _Reject("bad_envelope")
     try:
         answer = json.loads(content)
     except (ValueError, TypeError, RecursionError):
@@ -205,6 +208,8 @@ class ModelPlanner:
                 raw = post(cfg.model_url, headers, body, TIMEOUT)
             except (OSError, ValueError, http.client.HTTPException):  # a timeout is an OSError
                 raise _Reject("http_error") from None
+            if cfg.model_key.encode() in raw:  # never parsed, so no part of it can be stored
+                raise _Reject("echoed_key")
             return replace(_pick(raw, opens), host=host)
         except _Reject as e:
             ledger.add_fallback(cfg, e.code, host, e.shown.replace(cfg.model_key, "***"))

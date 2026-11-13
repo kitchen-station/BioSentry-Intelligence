@@ -87,6 +87,14 @@ def test_the_check_names_the_round_it_checks_and_open_experiments_lists_every_le
     assert all(tools.validate(p.tool, p.args) == p.args for p in opens)  # every open plan is a legal call
 
 
+def test_a_check_that_failed_is_tried_again_and_a_failed_reward_round_is_not():
+    failed_check = rnd("S-0003", "check_policy", ok=False)
+    assert first(rnd("S-0001", "reward_round"), failed_check) == ("check_policy", "R2")
+    assert first(rnd("S-0001", "reward_round"), failed_check, rnd("S-0005", "check_policy")) == (
+        "reward_round_no_temperature", "R3")
+    assert first(rnd("S-0001", "reward_round", ok=False, chosen_generation=None)) == ("reward_round_no_temperature", "R3")
+
+
 def test_the_last_round_with_a_policy_is_the_one_checked():
     checked_first = rnd("S-0002", "check_policy", checked="S-0001")
     state = {"rounds": [rnd("S-0001", "reward_round"), checked_first, rnd("S-0003", "reward_round")]}
@@ -224,6 +232,8 @@ BAD = {
     "wrong_keys_missing": reply(json.dumps({"tool": "sweep_baseline", "args": SWEEP["args"]})),
     "bad_envelope": b'{"choices": []}',
     "bad_envelope_text": b"<html>500</html>",
+    "bad_envelope_object": json.dumps({"choices": [{"message": {"content": SWEEP}}]}).encode(),  # not a string
+    "bad_envelope_null": reply(None),
     "refused_args_seed": reply(json.dumps({**SWEEP, "args": {"dataset": "ward-v2", "seeds": [12]}})),
     "refused_args_dataset": reply(json.dumps({**SWEEP, "args": {"dataset": "../x", "seeds": [1]}})),
     "refused_args_approve": reply(json.dumps({"tool": "approve", "args": {"id": "P-0001"}, "reason": "ok"})),
@@ -263,11 +273,15 @@ def test_the_fallback_reason_codes(tmp_path, monkeypatch):
 
 def test_the_key_is_not_in_the_request_body_nor_in_the_ledger_even_when_the_model_echoes_it(tmp_path, monkeypatch):
     cfg = model_cfg(tmp_path)
-    seen = sent(monkeypatch, reply(f"my key is {KEY}"))
-    plan = ModelPlanner(cfg).next(EMPTY)
-    assert plan.fallback == "not_json" and KEY.encode() not in seen[0][2]
+    for answer in (reply(f"my key is {KEY}"), reply(json.dumps({**SWEEP, "reason": f"key {KEY}"})),
+                   # a refused argument is echoed capped at 40 characters: no part of the key may survive that
+                   reply(json.dumps({**SWEEP, "tool": "x" * 30 + KEY}))):
+        seen = sent(monkeypatch, answer)
+        plan = ModelPlanner(cfg).next(EMPTY)
+        assert plan.fallback == "echoed_key" and plan.experiment == "reward_round"
+        assert KEY.encode() not in seen[0][2]
     text = (cfg.home / "ledger.jsonl").read_text()
-    assert KEY not in text and "***" in text
+    assert KEY not in text and KEY[:8] not in text and text.count("echoed_key") == 3
 
 
 def test_nothing_open_means_no_model_call(tmp_path, monkeypatch):

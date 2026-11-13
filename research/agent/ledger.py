@@ -242,7 +242,7 @@ def propose(cfg: Config, action: str, step_id: str, run_dir_rel: str, no_tempera
     targets = {f["target"] for f in files}
     for r in records:
         if r["type"] == "proposal" and r["action"] == action and status(records, r["id"]) == "proposed" \
-                and {f["target"] for f in r["files"]} == targets:
+                and {f["target"] for f in r["files"]} & targets:
             raise LedgerError(f"{r['id']} already proposes this and is waiting for a person")
     return _append(cfg, "proposal", {"action": action, "step": step_id, "files": files, "evidence": evidence})["id"]
 
@@ -309,7 +309,7 @@ def apply(cfg: Config, proposal_id: str) -> dict:
     # The record of what was written must fit: checked now, not after the copy.
     if (cfg.home / LEDGER).stat().st_size + 512 * (len(plan) + 2) > MAX_FILE:
         raise LedgerError("ledger is full; nothing was written")
-    done = []
+    done, tmp = [], None
     try:
         for f, data, dest, before in sorted(plan, key=lambda p: p[0]["target"].endswith("policy.json")):
             dest.parent.mkdir(parents=True, exist_ok=True)
@@ -319,7 +319,16 @@ def apply(cfg: Config, proposal_id: str) -> dict:
             os.replace(tmp, dest)
             done.append({"target": f["target"], "sha256_before": before, "sha256_after": _sha(dest.read_bytes())})
     except OSError:
-        _append(cfg, "apply_failed", {"proposal": proposal_id, "files": done})
-        raise LedgerError(f"a file could not be written; {len(done)} of {len(plan)} files were written and are "
-                          "recorded as apply_failed; run apply again once the cause is fixed") from None
+        try:
+            if tmp.is_file():
+                tmp.unlink()
+        except OSError:
+            pass
+        wrote = f"a file could not be written; {len(done)} of {len(plan)} files were written"
+        try:
+            _append(cfg, "apply_failed", {"proposal": proposal_id, "files": done})
+        except LedgerError as e:
+            raise LedgerError(f"{wrote} and that could NOT be recorded ({e})") from None
+        raise LedgerError(f"{wrote} and are recorded as apply_failed; run apply again once the cause is "
+                          "fixed") from None
     return _append(cfg, "applied", {"proposal": proposal_id, "files": done})

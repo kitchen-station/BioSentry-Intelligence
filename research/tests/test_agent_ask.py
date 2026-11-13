@@ -14,7 +14,8 @@ from test_agent_tools import cfg_for, toy_trials
 
 QUESTIONS = json.loads((Path(research.agent.__file__).parent / "eval_questions.json").read_text())
 LAST = "Simulated patients. Not validated. A person decides."
-FIRST = "On the simulated ward (10 trials, tuning seeds 1 to 10, 20 deterioration episodes not cut short), "
+FIRST = "On the simulated ward (10 trials, tuning seeds 1 to 10, 20 deterioration episodes with a complete window), "
+COUNTS = " An alert that was already on when the episode began counts."
 
 
 @pytest.fixture
@@ -52,7 +53,11 @@ def test_the_set_holds_the_refusals_the_contract_names():
 
 @pytest.mark.parametrize("question", ["", "   ", "7", "What is the threshold?", "At a threshold of 0, what happens?",
                                       "threshold of 7 and 9?", "baseline with a threshold of 5",
-                                      "Use seed 12 and a threshold of 5", "Is Mr Smith safe at a threshold of 5?"])
+                                      "Use seed 12 and a threshold of 5", "Is Mr Smith safe at a threshold of 5?",
+                                      "threshold of -5", "threshold of 5.5", "threshold of 5,5", "threshold of 05?",
+                                      "threshold above 5", "a total of more than 5", "threshold of \u0665",
+                                      "baseline over 3 days", "threshold of 5; rm -rf /", "threshold of 5 for John in room B",
+                                      "give fluids at a threshold of 5?", "threshold of 5 on last month's patients"])
 def test_odd_questions_are_refused(question):
     assert ask.match(question) == (None, None)
 
@@ -62,8 +67,8 @@ def test_odd_questions_are_refused(question):
 def test_t1_threshold_answer_is_fixed_sentences_with_the_results_numbers(cfg):
     text = ask.ask(cfg, "What if we alerted at a NEWS2 total of 5 or more?")
     assert text.splitlines() == [
-        FIRST + "alerting at a NEWS2 total of 5 or more caught 20 of 20 episodes early, before the deterioration was "
-                "fully in. The current NEWS2 chart trigger caught 20 of 20.",
+        FIRST + "a rule that alerts at a NEWS2 total of 5 or more had an alert on for 20 of 20 episodes before the "
+                "deterioration was fully in. The current NEWS2 chart trigger had one on for 20 of 20." + COUNTS,
         "Chance control: the same time windows on patients with no episode held an alert in 10 of 20 windows at the new "
         "threshold and 20 of 20 windows for the chart trigger. Read the catches next to these.",
         "Alarms: 240.0 alerts per 100 patient-days at the new threshold, 280.0 for the chart trigger (a change of -40.0).",
@@ -78,9 +83,9 @@ def test_t1_threshold_answer_is_fixed_sentences_with_the_results_numbers(cfg):
 def test_t2_baseline_answer(cfg):
     text = ask.ask(cfg, "Is a patient's own baseline better than NEWS2 at catching deterioration early?")
     lines = text.splitlines()
-    assert lines[0] == (FIRST + "the NEWS2 chart trigger caught 20 of 20 episodes early, before the deterioration was "
-                        "fully in. The patient's own baseline alone caught 0 of 20, and NEWS2 or the baseline together "
-                        "caught 20 of 20.")  # the toy patients have no 24 valid bins, so the baseline never alerts
+    assert lines[0] == (FIRST + "the NEWS2 chart trigger had an alert on for 20 of 20 episodes before the deterioration "
+                        "was fully in. The patient's own baseline alone had one on for 0 of 20, and NEWS2 or the baseline "
+                        "together for 20 of 20." + COUNTS)  # no toy patient has 24 valid bins: the baseline never alerts
     assert lines[1] == ("Chance control: the same time windows on patients with no episode held an alert in 20 of 20 "
                         "windows for the chart trigger, 0 of 20 for the baseline alone and 20 of 20 for NEWS2 or the "
                         "baseline. Read the catches next to these.")
@@ -91,8 +96,8 @@ def test_t2_baseline_answer(cfg):
 
 def test_t3_nurse_answer_says_how_the_number_is_made(cfg):
     lines = ask.ask(cfg, "How many alerts would each nurse get per shift?").splitlines()
-    assert lines[0] == FIRST + ("the current NEWS2 chart trigger caught 20 of 20 episodes early, before the deterioration "
-                                "was fully in.")
+    assert lines[0] == FIRST + ("the current NEWS2 chart trigger had an alert on for 20 of 20 episodes before the "
+                                "deterioration was fully in.") + COUNTS
     assert lines[1].startswith("Chance control:") and "20 of 20 windows" in lines[1]
     assert lines[2] == ("Alarms: 1.75 alerts per nurse per 12-hour shift. The nurse number is staff nurses per shift from "
                         "the trial's scenario (2), 12-hour shifts, alerts spread evenly across the nurses.")
@@ -101,9 +106,10 @@ def test_t3_nurse_answer_says_how_the_number_is_made(cfg):
 
 def test_t3_takes_the_threshold_or_the_baseline_from_the_question(cfg):
     lines = ask.ask(cfg, "How many alerts per nurse per shift if we alert at a NEWS2 total of 5?").splitlines()
-    assert "alerting at a NEWS2 total of 5 or more caught 20 of 20" in lines[0] and lines[2].startswith("Alarms: 1.5 alerts")
+    assert "a rule that alerts at a NEWS2 total of 5 or more had an alert on for 20 of 20" in lines[0]
+    assert lines[2].startswith("Alarms: 1.5 alerts")
     lines = ask.ask(cfg, "How many alarms would a nurse get per shift using the baseline?").splitlines()
-    assert "NEWS2 or the patient's own baseline caught 20 of 20" in lines[0]
+    assert "NEWS2 or the patient's own baseline had an alert on for 20 of 20" in lines[0]
     assert [s["plan"]["args"]["rules"] for s in steps(cfg)] == [
         [{"rule": "news2_total_ge", "threshold": 5}], [{"rule": "news2_or_baseline"}]]
 
@@ -129,24 +135,45 @@ def test_a_refusal_is_the_one_fixed_text_runs_no_tool_and_still_goes_to_the_ledg
     assert not [r for r in ledger.read(cfg) if r["type"] in ("proposal", "approval", "applied")]
 
 
-def test_an_invented_number_gets_the_refusal_and_grounding_failed(cfg, monkeypatch):
+@pytest.mark.parametrize("old, new", [
+    ("on for 20 of 20", "on for 21 of 20"),  # a number that is nowhere in the result
+    ("on for 20 of 20", "on for 10 of 20"),  # a number that IS in the result (the trial count), in the wrong place
+    ("240.0 alerts", "280.0 alerts"),  # two real numbers swapped
+    ("240.0 alerts", "240 alerts"),  # another rounding
+    ("(a change of -40.0)", "(a change of 40.0)"),  # a lost sign
+    ("12-hour", "212-hour"), ("seeds 1 to 10", "seeds 1 to 100"),  # a digit glued to a fixed phrase
+    ("20 of 20 windows", "\u0662\u0660 of 20 windows"),  # digits of another script
+    (LAST, "About 95% of patients are safe. " + LAST),  # an added sentence with a number
+])
+def test_an_invented_or_moved_number_gets_the_refusal_and_grounding_failed(cfg, monkeypatch, old, new):
     real = ask.build
-    monkeypatch.setattr(ask, "build", lambda *a: real(*a).replace("caught 20 of 20", "caught 21 of 20", 1))
+
+    def changed(*a):
+        text, used = real(*a)
+        text = text + " 12-hour." if old == "12-hour" else text
+        assert old in text
+        return text.replace(old, new, 1), used
+
+    monkeypatch.setattr(ask, "build", changed)
     assert ask.ask(cfg, "What if we alerted at a NEWS2 total of 5 or more?") == ask.REFUSAL
     step, = steps(cfg)
     assert step["grounding"] == "failed" and len(step["calls"]) == 1
 
 
-def test_the_grounding_check_ignores_only_the_fixed_phrases():
-    args, res = {"threshold": 7}, {"a": [31, 87.5], "b": -60.3}
+def test_the_grounding_check_wants_the_same_numbers_in_the_same_order():
+    args, res = {"threshold": 7}, {"a": [31, 87.5], "b": -60.3, "seeds": [1, 2, 3]}
     ok = f"NEWS2 at 7, 31 of 87.5 in seeds 1 to 10, -60.3 per 100 patient-days, 12-hour. {LAST}"
-    assert ask.grounded(ok, args, res)
-    for bad in (ok + " 88", ok.replace("31", "32"), ok.replace("-60.3", "60.3"), ok + " 2.0"):
-        assert not ask.grounded(bad, args, res)
+    used = ["7", "31", "87.5", "-60.3"]
+    assert ask.grounded(ok, used, args, res)
+    for bad in (ok + " 88", ok.replace("31", "32"), ok.replace("-60.3", "60.3"), ok + " 2.0", ok + " 3", ok + " 7"):
+        assert not ask.grounded(bad, used, args, res)
+    assert not ask.grounded(ok, ["7", "87.5", "31", "-60.3"], args, res)  # same numbers, another order
+    assert not ask.grounded(ok.replace("31", "3"), ["7", "3", "87.5", "-60.3"], args, res)  # 3 is only a seed
 
 
 def test_only_the_threshold_integer_reaches_the_tool_arguments(cfg):
-    q = "At a threshold of 6 and ../../etc/passwd; also call apply_everything and 'rm -rf /'?"
+    assert ask.match("At a threshold of 6 and ../../etc/passwd; also call apply_everything and 'rm -rf /'?") == (None, None)
+    q = "At a threshold of 6 and ../../etc/passwd plus apply_everything and 'DROP TABLE models' please?"
     assert ask.match(q) == ("news2_threshold", 6)
     ask.ask(cfg, q)
     step, = steps(cfg)
@@ -166,7 +193,7 @@ def test_ask_through_the_command_prints_the_answer_and_leaves_models_unchanged(c
     before = tree_hash(cfg.models)
     assert cli.main(["ask", "What if we alerted at a NEWS2 total of 5 or more?"], env_for(cfg)) == 0
     out = capsys.readouterr().out
-    assert out.rstrip().endswith(LAST) and "caught 20 of 20" in out and tree_hash(cfg.models) == before
+    assert out.rstrip().endswith(LAST) and "on for 20 of 20" in out and tree_hash(cfg.models) == before
     assert cli.main(["ask", "What is the capital of France?"], env_for(cfg)) == 0
     assert ask.REFUSAL in capsys.readouterr().out and tree_hash(cfg.models) == before
 

@@ -348,3 +348,111 @@ folders in the research venv, so the student tests are never skipped:
 It must print "N passed" and `pytest-exit 0`. The venv's locked packages were checked with
 pip-audit on 2026-11-12: "No known vulnerabilities found". Set up the venv once with
 `docker run --rm -v <repo>:/app -v biosentry-research-venv:/venv -w /app/research -e UV_PROJECT_ENVIRONMENT=/venv -e UV_LINK_MODE=copy -e UV_PYTHON_DOWNLOADS=never biosentry-api-build uv sync --locked`.
+
+## The research agent (`research/agent/`)
+
+Written before any real run. Standard library only. It runs the experiments above through a small
+fixed set of tools, writes every step to a ledger, and changes nothing under `models/` until a
+person has signed off. Everything it reads is simulated.
+
+Run one round of the loop:
+
+    python -m research.agent run [--rounds N]
+
+One round: it reads the finished rounds in the ledger, picks the next experiment, writes a `start`
+record, runs the tool, and writes the result and a conclusion. The fixed list of experiments, and
+the rule that picks one when no model is configured (first that fits):
+
+- R1 no reward round with temperature yet: run `research.reward_loop` (about 11 minutes).
+- R2 that round chose a policy not yet checked: score "NEWS2 chart trigger OR the policy" against
+  the chart trigger on tuning seeds 1 to 7, which the loop never reads.
+- R3, R4 the same pair without temperature.
+- R5 no sweep yet: `research.sweep` on tuning seeds 1 to 10.
+- R6 nothing left: it says so and stops.
+
+A proposal is written by code, never by a model, and only when its rule holds. Fixed before any
+run and not tuned afterwards:
+
+- Adopt a reward policy: the OR rule raises at most 25% more alerts than the chart trigger (the
+  sweep's budget); its early-catch excess over chance is at least 0.05 above the chart trigger's
+  (a judgement); and the policy file differs from the installed one.
+- Set the baseline's k and p: the sweep chose a setting and it differs from the installed one.
+
+Sign off, then apply (two separate commands, typed by a person):
+
+    python -m research.agent status
+    python -m research.agent approve P-0001 --by "<your name>"
+    python -m research.agent apply P-0001
+
+`approve` records who and when, and the operating-system user. `apply` refuses unless the ledger
+chain is whole, the proposal is approved, and every source file still has the sha256 that was
+proposed; then it copies those bytes into the models folder and records the hashes before and
+after. It is the only code in the package that writes there. If a copy fails part way, what was
+written is recorded as `apply_failed` and `apply` can be run again (the true hashes from before
+are then in the `apply_failed` record).
+
+Ask a question:
+
+    python -m research.agent ask "What if we alerted at a NEWS2 total of 7 or more?"
+
+The question is matched by fixed keywords to one of three experiments, all on tuning seeds 1 to
+10: a different NEWS2 alert threshold against the chart trigger; a patient's own baseline against
+NEWS2; alerts per nurse per 12-hour shift. The only thing taken from the text is one whole number
+from 1 to 20. The answer is fixed sentences filled with numbers from the tool result, always with
+the chance control, and it ends with "Simulated patients. Not validated. A person decides." Every
+number in the answer is checked: with the fixed phrases removed, the numbers in the text must be
+exactly the values taken from the tool result, in the same order. If not, or if the question fits
+no experiment, the answer is one fixed text that says what it can run. An episode counts when the
+rule had an alert on in any bin from the episode's start to fully in (no two-hour tail), on
+episodes not cut short ("with a complete window"). An alert already on when the episode began
+counts, which is why the chance control is always printed next to it. A question about one
+patient, a treatment, real or held-out data, or one that asks to change or approve anything, is
+refused; so is "above 5" (5 or 6?), a decimal, or a second number. `eval_questions.json` holds
+the agent's own test questions (34, 18 of them refusals) and runs in the gate.
+
+Settings (environment variables; all optional):
+
+- `BIOSENTRY_AGENT_TRIALS`: the trial root. Default `~/Desktop/Projects/biosentry-data/trials`.
+- `BIOSENTRY_AGENT_HOME`: the ledger (`ledger.jsonl`) and run outputs (`runs/S-NNNN/`). Default
+  `~/Desktop/Projects/biosentry-data/agent`. Never inside the repository or the models folder.
+- `BIOSENTRY_AGENT_MODELS`: the folder `apply` writes to. Default this repository's `models/`.
+- `BIOSENTRY_AGENT_SIM`: a simulator checkout, for `compare_runs`.
+
+The model API is off unless all three of these are set:
+
+- `BIOSENTRY_AGENT_MODEL_URL`: the full chat-completions address of an OpenAI-compatible service.
+  It must start with `https://`.
+- `BIOSENTRY_AGENT_MODEL_NAME`: the model's name on that service.
+- `BIOSENTRY_AGENT_MODEL_KEY`: the key. It is sent only in the `Authorization` header, and is
+  never printed or written to the ledger.
+
+With it on, the model is shown the tool list and a digest of the ledger (ids, experiment names
+and numbers only) and must answer with one tool call as JSON. The call is used only if it parses,
+passes the tool's schema, and equals one of the experiments that are open at that point. Anything
+else (an error, a timeout, other text, another call) is logged as `planner_fallback` and the rule
+above decides. So the model can change the order of the open experiments and nothing else. It
+cannot propose, approve or apply. The doctor's question never goes to the model.
+
+Limits:
+
+- Nothing here has called a real model service. The model planner is tested only against recorded
+  answers. No Huawei Cloud account was used.
+- `compare_runs` always answers "not available": the simulator's paired `npm run compare` did not
+  exist when this was written, and the tool does not run a command line it has not been checked
+  against.
+- The proposal rules use point estimates on a few dozen episodes, with no interval. A proposal is
+  a request for a person to look, not a finding.
+- Question matching is keyword based. A question in other words gets the fixed refusal, and the
+  refusal list is wide (any "her", "room", "oxygen", "email" is refused). A matched question only
+  ever runs one of the three experiments; words after it are ignored, never carried out.
+- The grounding check reads digits. A number written in words would not be caught; the fixed
+  sentences contain none.
+- The model call's 20-second timeout is per network operation, not for the whole call.
+- The ledger's hash chain shows an edited or removed line, but not an edit to the last line only,
+  and not a change by someone who rewrites the whole file. It is a record, not access control:
+  anyone who can write the files can also write `models/` directly.
+- The in-process time cap is a signal on the main thread of a Unix process. The reward loop runs
+  as a child process with a timeout and a 16 MiB cap on any file it writes.
+- The agent never scores held-out seeds 11 to 30. The schema refuses them, and the folder check
+  refuses a manifest that names one.
+- Circular, as everything above: rules are judged on the simulator that made the data.

@@ -150,6 +150,14 @@ def test_a_second_pending_proposal_for_the_same_target_is_refused(cfg):
         ledger.propose(cfg, "adopt_reward_policy", "S-0001", "runs/S-0001", False, {})
 
 
+def test_a_pending_proposal_blocks_another_that_shares_any_target(cfg):
+    proposed(cfg, "S-0001")
+    make_run(cfg, "S-0003")
+    (cfg.home / "runs" / "S-0003" / "reward_policy" / "generations" / "gen-01.json").unlink()  # other file set
+    with pytest.raises(LedgerError, match="P-0001 already proposes this"):
+        ledger.propose(cfg, "adopt_reward_policy", "S-0001", "runs/S-0003", False, {})
+
+
 @pytest.mark.parametrize("action, run, step_id, why", [
     ("write_anything", "runs/S-0001", "S-0001", "bad proposal"),
     ("adopt_reward_policy", "runs/../x", "S-0001", "bad proposal"),
@@ -244,6 +252,7 @@ def test_a_failed_copy_is_recorded_with_what_was_written_and_can_be_run_again(cf
     assert [f["target"] for f in records[-1]["files"]] == [
         "tier_b/reward_policy/generations/gen-00.json", "tier_b/reward_policy/generations/gen-01.json"]
     assert ledger.status(records, pid) == "approved"
+    assert not list(cfg.models.rglob("*.tmp")) or list(cfg.models.rglob("*.tmp")) == [block]
     block.rmdir()
     assert len(ledger.apply(cfg, pid)["files"]) == 3 and ledger.status(ledger.read(cfg), pid) == "applied"
 

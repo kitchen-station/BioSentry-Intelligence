@@ -258,6 +258,24 @@ def test_a_run_folder_symlinked_out_of_the_agent_home_is_refused(toy, tmp_path):
         call(toy, "evaluate_rules", with_(EVAL, rules=rules))
 
 
+def test_a_policy_file_or_a_runs_folder_that_is_a_symlink_is_refused(toy, tmp_path, monkeypatch):
+    make_run(toy)
+    policy = toy.home / "runs" / "S-0001" / "reward_policy" / "policy.json"
+    policy.rename(tmp_path / "policy.json")
+    policy.symlink_to(tmp_path / "policy.json")
+    rules = [{"rule": "reward_policy", "run": "S-0001", "no_temperature": False}]
+    with pytest.raises(ToolError, match="outside the agent home"):
+        call(toy, "evaluate_rules", with_(EVAL, rules=rules))
+    # a runs folder that points somewhere else (the models folder, say) gets no tool output
+    seen = fake_runner(monkeypatch)
+    (toy.home / "runs").rename(tmp_path / "moved")
+    toy.models.mkdir()
+    (toy.home / "runs").symlink_to(toy.models)
+    with pytest.raises(ToolError, match="inside the agent home"):
+        call(toy, "run_reward_round", ROUND, toy.home / "runs" / "S-0002")
+    assert seen == [] and not list(toy.models.iterdir())
+
+
 def test_a_seed_that_changes_between_the_check_and_the_load_is_refused(toy, monkeypatch):
     real = tools.load_trial
     monkeypatch.setattr(tools, "load_trial", lambda folder: dataclasses.replace(real(folder), seed=12))

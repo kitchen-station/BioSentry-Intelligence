@@ -70,7 +70,7 @@ def _judge_check(cfg: Config, records: list[dict], exp: str, args: dict, r: dict
     parts = [f"alerts {either['alerts']} are {'at most' if ok1 else 'more than'} {budget} times the chart trigger's {chart['alerts']}",
              f"excess over chance {either['excess_over_chance']} is {'at least' if ok2 else 'not at least'} {MARGIN} "
              f"above the chart trigger's {chart['excess_over_chance']}"]
-    new = next((_policy_sha(x) for x in records if x["type"] == "step" and x["id"] == run), None)
+    new = next((_policy_sha(x) for x in records if x["type"] == "step" and x.get("id") == run), None)
     ok3 = False
     try:
         if new is None:

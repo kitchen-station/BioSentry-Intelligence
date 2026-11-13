@@ -236,9 +236,8 @@ def _policies(cfg: Config, rules: list[dict]) -> list[Policy]:
             out.append(alone if kind == "baseline_alone" else either)
         else:
             nt = r["no_temperature"]
-            home = cfg.home.resolve()
-            path = (home / "runs" / r["run"] / "reward_policy" / (reward_loop.NO_TEMP_DIR if nt else "")).resolve()
-            if not path.is_relative_to(home):
+            path = cfg.home.resolve() / "runs" / r["run"] / "reward_policy" / (reward_loop.NO_TEMP_DIR if nt else "")
+            if (path / "policy.json").resolve() != path / "policy.json":  # a symlink anywhere on the way
                 raise ToolError(f"{r['run']}: outside the agent home")
             name = f"reward_{r['run']}{'_no_temp' if nt else ''}"
             alone, either = reward_policy.policies(name, reward_loop.read_policy(path / "policy.json", not nt))
@@ -297,7 +296,9 @@ def evaluate_rules(cfg: Config, dataset: str, seeds: list[int], rules: list[dict
         })
     for r in out[1:]:
         r["vs_first"] = {
-            "extra_alerts_per_100_patient_days": _div(100 * (r["alerts"] - out[0]["alerts"]), pd, 1),
+            # from the two printed values, so a reader's own subtraction gives the same number
+            "extra_alerts_per_100_patient_days": None if pd == 0 else round(
+                r["alerts_per_100_patient_days"] - out[0]["alerts_per_100_patient_days"], 1),
             "extra_caught": r["caught"][0] - out[0]["caught"][0],
         }
     return Evaluation(len(seeds), list(seeds), window, pool.evaluated, pool.uncut, pool.controls,
@@ -477,7 +478,7 @@ def call(cfg: Config, name: str, args: dict, run_dir: Path | None = None) -> tup
     args = validate(name, args)
     extra = {}
     if name in WRITES:
-        runs = (cfg.home / "runs").resolve()
+        runs = cfg.home.resolve() / "runs"  # not resolved itself: a symlinked runs folder is refused
         if run_dir is None or Path(run_dir).resolve().parent != runs or not re.fullmatch(r"S-[0-9]{4}", Path(run_dir).name):
             raise ToolError(f"{name}: the run folder must be runs/S-NNNN inside the agent home")
         extra["run_dir"] = Path(run_dir)
