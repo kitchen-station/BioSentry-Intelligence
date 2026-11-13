@@ -661,6 +661,8 @@ describe("PatientDetail follows the ward's speed", () => {
     await advance(5_100);
     const gone = await screen.findByText(/No longer on your ranked list\. Figures from/);
     expect(summaryBar().contains(gone)).toBe(true);
+    // The server answered, so the line that it cannot be reached is no longer true and must go.
+    expect(screen.queryByText(/Cannot reach the ward server since/)).toBeNull();
   });
 
   it("shows the Cannot reach line in an open drawer's header too", async () => {

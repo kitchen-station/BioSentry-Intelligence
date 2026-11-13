@@ -120,7 +120,10 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
           setFailedSince(null);
           setStaleSince(null);
         } else if (first) setNotFound(true);
-        else setStaleSince(Date.now());
+        else {
+          setFailedSince(null); // the server answered: only the no-longer line is true now
+          setStaleSince(Date.now());
+        }
       }
       return true;
     } catch {
@@ -308,7 +311,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
                 {drawer === "notes" ? `Clinical notes${notes.length > 0 ? ` \u00b7 ${notes.length}` : ""}` : "Vital trends -- last 6 hours"}
               </span>
               {failedSince !== null && (
-                <span role="status">Cannot reach the ward server since {formatClock(failedSince)}.</span>
+                <span>Cannot reach the ward server since {formatClock(failedSince)}.</span>
               )}
               <button type="button" className={styles.overlayClose} onClick={() => setDrawer(null)}>&times;</button>
             </div>
