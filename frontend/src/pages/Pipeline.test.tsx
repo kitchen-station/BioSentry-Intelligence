@@ -48,7 +48,7 @@ describe("pipeline page", () => {
     expect(states()).toEqual(OWN);
     expect(screen.getByText("Reading the ward's tier status.")).toBeTruthy();
     expect(screen.getByText(/Synthetic, not validated/)).toBeTruthy();
-    expect(screen.getByText("Decides what reaches the nurse")).toBeTruthy();
+    expect(screen.getByText("The only part that decides what reaches the nurse.")).toBeTruthy();
   });
 
   it("takes the NEWS2 state from the ward when tier A is live", async () => {
@@ -64,6 +64,18 @@ describe("pipeline page", () => {
     expect(states().slice(1)).toEqual(OWN.slice(1));
   });
 
+  it("ignores the fixture's tier B demo entry: it is not a stage", async () => {
+    show(Promise.resolve({ tier_status: [{ tier: "A", label: "NEWS2", live: true }, { tier: "B", label: "Mechanism axes (demo)", live: false }] }));
+    await screen.findByText(/NEWS2 state from this ward's tier status/);
+    expect(states()).toEqual(OWN);
+  });
+
+  it("treats a ward answer with no tier status as a failed read", async () => {
+    show(Promise.resolve({}));
+    await waitFor(() => expect(screen.getByText(/Ward read failed/)).toBeTruthy());
+    expect(states()).toEqual(OWN);
+  });
+
   it("uses the page's own state when the ward has no tier A entry", async () => {
     show(Promise.resolve({ tier_status: [] }));
     await screen.findByText(/NEWS2 state from this ward's tier status/);
@@ -76,7 +88,7 @@ describe("pipeline page", () => {
     expect(states()).toEqual(OWN);
   });
 
-  it("ignores a ward answer that arrives after the page is gone", async () => {
+  it("does not throw when a ward answer arrives after the page is gone", async () => {
     let resolve!: (v: unknown) => void;
     show(new Promise((r) => (resolve = r)));
     cleanup();
@@ -84,7 +96,7 @@ describe("pipeline page", () => {
     await Promise.resolve();
   });
 
-  it("ignores a ward failure that arrives after the page is gone", async () => {
+  it("does not throw when a ward failure arrives after the page is gone", async () => {
     let reject!: (e: Error) => void;
     show(new Promise((_, r) => (reject = r)));
     cleanup();

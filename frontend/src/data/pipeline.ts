@@ -14,13 +14,13 @@ export interface Stage {
 export const PIPELINE: readonly Stage[] = [
   {
     id: "news2", name: "NEWS2", state: "live in the ranking", tier: "A",
-    text: ["The published RCP 2017 early warning score, from eight bedside readings, with no learned weights.", "It orders the ward list: trigger level first, then the total."],
+    text: ["The published RCP 2017 early warning score: seven bedside observations scored from fixed tables, on the SpO2 scale a clinician has recorded, with no learned weights.", "It orders the ward list: trigger level first, then the total."],
     evidence: "backend/src/biosentry/domain/scoring/tier_a/news2.py, domain/arbiter.py:105-107, models/tier_a/news2/card.md",
   },
   {
     id: "quality", name: "Signal quality check", state: "live in the ranking",
-    text: ["Each device reading carries a quality mark, set by the ward simulator with a fixed rule: a reading held too long turns degraded, then missing.", "A missing or impossible reading is not scored, so the patient is listed NOT RANKED with what to record."],
-    evidence: "sim src/sim/sim.ts:3,316-320, domain/scoring/tier_a/news2.py:150-162,269-298, domain/arbiter.py:184-186",
+    text: ["Each device reading carries a quality mark set by the ward simulator's fixed demo rule, not by BioSentry: a value not refreshed in time turns degraded, then missing.", "BioSentry scores a degraded reading as recorded; a missing or impossible one is not scored, so the patient is listed NOT RANKED with the step to take."],
+    evidence: "sim src/sim/sim.ts:3,316-320, domain/scoring/tier_a/news2.py:154-163,269-298, domain/arbiter.py:184-186",
   },
   {
     id: "baseline", name: "Change from the patient's own baseline", state: "shown, does not change the ranking",
@@ -49,7 +49,7 @@ export const PIPELINE: readonly Stage[] = [
   },
   {
     id: "arbiter", name: "The arbiter", state: "live in the ranking", decides: true,
-    text: ["The only part that decides what reaches the nurse.", "Two rules are live: a NEWS2 trigger escalates the patient, and a missing required reading lists the patient NOT RANKED. Its slots for the model, the findings and the notes accept input and change nothing."],
+    text: ["The only part that decides what reaches the nurse.", "Two rules are live: a NEWS2 trigger escalates the patient, and a missing or impossible required input lists the patient NOT RANKED. Its other slots accept input and change nothing; today nothing is passed to them."],
     evidence: "domain/arbiter.py:1-17,172-195, services/scoring.py:10-12",
   },
 ];

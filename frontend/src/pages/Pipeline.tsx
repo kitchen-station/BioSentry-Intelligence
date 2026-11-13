@@ -27,7 +27,7 @@ export function Pipeline({ session, onSignOut }: Props) {
   useEffect(() => {
     let cancelled = false;
     getWard().then(
-      (w) => !cancelled && setTiers(w.tier_status),
+      (w) => !cancelled && setTiers(Array.isArray(w.tier_status) ? w.tier_status : "failed"),
       () => !cancelled && setTiers("failed"),
     );
     return () => {
@@ -56,15 +56,14 @@ export function Pipeline({ session, onSignOut }: Props) {
         <p className={research.small}>
           {tiers === "loading" ? SOURCE.loading : tiers === "failed" ? SOURCE.failed : SOURCE.ok}
         </p>
-        <ol className={styles.stages}>
+        <ol role="list" className={styles.stages}>
           {PIPELINE.map((s, i) => (
             <li key={s.id} className={`${research.card} ${s.decides ? styles.decides : ""}`}>
               <h2 className={research.heading}>
-                <span className={styles.num}>{i + 1}</span>
+                <span aria-hidden="true" className={styles.num}>{i + 1}</span>
                 {s.name}
               </h2>
               <span className={styles.state}>{stateOf(s.tier, s.state)}</span>
-              {s.decides && <p><strong>Decides what reaches the nurse</strong></p>}
               {s.text.map((t) => <p key={t}>{t}</p>)}
             </li>
           ))}

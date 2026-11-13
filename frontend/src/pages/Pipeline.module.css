@@ -7,7 +7,7 @@
 }
 
 .stages li + li::before {
-  content: "\2193";
+  content: "\2193" / "";
   display: block;
   margin-bottom: var(--sp-3);
   text-align: center;
