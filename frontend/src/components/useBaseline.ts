@@ -12,9 +12,10 @@ const REFRESH_MS = 60_000;
  * open (the age in it is the server's, so only a new answer moves it). A failure, including a
  * failed refetch, or an answer about another patient, is "failed" and never throws. The answer is
  * kept with the id it was asked for, so one that arrives after the page has moved to another
- * patient is never shown.
+ * patient is never shown. A change of `refresh` fetches again at once: the page passes its count of
+ * saves, because a recorded value can change what counts.
  */
-export function useBaseline(id: string | undefined): BaselineState {
+export function useBaseline(id: string | undefined, refresh = 0): BaselineState {
   const [got, setGot] = useState<{ id: string; value: BaselineState }>();
   useEffect(() => {
     if (!id) return;
@@ -29,6 +30,6 @@ export function useBaseline(id: string | undefined): BaselineState {
       current = false;
       clearInterval(timer);
     };
-  }, [id]);
+  }, [id, refresh]);
   return got && got.id === id ? got.value : undefined;
 }

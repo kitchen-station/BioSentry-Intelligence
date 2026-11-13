@@ -24,7 +24,7 @@ export const PIPELINE: readonly Stage[] = [
   },
   {
     id: "baseline", name: "Change from the patient's own baseline", state: "live in the ranking",
-    text: ["Compares heart rate, breathing rate and SpO2 with the patient's own first 24 valid 15-minute bins, six hours of data. Temperature has no stored history, so it has no baseline.", "A change in the worse direction (heart rate or breathing rate up, SpO2 down) lasting 45 minutes or more, while the patch is still sampling, is listed as a reason on the ward row and breaks ties between patients with the same NEWS2 total and no trigger. It never moves a patient past a NEWS2 difference. Live API only."],
+    text: ["Compares heart rate, breathing rate and SpO2 with the patient's own first 24 valid 15-minute bins, six hours of data. Temperature is not compared: the patient read carries no temperature history, so it has no baseline.", "A change in the worse direction (heart rate or breathing rate up, SpO2 down) lasting 45 minutes or more, while the patch is still sampling, is listed as a reason on the ward row and breaks ties between patients with the same NEWS2 total and no trigger. It never moves a patient past a NEWS2 difference. It runs on the ward's own setting (k 2.0, p 3), not the k 4.0, p 8 measured on the Research page. Live API only."],
     evidence: "services/scoring.py (drift), domain/scoring/tier_b/baseline.py (baseline_finding), domain/arbiter.py (Ranked.sort_key), frontend/src/components/BaselinePanel.tsx",
   },
   {

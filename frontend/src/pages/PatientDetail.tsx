@@ -56,7 +56,8 @@ const ROLE_LABEL: Record<SessionRole, string> = { rn: "RN", charge_rn: "Charge R
 export function PatientDetail({ session }: { session: Session }) {
   const role = session.role;
   const { id } = useParams<{ id: string }>();
-  const baseline = useBaseline(id);
+  const [saves, setSaves] = useState(0);
+  const baseline = useBaseline(id, saves);
   const [patient, setPatient] = useState<PatientDetailType | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [now, setNow] = useState(() => new Date());
@@ -101,6 +102,7 @@ export function PatientDetail({ session }: { session: Session }) {
     // A patient who is now NOT RANKED has no patient read: it would 404 and say "not found".
     if (!id) return;
     setRefreshFailed(false);
+    setSaves((n) => n + 1);
     if (recorded.ranked) {
       setUnranked(null);
       getPatient(id).then((p) => p && setPatient(p)).catch(() => setRefreshFailed(true));

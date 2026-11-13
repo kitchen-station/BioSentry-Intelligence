@@ -93,6 +93,9 @@ answers 409 when the ward is not receiving data from a live sim run. `GET /sim/r
 `GET /patients/{id}/baseline` (bearer token, same visibility, 404 and audit as the patient route, action `view_baseline`)
 serves a research finding of how far each device vital sits from the patient's own baseline: derived,
 synthetic, not validated, the same finding the ward uses as a tie-break and a reason; it stores nothing.
+A vital whose live value is not from the patch, or whose patch has not sampled in the last 30 minutes,
+is `unavailable` (`patch_not_live`) and flags nothing. The detector runs on its code defaults (k 2.0,
+p 3), not the k 4.0, p 8 the research sweep chose in `models/tier_b/baseline/params.json`.
 The baseline is the first 24
 valid bins (6 hours) from admission when it is known, from the first stored bin when it is not (every patient
 present before the run), and from the oldest bin still kept once the 7-day prune or the 672-bin cap has dropped

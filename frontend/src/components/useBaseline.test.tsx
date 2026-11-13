@@ -29,6 +29,14 @@ describe("useBaseline", () => {
     expect(api.getBaseline).toHaveBeenCalledWith("p-1");
   });
 
+  it("fetches again at once when the page says a value was saved", async () => {
+    api.getBaseline.mockResolvedValue(found("p-1"));
+    const { rerender } = renderHook(({ saves }) => useBaseline("p-1", saves), { initialProps: { saves: 0 } });
+    await waitFor(() => expect(api.getBaseline).toHaveBeenCalledTimes(1));
+    rerender({ saves: 1 });
+    await waitFor(() => expect(api.getBaseline).toHaveBeenCalledTimes(2));
+  });
+
   it("passes fixture mode's null through", async () => {
     api.getBaseline.mockResolvedValue(null);
     const { result } = renderHook(() => useBaseline("p-1"));

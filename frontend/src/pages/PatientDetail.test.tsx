@@ -360,6 +360,8 @@ describe("PatientDetail", () => {
       page();
       await save(user);
       await waitFor(() => expect(api.getPatient).toHaveBeenCalledTimes(2));
+      // The panel reads again at once: a typed value can change which vital counts.
+      await waitFor(() => expect(api.getBaseline).toHaveBeenCalledTimes(2));
       api.getPatient.mockResolvedValue({ ...base, score: 4, escalation_reasons: [] });
       await user.type(screen.getByLabelText("Heart rate (bpm)"), "120");
       await user.click(screen.getByRole("button", { name: "Record" }));

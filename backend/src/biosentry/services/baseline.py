@@ -28,7 +28,7 @@ from biosentry.schemas.baseline import (
     BaselineVital,
 )
 
-from .scoring import BIN, MAX_BINS, counted, decide, grid, possible  # noqa: F401 (re-exported)
+from .scoring import BIN, MAX_BINS, counted, decide, grid  # noqa: F401 (re-exported)
 from .ward import WardService
 
 ADMISSION_SLACK = timedelta(minutes=30)  # a window starting this close to admission is "at admission"
