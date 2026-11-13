@@ -34,6 +34,10 @@ describe("pipeline data", () => {
     }
   });
 
+  it("marks the research agent as research only, offline", () => {
+    expect(PIPELINE.find((s) => s.id === "agent")!.state).toBe("research only, offline");
+  });
+
   it("has exactly one stage that decides", () => {
     expect(PIPELINE.filter((s) => s.decides)).toHaveLength(1);
   });

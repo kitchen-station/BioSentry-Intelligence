@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import type { Session } from "../types";
 import { SessionMenu } from "../components/SessionMenu";
 import { LEARNED_RULES, RESEARCH_PROVENANCE as P, RESEARCH_RESULTS, RUN_COMPARISON } from "../data/researchResults";
+import { ResearchAgentSection } from "./ResearchAgentSection";
 import styles from "./Research.module.css";
 
 interface Props {
@@ -184,6 +185,8 @@ export function Research({ session, onSignOut }: Props) {
             to rescue a result.
           </p>
         </section>
+
+        <ResearchAgentSection />
 
         <p className={styles.small}>
           Source: evaluation at commit {P.commit}, {P.date}, simulator commit {P.simCommit}, scenario {P.scenario}. {P.trials}. {P.tuning} Student model numbers: commit {P.studentCommit}. Reward-learned policy numbers: commit {P.rewardCommit}. Earlier run: {P.previous}. NEWS2 itself is never

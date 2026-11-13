@@ -43,9 +43,9 @@ export const PIPELINE: readonly Stage[] = [
     evidence: "domain/arbiter.py:80-83,131-145, README Pending",
   },
   {
-    id: "agent", name: "Research agent", state: "planned",
-    text: ["A plain-language explanation of each ranked alert for the nurse or physician.", "Not built. Nothing of it is in this repository."],
-    evidence: "README Pending",
+    id: "agent", name: "Research agent", state: "research only, offline",
+    text: ["Run by hand, offline, on simulated trials: it picks the next experiment from a fixed list and answers three fixed kinds of question in fixed sentences, each with a chance control.", "Every step goes to a ledger, and a person signs off before a proposal changes any file. It is not connected to the API, the rank or the arbiter."],
+    evidence: "research/agent/ (on main since #19), frontend/src/data/research-agent.json",
   },
   {
     id: "arbiter", name: "The arbiter", state: "live in the ranking", decides: true,

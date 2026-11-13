@@ -203,6 +203,12 @@ describe("Research page", () => {
     for (const r of RUN_COMPARISON) for (const s of [r.v1, r.v2]) expect(s.lo <= s.anyAll && s.anyAll <= s.hi, r.id).toBe(true);
   });
 
+  it("has the research agent section under its own heading", () => {
+    show();
+    expect(screen.getByRole("heading", { level: 2, name: "Research agent: questions asked on the simulated ward" })).toBeTruthy();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
   it("makes no API call", () => {
     show();
     for (const fn of Object.values(api)) expect(fn).not.toHaveBeenCalled();
