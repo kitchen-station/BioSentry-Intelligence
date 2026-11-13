@@ -358,7 +358,7 @@ and ward-v2 folders are skipped after reading their manifest; other seeds are re
 - `--lite_rows <dir>` (optional) only writes files: for each exported variant, 20 fixed training rows
   as float32 input files (`row<i>.bin`) and the calibration files the MindSpore Lite `benchmark`
   expects (`row<i>.txt`, MindSpore's p), into `<dir>/<model stem>/`.
-- The Lite conversion is a separate, hand-run step, because research code starts no external program (no subprocess, no shell; it does use Python's own worker processes for feature extraction):
+- The Lite conversion is a separate, hand-run step, because research code starts no external program (no subprocess, no shell; it does use Python's own worker processes for feature extraction; the one exception is the question worker's model mode, which starts one Python child for the model, `research/agent_tuning/route.py`):
 
       sh models/tier_c/student_vitals/convert_lite.sh <unpacked MindSpore Lite 2.11.0 dir> <model dir> <rows dir> | tee lite.txt
 
@@ -989,3 +989,38 @@ It runs in-process, on the main thread, one job at a time. There is no child-pro
 - `the agent stopped with an error`
 
 No exception text, question or answer goes into a log line. A log line is `job <id>: <state>`.
+
+#### Model mode
+
+Off by default. Two more environment values turn it on, and both must be set (one alone: exit 2):
+`BIOSENTRY_AGENT_TUNED_BASE` (the base weights folder) and `BIOSENTRY_AGENT_TUNED_ADAPTER` (the adapter
+folder). The model needs the optional MindSpore environment of `research/agent_tuning/`. When that is another
+Python than the worker's, `BIOSENTRY_AGENT_TUNED_PYTHON` names its interpreter; unset, the worker's own Python
+runs the model. The model's process imports nothing of the agent or the backend.
+
+The model can only pick one of the three fixed experiments, or nothing. The guard in `tasks.guard_question`
+decides: the answer must be exactly a template and the number written in the question. Where the guard
+refuses, the rules answer as before. No answer can change a setting. The guard cannot check that the model
+chose the right experiment. Where the keyword matcher is silent, a wrong pick among the three fixed
+experiments can pass, and the doctor gets an answer about another experiment. The record says
+`agent.ask: "tuned-model"` and the adapter's sha256.
+
+With the mode on, the question text reaches a language model. Prompt injection can at most make the model
+pick another of the three experiments, or refuse. A question that the guard refuses by its own rules never
+reaches the model. The model runs in a child process, one question at a time. Its environment holds no
+`BIOSENTRY_*` value, so it never holds the ingest key; the two folder paths are its arguments.
+
+Loading has 300 s. One answer has 240 s, and that covers the write to the child too, so a child that does
+not read cannot block the worker. A failure kills the child's process group, the rules answer that question,
+and a new child starts for the next. A process that left that group is not reached. A failure is: a timeout, a line over 8192 bytes, an
+answer over 2000 characters, an answer that is not one of the two allowed shapes, or a child that ends.
+After 3 failures in a row the mode is off until the worker restarts. Not a failure: a slow answer in an
+allowed shape. A model that always takes just under 240 s makes every question wait that long.
+
+At start, and again before each start of the model process, the router checks the two folders against
+`research/agent_tuning/weights.json`. Every listed file must be there with the right sha256. A folder may
+hold nothing else but `LICENSE`, `README.md` and `SHA256SUMS.txt`. A file or a weights folder that is a
+link is refused; a link higher in the path is not looked at. On any mismatch the mode turns itself off, the
+log names the listed file, and the rules answer every question. Not caught: a file that is swapped after the
+check and before the model loads it. Mount the folders read-only. The start line says
+`model mode: on` or `model mode: off`.

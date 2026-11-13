@@ -84,3 +84,13 @@ weights came from and their sha256.
   experiment runs.
 - A model that passes the guard can still pick the wrong template for a good question. That runs
   one of the three fixed experiments on simulated tuning trials, nothing else.
+
+## Storage and the server
+
+- `weights.json`: the sha256 of every base-model file and adapter file. The question worker's model mode checks
+  the local copies against it at start.
+- `upload_adapter.py`: `prepare` makes a release folder outside the repository (the adapter, its config with the
+  base model's public name, a sha256 file and a card). `upload` sends that folder to a private Hugging Face model
+  repository. It takes no token: it uses the login the owner makes on the machine. It uploads nothing unless the
+  repository reports itself private. `upload` was never run.
+- `SERVER.md`: what the team server needs to run the tuned model, with the measured memory and time.

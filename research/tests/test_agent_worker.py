@@ -471,3 +471,86 @@ def test_the_command_refuses_with_exit_2_and_one_line(cfg, capsys):
     assert err.startswith("refused: ") and err.count("\n") == 1 and KEY not in err
     assert cli.main(["worker"], env_for(cfg)) == 2
     assert cli.main(["worker", "a", "b"], env_for(cfg)) == 2
+
+
+# --- model mode ---------------------------------------------------------------------------------------------------
+
+SHA = "ab" * 32
+QUIET = "How noisy is the ward for nurses?"
+TUNED = {"BIOSENTRY_AGENT_TUNED_BASE": "/w/base", "BIOSENTRY_AGENT_TUNED_ADAPTER": "/w/adapter"}
+
+
+class FakeRouter:
+    made = []
+    pick, on, boom = ("alerts_per_nurse", None), True, False  # class values: a test sets them with monkeypatch
+
+    def __init__(self, base, adapter, log, python=None):
+        self.args, self.closed, self.adapter_sha256 = (base, adapter, python), False, SHA
+        FakeRouter.made.append(self)
+
+    def route(self, question):
+        if self.boom:
+            raise RuntimeError("secret path /w/base")
+        return self.pick
+
+    def close(self):
+        self.closed = True
+
+
+@pytest.fixture
+def tuned(monkeypatch):
+    import research.agent_tuning.route as route_mod
+    FakeRouter.made = []
+    monkeypatch.setattr(route_mod, "Router", FakeRouter)
+    return {"BIOSENTRY_API_URL": BASE, "BIOSENTRY_INGEST_KEY": KEY, **TUNED}
+
+
+def test_model_mode_uses_the_pick_and_records_the_adapter(cfg, tuned):
+    fake = Fake(job(question=QUIET))
+    lines, _ = go(cfg, fake, env=tuned, max_polls=1)
+    rec = json.loads(json.loads(fake.reports[0][3])["record_json"])
+    assert rec["agent"] == {"ask": "tuned-model", "step": "S-0001", "commit": None, "adapter_sha256": SHA}
+    assert lines[:2] == ["worker started: http://api.test", "model mode: on"]
+    assert FakeRouter.made[0].args == ("/w/base", "/w/adapter", None) and FakeRouter.made[0].closed
+    go(cfg, Fake(job(question=QUIET)), env={**tuned, "BIOSENTRY_AGENT_TUNED_PYTHON": "/env/bin/python"}, max_polls=1)
+    assert FakeRouter.made[1].args == ("/w/base", "/w/adapter", "/env/bin/python")
+
+
+def test_model_mode_with_no_pick_answers_as_the_rules_do(cfg, tuned, monkeypatch):
+    monkeypatch.setattr(FakeRouter, "pick", None)
+    fake = Fake(job())
+    go(cfg, fake, env=tuned, max_polls=1)
+    rec = json.loads(json.loads(fake.reports[0][3])["record_json"])
+    assert rec["agent"] == {"ask": "keywords", "step": "S-0001", "commit": None}
+    fake = Fake(job(question=QUIET))
+    go(cfg, fake, env=tuned, max_polls=1)
+    assert body_of(fake.reports[0]) == {"state": "refused", "reason": "Refused: no template fits this question."}
+
+
+def test_a_router_that_raises_never_fails_a_job_and_is_closed(cfg, tuned, monkeypatch):
+    monkeypatch.setattr(FakeRouter, "boom", True)
+    fake = Fake(job())
+    lines, _ = go(cfg, fake, env=tuned, max_polls=1)
+    assert body_of(fake.reports[0])["state"] == "done" and "secret" not in " ".join(lines)
+    assert FakeRouter.made[0].closed
+
+
+def test_the_router_is_closed_when_the_worker_stops_with_an_error(cfg, tuned):
+    with pytest.raises(AgentError):
+        go(cfg, Fake(job(kind="compare")), env=tuned, max_polls=1)
+    assert FakeRouter.made[0].closed
+
+
+def test_a_router_that_is_off_is_logged_without_a_path(cfg, tuned, monkeypatch):
+    monkeypatch.setattr(FakeRouter, "on", False)
+    lines, _ = go(cfg, Fake(), env=tuned, max_polls=1)
+    assert lines[1] == "model mode: off (the weights check failed)" and "/w/" not in " ".join(lines)
+
+
+@pytest.mark.parametrize("only", list(TUNED))
+def test_one_of_the_two_values_alone_refuses_to_start(cfg, only):
+    env = {"BIOSENTRY_API_URL": BASE, "BIOSENTRY_INGEST_KEY": KEY, only: "/w/x"}
+    fake = Fake()
+    with pytest.raises(AgentError) as e:
+        go(cfg, fake, env=env)
+    assert "TUNED" in str(e.value) and "/w/x" not in str(e.value) and not fake.calls
