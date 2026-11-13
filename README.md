@@ -11,9 +11,10 @@ SpO2 and temperature when there is no patch or the patch gives no reading) and p
 patient on one ranked list, one screen per clinician. So a patient can be ranked with no
 patch. A typed heart rate, respiratory rate, SpO2 or temperature counts for 12 hours (the
 longest gap NEWS2 allows between observation sets; using it for every score is our
-judgement), then the patient is NOT RANKED until it is entered again. The next patch sample
-replaces a typed value. Blood pressure and level of consciousness do not expire. Trend charts
-show patch data only.
+judgement), then the patient is NOT RANKED until it is entered again or the patch reads it
+again. A patch reading of the same vital, new or still current, replaces a typed value. Blood
+pressure, level of consciousness, oxygen and SpO2 scale do not expire. Trend charts show patch
+data only.
 
 **Why.** Ward nurse-to-patient ratios run 1:20 or worse (DOH standard 1:12), and automated
 alerts alone have not cut mortality: the gap is unreliable alerts and too few people to act.

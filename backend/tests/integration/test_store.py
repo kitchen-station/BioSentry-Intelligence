@@ -1068,6 +1068,31 @@ def test_an_absent_device_row_does_not_erase_a_valid_nurse_value(api: Api) -> No
     assert hr_of(api).data.value == 100
 
 
+def test_a_patch_that_samples_other_vitals_does_not_end_a_nurse_value_for_a_lost_one(
+    api: Api,
+) -> None:
+    run_id = start(api)
+    record_hr(api)
+    at(api, 5)  # heart rate is lost, the patch still samples the rest at minute 5
+    gone = obs("s-1", "heart_rate", 5, absent_reason="No usable reading for 5 min")
+    assert api.post(
+        f"/sim/runs/{run_id}/batch", batch(minute=5, observations=[gone])
+    ).status_code == 204
+    assert hr_of(api).data.value == 100
+
+
+def test_an_expired_nurse_value_under_a_newer_device_value_serves_the_device_value(
+    api: Api,
+) -> None:
+    run_id = start(api)
+    record_hr(api)
+    at(api, 5)
+    batch_5 = batch(minute=5, observations=[obs("s-1", "heart_rate", 5, num=125)])
+    assert api.post(f"/sim/runs/{run_id}/batch", batch_5).status_code == 204
+    expire(api)
+    assert hr_of(api).data.value == 125
+
+
 def test_an_expired_nurse_value_does_not_fall_back_to_an_older_device_value(api: Api) -> None:
     start(api)
     record_hr(api)  # newer than the device row at minute -2; the patch does not sample again
