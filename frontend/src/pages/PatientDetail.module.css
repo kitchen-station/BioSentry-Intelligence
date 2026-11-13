@@ -709,3 +709,8 @@
     padding-top: 40px;
   }
 }
+
+.readOnly {
+  margin: 8px 16px;
+  font-size: 0.85rem;
+}

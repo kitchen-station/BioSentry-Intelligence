@@ -357,3 +357,112 @@ describe("simulated runs: the result", () => {
     expect(screen.getAllByText("-")).toHaveLength(7);
   });
 });
+
+describe("simulated runs: the timer", () => {
+  const open = [item({ id: 1 })];
+  const done = [item({ id: 1, state: "done" })];
+  const tick = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
+  const start = async (role: "md" | "admin" = "md") => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    render(<LabRuns role={role} />);
+    await tick(0);
+  };
+  afterEach(() => vi.useRealTimers());
+
+  it("reads again by itself while a run is open, shows Done with no click, then stops", async () => {
+    api.getLabRuns.mockResolvedValueOnce(open).mockResolvedValue(done);
+    await start();
+    expect(screen.getByText("Waiting for the lab worker")).toBeTruthy();
+    await tick(5_000);
+    expect(screen.getByText("Done")).toBeTruthy();
+    expect(api.getLabRuns).toHaveBeenCalledTimes(2);
+    await tick(60_000);
+    expect(api.getLabRuns).toHaveBeenCalledTimes(2);
+  });
+
+  it("starts no timer when no run is open", async () => {
+    api.getLabRuns.mockResolvedValue(done);
+    await start();
+    await tick(60_000);
+    expect(api.getLabRuns).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops when the page unmounts", async () => {
+    api.getLabRuns.mockResolvedValue(open);
+    await start();
+    cleanup();
+    await tick(60_000);
+    expect(api.getLabRuns).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not start a second read while one is in flight", async () => {
+    let finish: (v: LabRunItem[]) => void = () => {};
+    api.getLabRuns.mockResolvedValueOnce(open).mockReturnValueOnce(new Promise((r) => { finish = r; })).mockResolvedValue(done);
+    await start();
+    await tick(15_000);
+    expect(api.getLabRuns).toHaveBeenCalledTimes(2);
+    finish(done);
+    await tick(0);
+    expect(screen.getByText("Done")).toBeTruthy();
+  });
+
+  it("Refresh does not start a read while one is in flight", async () => {
+    let finish: (v: LabRunItem[]) => void = () => {};
+    api.getLabRuns.mockResolvedValueOnce(open).mockReturnValueOnce(new Promise((r) => { finish = r; })).mockResolvedValue(open);
+    await start();
+    await tick(5_000);
+    expect(api.getLabRuns).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(api.getLabRuns).toHaveBeenCalledTimes(2);
+    finish(open);
+    await tick(0);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(api.getLabRuns).toHaveBeenCalledTimes(3);
+  });
+
+  it("stops after a failed timed read and shows the error; Refresh starts it again", async () => {
+    api.getLabRuns.mockResolvedValueOnce(open).mockRejectedValueOnce(new Error("x")).mockResolvedValue(open);
+    await start();
+    await tick(5_000);
+    expect((await screen.findByRole("alert")).textContent).toBe("The runs could not be read. Try Refresh.");
+    expect(screen.queryByText("Waiting for the lab worker")).toBeNull();
+    await tick(60_000);
+    expect(api.getLabRuns).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await tick(0); // the effects that start the timer run when this act ends
+    await tick(5_000);
+    expect(api.getLabRuns).toHaveBeenCalledTimes(4);
+  });
+
+  it("ends the session on a 401 in a timed read, as a manual read does", async () => {
+    api.getLabRuns.mockResolvedValueOnce(open).mockRejectedValue(new MockApiError(401));
+    await start();
+    await tick(5_000);
+    expect(signOut).toHaveBeenCalledTimes(1);
+    await tick(60_000);
+    expect(api.getLabRuns).toHaveBeenCalledTimes(2);
+  });
+
+  it("starts no timer for an admin or in the fixture build", async () => {
+    await start("admin");
+    await tick(60_000);
+    cleanup();
+    api.hasLabRuns = false;
+    await start();
+    await tick(60_000);
+    expect(api.getLabRuns).not.toHaveBeenCalled();
+  });
+
+  it("keeps an open result panel across a timed read", async () => {
+    api.getLabRuns.mockResolvedValue([item({ id: 3, state: "done" }), item({ id: 1 })]);
+    api.getLabRun.mockResolvedValue(detail({ report: {}, report_text: "t" }));
+    await start();
+    fireEvent.click(screen.getByRole("button", { name: "Show result" }));
+    await tick(0);
+    const panel = screen.getByRole("heading", { name: "Result of run 3" });
+    await tick(5_000);
+    expect(api.getLabRuns).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("heading", { name: "Result of run 3" })).toBe(panel);
+    expect(document.activeElement).toBe(panel);
+  });
+});

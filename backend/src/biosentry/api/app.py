@@ -6,7 +6,7 @@ get the same 401, after the same work; five failures for an id within 15 minutes
 anything is hashed; every attempt is audited (ids and outcome, never the passphrase). Missing,
 malformed, unknown or expired credentials get 401 and nothing is served. Identity comes first on
 every route, including for a body that fails validation. Everything else is scoped to the
-caller's patients on the server, on every call, and a patient who does not exist and one who is
+caller's patients (an admin: every patient on the ward, read-only) on the server, on every call, and a patient who does not exist and one who is
 not yours get the same 404. A
 write whose body fails validation leaves a `rejected` audit row (ids only, no values). Responses
 are `Cache-Control: no-store`. The service serves nothing unauthenticated except /healthz and
@@ -37,7 +37,7 @@ from pydantic import BaseModel
 
 from biosentry.core.audit import AuditLog, Clock, Outcome, utc_now
 from biosentry.core.config import Settings, restricted
-from biosentry.db.passphrase import verify
+from biosentry.db.passphrase import Busy, verify
 from biosentry.db.seed import ensure
 from biosentry.repositories.postgres import Conn, PostgresStore, connect
 from biosentry.schemas import (
@@ -84,6 +84,10 @@ from biosentry.services.ward import WardService
 NOT_FOUND = "Not found"
 SIGN_IN_FAILURES = 5  # failed sign-ins for one id within the window, then 429
 SIGN_IN_WINDOW = timedelta(minutes=15)
+# Audit rows cannot be deleted, and these two are written for callers nobody identified. At most one
+# of each per minute (per id for a locked sign-in), so a flood cannot fill the disk. Every request
+# is still refused; only the row is limited.
+ANONYMOUS_ROW_EVERY = timedelta(minutes=1)
 
 # The body-bearing write routes and the action their audit rows carry. A body that fails
 # validation never reaches the handler, so its audit row is written by the validation handler.
@@ -160,7 +164,9 @@ def identify(ctx: Context, authorization: str | None) -> str:
     scheme, _, token = (authorization or "").partition(" ")
     who = ctx.store.clinician_for(token.strip()) if scheme.lower() == "bearer" else None
     if who is None:
-        ctx.audit.append(None, "authenticate", "-", "denied")
+        since = ctx.store.clock() - ANONYMOUS_ROW_EVERY
+        if not ctx.audit.count("authenticate", "-", "denied", since):
+            ctx.audit.append(None, "authenticate", "-", "denied")
         raise HTTPException(
             status_code=401,
             detail="Authentication required",
@@ -277,6 +283,15 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
     async def conflict(_: Request, exc: ingest.ConflictError) -> JSONResponse:
         return JSONResponse(status_code=409, content={"detail": str(exc)})
 
+    @app.exception_handler(Busy)
+    async def busy(_: Request, __: Busy) -> JSONResponse:
+        # Raised inside the sign-in transaction: no audit row, and the thread is free again.
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "Sign-in is busy. Try again."},
+            headers={"Retry-After": "5"},
+        )
+
     @app.exception_handler(RejectedError)
     async def rejected(_: Request, exc: RejectedError) -> JSONResponse:
         return JSONResponse(status_code=422, content={"detail": str(exc)})
@@ -336,7 +351,9 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
                 outcome: Outcome = "limited"  # before any hashing
             else:
                 outcome = "ok" if verify(body.passphrase, stored) else "denied"
-            ctx.audit.append(body.clinician_id if known else None, "sign_in", resource, outcome)
+            since = ctx.store.clock() - ANONYMOUS_ROW_EVERY
+            if outcome != "limited" or not ctx.audit.count("sign_in", resource, "limited", since):
+                ctx.audit.append(body.clinician_id if known else None, "sign_in", resource, outcome)
             token = ctx.store.open_session(body.clinician_id) if outcome == "ok" else None
         if outcome == "limited":  # raised outside the transaction: the audit row must be kept
             raise HTTPException(
@@ -376,8 +393,9 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
 
     @app.get("/wards/{ward}/live", response_model=LiveWard)
     def ward_live(ward: str, ctx: Ctx, who: Who) -> LiveWard:
-        # The sim's whole shared view is for the ward's clinicians. An admin gets its status
-        # keys through the overview and nothing more.
+        # The sim's whole shared view is for the ward's clinicians. An admin reads the ward's
+        # patients through /rows and the patient pages, and gets this view's status keys through
+        # the overview, nothing more.
         if ctx.store.is_admin(who):
             ctx.audit.append(who, "view_live", ward, "denied")
             raise HTTPException(status_code=403, detail="Forbidden")

@@ -5,7 +5,7 @@ import styles from "./SessionMenu.module.css";
 
 interface Props {
   session: Session;
-  onSignOut: () => void;
+  onSignOut: (explicit?: boolean) => void;
 }
 
 const ANALYTICS_PATH = /^\/(?![/\\])[^\s\\]*$/; // same-origin path only: "//x" and "/\x" leave the site
@@ -27,14 +27,9 @@ export function SessionMenu({ session, onSignOut }: Props) {
   return (
     <div className={styles.wrapper}>
       <nav aria-label="Pages" className={styles.nav}>
-        {admin ? (
-          <NavLink to="/overview" className={styles.place}>Overview</NavLink>
-        ) : (
-          <>
-            <NavLink to="/ward" end className={styles.place}>Ward</NavLink>
-            {station && <NavLink to="/station" className={styles.place}>Station</NavLink>}
-          </>
-        )}
+        {admin && <NavLink to="/overview" className={styles.place}>Overview</NavLink>}
+        <NavLink to="/ward" end className={styles.place}>Ward</NavLink>
+        {station && <NavLink to="/station" className={styles.place}>Station</NavLink>}
         {typeof analytics === "string" && ANALYTICS_PATH.test(analytics) && (
           <a href={analytics} target="_blank" rel="noopener noreferrer" className={styles.place}>Analytics</a>
         )}
@@ -60,7 +55,7 @@ export function SessionMenu({ session, onSignOut }: Props) {
             {/* The same switch as the API build in api/index.ts; read here so the lab never reaches the api module. */}
             {import.meta.env.VITE_API_URL && !admin && (
               <p className={styles.notice}>
-                A ward administrator can see which beds you are assigned and counts of your actions from the last 24 hours.
+                A ward administrator can see which beds you are assigned, counts of your actions from the last 24 hours, and every patient's page, including the notes you write.
               </p>
             )}
 
@@ -77,7 +72,7 @@ export function SessionMenu({ session, onSignOut }: Props) {
               className={styles.menuItem}
               onClick={() => {
                 setOpen(false);
-                onSignOut();
+                onSignOut(true);
                 navigate("/");
               }}
             >
