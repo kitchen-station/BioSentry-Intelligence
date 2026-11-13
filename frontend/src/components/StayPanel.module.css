@@ -99,3 +99,5 @@
 .foot {
   margin-top: var(--sp-2);
 }
+
+.episode { fill: none; stroke: var(--label); stroke-width: 1; stroke-dasharray: 1 2; }

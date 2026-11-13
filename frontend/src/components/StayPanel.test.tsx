@@ -433,3 +433,99 @@ describe("text from the server", () => {
     expect(screen.getByText(`Acknowledged by ${bad} at ${clk(T("08:10"))} (NEWS2 9)`)).toBeTruthy();
   });
 });
+
+describe("the simulated episode", () => {
+  const EP = { kind: "respiratory", start: T("11:10"), full: T("11:40"), source: "simulation" } as const;
+  const clock = (iso: string) => formatClock(Date.parse(iso));
+
+  it("labels an alert run inside or outside, and nothing for null, a odd word or a non-alert run", async () => {
+    api.getPatientHistory.mockResolvedValue(
+      hist({
+        simulated_episode: EP,
+        runs: [
+          run({ start: T("08:00"), end: T("08:30"), in_episode: "inside" }),
+          run({ start: T("09:00"), end: T("09:30"), in_episode: "outside" }),
+          run({ start: T("10:00"), end: T("10:30"), in_episode: null }),
+          run({ start: T("10:45"), end: T("11:00"), in_episode: "later" as never }),
+          run({ state: "not_ranked", start: T("11:15"), end: T("11:30"), peak_score: null, peak_level: null, in_episode: "inside", reasons: [] }),
+        ],
+      }),
+    );
+    await open();
+    const high = "NEWS2 at an alert level, up to 9 (high)";
+    expect(lines()).toEqual([
+      `${rng(T("11:15"), T("11:30"))} \u00b7 Not ranked`,
+      `Simulated deterioration (respiratory): began ${clk(EP.start)}, fully in ${clock(EP.full)}`,
+      `${rng(T("10:45"), T("11:00"))} \u00b7 ${high} \u00b7 Total 9 (\u22657): high`,
+      `${rng(T("10:00"), T("10:30"))} \u00b7 ${high} \u00b7 Total 9 (\u22657): high`,
+      `${rng(T("09:00"), T("09:30"))} \u00b7 ${high} \u00b7 began outside the simulated episode \u00b7 Total 9 (\u22657): high`,
+      `${rng(T("08:00"), T("08:30"))} \u00b7 ${high} \u00b7 began inside a simulated episode \u00b7 Total 9 (\u22657): high`,
+    ]);
+  });
+
+  it.each([["tachycardic", "heart rate"], ["hypotensive", "blood pressure"], ["respiratory", "respiratory"]] as const)(
+    "words the %s episode, in time order with the other lines, and says why it is there",
+    async (kind, word) => {
+      api.getPatientHistory.mockResolvedValue(
+        hist({ simulated_episode: { ...EP, kind }, events: [ev({ kind: "bp_charted", at: T("11:00") }), ev({ kind: "bp_charted", at: T("12:00") })] }),
+      );
+      await open();
+      expect(lines()).toEqual([
+        `Blood pressure charted at ${clk(T("12:00"))}`,
+        `Simulated deterioration (${word}): began ${clk(EP.start)}, fully in ${clock(EP.full)}`,
+        `Blood pressure charted at ${clk(T("11:00"))}`,
+      ]);
+      expect(screen.getByText("No alert level in the stored sets.")).toBeTruthy(); // an episode with no alert run
+      expect(screen.getByText("Known only because this is a simulation. A real ward has no such line.")).toBeTruthy();
+    },
+  );
+
+  it("prints both dates when the episode crosses midnight", async () => {
+    const start = new Date(2026, 0, 5, 23, 30).toISOString();
+    const full = new Date(2026, 0, 6, 0, 30).toISOString();
+    api.getPatientHistory.mockResolvedValue(hist({ simulated_episode: { ...EP, start, full } }));
+    await open();
+    expect(lines()[0]).toBe(`Simulated deterioration (respiratory): began ${clk(start)}, fully in ${clk(full)}`);
+    expect(lines()[0]).toMatch(/Jan.*Jan/);
+  });
+
+  it("draws one dotted outline behind the bars, from the start to two hours after full, and extends the strip", async () => {
+    api.getPatientHistory.mockResolvedValue(hist({ simulated_episode: EP, runs: [run({ start: T("08:00"), end: T("09:00") })] }));
+    await open();
+    const svg = document.querySelector("svg")!;
+    const box = svg.querySelector("rect[data-episode]")!;
+    const bar = svg.querySelector("rect[data-kind]")!;
+    expect(box.compareDocumentPosition(bar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(box.getAttribute("class")).toContain("episode");
+    const from = Date.parse(T("08:00"));
+    const to = Date.parse(T("13:40")); // full plus two hours, later than grid_to
+    const { x, w } = place(Date.parse(EP.start), to, from, to);
+    expect(box.getAttribute("x")).toBe(`${x}%`);
+    expect(box.getAttribute("width")).toBe(`${w}%`);
+    expect(screen.getByText(clk(T("13:40")))).toBeTruthy();
+  });
+
+  it("shows nothing about a simulation when both fields are null", async () => {
+    api.getPatientHistory.mockResolvedValue(hist({ runs: [run({})] }));
+    await open();
+    expect(document.body.textContent).not.toMatch(/simulat/i);
+    expect(document.querySelector("rect[data-episode]")).toBeNull();
+  });
+
+  it.each([["a string", "x"], ["an unknown kind", { ...EP, kind: "septic" }], ["a bad time", { ...EP, start: "x" }], ["a bad full time", { ...EP, full: 5 }]])(
+    "an odd episode (%s) gives no line and no span, and says some entries could not be shown",
+    async (_name, simulated_episode) => {
+      api.getPatientHistory.mockResolvedValue(odd({ simulated_episode, runs: [run({})] }));
+      await open();
+      expect(document.body.textContent).not.toMatch(/Simulated|simulation/);
+      expect(document.querySelector("rect[data-episode]")).toBeNull();
+      expect(screen.getByText("Some entries could not be shown.")).toBeTruthy();
+    },
+  );
+
+  it("states no forbidden word", async () => {
+    api.getPatientHistory.mockResolvedValue(hist({ simulated_episode: EP, runs: [run({ in_episode: "inside" })] }));
+    await open();
+    expect(document.body.textContent).not.toMatch(/false alarm|real alert|confirmed|outcome|missed|\btrue\b/i);
+  });
+});
