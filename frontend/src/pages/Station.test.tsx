@@ -148,7 +148,7 @@ describe("Admit patient", () => {
     });
     expect(
       await screen.findByText(
-        "Admitted Garcia, Maria as p-013 -- Bed MW-4B. Status: NOT RANKED (patch not yet applied).",
+        "Admitted Garcia, Maria as p-013 -- Bed MW-4B. Status: NOT RANKED until every NEWS2 input is recorded.",
       ),
     ).toBeTruthy();
     expect(field("Last name").value).toBe(""); // the form is cleared for the next admission
@@ -203,7 +203,7 @@ describe("Enter lab results", () => {
     await open(user);
     const notRanked = screen.getByRole("option", { name: "Reyes, Ana -- Bed MW-4C (p-009)" });
     expect((notRanked as HTMLOptionElement).disabled).toBe(true);
-    expect(notRanked.closest("optgroup")?.label).toBe("Not ranked (lab entry pending patch)");
+    expect(notRanked.closest("optgroup")?.label).toBe("Not ranked (lab entry once ranked)");
     expect(screen.getByText("INR", { selector: "label" })).toBeTruthy(); // no unit, no brackets
     expect(screen.getByText("Troponin (ng/mL)", { selector: "label" })).toBeTruthy();
   });

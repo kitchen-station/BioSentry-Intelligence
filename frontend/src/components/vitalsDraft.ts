@@ -9,12 +9,23 @@
  */
 
 import { ApiError } from "../api/client";
-import { DIASTOLIC_BOUNDS, SYSTOLIC_BOUNDS } from "../api/bounds";
+import {
+  DIASTOLIC_BOUNDS,
+  HEART_RATE_BOUNDS,
+  RESPIRATORY_RATE_BOUNDS,
+  SPO2_BOUNDS,
+  SYSTOLIC_BOUNDS,
+  TEMPERATURE_BOUNDS,
+} from "../api/bounds";
 import type { Acvpu, NurseVitalsInput, VitalsRecorded } from "../types";
 
 // --- The draft: exactly what is in the form, as text and choices ---
 
 export interface VitalsDraft {
+  readonly heartRate: string;
+  readonly respiratoryRate: string;
+  readonly spo2: string;
+  readonly temperature: string;
   readonly systolic: string;
   readonly diastolic: string;
   readonly acvpu: Acvpu | "";
@@ -23,6 +34,10 @@ export interface VitalsDraft {
 }
 
 export const EMPTY_DRAFT: VitalsDraft = {
+  heartRate: "",
+  respiratoryRate: "",
+  spo2: "",
+  temperature: "",
   systolic: "",
   diastolic: "",
   acvpu: "",
@@ -40,6 +55,10 @@ export const ACVPU_CHOICES: readonly { value: Acvpu; label: string }[] = [
 
 export interface DraftProblems {
   readonly form?: string;
+  readonly heartRate?: string;
+  readonly respiratoryRate?: string;
+  readonly spo2?: string;
+  readonly temperature?: string;
   readonly systolic?: string;
   readonly diastolic?: string;
   readonly pair?: string;
@@ -50,11 +69,21 @@ export type Checked =
   | { readonly ok: false; readonly problems: DraftProblems };
 
 const WHOLE_NUMBER = /^\d{1,3}$/;
+const DIGITS = /^\d+$/;
+const ONE_DECIMAL = /^\d+(\.\d)?$/;
 
 /** `trimmed` has had its surrounding spaces removed by the caller, once, in check(). */
 function wholeNumber(trimmed: string): number | null {
   return WHOLE_NUMBER.test(trimmed) ? Number(trimmed) : null;
 }
+
+/** The four patch values: each optional, whole numbers except temperature (one decimal). */
+const PATCH_FIELDS = [
+  { key: "heartRate", name: "Heart rate", bounds: HEART_RATE_BOUNDS, field: "heart_rate" },
+  { key: "respiratoryRate", name: "Respiratory rate", bounds: RESPIRATORY_RATE_BOUNDS, field: "respiratory_rate" },
+  { key: "spo2", name: "SpO2", bounds: SPO2_BOUNDS, field: "spo2" },
+  { key: "temperature", name: "Temperature", bounds: TEMPERATURE_BOUNDS, field: "temperature" },
+] as const;
 
 /** Bounded entry. The server re-checks everything; this keeps an obvious slip off the wire. */
 export function check(draft: VitalsDraft): Checked {
@@ -85,12 +114,26 @@ export function check(draft: VitalsDraft): Checked {
     }
   }
 
+  const patch: Record<string, number> = {};
+  for (const { key, name, bounds, field } of PATCH_FIELDS) {
+    const text = draft[key].trim();
+    if (text === "") continue;
+    const whole = key !== "temperature";
+    const value = (whole ? DIGITS : ONE_DECIMAL).test(text) ? Number(text) : null;
+    if (value === null) problems[key] = `${name}: ${whole ? "whole numbers only." : "one decimal place at most."}`;
+    else if (value < bounds.min || value > bounds.max) {
+      problems[key] = `${name} must be ${bounds.min} to ${bounds.max}.`;
+    } else patch[field] = value;
+  }
+
   const nothing =
+    PATCH_FIELDS.every(({ key }) => draft[key].trim() === "") &&
     !hasPressure && draft.acvpu === "" && draft.oxygen === "" && draft.spo2Scale === "";
   if (nothing) problems.form = "Record at least one value.";
   if (Object.keys(problems).length > 0) return { ok: false, problems };
 
   const input: NurseVitalsInput = {
+    ...patch,
     ...(pressure !== null ? pressure : {}),
     ...(draft.acvpu !== "" ? { acvpu: draft.acvpu } : {}),
     ...(draft.oxygen !== "" ? { on_oxygen: draft.oxygen === "oxygen" } : {}),
@@ -104,6 +147,12 @@ export function check(draft: VitalsDraft): Checked {
 /** One line per value that will be recorded. A blank field has no line: it stays as it is. */
 export function echoLines(input: NurseVitalsInput): string[] {
   const lines: string[] = [];
+  if (typeof input.heart_rate === "number") lines.push(`Heart rate ${input.heart_rate} bpm`);
+  if (typeof input.respiratory_rate === "number") {
+    lines.push(`Respiratory rate ${input.respiratory_rate} /min`);
+  }
+  if (typeof input.spo2 === "number") lines.push(`SpO2 ${input.spo2}%`);
+  if (typeof input.temperature === "number") lines.push(`Temperature ${input.temperature} °C`);
   if (typeof input.systolic === "number" && typeof input.diastolic === "number") {
     lines.push(`Blood pressure ${input.systolic}/${input.diastolic} mmHg`);
   }

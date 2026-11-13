@@ -378,6 +378,10 @@ _BUILDERS: dict[type[BaseModel], Any] = {
     NurseVitalsInput: lambda: {"systolic": 120, "diastolic": 80},
     VitalsRecorded: lambda: {
         "patient_id": "p-004",
+        "heart_rate": None,
+        "respiratory_rate": None,
+        "spo2": None,
+        "temperature": None,
         "blood_pressure": measurement(present({"systolic": 120, "diastolic": 80})),
         "consciousness": None,
         "supplemental_o2": None,

@@ -34,8 +34,8 @@ class ScoreRow(Contract):
     tier_c: TierCData | None
     escalation_reasons: list[EscalationReason]
     synthetic: Flag
-    signal_quality: Percent
-    last_update_s: NonNegNum
+    signal_quality: Percent | None  # null when none is stored (served as stored, never invented)
+    last_update_s: NonNegNum | None
 
 
 class AbstainedRow(Contract):

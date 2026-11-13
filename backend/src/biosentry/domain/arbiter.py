@@ -47,8 +47,8 @@ _DEVICE = {
     "heart_rate": "Heart rate",
     "temperature": "Temperature",
 }
-_DEVICE_INSTRUCTION = "Check the patch is applied and the signal is verified"
-_NO_DEVICE_INSTRUCTION = "Apply the patch and verify the signal"
+_DEVICE_INSTRUCTION = "Check the patch is applied and the signal is verified, or enter the observations"
+_NO_DEVICE_INSTRUCTION = "Apply the patch and verify the signal, or enter the observations"
 
 
 # --- Typed hooks for rules 2-4 and the local guarantees: accepted, ignored in v1 ----------

@@ -98,6 +98,7 @@
 .summaryBlock[data-band="low-medium"] .responseText { color: var(--alert); }
 .summaryBlock[data-kind="response"] { max-width: 240px; }
 .summaryBlock[data-signal="good"] .summaryBig { color: var(--ok); }
+.summaryBlock[data-signal="none"] .summaryBig { font-size: 13px; }
 .summaryBlock[data-signal="degraded"] { background: var(--alert-tint); }
 .summaryBlock[data-signal="degraded"] .summaryBig { color: var(--alert); }
 

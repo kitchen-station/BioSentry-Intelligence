@@ -1,6 +1,13 @@
 import { useState } from "react";
 import { recordVitals } from "../api";
-import { DIASTOLIC_BOUNDS, SYSTOLIC_BOUNDS } from "../api/bounds";
+import {
+  DIASTOLIC_BOUNDS,
+  HEART_RATE_BOUNDS,
+  RESPIRATORY_RATE_BOUNDS,
+  SPO2_BOUNDS,
+  SYSTOLIC_BOUNDS,
+  TEMPERATURE_BOUNDS,
+} from "../api/bounds";
 import type { VitalsRecorded } from "../types";
 import {
   ACVPU_CHOICES,
@@ -12,6 +19,13 @@ import {
   submitDraft,
 } from "./vitalsDraft";
 import styles from "./VitalsEntry.module.css";
+
+const PATCH_INPUTS = [
+  { key: "heartRate", label: "Heart rate (bpm)", bounds: HEART_RATE_BOUNDS },
+  { key: "respiratoryRate", label: "Respiratory rate (/min)", bounds: RESPIRATORY_RATE_BOUNDS },
+  { key: "spo2", label: "SpO2 (%)", bounds: SPO2_BOUNDS },
+  { key: "temperature", label: "Temperature (°C)", bounds: TEMPERATURE_BOUNDS },
+] as const;
 
 // --- Presentation: everything the form shows is a function of its props ---
 
@@ -48,8 +62,38 @@ export function VitalsEntryForm(props: VitalsEntryFormProps) {
       <p className={styles.title}>Record vitals</p>
       <p className={styles.sub}>
         Enter what you measured. A field left as &ldquo;Not recorded&rdquo; stays as it is; nothing
-        is filled in for you.
+        is filled in for you. The first four values are for when there is no patch, or the patch
+        gives no reading. Each of those four counts for 12 hours, or until the patch gives a reading
+        for it again.
       </p>
+
+      <fieldset className={styles.group} disabled={busy}>
+        <legend className={styles.legend}>Patch values, if measured by hand</legend>
+        <div className={`${styles.pair} ${styles.wrap}`}>
+          {PATCH_INPUTS.map(({ key, label, bounds }) => (
+            <label key={key} className={styles.field}>
+              <span className={styles.fieldLabel}>{label}</span>
+              <input
+                className={styles.input}
+                inputMode={key === "temperature" ? "decimal" : "numeric"}
+                autoComplete="off"
+                placeholder={`${bounds.min}-${bounds.max}`}
+                value={draft[key]}
+                aria-invalid={problems[key] !== undefined}
+                onChange={(e) => onChange({ ...draft, [key]: e.target.value })}
+              />
+            </label>
+          ))}
+        </div>
+        {PATCH_INPUTS.map(
+          ({ key }) =>
+            problems[key] !== undefined && (
+              <p key={key} className={styles.problem}>
+                {problems[key]}
+              </p>
+            ),
+        )}
+      </fieldset>
 
       <fieldset className={styles.group} disabled={busy}>
         <legend className={styles.legend}>Blood pressure (mmHg)</legend>

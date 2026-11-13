@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 import type { Vitals } from "../types";
 import styles from "../pages/PatientDetail.module.css";
-import { formatBloodPressure, formatOxygen, formatSpo2Scale } from "./format";
+import { enteredByNurse, formatBloodPressure, formatOxygen, formatSpo2Scale } from "./format";
 import { MeasurementDisplay, type MeasurementProps } from "./MeasurementDisplay";
 import { news2Points, type Points } from "./news2";
 
@@ -25,6 +25,11 @@ function Row<T>({
           unit={unit}
           format={format as (value: T) => string}
         />
+        {measurement.data.present && measurement.provenance.source === "nurse" && (
+          <span className={styles.vitalLabel}>
+            {" "}{enteredByNurse(Date.parse(measurement.provenance.observed_at))}
+          </span>
+        )}
       </span>
       {points !== undefined && points > 0 && (
         <span className={styles.vitalPoints} title="NEWS2 points for this parameter">

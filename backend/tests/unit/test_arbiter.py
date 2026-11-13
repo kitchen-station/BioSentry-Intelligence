@@ -119,13 +119,13 @@ def test_missing_blood_pressure_is_not_ranked_and_says_what_to_do() -> None:
 def test_no_device_data_asks_for_the_patch() -> None:
     decision = not_ranked(respiratory_rate=None, spo2=None, heart_rate=None, temperature=None)
     assert decision.reason == "No device data"
-    assert decision.instruction == "Apply the patch and verify the signal"
+    assert decision.instruction == "Apply the patch and verify the signal, or enter the observations"
 
 
 def test_some_device_inputs_missing_names_them() -> None:
     decision = not_ranked(spo2=None, temperature=None)
     assert decision.reason == "SpO2 missing, Temperature missing"
-    assert decision.instruction == "Check the patch is applied and the signal is verified"
+    assert decision.instruction == "Check the patch is applied and the signal is verified, or enter the observations"
 
 
 def test_nurse_and_device_problems_combine_in_one_reason() -> None:
@@ -134,7 +134,7 @@ def test_nurse_and_device_problems_combine_in_one_reason() -> None:
         "Heart rate missing, Level of consciousness missing, SpO2 scale missing"
     )
     assert decision.instruction.split("; ") == [
-        "Check the patch is applied and the signal is verified",
+        "Check the patch is applied and the signal is verified, or enter the observations",
         "Record ACVPU",
         "Record the SpO2 scale (a clinician's decision)",
     ]

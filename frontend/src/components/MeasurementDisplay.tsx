@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import type { Measurement } from "../types";
+import { enteredByNurse } from "./format";
 
 type Primitive = string | number | boolean;
 
@@ -33,7 +34,14 @@ function Display<T>({
     : primitiveText(measurement.data.value);
 
   return (
-    <span className={isNurse ? "nurse-entered" : undefined}>
+    <span
+      className={isNurse ? "nurse-entered" : undefined}
+      title={
+        isNurse
+          ? enteredByNurse(Date.parse(measurement.provenance.observed_at))
+          : undefined
+      }
+    >
       {formatted}
       {unit && <span className="unit"> {unit}</span>}
       {isNurse && <sup className="prov-tag">N</sup>}

@@ -29,6 +29,12 @@ from .ward import WardService
 # zero-fill guard), so it is always rejected.
 SYSTOLIC_RANGE = (20, 300)
 DIASTOLIC_RANGE = (10, 200)
+# judgement: the same physical, not clinical, bounds for the device vitals a nurse types in when
+# there is no patch. The floor is low so RR 4 or SpO2 70 can be recorded; zero is always refused.
+HEART_RATE_RANGE = (1, 300)
+RESPIRATORY_RATE_RANGE = (1, 100)
+SPO2_RANGE = (1, 100)
+TEMPERATURE_RANGE = (20.0, 45.0)
 
 
 class RejectedError(ValueError):
@@ -37,6 +43,12 @@ class RejectedError(ValueError):
 
 class ConflictError(Exception):
     """The ward's state refuses this write (409). Nothing was written."""
+
+
+def check_number(name: str, value: float, bounds: tuple[float, float]) -> None:
+    low, high = bounds
+    if not low <= value <= high:
+        raise RejectedError(f"{name} {value} is outside {low}-{high}")
 
 
 def check_blood_pressure(systolic: int, diastolic: int) -> BloodPressure:
@@ -133,7 +145,7 @@ class PatientService:
     # --- admission -------------------------------------------------------------------------
 
     def admit(self, clinician_id: str, form: AdmitPatientInput) -> AbstainedRow:
-        """Admit a patient: NOT RANKED until a patch is applied and the signal is verified.
+        """Admit a patient: NOT RANKED until every NEWS2 input is recorded, by a patch or a nurse.
 
         Kept: name, age, sex, bed, admitting context, and the nurse-entered blood pressure
         (split once, structured) and ACVPU. Accepted but NOT stored in this build: date of
@@ -165,7 +177,7 @@ class PatientService:
                         "sex": form.sex.value,
                         "bed": form.bed,
                         "admitting_context": form.admitting_context,
-                        "mechanism": "Admitted; not ranked until a patch is applied and every input is recorded.",
+                        "mechanism": "Sorted on NEWS2 (Tier A) once every input is recorded, by a patch or a nurse.",
                         "supporting": "",
                         "trend": "insufficient",
                         "admission": {"admitted_at": iso(now), "admitted_by": clinician_id},
@@ -230,19 +242,34 @@ class PatientService:
         """
         if not self._visible(clinician_id, patient_id, "record_vitals"):
             return None
+        device = {
+            "heart_rate": (body.heart_rate, HEART_RATE_RANGE),
+            "respiratory_rate": (body.respiratory_rate, RESPIRATORY_RATE_RANGE),
+            "spo2": (body.spo2, SPO2_RANGE),
+            "temperature": (body.temperature, TEMPERATURE_RANGE),
+        }
         try:
             bp = (
                 check_blood_pressure(body.systolic, body.diastolic)
                 if body.systolic is not None and body.diastolic is not None
                 else None
             )
+            for name, (value, bounds) in device.items():
+                if value is not None:
+                    check_number(name, value, bounds)
+            if body.temperature is not None and round(body.temperature, 1) != body.temperature:
+                raise RejectedError("temperature takes one decimal place")
         except RejectedError:
             self._audit.append(clinician_id, "record_vitals", patient_id, "rejected")
             raise
 
         now = self._store.run_now
 
-        obs: dict[str, Obs] = {}
+        obs: dict[str, Obs] = {
+            name: Obs(patient_id, name, now, "nurse", num=float(value))
+            for name, (value, _) in device.items()
+            if value is not None
+        }
         if bp is not None:
             obs["blood_pressure"] = Obs(
                 patient_id, "blood_pressure", now, "nurse", num=bp.systolic, num2=bp.diastolic
@@ -273,7 +300,13 @@ class PatientService:
         assert state is not None
         echo = {
             code: getattr(state.vitals, code) if code in obs else None
-            for code in ("blood_pressure", "consciousness", "supplemental_o2", "spo2_scale")
+            for code in (
+                *DEVICE_VITALS,
+                "blood_pressure",
+                "consciousness",
+                "supplemental_o2",
+                "spo2_scale",
+            )
         }
         ranked, abstained = self._wards.compute(self._store.assigned(clinician_id))
         row = next((r for r in ranked if r.id == patient_id), None)

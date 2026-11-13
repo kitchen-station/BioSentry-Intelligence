@@ -20,6 +20,8 @@ const api = vi.hoisted(() => ({
   getNotes: vi.fn(),
   getBaseline: vi.fn(),
   addNote: vi.fn(),
+  canRecordVitals: false,
+  recordVitals: vi.fn(),
 }));
 vi.mock("../api", () => api);
 
@@ -300,6 +302,7 @@ describe("PatientDetail", () => {
     for (const label of ["Heart rate", "Respiratory rate", "SpO2"]) {
       expect(within(panel).getAllByText(label).length).toBeGreaterThan(0);
     }
+    expect(within(panel).getByText("Charts show patch data only. Values entered by a nurse are not plotted.")).toBeTruthy();
     await user.click(charts); // same button again closes it
     expect(screen.queryByText("Vital trends -- last 6 hours")).toBeNull();
 
@@ -311,5 +314,104 @@ describe("PatientDetail", () => {
     const backdrop = container.querySelector('[class*="overlayBackdrop"]') as HTMLElement;
     await user.click(backdrop);
     expect(screen.queryByPlaceholderText("Add a clinical note...")).toBeNull();
+  });
+
+  it("says there is no patch signal, and who entered the values, when the row has none", async () => {
+    const hr = base.vitals.heart_rate;
+    api.getPatient.mockResolvedValue({
+      ...base,
+      signal_quality: null,
+      last_update_s: null,
+      vitals: { ...base.vitals, heart_rate: { ...hr, provenance: { ...hr.provenance, source: "nurse", observed_at: "2026-09-03T06:45:00Z" } } },
+    });
+    page();
+    await loaded();
+    expect(screen.getByText("No patch signal")).toBeTruthy();
+    expect(screen.getByText("No patch").closest("[data-signal]")?.getAttribute("data-signal")).toBe("none");
+    expect(screen.getAllByText(/^Entered by a nurse at /).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Signal \d+%/)).toBeNull();
+  });
+
+  it("offers no vitals form when the build cannot record", async () => {
+    page();
+    await loaded();
+    expect(screen.queryByRole("button", { name: "Record vitals" })).toBeNull();
+  });
+
+  describe("recording vitals from the page", () => {
+    const recorded = (ranked: boolean) => ({
+      patient_id: "p-001", blood_pressure: null, consciousness: null, supplemental_o2: null, spo2_scale: null,
+      heart_rate: null, respiratory_rate: null, spo2: null, temperature: null,
+      ranked, rank: ranked ? 1 : null, score: ranked ? 9 : null,
+      not_ranked_reason: ranked ? null : "No device data", not_ranked_instruction: ranked ? null : "Apply the patch",
+    });
+    const save = async (user: ReturnType<typeof userEvent.setup>) => {
+      await loaded();
+      await user.click(screen.getByRole("button", { name: "Record vitals" }));
+      await user.type(screen.getByLabelText("Heart rate (bpm)"), "118");
+      await user.click(screen.getByRole("button", { name: "Record" }));
+    };
+    beforeEach(() => { api.canRecordVitals = true; });
+    afterEach(() => { api.canRecordVitals = false; });
+
+    it("reads the patient again when the result is ranked", async () => {
+      const user = userEvent.setup();
+      api.recordVitals.mockResolvedValue(recorded(true));
+      page();
+      await save(user);
+      await waitFor(() => expect(api.getPatient).toHaveBeenCalledTimes(2));
+      api.getPatient.mockResolvedValue({ ...base, score: 4, escalation_reasons: [] });
+      await user.type(screen.getByLabelText("Heart rate (bpm)"), "120");
+      await user.click(screen.getByRole("button", { name: "Record" }));
+      await waitFor(() => expect(api.getPatient).toHaveBeenCalledTimes(3));
+      expect(await screen.findByText("Sorted on NEWS2 only")).toBeTruthy();
+      expect(screen.queryByRole("link", { name: "Back to ward" })).toBeNull();
+    });
+
+    it("shows the result and a link to the ward, and does not read again, when NOT RANKED", async () => {
+      const user = userEvent.setup();
+      api.recordVitals.mockResolvedValue(recorded(false));
+      page();
+      await save(user);
+      expect(await screen.findByText(/Recorded. Still not ranked. No device data./)).toBeTruthy();
+      expect(screen.getByRole("link", { name: "Back to ward" }).getAttribute("href")).toBe("/ward");
+      expect(api.getPatient).toHaveBeenCalledTimes(1);
+    });
+
+    it("says so when the patient cannot be read again", async () => {
+      const user = userEvent.setup();
+      api.recordVitals.mockResolvedValue(recorded(true));
+      page();
+      await save(user);
+      api.getPatient.mockRejectedValue(new Error("down"));
+      await user.type(screen.getByLabelText("Heart rate (bpm)"), "120");
+      await user.click(screen.getByRole("button", { name: "Record" }));
+      expect(await screen.findByText("Recorded. The page could not refresh; reload to see the new score.")).toBeTruthy();
+      expect(screen.getByLabelText("Heart rate (bpm)")).toBeTruthy();
+      expect(screen.getByText(/Ranked #1 with NEWS2 9\./)).toBeTruthy();
+    });
+
+    it("clears the not ranked note on a later ranked save, and labels the old score meanwhile", async () => {
+      const user = userEvent.setup();
+      api.recordVitals.mockResolvedValue(recorded(false));
+      page();
+      await save(user);
+      const label = "No longer ranked. The figures below are from before this entry.";
+      expect(await screen.findByText(label)).toBeTruthy();
+      api.recordVitals.mockResolvedValue(recorded(true));
+      await user.type(screen.getByLabelText("Heart rate (bpm)"), "120");
+      await user.click(screen.getByRole("button", { name: "Record" }));
+      await waitFor(() => expect(screen.queryByText(/Still not ranked/)).toBeNull());
+      expect(screen.queryByText(label)).toBeNull();
+    });
+
+    it("closes the form", async () => {
+      const user = userEvent.setup();
+      page();
+      await loaded();
+      await user.click(screen.getByRole("button", { name: "Record vitals" }));
+      await user.click(screen.getByRole("button", { name: "Close" }));
+      expect(screen.queryByLabelText("Heart rate (bpm)")).toBeNull();
+    });
   });
 });

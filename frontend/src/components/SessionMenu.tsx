@@ -51,6 +51,9 @@ export function SessionMenu({ session, onSignOut }: Props) {
             <Link to="/research" className={styles.menuItem} onClick={() => setOpen(false)}>
               Research numbers
             </Link>
+            <Link to="/pipeline" className={styles.menuItem} onClick={() => setOpen(false)}>
+              Pipeline
+            </Link>
 
             <div className={styles.divider} />
 

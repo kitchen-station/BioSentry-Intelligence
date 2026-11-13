@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatAge, formatBloodPressure, formatOxygen, formatSimClock, formatSpo2Scale, simStatus } from "./format";
+import { enteredByNurse, formatAge, formatBloodPressure, formatClock, formatOxygen, formatSimClock, formatSpo2Scale, simStatus } from "./format";
 import type { SimStatus } from "./format";
 
 describe("formatAge", () => {
@@ -75,5 +75,19 @@ describe("formatSimClock", () => {
   it("says paused at speed 0, and ended whatever the speed", () => {
     expect(at(109_200, { speed: 0 })).toBe("day 2 06:20, paused");
     expect(at(109_200, { ended: true })).toBe("day 2 06:20, ended");
+  });
+});
+
+describe("enteredByNurse", () => {
+  const at = new Date(2026, 8, 3, 7, 40).getTime();
+
+  it("gives the time alone for an entry made today", () => {
+    expect(enteredByNurse(at, new Date(2026, 8, 3, 19, 0).getTime())).toBe(`Entered by a nurse at ${formatClock(at)}`);
+  });
+
+  it("adds the day for an entry from another day, so it does not read as today's", () => {
+    const text = enteredByNurse(at, new Date(2026, 8, 5, 7, 40).getTime());
+    expect(text.startsWith(`Entered by a nurse at ${formatClock(at)}, `)).toBe(true);
+    expect(text).toMatch(/3/);
   });
 });

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { getPatient, getWard, setActiveClinician } from "../data/fixtures";
 import type { PatientDetail, Vitals } from "../types";
 import { CurrentVitals, VitalRow } from "./CurrentVitals";
+import { enteredByNurse } from "./format";
 import { MeasurementDisplay } from "./MeasurementDisplay";
 
 let patients: PatientDetail[];
@@ -121,5 +122,21 @@ describe("MeasurementDisplay", () => {
     );
     expect(out).toContain("/");
     expect(out).not.toContain("[object Object]");
+  });
+});
+
+describe("a value a nurse typed", () => {
+  it("says who entered it and when, on the value and in the title", () => {
+    const base = patients[0].vitals;
+    const hr = base.heart_rate;
+    const vitals: Vitals = {
+      ...base,
+      heart_rate: { ...hr, provenance: { ...hr.provenance, source: "nurse", observed_at: "2026-09-03T06:45:00Z" } },
+    };
+    const text = enteredByNurse(Date.parse("2026-09-03T06:45:00Z"));
+    const out = html(vitals);
+    expect(out).toContain(`> ${text}<`);
+    expect(out).toContain(`title="${text}"`);
+    expect(html(base)).not.toContain(text);
   });
 });

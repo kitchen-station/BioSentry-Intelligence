@@ -108,7 +108,7 @@ export async function getWard(): Promise<WardResponse> {
   const filteredAbstained = abstained.filter((a) => allowed.has(a.id));
 
   // Re-rank after filtering so ranks are contiguous
-  const reRanked = filteredRanked.map((r, i) => ({ ...r, rank: i + 1, last_update_s: r.last_update_s + elapsedS() }));
+  const reRanked = filteredRanked.map((r, i) => ({ ...r, rank: i + 1, last_update_s: r.last_update_s === null ? null : r.last_update_s + elapsedS() }));
 
   return {
     ward: "W4",
@@ -367,7 +367,7 @@ export async function getPatient(id: string): Promise<PatientDetail | null> {
   if (!row || !detail) return null;
   return {
     ...row,
-    last_update_s: row.last_update_s + elapsedS(),
+    last_update_s: row.last_update_s === null ? null : row.last_update_s + elapsedS(),
     vital_history: detail.vital_history,
     tier_breakdown: detail.tier_breakdown,
   };

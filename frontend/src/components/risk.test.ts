@@ -39,6 +39,21 @@ describe("observations due", () => {
     expect(obsDue(row(0, t0, t0))).toBe(plus(720));
   });
 
+  it("starts the clock at a nurse-typed patch value too", () => {
+    const typed = { data: { present: true as const, value: 80 }, provenance: { source: "nurse", observed_at: "2026-09-03T08:00:00Z" } };
+    const patch = { data: { present: true as const, value: 80 }, provenance: { source: "device", observed_at: "2026-09-03T01:00:00Z" } };
+    const r2 = {
+      ...r(2),
+      vitals: {
+        heart_rate: typed, respiratory_rate: typed, spo2: typed, temperature: typed,
+        blood_pressure: at("2026-09-03T11:00:00Z"), consciousness: at("2026-09-03T11:00:00Z"),
+      },
+    } as unknown as Parameters<typeof obsDue>[0];
+    expect(obsDue(r2)).toBe(Date.parse("2026-09-03T12:00:00Z"));
+    const r3 = { ...r2, vitals: { ...r2.vitals, heart_rate: patch, respiratory_rate: patch, spo2: patch, temperature: patch } } as unknown as typeof r2;
+    expect(obsDue(r3)).toBe(Date.parse("2026-09-03T15:00:00Z"));
+  });
+
   it("is due now when a nurse-entered input was never observed", () => {
     const missing = { data: { present: false, reason: "not recorded" }, provenance: { observed_at: t0 } };
     const r0 = { ...r(2), vitals: { blood_pressure: missing, consciousness: at(t0) } } as unknown as Parameters<typeof obsDue>[0];

@@ -5,12 +5,13 @@ from typing import Annotated, Self
 
 from pydantic import AwareDatetime, Field, field_validator, model_validator
 
-from .base import Contract, Flag
+from .base import Contract, Flag, Num
 from .common import (
     Acvpu,
     AcvpuMeasurement,
     BloodPressureMeasurement,
     FlagMeasurement,
+    NumberMeasurement,
     Spo2Scale,
     Spo2ScaleMeasurement,
 )
@@ -74,12 +75,16 @@ class NurseVitalsInput(Contract):
     """Nurse-entered NEWS2 inputs (POST /patients/{id}/vitals): any subset, at least one.
 
     Blood pressure is a pair. Omitted means not entered (the stored value is left alone);
-    there is no default and nothing is clamped: an impossible value is rejected. Device-sourced
-    values (heart rate, respiratory rate, SpO2, temperature) are not accepted here. A stored
-    value carries source `nurse`, a manual clinician entry; the audit row for the write
-    records the clinician's id and role.
+    there is no default and nothing is clamped: an impossible value is rejected. Device
+    values may be typed here too (heart rate, respiratory rate, SpO2, temperature) when there
+    is no patch. A stored value carries source `nurse`, a manual clinician entry; the audit row
+    for the write records the clinician's id and role.
     """
 
+    heart_rate: Annotated[int, Field(strict=True)] | None = None
+    respiratory_rate: Annotated[int, Field(strict=True)] | None = None
+    spo2: Annotated[int, Field(strict=True)] | None = None
+    temperature: Num | None = None
     systolic: Annotated[int, Field(strict=True)] | None = None
     diastolic: Annotated[int, Field(strict=True)] | None = None
     acvpu: Acvpu | None = None
@@ -95,7 +100,17 @@ class NurseVitalsInput(Contract):
 
     @model_validator(mode="after")
     def _shape(self) -> Self:
-        entered = (self.systolic, self.diastolic, self.acvpu, self.on_oxygen, self.spo2_scale)
+        entered = (
+            self.heart_rate,
+            self.respiratory_rate,
+            self.spo2,
+            self.temperature,
+            self.systolic,
+            self.diastolic,
+            self.acvpu,
+            self.on_oxygen,
+            self.spo2_scale,
+        )
         if all(v is None for v in entered):
             raise ValueError("record at least one value")
         if (self.systolic is None) != (self.diastolic is None):
@@ -107,6 +122,10 @@ class VitalsRecorded(Contract):
     """What was stored (the echo, with provenance) and where the patient stands now."""
 
     patient_id: str
+    heart_rate: NumberMeasurement | None
+    respiratory_rate: NumberMeasurement | None
+    spo2: NumberMeasurement | None
+    temperature: NumberMeasurement | None
     blood_pressure: BloodPressureMeasurement | None
     consciousness: AcvpuMeasurement | None
     supplemental_o2: FlagMeasurement | None

@@ -6,6 +6,7 @@ import { SignIn } from "./pages/SignIn";
 import { Ward } from "./pages/Ward";
 import { PatientDetail } from "./pages/PatientDetail";
 import { Station } from "./pages/Station";
+import { Pipeline } from "./pages/Pipeline";
 import { Research } from "./pages/Research";
 
 // Per tab, gone when the tab closes. Only who is signed in is kept here, never a token: with the
@@ -93,6 +94,10 @@ export function App() {
       <Route
         path="/research"
         element={session ? <Research session={session} onSignOut={signOut} /> : <ToSignIn />}
+      />
+      <Route
+        path="/pipeline"
+        element={session ? <Pipeline session={session} onSignOut={signOut} /> : <ToSignIn />}
       />
     </Routes>
   );

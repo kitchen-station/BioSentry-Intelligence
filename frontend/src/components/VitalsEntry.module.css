@@ -51,6 +51,10 @@
   gap: var(--sp-2);
 }
 
+.wrap {
+  flex-wrap: wrap;
+}
+
 .field {
   display: flex;
   flex-direction: column;

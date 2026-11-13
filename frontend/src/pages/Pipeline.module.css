@@ -1,0 +1,44 @@
+.stages {
+  display: grid;
+  gap: var(--sp-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stages li {
+  position: relative;
+  margin: 0;
+}
+
+.stages li + li::before {
+  content: "\2193" / "";
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  left: 0;
+  line-height: var(--sp-5);
+  text-align: center;
+  color: var(--label);
+}
+
+.num {
+  margin-right: var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--label);
+}
+
+.state {
+  display: inline-block;
+  margin-bottom: var(--sp-2);
+  padding: 0 var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.decides {
+  border: 2px solid var(--primary);
+}

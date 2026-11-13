@@ -226,6 +226,10 @@ class Action(Contract):
     patient_id: str
     clinician_id: str
     score: int | None = None  # acknowledge: the NEWS2 total acknowledged
+    heart_rate: int | None = None  # record_vitals
+    respiratory_rate: int | None = None
+    spo2: int | None = None
+    temperature: float | None = None
     systolic: int | None = None  # record_vitals, admit_patient: both or neither
     diastolic: int | None = None
     acvpu: Literal["A", "C", "V", "P", "U"] | None = None  # record_vitals, admit_patient

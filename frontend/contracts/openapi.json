@@ -1208,7 +1208,7 @@
       },
       "NurseVitalsInput": {
         "additionalProperties": false,
-        "description": "Nurse-entered NEWS2 inputs (POST /patients/{id}/vitals): any subset, at least one.\n\nBlood pressure is a pair. Omitted means not entered (the stored value is left alone);\nthere is no default and nothing is clamped: an impossible value is rejected. Device-sourced\nvalues (heart rate, respiratory rate, SpO2, temperature) are not accepted here. A stored\nvalue carries source `nurse`, a manual clinician entry; the audit row for the write\nrecords the clinician's id and role.",
+        "description": "Nurse-entered NEWS2 inputs (POST /patients/{id}/vitals): any subset, at least one.\n\nBlood pressure is a pair. Omitted means not entered (the stored value is left alone);\nthere is no default and nothing is clamped: an impossible value is rejected. Device\nvalues may be typed here too (heart rate, respiratory rate, SpO2, temperature) when there\nis no patch. A stored value carries source `nurse`, a manual clinician entry; the audit row\nfor the write records the clinician's id and role.",
         "properties": {
           "acvpu": {
             "anyOf": [
@@ -1232,10 +1232,43 @@
             ],
             "default": null
           },
+          "heart_rate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "on_oxygen": {
             "anyOf": [
               {
                 "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "respiratory_rate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "spo2": {
+            "anyOf": [
+              {
+                "type": "integer"
               },
               {
                 "type": "null"
@@ -1258,6 +1291,17 @@
             "anyOf": [
               {
                 "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "type": "number"
               },
               {
                 "type": "null"
@@ -1788,8 +1832,15 @@
             "$ref": "#/components/schemas/LabPanel"
           },
           "last_update_s": {
-            "minimum": 0,
-            "type": "number"
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "mechanism": {
             "type": "string"
@@ -1817,9 +1868,16 @@
             ]
           },
           "signal_quality": {
-            "maximum": 100,
-            "minimum": 0,
-            "type": "number"
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "sort_tier": {
             "$ref": "#/components/schemas/Tier"
@@ -2162,8 +2220,15 @@
             "$ref": "#/components/schemas/LabPanel"
           },
           "last_update_s": {
-            "minimum": 0,
-            "type": "number"
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "mechanism": {
             "type": "string"
@@ -2191,9 +2256,16 @@
             ]
           },
           "signal_quality": {
-            "maximum": 100,
-            "minimum": 0,
-            "type": "number"
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "sort_tier": {
             "$ref": "#/components/schemas/Tier"
@@ -2951,6 +3023,16 @@
               }
             ]
           },
+          "heart_rate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NumberMeasurement"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "not_ranked_instruction": {
             "anyOf": [
               {
@@ -2988,12 +3070,32 @@
           "ranked": {
             "type": "boolean"
           },
+          "respiratory_rate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NumberMeasurement"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "score": {
             "anyOf": [
               {
                 "maximum": 20,
                 "minimum": 0,
                 "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "spo2": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NumberMeasurement"
               },
               {
                 "type": "null"
@@ -3019,10 +3121,24 @@
                 "type": "null"
               }
             ]
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NumberMeasurement"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
           "patient_id",
+          "heart_rate",
+          "respiratory_rate",
+          "spo2",
+          "temperature",
           "blood_pressure",
           "consciousness",
           "supplemental_o2",

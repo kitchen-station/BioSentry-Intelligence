@@ -5,9 +5,16 @@
 A ranked early-warning list for hospital wards in the Philippines.
 
 BioSentry answers one question: *of your twenty patients, see this one first.* It takes
-vital signs, adds what the hospital already knows (diagnosis, labs, and two values a nurse
-types in: blood pressure and level of consciousness) and puts every patient on one ranked
-list, one screen per clinician.
+vital signs, adds what the hospital already knows (diagnosis, labs, and values a nurse
+types in: blood pressure and level of consciousness, and also heart rate, respiratory rate,
+SpO2 and temperature when there is no patch or the patch gives no reading) and puts every
+patient on one ranked list, one screen per clinician. So a patient can be ranked with no
+patch. A typed heart rate, respiratory rate, SpO2 or temperature counts for 12 hours (the
+longest gap NEWS2 allows between observation sets; using it for every score is our
+judgement), then the patient is NOT RANKED until it is entered again or the patch reads it
+again. A patch reading of the same vital, new or still current, replaces a typed value. Blood
+pressure, level of consciousness, oxygen and SpO2 scale do not expire. Trend charts show patch
+data only.
 
 **Why.** Ward nurse-to-patient ratios run 1:20 or worse (DOH standard 1:12), and automated
 alerts alone have not cut mortality: the gap is unreliable alerts and too few people to act.
@@ -105,7 +112,7 @@ schemas. Every target is in the [Makefile](Makefile).
 - **Ward:** patients in priority order, each with its score and why. A patient the system
   cannot score is listed as NOT RANKED, with the reason and what to record to fix it.
 - **Patient detail:** the score and what drives it, vitals and labs with where each value
-  came from, notes, and trend charts.
+  came from, notes, and trend charts (patch data only).
 - **Station:** admit a patient, enter lab results, upload a document (extraction is a
   placeholder), or see patient flow: who came and went, length of stay and 14 days of bed use.
 

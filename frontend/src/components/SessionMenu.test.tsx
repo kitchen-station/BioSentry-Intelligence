@@ -51,6 +51,17 @@ describe("SessionMenu", () => {
     expect(screen.getByText("at /research")).toBeTruthy();
   });
 
+  it.each([
+    ["rn-reyes", "rn"],
+    ["md-santos", "md"],
+    ["rn-manalo", "charge_rn"],
+  ] as const)("links to the pipeline for %s (%s)", async (clinician_id, role) => {
+    menu({ clinician_id, ward: "W4", role });
+    await open(clinician_id);
+    await userEvent.click(screen.getByRole("link", { name: "Pipeline" }));
+    expect(screen.getByText("at /pipeline")).toBeTruthy();
+  });
+
   it("closes when the backdrop is clicked", async () => {
     menu({ clinician_id: "rn-reyes", ward: "W4", role: "rn" });
     await open("rn-reyes");

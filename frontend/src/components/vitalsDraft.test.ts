@@ -137,6 +137,51 @@ describe("bounded blood pressure entry (the server's bounds, both edges)", () =>
   });
 });
 
+describe("the four patch values, entered by hand", () => {
+  const input = (over: Partial<VitalsDraft>) => {
+    const checked = check(draft(over));
+    return checked.ok ? checked.input : checked.problems;
+  };
+
+  it("sends each one on its own, and a blank one is not sent", () => {
+    expect(input({ heartRate: "118" })).toEqual({ heart_rate: 118 });
+    expect(input({ respiratoryRate: "24" })).toEqual({ respiratory_rate: 24 });
+    expect(input({ spo2: " 91 " })).toEqual({ spo2: 91 });
+    expect(input({ temperature: "38.4" })).toEqual({ temperature: 38.4 });
+    expect(input({ temperature: "37", heartRate: "70" })).toEqual({ heart_rate: 70, temperature: 37 });
+  });
+
+  it("accepts both edges and refuses one past them", () => {
+    expect(input({ heartRate: "300", respiratoryRate: "1", spo2: "100", temperature: "20" })).toEqual({
+      heart_rate: 300, respiratory_rate: 1, spo2: 100, temperature: 20,
+    });
+    expect(input({ heartRate: "301" })).toEqual({ heartRate: "Heart rate must be 1 to 300." });
+    expect(input({ respiratoryRate: "0" })).toEqual({ respiratoryRate: "Respiratory rate must be 1 to 100." });
+    expect(input({ spo2: "0" })).toEqual({ spo2: "SpO2 must be 1 to 100." });
+    expect(input({ temperature: "45.1" })).toEqual({ temperature: "Temperature must be 20 to 45." });
+    expect(input({ temperature: "19.9" })).toEqual({ temperature: "Temperature must be 20 to 45." });
+  });
+
+  it("takes whole numbers, and one decimal for temperature", () => {
+    expect(input({ heartRate: "72.5" })).toEqual({ heartRate: "Heart rate: whole numbers only." });
+    expect(input({ temperature: "37.25" })).toEqual({ temperature: "Temperature: one decimal place at most." });
+    expect(input({ temperature: "abc" })).toEqual({ temperature: "Temperature: one decimal place at most." });
+    expect(input({ heartRate: "1000" })).toEqual({ heartRate: "Heart rate must be 1 to 300." });
+    expect(input({ temperature: "100" })).toEqual({ temperature: "Temperature must be 20 to 45." });
+    expect(input({ temperature: "0450" })).toEqual({ temperature: "Temperature must be 20 to 45." });
+  });
+
+  it("says each value in words", () => {
+    const checked = check(draft({ heartRate: "118", respiratoryRate: "24", spo2: "91", temperature: "38.4" }));
+    expect(checked.ok && echoLines(checked.input)).toEqual([
+      "Heart rate 118 bpm",
+      "Respiratory rate 24 /min",
+      "SpO2 91%",
+      "Temperature 38.4 °C",
+    ]);
+  });
+});
+
 describe("the echo of what will be stored", () => {
   it("lists exactly the entered values, in words", () => {
     const input: NurseVitalsInput = {
@@ -168,6 +213,10 @@ describe("the server's answer, in its own words", () => {
     consciousness: null,
     supplemental_o2: null,
     spo2_scale: null,
+    heart_rate: null,
+    respiratory_rate: null,
+    spo2: null,
+    temperature: null,
     ranked: true,
     rank: 3,
     score: 0,
@@ -239,6 +288,10 @@ describe("submitting", () => {
     consciousness: null,
     supplemental_o2: null,
     spo2_scale: null,
+    heart_rate: null,
+    respiratory_rate: null,
+    spo2: null,
+    temperature: null,
     ranked: true,
     rank: 2,
     score: 3,

@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import type { ScoreRow, SessionRole } from "../types";
-import { formatAge, formatBloodPressure, formatClock, STALE_AFTER_S } from "./format";
+import { formatAge, formatBloodPressure, formatClock, nurseEntryText, STALE_AFTER_S } from "./format";
 import { MeasurementDisplay } from "./MeasurementDisplay";
 import { news2Points } from "./news2";
 import { band, obsDue, response } from "./risk";
@@ -23,8 +23,10 @@ interface Props {
   ageOffsetS: number;
 }
 
-function ObsDue({ due, now }: { due: number | "continuous"; now: number }) {
-  if (due === "continuous") return <div className={styles.obsDue}>Obs continuous</div>;
+function ObsDue({ due, now, noPatch }: { due: number | "continuous"; now: number; noPatch: boolean }) {
+  if (due === "continuous") {
+    return <div className={styles.obsDue}>{noPatch ? "Continuous monitoring needed: no patch" : "Obs continuous"}</div>;
+  }
   if (due > now) return <div className={styles.obsDue}>Obs due {formatClock(due)}</div>;
   return (
     <div className={styles.obsDue} data-overdue>
@@ -36,7 +38,9 @@ function ObsDue({ due, now }: { due: number | "continuous"; now: number }) {
 export function WardRow({ row, role, now, ageOffsetS }: Props) {
   const b = band(row);
   const p = news2Points(row.vitals);
-  const age = row.last_update_s + ageOffsetS;
+  // Either figure can be null on a row ranked from nurse entries: never compute with a null.
+  const age = row.last_update_s === null ? null : row.last_update_s + ageOffsetS;
+  const nurse = nurseEntryText(row.vitals);
   return (
     <Link to={`/patient/${row.id}`} className={styles.link}>
       <div className={styles.row} data-band={b}>
@@ -56,12 +60,17 @@ export function WardRow({ row, role, now, ageOffsetS }: Props) {
             <span className={styles.detail}>
               {row.age ?? "--"}{row.sex ? ` ${row.sex}` : ""} &middot; Bed {row.bed}
             </span>
-            {row.signal_quality <= 90 && (
+            {nurse !== null && <span className={styles.updateTag}>{nurse}</span>}
+            {row.signal_quality !== null && row.signal_quality <= 90 && (
               <span className={styles.signalLow}>Signal {row.signal_quality}%</span>
             )}
-            <span className={styles.updateTag} data-stale={age > STALE_AFTER_S || undefined}>
-              {age > STALE_AFTER_S ? "Stale · " : ""}{formatAge(Math.floor(age))}
-            </span>
+            {age !== null ? (
+              <span className={styles.updateTag} data-stale={age > STALE_AFTER_S || undefined}>
+                {age > STALE_AFTER_S ? "Stale · " : ""}{formatAge(Math.floor(age))}
+              </span>
+            ) : (
+              row.signal_quality === null && <span className={styles.updateTag}>No patch signal</span>
+            )}
           </div>
           <div className={styles.context}>{row.admitting_context}</div>
           {b !== "low" && <div className={styles.response}>{response(b, role)}</div>}
@@ -115,7 +124,7 @@ export function WardRow({ row, role, now, ageOffsetS }: Props) {
               ? `Labs ${row.labs.freshness_hours}h`
               : "No labs"}
           </div>
-          <ObsDue due={obsDue(row)} now={now} />
+          <ObsDue due={obsDue(row)} now={now} noPatch={age === null} />
         </div>
       </div>
     </Link>

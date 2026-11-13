@@ -44,6 +44,10 @@ const ranked = (rank: number, score: number): VitalsRecorded => ({
   consciousness: null,
   supplemental_o2: null,
   spo2_scale: null,
+  heart_rate: null,
+  respiratory_rate: null,
+  spo2: null,
+  temperature: null,
   ranked: true,
   rank,
   score,
@@ -94,6 +98,27 @@ const entry = (over: { onRecorded?: (r: VitalsRecorded) => void; onClose?: () =>
 const field = (label: string) => screen.getByLabelText(label) as HTMLInputElement;
 const recordButton = () => screen.getByRole("button", { name: "Record" });
 const sentInput = (call = 0): NurseVitalsInput => api.recordVitals.mock.calls[call][1] as NurseVitalsInput;
+
+describe("the patch values", () => {
+  it("says they count for 12 hours, sends a typed value and refuses a bad one", async () => {
+    const user = userEvent.setup();
+    api.recordVitals.mockResolvedValue(ranked(1, 5));
+    entry();
+    expect(screen.getByText(/counts for 12 hours/)).toBeTruthy();
+
+    await user.type(field("Heart rate (bpm)"), "301");
+    await user.click(recordButton());
+    expect(api.recordVitals).not.toHaveBeenCalled();
+    expect(screen.getByText("Heart rate must be 1 to 300.")).toBeTruthy();
+    expect(field("Heart rate (bpm)").getAttribute("aria-invalid")).toBe("true");
+
+    await user.clear(field("Heart rate (bpm)"));
+    await user.type(field("Heart rate (bpm)"), "118");
+    await user.type(field("Temperature (°C)"), "38.4");
+    await user.click(recordButton());
+    expect(sentInput()).toEqual({ heart_rate: 118, temperature: 38.4 });
+  });
+});
 
 describe("a draft that cannot be sent never reaches the network", () => {
   it("refuses a value outside the bounds and says why, in the form", async () => {
@@ -232,7 +257,7 @@ describe("a valid draft is one request carrying only what was entered", () => {
     // Every group is locked, so the draft cannot change under the echo of a request in flight.
     // The fields sit in disabled fieldsets: disabled for the browser, whatever their own flag.
     const groups = screen.getAllByRole("group") as HTMLFieldSetElement[];
-    expect(groups).toHaveLength(4);
+    expect(groups).toHaveLength(5);
     for (const group of groups) {
       expect(group.disabled, group.textContent ?? "").toBe(true);
     }
