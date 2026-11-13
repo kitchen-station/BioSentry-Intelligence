@@ -7,6 +7,9 @@
                              dashboard and sim ports when unset
     BIOSENTRY_RETENTION_DAYS days of sim time a run keeps its vital bins and superseded observations
                              (7 when unset); a whole number from 1 to 36500
+    BIOSENTRY_MODELS_DIR     the folder holding the model files and manifest.json; the repository's
+                             `models/` when unset (a checkout, and /app/models in the image, which are
+                             the same rule: the folder three levels above the package)
 
 In production the process refuses to start on a database URL that holds the dev password (an early
 check on the text) or an ingest key that is not 32 or more characters, at least 8 of them distinct,
@@ -26,6 +29,7 @@ from urllib.parse import unquote
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_DATASET = _REPO_ROOT / "frontend" / "src" / "data" / "synthetic.json"
+DEFAULT_MODELS_DIR = _REPO_ROOT / "models"  # /app/models in the image, where the package sits at /app/backend/src
 # The dev database from compose.yaml (loopback only, dev-only password).
 DEV_DATABASE_PASSWORD = "biosentry-dev-only"
 DEFAULT_DATABASE_URL = f"postgresql://biosentry:{DEV_DATABASE_PASSWORD}@127.0.0.1:5432/biosentry"
@@ -73,6 +77,7 @@ class Settings:
     ingest_key: str | None = None
     env: str = "local"
     retention_days: int = 7
+    models_dir: Path = DEFAULT_MODELS_DIR
 
     def __post_init__(self) -> None:
         if not 1 <= self.retention_days <= MAX_RETENTION_DAYS:
@@ -110,4 +115,5 @@ class Settings:
             cors_origins=tuple(o for o in origins if o) or DEFAULT_CORS_ORIGINS,
             env=(source.get("BIOSENTRY_ENV") or "local").strip().lower(),
             retention_days=retention_days,
+            models_dir=Path(source.get("BIOSENTRY_MODELS_DIR", "").strip() or DEFAULT_MODELS_DIR),
         )
