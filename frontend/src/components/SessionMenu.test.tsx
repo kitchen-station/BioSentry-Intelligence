@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 /**
  * The session menu: the top bar links only the pages the role can use (Ward, Station, Overview, and
- * Analytics when the build sets a same-site path); the dropdown names the role and ward, holds the
- * simulation lab, and signing out calls back and returns to sign-in.
+ * Analytics when the build sets a same-site path); the dropdown names the role and ward, and signing out calls back and returns to sign-in.
  */
 
 import { cleanup, render, screen, within } from "@testing-library/react";
@@ -48,14 +47,13 @@ describe("SessionMenu", () => {
     expect(screen.queryByText("Ward W4")).toBeNull();
   });
 
-  it("offers the lab as a dropdown item for every role, goes to it and closes the menu", async () => {
+  it("holds no link to the lab in the open menu, for every role", async () => {
     for (const role of ["rn", "charge_rn", "md", "admin"] as const) {
       menu({ clinician_id: "x-1", ward: "W4", role });
-      expect(screen.queryByRole("link", { name: "Simulation lab" })).toBeNull();
       await open("x-1");
-      await userEvent.click(screen.getByRole("link", { name: "Simulation lab" }));
-      expect(screen.getByText("at /lab")).toBeTruthy();
-      expect(screen.queryByText("Ward W4")).toBeNull();
+      expect(screen.getByText("Ward W4")).toBeTruthy();
+      expect(document.querySelector('a[href="/lab"]')).toBeNull();
+      expect(screen.queryByText(/Simulation lab/)).toBeNull();
       cleanup();
     }
   });
