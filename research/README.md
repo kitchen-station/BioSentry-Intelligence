@@ -1098,3 +1098,8 @@ start it until the API serves `?kind=patient_question` on the claim. It stops af
 The data lives in memory for one job. The worker writes no file. A log line holds a job id and a state only. The
 `done` record holds the kind, the arguments, the numbers and `data_sha256`, the hash of the patient object as
 received (the contract's canonical JSON, NaN refused). It holds no copy of the data. A refusal and a failure carry one fixed reason, and never an exception text.
+
+One claim body from the dashboard session's API (its branch, not on `main`; the seeded patient p-001) is a test
+file: `tests/data/patient_question_job.json`. A test checks that the worker's hash of it is the hash that API
+stored when the question was asked, and that the job ends `done`. That is one sample, read from a file. The
+worker has still never talked to a running API.
