@@ -1,0 +1,221 @@
+{
+ "generated_by": "python -m research.manifest --write",
+ "models": [
+  {
+   "bytes": 16761,
+   "commit_at_run": null,
+   "commit_note": "chosen by research.sweep, which writes no run log",
+   "format": "JSON",
+   "framework": "none (median and MAD arithmetic)",
+   "framework_version": null,
+   "model": "tier_b/baseline",
+   "path": "models/tier_b/baseline/params.json",
+   "run_id": null,
+   "sha256": "d1d895e6781542155fa74f5243f0e6c9a0af11e88ce82bb2cc596297aa9d8a16",
+   "training_seeds": {
+    "chosen_on": "ward-v2 seeds 1-10"
+   },
+   "variant": "all"
+  },
+  {
+   "bytes": 4916,
+   "commit_at_run": "6c5814f",
+   "format": "JSON",
+   "framework": "none (six numbers, plain arithmetic)",
+   "framework_version": null,
+   "model": "tier_b/reward_policy",
+   "path": "models/tier_b/reward_policy/no_temperature/policy.json",
+   "run_id": "m2-20261113",
+   "sha256": "522195aa8104271d3bfec0e87ab1f37e07b074dccbd5a347d05191905a12a3b3",
+   "training_seeds": {
+    "generations": "401-480",
+    "validation": "341-400"
+   },
+   "variant": "no_temp"
+  },
+  {
+   "bytes": 5064,
+   "commit_at_run": "6c5814f",
+   "format": "JSON",
+   "framework": "none (six numbers, plain arithmetic)",
+   "framework_version": null,
+   "model": "tier_b/reward_policy",
+   "path": "models/tier_b/reward_policy/policy.json",
+   "run_id": "m2-20261113",
+   "sha256": "21cf038e4ab699906eeab87d56ddbd39965915a8ec085e75f56ca99501114775",
+   "training_seeds": {
+    "generations": "401-500",
+    "validation": "341-400"
+   },
+   "variant": "all"
+  },
+  {
+   "bytes": 660,
+   "commit_at_run": "fbd39f2",
+   "format": "JSON",
+   "framework": "none (one quantile of drawn scores, plain arithmetic)",
+   "framework_version": null,
+   "model": "tier_c/confidence_check",
+   "path": "models/tier_c/confidence_check/calibration.json",
+   "run_id": "m3-20261113-fbd39f2",
+   "sha256": "7815bd3885c794fafa38e8384d6837300c163738dbb6a0a7a126c4dca2484f11",
+   "training_seeds": {
+    "calibration": "301-340"
+   },
+   "variant": "all"
+  },
+  {
+   "bytes": 664,
+   "commit_at_run": "fbd39f2",
+   "format": "JSON",
+   "framework": "none (one quantile of drawn scores, plain arithmetic)",
+   "framework_version": null,
+   "model": "tier_c/confidence_check",
+   "path": "models/tier_c/confidence_check/calibration_no_temp.json",
+   "run_id": "m3-20261113-fbd39f2",
+   "sha256": "4a3de9544cce7e6cc838837bb2c1646261d85d1f41bef35f84135509fa0729bb",
+   "training_seeds": {
+    "calibration": "301-340"
+   },
+   "variant": "no_temp"
+  },
+  {
+   "bytes": 34949,
+   "commit_at_run": "3d634f3",
+   "format": "biosentry-plain-mlp-1",
+   "framework": "MindSpore",
+   "framework_version": "2.11.0",
+   "model": "tier_c/student_vitals",
+   "path": "models/tier_c/student_vitals/model.json",
+   "run_id": "m1-20261113-3d634f3",
+   "sha256": "d05d75ee0ad8da0db138a74f3a9796c98de6b8af5dfea513789d5521f1768af6",
+   "training_seeds": {
+    "train": "61-160",
+    "validation": "261-300"
+   },
+   "variant": "all",
+   "written_by": "research.export_plain"
+  },
+  {
+   "bytes": 11539,
+   "commit_at_run": "3d634f3",
+   "format": "MindIR",
+   "framework": "MindSpore",
+   "framework_version": "2.11.0",
+   "model": "tier_c/student_vitals",
+   "path": "models/tier_c/student_vitals/model.mindir",
+   "run_id": "m1-20261113-3d634f3",
+   "sha256": "cbc9c82ae041e5bc01adf7781d81c79339bf26820c646748cfa6ab795ca309b1",
+   "training_seeds": {
+    "train": "61-160",
+    "validation": "261-300"
+   },
+   "variant": "all",
+   "written_by": "MindSpore export"
+  },
+  {
+   "bytes": 6688,
+   "commit_at_run": "3d634f3",
+   "format": "MindSpore Lite",
+   "framework": "MindSpore",
+   "framework_version": "2.11.0",
+   "model": "tier_c/student_vitals",
+   "path": "models/tier_c/student_vitals/model.ms",
+   "run_id": "m1-20261113-3d634f3",
+   "sha256": "4ca0d0deb3a20835dacd1bc50c3981bae65111051ecc8817265d9e9f4fc06509",
+   "training_seeds": {
+    "train": "61-160",
+    "validation": "261-300"
+   },
+   "variant": "all",
+   "written_by": "MindSpore Lite converter"
+  },
+  {
+   "bytes": 5334,
+   "commit_at_run": "3d634f3",
+   "format": "ONNX",
+   "framework": "MindSpore",
+   "framework_version": "2.11.0",
+   "model": "tier_c/student_vitals",
+   "path": "models/tier_c/student_vitals/model.onnx",
+   "run_id": "m1-20261113-3d634f3",
+   "sha256": "d1ae4e881732922024b08c6cf9c37adbd8b01c48bc8390ee22b28ab802ddfdbc",
+   "training_seeds": {
+    "train": "61-160",
+    "validation": "261-300"
+   },
+   "variant": "all",
+   "written_by": "onnx.helper, built from the MindSpore weights"
+  },
+  {
+   "bytes": 14903,
+   "commit_at_run": "3d634f3",
+   "format": "biosentry-plain-mlp-1",
+   "framework": "MindSpore",
+   "framework_version": "2.11.0",
+   "model": "tier_c/student_vitals",
+   "path": "models/tier_c/student_vitals/model_no_temp.json",
+   "run_id": "m1-20261113-3d634f3",
+   "sha256": "d041b6584edc7d67c54dcdb03e81f0c1a58f51282a3cf02fbc3e869ff53cb2fc",
+   "training_seeds": {
+    "train": "61-160",
+    "validation": "261-300"
+   },
+   "variant": "no_temp",
+   "written_by": "research.export_plain"
+  },
+  {
+   "bytes": 8706,
+   "commit_at_run": "3d634f3",
+   "format": "MindIR",
+   "framework": "MindSpore",
+   "framework_version": "2.11.0",
+   "model": "tier_c/student_vitals",
+   "path": "models/tier_c/student_vitals/model_no_temp.mindir",
+   "run_id": "m1-20261113-3d634f3",
+   "sha256": "6ac94a6b5bee43689187d739b171f91858f96d10e4b11b652ac9c3812e3faa6d",
+   "training_seeds": {
+    "train": "61-160",
+    "validation": "261-300"
+   },
+   "variant": "no_temp",
+   "written_by": "MindSpore export"
+  },
+  {
+   "bytes": 3744,
+   "commit_at_run": "3d634f3",
+   "format": "MindSpore Lite",
+   "framework": "MindSpore",
+   "framework_version": "2.11.0",
+   "model": "tier_c/student_vitals",
+   "path": "models/tier_c/student_vitals/model_no_temp.ms",
+   "run_id": "m1-20261113-3d634f3",
+   "sha256": "fb023119cb8038dfdd174df10d3097e26413a0711b6f76af6ee15f975e445e5a",
+   "training_seeds": {
+    "train": "61-160",
+    "validation": "261-300"
+   },
+   "variant": "no_temp",
+   "written_by": "MindSpore Lite converter"
+  },
+  {
+   "bytes": 2382,
+   "commit_at_run": "3d634f3",
+   "format": "ONNX",
+   "framework": "MindSpore",
+   "framework_version": "2.11.0",
+   "model": "tier_c/student_vitals",
+   "path": "models/tier_c/student_vitals/model_no_temp.onnx",
+   "run_id": "m1-20261113-3d634f3",
+   "sha256": "e6b6ae44c11aa38fc38a961eebaf3e3bd51b1b5812b9e200d31d8c04101869ee",
+   "training_seeds": {
+    "train": "61-160",
+    "validation": "261-300"
+   },
+   "variant": "no_temp",
+   "written_by": "onnx.helper, built from the MindSpore weights"
+  }
+ ],
+ "note": "never edited by hand; every field comes from the file or its metadata, null when not recorded",
+ "schema": 1
+}

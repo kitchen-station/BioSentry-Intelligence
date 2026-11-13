@@ -107,26 +107,27 @@ def test_every_field_comes_from_the_files_and_their_metadata(repo):
     assert (onnx["bytes"], onnx["sha256"], onnx["format"], onnx["variant"]) == (8, sha(b"onnx-all"), "ONNX", "all")
     assert (onnx["framework"], onnx["framework_version"]) == ("MindSpore", "2.11.0")
     assert onnx["training_seeds"] == {"train": "61-63,70", "validation": "261-262"}
-    assert (onnx["run_id"], onnx["commit"]) == ("m1-new", "abc1234") and "commit_note" not in onnx  # the matching log, not the old one
+    assert (onnx["run_id"], onnx["commit_at_run"]) == ("m1-new", "abc1234") and "commit_note" not in onnx  # the matching log, not the old one
+    assert onnx["written_by"] == "onnx.helper, built from the MindSpore weights"
     assert got["tier_c/student_vitals/model.json"]["format"] == "biosentry-plain-mlp-1"
     assert got["tier_c/student_vitals/model.mindir"]["format"] == "MindIR"
     pol = got["tier_b/reward_policy/policy.json"]
-    assert (pol["run_id"], pol["commit"], pol["framework_version"]) == ("m2-1", "def5678", None)
+    assert (pol["run_id"], pol["commit_at_run"], pol["framework_version"]) == ("m2-1", "def5678", None)
     assert pol["framework"].startswith("none") and pol["training_seeds"] == {"generations": "401-500", "validation": "341-343"}
     nt = got["tier_b/reward_policy/no_temperature/policy.json"]  # its sha256 is in no ledger line: nothing is guessed
-    assert (nt["run_id"], nt["commit"]) == (None, None) and "no run log" in nt["commit_note"]
+    assert (nt["run_id"], nt["commit_at_run"]) == (None, None) and "no run log" in nt["commit_note"]
     cal = got["tier_c/confidence_check/calibration.json"]
-    assert cal["run_id"] == "m3-1" and cal["commit"] is None and cal["commit_note"] == "the run log records no commit"
+    assert cal["run_id"] == "m3-1" and cal["commit_at_run"] is None and cal["commit_note"] == "the run log records no commit"
     assert cal["training_seeds"] == {"calibration": "301-303"}
     base = got["tier_b/baseline/params.json"]
-    assert base["training_seeds"] == {"chosen_on": "ward-v2 seeds 1-10"} and base["commit"] is None and "sweep" in base["commit_note"]
+    assert base["training_seeds"] == {"chosen_on": "ward-v2 seeds 1-10"} and base["commit_at_run"] is None and "sweep" in base["commit_note"]
 
 
 def test_without_a_matching_run_log_the_ids_are_null_with_a_note(repo):
     (repo / "training/runs/student_vitals/m1-new.json").unlink()
     run(repo, "--write")
     m = next(x for x in json.loads((repo / "models/manifest.json").read_bytes())["models"] if x["path"].endswith("student_vitals/model.onnx"))
-    assert (m["run_id"], m["commit"]) == (None, None) and "no run log" in m["commit_note"]
+    assert (m["run_id"], m["commit_at_run"]) == (None, None) and "no run log" in m["commit_note"]
 
 
 def test_a_changed_byte_a_missing_file_and_an_unlisted_model_file_fail_the_check(repo, capsys):
@@ -157,7 +158,7 @@ def test_a_changed_metadata_or_run_log_shows_up_as_a_named_field(repo, capsys):
         "data": {"train_seeds": [61, 62, 63, 70], "validation_seeds": [261, 262]},
         "variants": {"all": {"parameters": {"student": 25}}, "no_temp": {"parameters": {"student": 40}}}})
     assert run(repo, "--check") == 2
-    assert "model.onnx: commit differs (manifest 'abc1234', now '9999999')" in capsys.readouterr().err
+    assert "model.onnx: commit_at_run differs (manifest 'abc1234', now '9999999')" in capsys.readouterr().err
 
 
 def test_a_missing_or_foreign_manifest_fails_clearly(repo, capsys):
@@ -213,7 +214,6 @@ def test_ranges():
 MANIFEST = Path(__file__).parent.parent.parent / "models" / "manifest.json"
 
 
-@pytest.mark.skipif(not MANIFEST.exists(), reason="TODO part 2: models/manifest.json is written once the real student run has finished")
 def test_the_committed_manifest_and_registry_match_the_committed_files(capsys):
     assert mf.main([]) == 2  # no flag: usage
     capsys.readouterr()

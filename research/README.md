@@ -659,7 +659,7 @@ its missing flags; a wrong length or a non-finite value is refused, never filled
 
 Tolerance: on a fixed batch of 1,000 rows the plain forward pass (double precision, the ONNX graph's order) is
 within 1e-6 of onnxruntime and within 1e-5 of MindSpore and MindIR. The test that compares the committed
-`model.json` with the committed models is skipped until the exporter has been run on the real model.
+`model.json` with the committed models runs in the ML gate.
 Tests: `tests/test_plain_student.py` and `tests_ml/test_export_plain.py`.
 
 ## Manifest, run logs and notebooks (slices M4 and M6)
@@ -669,9 +669,9 @@ Packaging and documentation only: no model is trained or changed, no held-out se
 commands, the run logs and the notebooks.
 
 - `research/manifest.py` (standard library only): `python -m research.manifest --write` makes `models/manifest.json`
-  (path, model, framework and version, format, bytes, sha256, training seeds, run id, commit; sorted, deterministic
+  (path, model, framework and version, format, bytes, sha256, training seeds, run id, `commit_at_run`; sorted, deterministic
   bytes) from the files and their own metadata; `--check` exits 2 with one line per difference; `--registry` rewrites
-  only the models table of `training/REGISTRY.md`. A field recorded nowhere is `null`. The commit comes from the run
+  only the models table of `training/REGISTRY.md`. A field recorded nowhere is `null`. `commit_at_run` comes from the run
   logs (research code starts no process, so not from git). Tests: `tests/test_manifest.py`.
 - Run logs are `training/runs/<model>/<run id>.json`. The student's comes from `train_student --run_log`, the
   confidence check's from `confidence calibrate --run_log`, the reward policy's from

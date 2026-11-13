@@ -156,8 +156,7 @@ def test_the_confidence_notebook_runs_on_a_tiny_log(tmp_path, patched, model):  
 
 @pytest.mark.parametrize("name", ["student_vitals", "confidence_check"])
 def test_the_committed_notebooks_run_on_the_committed_logs(name):
-    if not committed_log(name):  # TODO part 2: runs once the real student and confidence run logs are committed
-        pytest.skip("TODO part 2: the real run log of this model is not committed yet")
+    assert committed_log(name)
     nb = run(BOOKS / f"{name}.ipynb", BOOKS)
     plain(nb)
     assert figures(nb) >= 1

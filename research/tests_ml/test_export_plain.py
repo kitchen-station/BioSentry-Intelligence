@@ -136,8 +136,6 @@ def test_a_missing_metadata_is_refused(tmp_path, capsys):
     assert capsys.readouterr().err.count("\n") == 1
 
 
-@pytest.mark.skipif(not (COMMITTED / "model.json").exists(),
-                    reason="skipped until the exporter has been run on the real model (models/tier_c/student_vitals/model.json)")
 def test_the_committed_json_is_a_fresh_export_and_matches_the_committed_models():
     fresh = export_plain.run(COMMITTED)
     for name, data in fresh.items():

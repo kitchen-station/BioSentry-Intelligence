@@ -27,7 +27,7 @@ no path.
 
 - The student's log is written by `train_student --run_log`, the confidence check's by `confidence calibrate --run_log`.
 - The reward policy's is written by `python -m research.reward_loop --run-log <file> --run-id <id> --commit <sha> --out <policy folder>`. It only reads the committed generation records, policy files and ledger, opens no trial, and has no wall time (its `time` object says so). `<sha>` is the commit that holds the final policy files.
-- `--commit` is whatever the person running it passes: research code starts no process, so it cannot ask git.
+- `--commit` is whatever the person running it passes: research code starts no process, so it cannot ask git. The hash is the branch commit when the run was made; after the squash merge, find the run by its run id and the pull request. The manifest and the registry name it `commit_at_run`.
 
 ## Notebooks
 

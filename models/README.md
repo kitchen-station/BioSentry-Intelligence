@@ -14,7 +14,7 @@ log, notebook and registry row are in `training/`.
 | `tier_c/student_vitals/` | the distilled student: `model.onnx`, `model.mindir`, `model.ms` (hand-run Lite step), `model.json` (plain export), the `_no_temp` versions, `metadata.json`, `exports.json`, `timing.json`, `convert_lite.sh`, the card |
 | `tier_c/confidence_check/` | `calibration.json` and `calibration_no_temp.json` (each with a `.sha256`), `heldout.txt` |
 | `data/` | dataset cards only (no data) |
-| `manifest.json` | one record per shipped model file: path, model, variant, framework and version, format, bytes, sha256, training seeds, run id, commit |
+| `manifest.json` | one record per shipped model file: path, model, variant, framework and version, format, bytes, sha256, training seeds, run id, `commit_at_run` |
 
 ## The manifest and its rule
 
@@ -40,7 +40,8 @@ Where a record's fields come from (a field recorded nowhere is `null`, never gue
 - Reward policy: the generation and validation seeds from the policy file; the run id and commit from the run log whose ledger lines name that file's sha256. Framework: "none (six numbers, plain arithmetic)".
 - Confidence check: the calibration seeds from its JSON; the run id and commit from the run log that names its sha256.
 - Baseline: its own `chosen_on`. It has no run log (`research.sweep` writes none), so run id and commit are `null`.
-- The commit cannot come from git (research code starts no process). It is the `commit` the run log was given with `--commit`. When there is none, the record says why in `commit_note`.
+- The commit cannot come from git (research code starts no process). It is the `commit` the run log was given with `--commit`. When there is none, the record says why in `commit_note`. It is stored as `commit_at_run`. The hash is the branch commit when the run was made; after the squash merge, find the run by its run id and the pull request.
+- Student files also carry `written_by`: `.mindir` MindSpore export, `.onnx` built with onnx.helper from the MindSpore weights, `.ms` MindSpore Lite converter, `.json` `research.export_plain`.
 
 ## Retrain, one command per model
 
