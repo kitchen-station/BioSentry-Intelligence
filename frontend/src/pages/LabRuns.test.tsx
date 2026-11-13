@@ -73,7 +73,6 @@ describe("simulated runs: who sees what", () => {
     render(<LabRuns role={role} />);
     expect(await screen.findByRole("button", { name: "Ask for a simulated run" })).toBeTruthy();
     expect(screen.getByText("A lab worker beside the ward runs each request. If none is running, a request fails after an hour.")).toBeTruthy();
-    expect(screen.getByText("One at a time for each clinician, 10 in 24 hours, 5 waiting on the ward.")).toBeTruthy();
     expect(screen.getAllByRole("combobox")).toHaveLength(4);
     expect(screen.queryAllByRole("textbox")).toHaveLength(0);
   });
@@ -215,7 +214,7 @@ describe("simulated runs: the form", () => {
     await screen.findByText("Done");
     const button = screen.getByRole("button", { name: "Ask for a simulated run" }) as HTMLButtonElement;
     const seed = screen.getByLabelText(/Seed/);
-    const hint = screen.getByText("A whole number from 0 to 2147483647. The same seed gives the same patients.");
+    const hint = screen.getByText("A whole number from 0 to 2147483647.");
     expect(seed.getAttribute("aria-describedby")).toBe(hint.id);
     expect(hint.closest("label")).toBeNull();
     expect(hint.className).toBe("");

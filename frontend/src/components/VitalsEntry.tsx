@@ -61,10 +61,7 @@ export function VitalsEntryForm(props: VitalsEntryFormProps) {
     >
       <p className={styles.title}>Record vitals</p>
       <p className={styles.sub}>
-        Enter what you measured. A field left as &ldquo;Not recorded&rdquo; stays as it is; nothing
-        is filled in for you. The first four values are for when there is no patch, or the patch
-        gives no reading. Each of those four counts for 12 hours, or until the patch gives a reading
-        for it again.
+        Nothing is filled in for you. A patch value typed here counts for 12 hours, or until the patch reads it again.
       </p>
 
       <fieldset className={styles.group} disabled={busy}>
@@ -204,8 +201,7 @@ export function VitalsEntryForm(props: VitalsEntryFormProps) {
           />
         </div>
         <p className={styles.hint}>
-          Scale 2 is a clinician&rsquo;s decision (hypercapnic respiratory failure). It is never
-          assumed.
+          Scale 2 only on a clinician&rsquo;s decision (hypercapnic respiratory failure).
         </p>
       </fieldset>
 

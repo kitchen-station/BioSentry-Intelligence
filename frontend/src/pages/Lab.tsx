@@ -22,8 +22,7 @@ export function Lab({ session, onSignOut }: { session: Session; onSignOut: () =>
           <section aria-labelledby="outside">
             <h2 id="outside" className={research.heading}>Outside the lab</h2>
             <p>
-              The ward simulator draws the ward that is running now. A physician or charge nurse signed in there
-              can change that ward, and so the ranks on the ward list. It opens in a new tab and asks for its own sign-in.
+              The ward simulator runs the live ward: a change made there changes the ranks on the ward list. It opens in a new tab and asks for its own sign-in.
             </p>
             <a href="/simulator/" target="_blank" rel="noopener">Open the ward simulator</a>
           </section>

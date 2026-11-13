@@ -40,7 +40,6 @@ export function FlowSection() {
     <div className={styles.flow}>
       <header>
         <h1 className={styles.title}>Patient flow</h1>
-        <p className={styles.sub}>Admissions, departures and bed use. Synthetic data.</p>
       </header>
       {failed && <p role="alert" className={styles.alert}>Could not refresh. Showing the last stays received.</p>}
       {stays === null || stats === null ? (

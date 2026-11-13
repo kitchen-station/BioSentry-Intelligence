@@ -84,7 +84,7 @@ describe("Station tabs", () => {
     const user = userEvent.setup();
     page();
     expect(screen.getByText(/Station · Ward W4/)).toBeTruthy();
-    expect(screen.getByText(/New patients are added as NOT RANKED/)).toBeTruthy();
+    expect(screen.getByText(/New patients start NOT RANKED/)).toBeTruthy();
 
     await user.click(screen.getByRole("button", { name: "Enter lab results" }));
     expect(screen.getByText(/Select a ranked patient/)).toBeTruthy();
@@ -93,7 +93,7 @@ describe("Station tabs", () => {
     expect(screen.getByText("Upload document")).toBeTruthy();
 
     await user.click(screen.getAllByRole("button", { name: "Admit patient" })[0]);
-    expect(screen.getByText(/New patients are added as NOT RANKED/)).toBeTruthy();
+    expect(screen.getByText(/New patients start NOT RANKED/)).toBeTruthy();
   });
 });
 

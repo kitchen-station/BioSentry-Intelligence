@@ -334,8 +334,8 @@ export function SignIn({ onSignIn }: Props) {
 
             <p className={styles.authNote}>
               {usesServer
-                ? "The ward server checks your passphrase. After 5 failed attempts for a clinician, sign-in is locked for 15 minutes. Every attempt is recorded."
-                : "Public demo: there is no server and no real sign-in. Any passphrase is accepted, and nothing you enter is kept after a reload."}
+                ? "After 5 failed attempts for a clinician, sign-in is locked for 15 minutes. Every attempt is recorded."
+                : "Public demo: any passphrase works. Nothing is kept after a reload."}
             </p>
           </form>
         )}
@@ -360,7 +360,7 @@ export function SignIn({ onSignIn }: Props) {
                 <div className={ch.inner} />
                 <span className={styles.destTitle}>Ward Monitor</span>
                 <span className={styles.destDesc}>
-                  View your assigned patients, ranked by deterioration risk.
+                  Your assigned patients, in priority order.
                 </span>
               </button>
               {(selected.sessionRole === "md" || selected.sessionRole === "charge_rn") && (
@@ -372,7 +372,7 @@ export function SignIn({ onSignIn }: Props) {
                   <div className={ch.inner} />
                   <span className={styles.destTitle}>Station</span>
                   <span className={styles.destDesc}>
-                    Admit patients, enter lab results, upload documents.
+                    Admit, labs, documents.
                   </span>
                 </button>
               )}

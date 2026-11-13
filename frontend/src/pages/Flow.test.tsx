@@ -95,7 +95,6 @@ describe("Flow page", () => {
     await screen.findByRole("heading", { name: "Recent movement" });
     expect(screen.getAllByRole("link", { name: "Cruz, Ana" })).toHaveLength(1); // d: arrival known, still here
     expect(screen.getAllByRole("img", { name: "Cruz, Ana, Higher care" })).toHaveLength(1);
-    expect(screen.getByText(/Synthetic data/)).toBeTruthy();
   });
 
   it("says when nobody has moved yet", async () => {

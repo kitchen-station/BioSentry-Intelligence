@@ -135,8 +135,7 @@ describe("the public demo (no server)", () => {
     await click(/Nurse/);
     await click(/Nurse Reyes/);
     expect((screen.getByLabelText("Passphrase") as HTMLInputElement).value).toBe("anything");
-    expect(screen.getByText(/Public demo: there is no server and no real sign-in/)).toBeTruthy();
-    expect(screen.getByText(/Any passphrase is accepted/)).toBeTruthy();
+    expect(screen.getByText("Public demo: any passphrase works. Nothing is kept after a reload.")).toBeTruthy();
     expect(screen.getByText(/Public demo: synthetic data, no server, no real sign-in/)).toBeTruthy();
     expect(screen.queryByText(/hospital identity provider/)).toBeNull();
     await click("Continue");
@@ -170,7 +169,7 @@ describe("with the API", () => {
     expect([input.value, input.required, input.maxLength]).toEqual(["", true, 256]);
     expect(screen.queryByText(/anything/i)).toBeNull();
     expect(screen.queryByText(/accepts any passphrase/i)).toBeNull();
-    expect(screen.getByText(/The ward server checks your passphrase/)).toBeTruthy();
+    expect(screen.getByText("After 5 failed attempts for a clinician, sign-in is locked for 15 minutes. Every attempt is recorded.")).toBeTruthy();
     expect(screen.getByText(/Pilot build: synthetic data only/)).toBeTruthy();
   });
 

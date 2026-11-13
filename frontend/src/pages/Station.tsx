@@ -154,7 +154,7 @@ function AdmitForm() {
     <form className={styles.form} onSubmit={handleSubmit}>
       <p className={styles.formTitle}>Admit patient</p>
       <p className={styles.formSub}>
-        New patients are added as NOT RANKED until every NEWS2 input is recorded, by a chest patch or by entering the observations.
+        New patients start NOT RANKED.
       </p>
 
       {result && (
@@ -349,7 +349,7 @@ function LabForm() {
     <form className={styles.form} onSubmit={handleSubmit}>
       <p className={styles.formTitle}>Enter lab results</p>
       <p className={styles.formSub}>
-        Select a ranked patient and enter one or more lab values. Lab entry for non-ranked patients will be available once they are ranked.
+        Select a ranked patient.
       </p>
 
       {result && (
@@ -546,12 +546,8 @@ function UploadForm() {
   return (
     <div className={styles.form}>
       <p className={styles.formTitle}>Upload document</p>
-      <p className={styles.formSub}>
-        Upload a lab result or patient record. Values are read from the document for you to review and confirm before saving.
-      </p>
-
       <div className={styles.syntheticBanner}>
-        Document reading is simulated in this pilot build. Values shown are sample data, not from the uploaded file.
+        Document reading is simulated: the values are sample data, not from your file.
       </div>
 
       {result && (
