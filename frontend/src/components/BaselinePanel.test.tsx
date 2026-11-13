@@ -31,6 +31,8 @@ const computed = (over: Partial<BaselineComputed> = {}): BaselineComputed => ({
   anchored_at: "admission",
   delta: 20,
   z: 4.1,
+  band_low: 58.1,
+  band_high: 81.9,
   run_bins: 4,
   since: at(60),
   significant: true,

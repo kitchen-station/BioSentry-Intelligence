@@ -163,7 +163,7 @@ def drifting(vital: str = "heart_rate", bins: int = 3, significant: bool = True)
         f"baseline/{vital}", "x", "+1", FindingDirection.rising, ProvenanceSource.derived,
         significant, "circulatory",
     )  # fmt: skip
-    return finding, Deviation(vital, 90.0, 70.0, 20.0, 3.0, bins, 0)
+    return finding, Deviation(vital, 90.0, 70.0, 20.0, 3.0, bins, 0, 6.7)
 
 
 def inert_inputs() -> dict[str, Any]:

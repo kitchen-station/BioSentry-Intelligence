@@ -233,3 +233,87 @@ def test_parameters_are_immutable_and_do_not_share_the_callers_mapping() -> None
     params = BaselineParams(floors=mine)
     mine["heart_rate"] = 0.5
     assert params.floors["heart_rate"] == 2.0
+
+
+# Values taken from the detector before the spread was added to `Deviation`. Every old field must
+# stay as it was: the band is display only and must not move a finding.
+PINNED = {
+    "hr_stable": (
+        "heart_rate", window(70, 4),
+        ("baseline/heart_rate", "Heart rate vs own baseline", "+4.0 bpm (median 70.0, z +0.7, 0 bins)",
+         "rising", "derived", False, "circulatory", 74, 70.0, 4.0, 0.6744907594765952, 0, None),
+    ),
+    "hr_floor": (
+        "heart_rate", [70.0] * 24 + [71.0] * 10,
+        ("baseline/heart_rate", "Heart rate vs own baseline", "+1.0 bpm (median 70.0, z +0.5, 0 bins)",
+         "rising", "derived", False, "circulatory", 71.0, 70.0, 1.0, 0.5, 0, None),
+    ),
+    "hr_flagged": (
+        "heart_rate", [70.0] * 24 + [90.0] * 3,
+        ("baseline/heart_rate", "Heart rate vs own baseline", "+20.0 bpm (median 70.0, z +10.0, 3 bins)",
+         "rising", "derived", True, "circulatory", 90.0, 70.0, 20.0, 10.0, 3, 24),
+    ),
+    "hr_gap_run": (
+        "heart_rate", [70.0] * 24 + [90.0] * 3 + [None] + [90.0] * 2,
+        ("baseline/heart_rate", "Heart rate vs own baseline", "+20.0 bpm (median 70.0, z +10.0, 2 bins)",
+         "rising", "derived", False, "circulatory", 90.0, 70.0, 20.0, 10.0, 2, 28),
+    ),
+    "rr_wide": (
+        "respiratory_rate", window(16, 1.5) + [23.0] * 3,
+        ("baseline/respiratory_rate", "Respiratory rate vs own baseline",
+         "+7.0 /min (median 16.0, z +3.1, 3 bins)",
+         "rising", "derived", True, "respiratory", 23.0, 16.0, 7.0, 3.147623544224111, 3, 24),
+    ),
+    "spo2_fall": (
+        "spo2", window(97, 0.8) + [92.5] * 3,
+        ("baseline/spo2", "SpO2 vs own baseline", "-4.5 % (median 97.0, z -3.8, 3 bins)",
+         "falling", "derived", True, "respiratory", 92.5, 97.0, -4.5, -3.7940105220558613, 3, 24),
+    ),
+    "spo2_rise": (
+        "spo2", [97.0] * 24 + [99.0] * 4,
+        ("baseline/spo2", "SpO2 vs own baseline", "+2.0 % (median 97.0, z +2.0, 0 bins)",
+         "rising", "derived", False, "respiratory", 99.0, 97.0, 2.0, 2.0, 0, None),
+    ),
+    "hr_back_in_window": (
+        "heart_rate", [70.0] * 21 + [90.0] * 3,
+        ("baseline/heart_rate", "Heart rate vs own baseline", "+20.0 bpm (median 70.0, z +10.0, 3 bins)",
+         "rising", "derived", True, "circulatory", 90.0, 70.0, 20.0, 10.0, 3, 21),
+    ),
+    "temp_flat": (
+        "temperature", [37.0] * 25,
+        ("baseline/temperature", "Temperature vs own baseline", "+0.0 °C (median 37.0, z +0.0, 0 bins)",
+         "stable", "derived", False, "temperature", 37.0, 37.0, 0.0, 0.0, 0, None),
+    ),
+}
+
+
+@pytest.mark.parametrize("name", list(PINNED))
+def test_the_finding_and_every_old_deviation_field_are_unchanged(name: str) -> None:
+    vital, bins, expected = PINNED[name]
+    finding, dev = found(vital, bins)
+    old = (
+        finding.id, finding.label, finding.value, finding.direction.value, finding.source.value,
+        finding.significant, finding.pathway,
+        dev.value, dev.baseline_median, dev.delta, dev.z, dev.run_bins, dev.since_bin,
+    )
+    assert old == expected
+
+
+def test_the_spread_is_the_one_behind_z() -> None:
+    # MAD 4 gives 1.4826 * 4; a flat window gives the 2 bpm floor.
+    _, wide = found("heart_rate", window(70, 4))
+    _, flat = found("heart_rate", [70.0] * 25)
+    assert wide.spread == pytest.approx(1.4826 * 4)
+    assert flat.spread == 2.0
+    assert wide.z == pytest.approx(wide.delta / wide.spread)
+
+
+def test_a_value_at_the_band_edge_has_z_k_from_the_same_centre_and_spread() -> None:
+    _, dev = found("heart_rate", window(70, 4))
+    high = dev.baseline_median + DEFAULTS.k * dev.spread
+    low = dev.baseline_median - DEFAULTS.k * dev.spread
+    assert (round(low, 1), round(high, 1)) == (58.1, 81.9)
+    _, at_high = found("heart_rate", window(70, 4) + [high])
+    _, at_low = found("heart_rate", window(70, 4) + [low])
+    assert at_high.z == pytest.approx(DEFAULTS.k)
+    assert at_low.z == pytest.approx(-DEFAULTS.k)

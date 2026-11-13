@@ -98,7 +98,7 @@ def test_a_computed_baseline_that_has_not_moved_is_not_significant(api: Api) -> 
     assert hr == {
         "vital": "heart_rate", "status": "computed", "baseline_median": 70.0, "latest": 72.0,
         "latest_at": served(api, 26 * 15), "latest_age_s": 0, "baseline_from": served(api, 0),
-        "anchored_at": "first_kept_bin", "delta": 2.0, "z": 0.3, "run_bins": 0, "since": None, "significant": False, "direction": "rising",
+        "anchored_at": "first_kept_bin", "delta": 2.0, "z": 0.3, "band_low": 58.1, "band_high": 81.9, "run_bins": 0, "since": None, "significant": False, "direction": "rising",
         "pathway": "circulatory", "unit": "bpm",
     }  # fmt: skip
 
@@ -109,6 +109,7 @@ def test_a_persistent_rise_is_significant_and_says_when_it_began(api: Api) -> No
     hr = {v["vital"]: v for v in response.json()["vitals"]}["heart_rate"]
     assert (hr["latest"], hr["delta"], hr["run_bins"], hr["significant"]) == (90.0, 20.0, 4, True)
     assert hr["z"] == 3.4
+    assert (hr["band_low"], hr["band_high"]) == (58.1, 81.9)
     assert hr["since"] == history_times(api)[26] == served(api, 26 * 15)  # first of the four past k
     assert (hr["latest_at"], hr["baseline_from"]) == (served(api, 29 * 15), served(api, 0))
     assert BaselineResponse.model_validate(response.json()).label == BASELINE_LABEL
@@ -457,7 +458,7 @@ def test_the_response_carries_no_name_and_no_stored_text(api: Api) -> None:
     }  # fmt: skip
     assert {s for s in strings if s not in fixed and not TIMES.match(s)} <= {
         "patient_id", "synthetic", "admission_known", "latest_at", "baseline_from", "label", "params", "vitals", "window_bins", "k", "p", "vital", "latest_age_s", "anchored_at",
-        "status", "baseline_median", "latest", "delta", "z", "run_bins", "since", "significant",
+        "status", "baseline_median", "latest", "delta", "z", "band_low", "band_high", "run_bins", "since", "significant",
         "direction", "pathway", "unit", "bins_valid", "bins_needed", "reason",
     }  # fmt: skip
 

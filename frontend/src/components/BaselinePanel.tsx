@@ -35,7 +35,7 @@ const isObj = (x: unknown): x is Record<string, unknown> => typeof x === "object
 const num = (x: unknown): x is number => typeof x === "number" && Number.isFinite(x);
 const time = (x: unknown): x is string => typeof x === "string" && Number.isFinite(Date.parse(x));
 
-function isComputed(v: Record<string, unknown>): v is BaselineComputed {
+export function isComputed(v: Record<string, unknown>): v is BaselineComputed {
   return (
     [v.latest, v.delta, v.baseline_median, v.z, v.run_bins, v.latest_age_s].every(num) &&
     (v.latest_age_s as number) >= 0 && // the server never sends a negative age

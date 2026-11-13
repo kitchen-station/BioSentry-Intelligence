@@ -10,7 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import synthetic from "../data/synthetic.json";
-import type { BaselineResponse, ClinicalNote, LabPanel, PatientDetail as Detail, Session, SessionRole } from "../types";
+import type { BaselineComputed, BaselineResponse, ClinicalNote, LabPanel, PatientDetail as Detail, Session, SessionRole } from "../types";
 import { PatientDetail } from "./PatientDetail";
 
 // "Sep" or "Sept", whichever the runtime's en-GB gives: the clock uses the same call as the simulator.
@@ -69,7 +69,7 @@ const baseline: BaselineResponse = {
   vitals: [
     {
       vital: "heart_rate", status: "computed", baseline_median: 70, latest: 90, latest_at: "2026-09-03T06:45:00Z",
-      latest_age_s: 60, anchored_at: "admission", baseline_from: "2026-09-03T00:45:00Z", delta: 20, z: 4.1, run_bins: 4, since: "2026-09-03T06:00:00Z",
+      latest_age_s: 60, anchored_at: "admission", baseline_from: "2026-09-03T00:45:00Z", delta: 20, z: 4.1, band_low: 58.1, band_high: 81.9, run_bins: 4, since: "2026-09-03T06:00:00Z",
       significant: true, direction: "rising", pathway: "circulatory", unit: "bpm",
     },
   ],
@@ -318,18 +318,18 @@ describe("PatientDetail", () => {
     const charts = screen.getByRole("button", { name: "Charts" });
 
     await user.click(charts);
-    const title = screen.getByText("Vital trends -- last 6 hours");
+    const title = screen.getByText("Vital trends \u00b7 5 h");
     const panel = title.closest("div")!.parentElement!;
     for (const label of ["Heart rate", "Respiratory rate", "SpO2"]) {
       expect(within(panel).getAllByText(label).length).toBeGreaterThan(0);
     }
     expect(within(panel).getByText("Charts show patch data only. Values entered by a nurse are not plotted.")).toBeTruthy();
     await user.click(charts); // same button again closes it
-    expect(screen.queryByText("Vital trends -- last 6 hours")).toBeNull();
+    expect(screen.queryByText("Vital trends \u00b7 5 h")).toBeNull();
 
     await user.click(charts);
     await user.click(screen.getByRole("button", { name: "×" }));
-    expect(screen.queryByText("Vital trends -- last 6 hours")).toBeNull();
+    expect(screen.queryByText("Vital trends \u00b7 5 h")).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "Notes" }));
     const backdrop = container.querySelector('[class*="overlayBackdrop"]') as HTMLElement;
@@ -552,6 +552,83 @@ describe("PatientDetail for an administrator (read only)", () => {
   });
 });
 
+describe("PatientDetail own baseline on the charts", () => {
+  const hr = baseline.vitals[0] as BaselineComputed;
+  const withVitals = (...vitals: BaselineResponse["vitals"]): BaselineResponse => ({ ...baseline, vitals });
+  const bands = () => document.querySelectorAll('[data-testid="own-baseline-band"]');
+  const SHADED = "Shaded: this patient's own baseline (synthetic, not validated). Not a normal range.";
+  const openCharts = async (role?: SessionRole) => {
+    const user = userEvent.setup();
+    page(role);
+    await loaded();
+    await user.click(screen.getByRole("button", { name: "Charts" }));
+  };
+
+  it("draws each computed vital's band from the answer the page already has, with one label line", async () => {
+    api.getBaseline.mockResolvedValue(
+      withVitals(hr, { ...hr, vital: "respiratory_rate", band_low: 10, band_high: 18, significant: false, unit: "/min" }),
+    );
+    await openCharts();
+    await waitFor(() => expect(bands()).toHaveLength(2)); // SpO2 has no entry: no band
+    expect(screen.getByText(/Own baseline 58\.1 to 81\.9 bpm · Flagged/)).toBeTruthy();
+    expect(screen.getByText(/Own baseline 10 to 18 \/min$/)).toBeTruthy();
+    expect(screen.getAllByText(SHADED)).toHaveLength(1);
+    expect(api.getBaseline).toHaveBeenCalledOnce(); // no second request for the charts
+  });
+
+  it("shows an admin the same band", async () => {
+    api.getBaseline.mockResolvedValue(withVitals(hr));
+    await openCharts("admin");
+    await waitFor(() => expect(bands()).toHaveLength(1));
+    expect(api.getBaseline).toHaveBeenCalledOnce();
+  });
+
+  it("draws no band and no label line when the baseline is not computed, absent or old", async () => {
+    const oldServer = { ...hr, band_low: undefined }; // a server from before the two fields
+    for (const answer of [
+      null, // fixture build
+      withVitals({ vital: "heart_rate", status: "forming", bins_valid: 3, bins_needed: 24 }),
+      withVitals({ vital: "heart_rate", status: "unavailable", reason: "no_history" }),
+      withVitals(oldServer as unknown as BaselineComputed),
+      withVitals({ ...hr, delta: "x" } as unknown as BaselineComputed),
+      "failed", // a rejected request
+    ]) {
+      if (answer === "failed") api.getBaseline.mockRejectedValue(new Error("404"));
+      else api.getBaseline.mockResolvedValue(answer);
+      await openCharts();
+      await waitFor(() => expect(api.getBaseline).toHaveBeenCalled());
+      await act(async () => undefined);
+      expect(bands()).toHaveLength(0);
+      expect(screen.queryByText(SHADED)).toBeNull();
+      expect(screen.queryByText(/Own baseline \d/)).toBeNull();
+      cleanup();
+      vi.clearAllMocks();
+    }
+  });
+});
+
+describe("PatientDetail charts title", () => {
+  const hist = (...times: string[]) => ({
+    heart_rate: times.map((time) => ({ time, value: 80 })),
+    respiratory_rate: [],
+    spo2: [],
+  });
+  it.each([
+    ["no points", [], "Vital trends"],
+    ["one point", ["2026-09-03T01:00:00Z"], "Vital trends \u00b7 under 1 h"],
+    ["30 minutes", ["2026-09-03T01:00:00Z", "2026-09-03T01:30:00Z"], "Vital trends \u00b7 under 1 h"],
+    ["6 hours", ["2026-09-03T01:00:00Z", "2026-09-03T07:00:00Z"], "Vital trends \u00b7 6 h"],
+    ["3 days", ["2026-09-01T01:00:00Z", "2026-09-04T01:00:00Z"], "Vital trends \u00b7 72 h"],
+  ])("says the span for %s", async (_name, times, title) => {
+    api.getPatient.mockResolvedValue({ ...base, vital_history: hist(...times) });
+    const user = userEvent.setup();
+    page();
+    await loaded();
+    await user.click(screen.getByRole("button", { name: "Charts" }));
+    expect(screen.getByText(title)).toBeTruthy();
+  });
+});
+
 describe("PatientDetail follows the ward's speed", () => {
   const published = (over: object = {}) => ({
     shared: { clockS: 109_200, speed: 60, ended: false, counts: { received: 1, rejected: 0, abstained: 0 }, ...over },
@@ -665,6 +742,19 @@ describe("PatientDetail follows the ward's speed", () => {
     await advance(2_100);
     const overlay = document.querySelector('[class*="overlayHeader"]') as HTMLElement;
     await waitFor(() => expect(within(overlay).getByText(/Cannot reach the ward server since/)).toBeTruthy());
+  });
+
+  it("keeps the band across a timed read of the patient", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    api.getBaseline.mockResolvedValue({ ...baseline, vitals: [baseline.vitals[0]] });
+    page();
+    await loaded();
+    await screen.findByRole("region", { name: "Change from own baseline" });
+    await user.click(screen.getByRole("button", { name: /Charts/ }));
+    const grid = document.querySelector('[class*="chartGrid"]');
+    await advance(2_100);
+    expect(document.querySelector('[class*="chartGrid"]')).toBe(grid);
+    expect(document.querySelectorAll('[data-testid="own-baseline-band"]')).toHaveLength(1);
   });
 
   it("leaves the open charts drawer alone while the data does not change", async () => {
