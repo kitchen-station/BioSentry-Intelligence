@@ -61,6 +61,11 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+const expectLabEntry = () => {
+  expect(screen.getAllByRole("link", { name: "Simulation lab" })).toHaveLength(1);
+  expect(screen.getAllByText("Simulated patients until a hospital is connected.")).toHaveLength(1);
+};
+
 describe("the simulated note", () => {
   it("says the patients are simulated, once, with the lab entry in the bar", async () => {
     page();
@@ -103,6 +108,14 @@ describe("when the server fails", () => {
     expect((await screen.findByRole("alert")).textContent).toBe(
       "The ward server cannot be reached. Retrying every 15 seconds.",
     );
+    expectLabEntry();
+  });
+
+  it("shows the lab entry and the quiet line while the ward loads", () => {
+    api.getWard.mockReturnValue(new Promise(() => {}));
+    page();
+    expect(screen.getByText("Loading ward…")).toBeTruthy();
+    expectLabEntry();
   });
 
   it("keeps every alert open, says so, and lets the notice be dismissed", async () => {
@@ -207,6 +220,8 @@ describe("how often the ward is asked for", () => {
       await vi.advanceTimersByTimeAsync(2_000);
     });
     expect(api.getWard).toHaveBeenCalledTimes(1);
-    expect(await screen.findByText(new RegExp(`Retrying every ${ms / 1000} seconds\\.`))).toBeTruthy();
+    const offline = await screen.findByText(new RegExp(`Retrying every ${ms / 1000} seconds\\.`));
+    const note = screen.getByText("Simulated patients until a hospital is connected.");
+    expect(offline.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

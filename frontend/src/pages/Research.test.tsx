@@ -12,9 +12,9 @@ import { Research } from "./Research";
 
 afterEach(cleanup);
 
-const show = () =>
+const show = (at = "/") =>
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[at]}>
       <Research session={{ clinician_id: "md-santos", ward: "W4", role: "md" }} onSignOut={() => {}} />
     </MemoryRouter>,
   );
@@ -209,6 +209,19 @@ describe("Research page", () => {
     show();
     expect(screen.getByRole("heading", { level: 2, name: "Research agent: questions asked on the simulated ward" })).toBeTruthy();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
+  it("scrolls to the agent section when the address has its hash, and not without one", () => {
+    // jsdom has no scrollIntoView.
+    const spy = vi.fn();
+    Element.prototype.scrollIntoView = spy;
+    show();
+    expect(spy).not.toHaveBeenCalled();
+    cleanup();
+    show("/lab/research#agent");
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect((spy.mock.contexts[0] as Element).id).toBe("agent");
+    delete (Element.prototype as Partial<Element>).scrollIntoView;
   });
 
   it("makes no API call", () => {

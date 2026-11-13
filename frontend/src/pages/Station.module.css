@@ -13,7 +13,7 @@
 .statusBar {
   background: var(--primary);
   color: var(--button-ink);
-  height: 36px;
+  min-height: 36px;
   display: flex;
   align-items: center;
   padding: 0 var(--sp-4);

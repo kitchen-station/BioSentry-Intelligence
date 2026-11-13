@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import type { Session } from "../types";
 import { LabFrame } from "../components/LabFrame";
 import { LEARNED_RULES, RESEARCH_PROVENANCE as P, RESEARCH_RESULTS, RUN_COMPARISON } from "../data/researchResults";
@@ -20,6 +22,11 @@ const Rate = ({ rate, n, d }: { rate: number; n?: number; d?: number }) => (
 
 /** What the offline evaluation found. Static: reads no patient data, makes no API call, changes no rank. */
 export function Research({ session, onSignOut }: Props) {
+  const { hash } = useLocation();
+  // React Router does not scroll to a hash by itself.
+  useEffect(() => {
+    if (hash) document.getElementById(hash.slice(1))?.scrollIntoView();
+  }, [hash]);
   return (
     <LabFrame session={session} onSignOut={onSignOut}>
       <main className={styles.main}>

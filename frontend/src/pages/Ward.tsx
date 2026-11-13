@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { AbstainedRow as AbstainedRowType, Session, VitalsRecorded, WardResponse } from "../types";
@@ -39,6 +40,19 @@ function beep(): void {
 
 function setTitle(title: string): void {
   document.title = title;
+}
+
+function Bar({ session, onSignOut, left }: { session: Session; onSignOut: () => void; left?: ReactNode }) {
+  return (
+    <div className={styles.statusBar}>
+      <div className={styles.statusInner}>
+        <div className={styles.statusLeft}>{left}</div>
+        <div className={styles.statusRight}>
+          <SessionMenu session={session} onSignOut={onSignOut} />
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function Ward({ session, onSignOut }: Props) {
@@ -127,13 +141,17 @@ export function Ward({ session, onSignOut }: Props) {
 
   if (!data) {
     return (
-      <main className={styles.container}>
-        <p role={failedSince ? "alert" : "status"}>
-          {failedSince
-            ? `The ward server cannot be reached. Retrying every ${pollMs / 1000} seconds.`
-            : "Loading ward…"}
-        </p>
-      </main>
+      <div className={styles.page}>
+        <Bar session={session} onSignOut={onSignOut} />
+        <main className={styles.container}>
+          <p role={failedSince ? "alert" : "status"}>
+            {failedSince
+              ? `The ward server cannot be reached. Retrying every ${pollMs / 1000} seconds.`
+              : "Loading ward…"}
+          </p>
+        </main>
+        <SimulatedNote />
+      </div>
     );
   }
 
@@ -151,31 +169,24 @@ export function Ward({ session, onSignOut }: Props) {
 
   return (
     <div className={styles.page}>
-      {/* Status bar */}
-      <div className={styles.statusBar}>
-        <div className={styles.statusInner}>
-          <div className={styles.statusLeft}>
-            <span className={styles.statusItem}>
-              <span className={styles.statusLabel}>BioSentry</span>
-              <span className={styles.statusValue}>Ward {data.ward}</span>
+      <Bar session={session} onSignOut={onSignOut} left={
+        <>
+          <span className={styles.statusItem}>
+            <span className={styles.statusLabel}>BioSentry</span>
+            <span className={styles.statusValue}>Ward {data.ward}</span>
+          </span>
+          <span className={styles.statusDivider} />
+          <span className={styles.statusItem}>
+            <span className={styles.statusValue}>
+              {!data.receiving_data
+                ? "No signal"
+                : failedSince
+                  ? `Offline since ${formatClock(failedSince)}`
+                  : `Updated ${fetchedAt ? formatClock(fetchedAt) : "--"}`}
             </span>
-            <span className={styles.statusDivider} />
-            <span className={styles.statusItem}>
-              <span className={styles.statusValue}>
-                {!data.receiving_data
-                  ? "No signal"
-                  : failedSince
-                    ? `Offline since ${formatClock(failedSince)}`
-                    : `Updated ${fetchedAt ? formatClock(fetchedAt) : "--"}`}
-              </span>
-            </span>
-          </div>
-          <div className={styles.statusRight}>
-            <SessionMenu session={session} onSignOut={onSignOut} />
-          </div>
-        </div>
-      </div>
-      <SimulatedNote />
+          </span>
+        </>
+      } />
 
       {failedSince && (
         <p className={styles.offline} role="status">
@@ -183,6 +194,7 @@ export function Ward({ session, onSignOut }: Props) {
           {fetchedAt ? formatClock(fetchedAt) : "--"}; ages below keep counting. Retrying every {pollMs / 1000} seconds.
         </p>
       )}
+      <SimulatedNote />
 
       {/* Summary cards */}
       <div className={styles.summary}>

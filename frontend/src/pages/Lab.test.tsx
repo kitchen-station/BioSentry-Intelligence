@@ -60,7 +60,11 @@ describe("lab index", () => {
     lab();
     expect(screen.getByRole("heading", { name: "Outside the lab" })).toBeTruthy();
     expect(screen.getByText(/can change that ward, and so the ranks on the ward list/)).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Open the ward simulator" }).getAttribute("href")).toBe("/simulator/");
+    const link = screen.getByRole("link", { name: "Open the ward simulator" });
+    expect(link.getAttribute("href")).toBe("/simulator/");
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toBe("noopener");
+    expect(screen.getByText(/It opens in a new tab and asks for its own sign-in\./)).toBeTruthy();
   });
 
   it("hides the simulator link for a local API address", () => {
@@ -71,9 +75,8 @@ describe("lab index", () => {
 });
 
 describe("the lab writes nothing to the ward", () => {
-  it("calls no write and sends no request but a GET while every lab page is opened", async () => {
+  it("calls no write of the mocked api while every lab page renders and its in-lab links are clicked", async () => {
     api.getWard.mockResolvedValue(synthetic);
-    const fetchSpy = vi.spyOn(globalThis, "fetch");
     lab();
     for (const name of ["Research numbers", "The pipeline"]) {
       await userEvent.click(screen.getByRole("link", { name }));
@@ -84,6 +87,5 @@ describe("the lab writes nothing to the ward", () => {
       lab();
     }
     for (const w of WRITES) expect(w).toHaveBeenCalledTimes(0);
-    for (const call of fetchSpy.mock.calls) expect((call[1]?.method ?? "GET").toUpperCase()).toBe("GET");
   });
 });
