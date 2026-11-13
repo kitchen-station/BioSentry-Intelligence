@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import type { Session } from "../types";
 import styles from "./SessionMenu.module.css";
 
@@ -58,12 +58,6 @@ export function SessionMenu({ session, onSignOut }: Props) {
                 A ward administrator can see which beds you are assigned, counts of your actions from the last 24 hours, and every patient's page, including the notes you write.
               </p>
             )}
-
-            <div className={styles.divider} />
-
-            <Link to="/lab" className={styles.menuItem} onClick={() => setOpen(false)}>
-              Simulation lab
-            </Link>
 
             <div className={styles.divider} />
 
