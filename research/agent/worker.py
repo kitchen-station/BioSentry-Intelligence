@@ -19,7 +19,9 @@ from .config import AgentError, Config
 from .ledger import LedgerError
 from .tools import ToolError
 
-TIMEOUT = 30
+TIMEOUT = 30  # per socket operation
+TOTAL_TIMEOUT = 60  # per request, all reads together
+HANDLED_KEEP = 1000
 MAX_RESPONSE = 64 * 1024
 MAX_ID = 2**53 - 1
 MAX_QUESTION = 500
@@ -50,13 +52,34 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None  # a 3xx becomes an HTTPError: the key never goes to another host
 
 
-def urllib_transport(method: str, url: str, headers: dict, body: bytes, timeout: float) -> tuple[int, bytes]:
+def default_opener() -> urllib.request.OpenerDirector:
+    """No redirect, and no proxy from the environment: the key goes to the API host only."""
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect)
+
+
+def read_capped(response, clock, deadline: float) -> bytes:
+    """At most 64 KiB + 1 byte, read in chunks; TimeoutError when the total deadline passes (slow-loris)."""
+    data = b""
+    while len(data) <= MAX_RESPONSE:
+        if clock() > deadline:
+            raise TimeoutError
+        chunk = response.read(min(4096, MAX_RESPONSE + 1 - len(data)))
+        if not chunk:
+            break
+        data += chunk
+    return data
+
+
+def urllib_transport(method: str, url: str, headers: dict, body: bytes, timeout: float,
+                     clock=time.monotonic) -> tuple[int, bytes]:
     """(status, at most 64 KiB + 1 byte of body). Network errors propagate; the caller never prints them."""
     request = urllib.request.Request(url, data=body, headers=headers, method=method)
+    deadline = clock() + TOTAL_TIMEOUT
     try:
-        with urllib.request.build_opener(_NoRedirect).open(request, timeout=timeout) as response:
-            return response.status, response.read(MAX_RESPONSE + 1)
+        with default_opener().open(request, timeout=timeout) as response:
+            return response.status, read_capped(response, clock, deadline)
     except urllib.error.HTTPError as e:
+        e.close()
         return e.code, b""
 
 
@@ -99,7 +122,7 @@ def _record(out: dict, commit: str | None) -> str:
         "agent": {"ask": "keywords", "step": out["step"], "commit": commit},
         "experiment": {"template": out["template"], "tool": "evaluate_rules", "args": out["args"],
                        "result_sha256": out["result_sha256"], "result": out["result"]},
-        "numbers": out["numbers"]})
+        "numbers": out["numbers"]}, allow_nan=False)  # the API parser refuses NaN
 
 
 def report_for(cfg: Config, job: dict, commit: str | None) -> dict:
@@ -116,12 +139,16 @@ def report_for(cfg: Config, job: dict, commit: str | None) -> dict:
         return {"state": "refused", "reason": R_NO_TEMPLATE}
     if out["status"] == "ungrounded":
         return {"state": "refused", "reason": R_UNGROUNDED}
+    if out["status"] != "answered":  # `done` is never the default
+        return {"state": "failed", "reason": R_ERROR}
     try:
         record = _record(out, commit)
     except Exception:  # noqa: BLE001
         return {"state": "failed", "reason": R_ERROR}
     text = out["text"]
-    if not 1 <= len(text) <= MAX_ANSWER or _BAD_TEXT.search(text) or len(record) > MAX_RECORD:
+    if _BAD_TEXT.search(text):
+        return {"state": "failed", "reason": R_ERROR}
+    if not 1 <= len(text) <= MAX_ANSWER or len(record) > MAX_RECORD:
         return {"state": "failed", "reason": R_SIZE}
     return {"state": "done", "record_json": record, "answer": text}
 
@@ -132,6 +159,7 @@ class Worker:
         self.headers = {"X-Ingest-Key": key}
         self.transport, self.sleep, self.clock, self.log = transport, sleep, clock, log
         self.conn = None
+        self.handled: dict[int, None] = {}  # insertion-ordered, the last HANDLED_KEEP ids
 
     def _send(self, url: str, body: bytes, headers: dict) -> tuple[int | None, bytes]:
         """(status, body), or (None, b"") on any transport failure. Failure text is dropped."""
@@ -186,6 +214,12 @@ class Worker:
         if type(jid) is not int or not 1 <= jid <= MAX_ID:
             self.log("ignored a job with no usable id")
             return False
+        if jid in self.handled:  # a broken API may hand the same job back: never run it twice
+            self.log(f"job {jid}: ignored, already handled")
+            return False
+        self.handled[jid] = None
+        if len(self.handled) > HANDLED_KEEP:
+            del self.handled[next(iter(self.handled))]
         reason = check_job(job)
         body = {"state": "refused", "reason": reason} if reason else report_for(self.cfg, job, self.commit)
         state = body["state"] if self.deliver(jid, body) else "report not delivered"

@@ -504,6 +504,10 @@ and `contract-d7` v3.1.
 
 `--once` makes one claim, handles at most one job and exits 0. There is no other option.
 
+A job id the worker has already handled (it keeps the last 1000) is never run or reported again: it logs
+`job <id>: ignored, already handled` and waits 30 s. Each request has a 60 s total deadline, follows no
+redirect and uses no proxy from the environment, so the key goes to the API host only.
+
 Three environment variables, read once at start:
 
 - `BIOSENTRY_API_URL`: an `http://` or `https://` address with a host, no user-info, query or fragment.

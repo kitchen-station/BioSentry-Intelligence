@@ -32,11 +32,12 @@ class Fake:
 
     def __init__(self, *script):
         self.script, self.calls, self.violations, self.running = list(script), [], [], False
+        self.strict = True  # off for a broken API that hands a job back without a report in between
 
     def __call__(self, method, url, headers, body, timeout):
         self.calls.append((method, url, dict(headers), body, timeout))
         is_claim = "/claim" in url
-        if is_claim and self.running:
+        if is_claim and self.running and self.strict:
             self.violations.append("claimed while a job runs")
         item = self.script.pop(0) if self.script else (204, b"")
         if isinstance(item, Exception):
@@ -161,12 +162,52 @@ def fake_answer(text="ok.", record_pad=0):
     return answer
 
 
-@pytest.mark.parametrize("text, pad", [("a" * 4001, 0), ("a\x00b", 0), ("a‮b", 0), ("", 0), ("fine", 131072)])
-def test_over_cap_or_forbidden_is_failed_and_nothing_is_cut(cfg, monkeypatch, text, pad):
+@pytest.mark.parametrize("text, pad", [("a" * 4001, 0), ("", 0), ("fine", 131072)])
+def test_over_cap_is_failed_and_nothing_is_cut(cfg, monkeypatch, text, pad):
     monkeypatch.setattr(ask, "answer", fake_answer(text, pad))
     fake = Fake(job())
     go(cfg, fake, max_polls=1)
     assert body_of(fake.reports[0]) == {"state": "failed", "reason": "the agent's answer is over the size cap"}
+
+
+@pytest.mark.parametrize("text", ["a\x00b", "a‮b", "a\ud800b"])
+def test_a_forbidden_character_is_an_error_not_a_size_problem(cfg, monkeypatch, text):
+    monkeypatch.setattr(ask, "answer", fake_answer(text))
+    fake = Fake(job())
+    go(cfg, fake, max_polls=1)
+    assert body_of(fake.reports[0]) == {"state": "failed", "reason": "the agent stopped with an error"}
+
+
+def test_done_is_only_for_answered(cfg, monkeypatch):
+    monkeypatch.setattr(ask, "answer", lambda c, q: {**fake_answer()(c, q), "status": "weird"})
+    fake = Fake(job())
+    go(cfg, fake, max_polls=1)
+    assert body_of(fake.reports[0]) == {"state": "failed", "reason": "the agent stopped with an error"}
+
+
+def test_nan_in_the_record_is_an_error(cfg, monkeypatch):
+    def nan(c, q):
+        return {**fake_answer()(c, q), "result": {"x": float("nan")}}
+    monkeypatch.setattr(ask, "answer", nan)
+    fake = Fake(job())
+    go(cfg, fake, max_polls=1)
+    assert body_of(fake.reports[0]) == {"state": "failed", "reason": "the agent stopped with an error"}
+
+
+def test_the_same_job_handed_back_is_not_run_again(cfg):
+    fake = Fake(job(), (204, b""), job(), job(question="x" * 501, id=9), (204, b""), job(id=9))
+    fake.strict = False
+    lines, clock = go(cfg, fake, max_polls=5)
+    assert len(fake.reports) == 2 and len(ledger.read(cfg)) == 2  # id 31 once, id 9 refused once
+    assert lines.count("job 31: ignored, already handled") == 1 and lines.count("job 9: ignored, already handled") == 1
+    assert clock.slept == [30, 30, 30]  # each repeat waits; the last is the idle poll
+
+
+def test_the_handled_set_is_bounded(cfg, monkeypatch):
+    monkeypatch.setattr(worker, "HANDLED_KEEP", 2)
+    fake = Fake(*[x for i in (1, 2, 3) for x in (job(id=i, question="x" * 501), (204, b""))], job(id=1, question="x" * 501))
+    go(cfg, fake, max_polls=4)
+    assert len(fake.reports) == 4  # id 1 was forgotten, so it ran again
 
 
 def test_an_answer_at_the_cap_with_lf_is_sent_whole(cfg, monkeypatch):
@@ -313,8 +354,44 @@ def test_a_redirect_is_an_error_not_followed(cfg):
     assert len(fake.calls) == 1 and clock.slept == [30]
 
 
-def test_the_default_transport_never_follows_a_redirect():
-    assert worker._NoRedirect().redirect_request(None, None, 302, "", {}, "http://other.test/") is None
+def test_the_default_opener_has_no_redirect_and_no_proxy(monkeypatch):
+    monkeypatch.setenv("http_proxy", "http://proxy.test:3128")
+    monkeypatch.setenv("https_proxy", "http://proxy.test:3128")
+    handlers = worker.default_opener().handlers
+    redirects = [h for h in handlers if isinstance(h, worker.urllib.request.HTTPRedirectHandler)]
+    assert redirects and all(type(h) is worker._NoRedirect for h in redirects)
+    proxies = [h for h in handlers if isinstance(h, worker.urllib.request.ProxyHandler)]
+    assert all(h.proxies == {} for h in proxies)  # an empty ProxyHandler is not even listed; the default one would be
+
+
+class Slow:
+    """A response that gives one byte per read."""
+
+    def __init__(self, clock):
+        self.clock = clock
+
+    def read(self, n):
+        self.clock.t += 1
+        return b"x"
+
+
+def test_a_slow_body_hits_the_total_deadline():
+    clock = Clock()
+    with pytest.raises(TimeoutError):
+        worker.read_capped(Slow(clock), clock, clock() + 60)
+    assert clock.t <= 62
+
+
+def test_a_fast_body_is_capped_at_64_kib_plus_one():
+    class Fast:
+        def read(self, n):
+            return b"x" * n
+    assert len(worker.read_capped(Fast(), Clock(), 60)) == 64 * 1024 + 1
+
+
+def test_a_timeout_in_the_transport_is_unreachable(cfg):
+    lines, clock = go(cfg, Fake(TimeoutError()), max_polls=1)
+    assert clock.slept == [30] and lines[-1] == "connection: unreachable"
 
 
 @pytest.mark.parametrize("data", [b"x" * 70000, b"not json", b"[1]", b'"s"', b"\xff\xfe", b"[" * 100000])
