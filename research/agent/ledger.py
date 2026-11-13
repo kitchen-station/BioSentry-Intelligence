@@ -200,6 +200,7 @@ def export(records: list[dict]) -> dict:
         applied = next((x for x in after if x["type"] == "applied"), None)
         proposals.append({"id": r["id"], "action": r["action"], "step": r["step"], "proposed_at": r["at"],
                           "state": status(records, r["id"]), "files": len(r["files"]),
+                          "conclusion": (steps.get(r["step"]) or {}).get("conclusion"),
                           "approved_by": approval["by"] if approval else None,
                           "approved_at": approval["at"] if approval else None,
                           "applied_at": applied["at"] if applied else None})

@@ -490,5 +490,5 @@ Export for a page that shows the record (read only; it writes one JSON file and 
 chance control and the last line; null when refused). `rounds`: `id`, `started_at`,
 `finished_at` (null for a round that did not finish), `experiment`, `planner`, `rule`, `tool`,
 `ok`, `conclusion`. `proposals`: `id`, `action`, `step`, `proposed_at`, `state` (`proposed`,
-`approved`, `applied`), `files`, `approved_by`, `approved_at`, `applied_at`. The question text is
-what a person typed: a page must show it as text.
+`approved`, `applied`), `files`, `conclusion` (of the step that led to it), `approved_by`,
+`approved_at`, `applied_at`. The question text is what a person typed: a page must show it as text.

@@ -36,7 +36,7 @@ def test_export_lists_questions_rounds_and_proposals_and_changes_nothing(cfg, tm
     assert (r2["experiment"], r2["finished_at"], r2["ok"], r2["conclusion"]) == ("reward_round", None, None, None)
     p, = data["proposals"]
     assert {k: p[k] for k in p if k != "proposed_at"} == {
-        "id": pid, "action": "adopt_reward_policy", "step": sid, "state": "proposed", "files": 3,
+        "id": pid, "action": "adopt_reward_policy", "step": sid, "state": "proposed", "files": 3, "conclusion": "done",
         "approved_by": None, "approved_at": None, "applied_at": None}
     assert p["proposed_at"] >= r1["finished_at"]
     # read only: the ledger and the models folder are byte for byte what they were
