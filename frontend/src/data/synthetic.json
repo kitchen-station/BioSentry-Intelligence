@@ -4274,7 +4274,7 @@
           "tier": "A"
         }
       ],
-      "trend": "rising",
+      "trend": "insufficient",
       "vital_trends": {
         "heart_rate": [
           103.6,
@@ -4743,7 +4743,7 @@
           "tier": "A"
         }
       ],
-      "trend": "rising",
+      "trend": "insufficient",
       "vital_trends": {
         "heart_rate": [
           60.5,
@@ -5212,7 +5212,7 @@
           "tier": "A"
         }
       ],
-      "trend": "stable",
+      "trend": "insufficient",
       "vital_trends": {
         "heart_rate": [
           96.3,
@@ -6108,7 +6108,7 @@
           "tier": "A"
         }
       ],
-      "trend": "stable",
+      "trend": "insufficient",
       "vital_trends": {
         "heart_rate": [
           52.9,
@@ -6529,7 +6529,7 @@
           "tier": "A"
         }
       ],
-      "trend": "stable",
+      "trend": "insufficient",
       "vital_trends": {
         "heart_rate": [
           95.4,
@@ -6950,7 +6950,7 @@
           "tier": "A"
         }
       ],
-      "trend": "stable",
+      "trend": "insufficient",
       "vital_trends": {
         "heart_rate": [
           97.1,
@@ -7385,7 +7385,7 @@
           "tier": "A"
         }
       ],
-      "trend": "stable",
+      "trend": "insufficient",
       "vital_trends": {
         "heart_rate": [
           98.0,
@@ -7806,7 +7806,7 @@
           "tier": "A"
         }
       ],
-      "trend": "stable",
+      "trend": "insufficient",
       "vital_trends": {
         "heart_rate": [
           67.7,
@@ -8227,7 +8227,7 @@
           "tier": "A"
         }
       ],
-      "trend": "stable",
+      "trend": "insufficient",
       "vital_trends": {
         "heart_rate": [
           70.6,
