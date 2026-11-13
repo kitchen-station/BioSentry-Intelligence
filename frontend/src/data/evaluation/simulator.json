@@ -774,14 +774,24 @@
      "verdict": "pass"
     },
     {
-     "check": "H1",
-     "real": "-",
-     "real_data": "none",
+     "check": "A4",
+     "real": "0.26",
+     "real_data": "eICU held-out hospitals",
      "signal": "temperature",
-     "sim": "-",
-     "statistic": "fitted from eICU; not tested",
-     "tolerance": "-",
-     "verdict": "no real comparison"
+     "sim": "0.20",
+     "statistic": "sd, 5-min reads",
+     "tolerance": "ratio 0.75-1.25",
+     "verdict": "pass"
+    },
+    {
+     "check": "A4",
+     "real": "0.938",
+     "real_data": "eICU held-out hospitals",
+     "signal": "temperature",
+     "sim": "0.623",
+     "statistic": "lag-1 (5 min) autocorrelation",
+     "tolerance": "abs diff < 0.2",
+     "verdict": "known miss"
     },
     {
      "check": "B1",
@@ -889,7 +899,7 @@
      "real_data": "none",
      "signal": "heart rhythm",
      "sim": "-",
-     "statistic": "fitted from MIT-BIH, AFDB, LTAFDB; not tested",
+     "statistic": "fitted from MIT-BIH, AFDB, LTAFDB; open data exists, no honest check (docs/realism.md)",
      "tolerance": "-",
      "verdict": "no real comparison"
     },
@@ -941,9 +951,9 @@
   "realism: the rows and footer of npm run realism, run by this export at provenance.commit; its seeds are fixed in src/realism.ts and are not listed in seeds"
  ],
  "provenance": {
-  "commit": "54fcbd03da3bcda171c8f566695ce90477fec938",
+  "commit": "01dcaaff997a1d7813477d374387aa1640cd4d95",
   "data": "biosentry-ward-sim ward W4 runs and realism checks",
-  "date": "2026-11-13",
+  "date": "2026-11-14",
   "exporter": {
    "name": "npm run export:evaluation",
    "version": "1"
