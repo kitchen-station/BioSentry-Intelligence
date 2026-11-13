@@ -591,6 +591,8 @@ describe("PatientDetail own baseline on the charts", () => {
       withVitals({ vital: "heart_rate", status: "unavailable", reason: "no_history" }),
       withVitals(oldServer as unknown as BaselineComputed),
       withVitals({ ...hr, delta: "x" } as unknown as BaselineComputed),
+      { ...withVitals(hr), vitals: null }, // an answer of an odd shape must not blank the page
+      { ...withVitals(hr), vitals: [null] },
       "failed", // a rejected request
     ]) {
       if (answer === "failed") api.getBaseline.mockRejectedValue(new Error("404"));

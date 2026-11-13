@@ -31,8 +31,8 @@ const REASONS: Record<string, string> = {
 };
 
 // The response is checked, not trusted: an odd shape becomes a plain line, never a blank page.
-const isObj = (x: unknown): x is Record<string, unknown> => typeof x === "object" && x !== null;
-const num = (x: unknown): x is number => typeof x === "number" && Number.isFinite(x);
+export const isObj = (x: unknown): x is Record<string, unknown> => typeof x === "object" && x !== null;
+export const num = (x: unknown): x is number => typeof x === "number" && Number.isFinite(x);
 const time = (x: unknown): x is string => typeof x === "string" && Number.isFinite(Date.parse(x));
 
 export function isComputed(v: Record<string, unknown>): v is BaselineComputed {

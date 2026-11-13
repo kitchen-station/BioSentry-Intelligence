@@ -5,7 +5,7 @@ import type { ClinicalNote, PatientDetail as PatientDetailType, Session, Session
 import { getPatient, getNotes, addNote, canRecordVitals, usesServer } from "../api";
 import { SessionMenu } from "../components/SessionMenu";
 import { SimulatedNote } from "../components/LabFrame";
-import { BaselinePanel, isComputed } from "../components/BaselinePanel";
+import { BaselinePanel, isComputed, isObj, num } from "../components/BaselinePanel";
 import { useBaseline, type BaselineState } from "../components/useBaseline";
 import { CurrentVitals, VitalRow } from "../components/CurrentVitals";
 import { TrendChart } from "../components/TrendChart";
@@ -19,15 +19,14 @@ import styles from "./PatientDetail.module.css";
 // --- Shared sub-components ---
 
 // The patient's own band for one vital, from the answer the page already loaded. An older server
-// without the two fields, a vital still forming and a build without the route give no band.
+// without the two fields, a vital still forming, a build without the route and an answer of an
+// odd shape give no band (the panel says the baseline could not be loaded; the page never blanks).
 function bandOf(baseline: BaselineState, vital: string) {
-  if (typeof baseline !== "object" || baseline === null) return undefined;
-  const v: unknown = baseline.vitals.find((x) => x.vital === vital);
-  if (typeof v !== "object" || v === null || !isComputed(v as Record<string, unknown>)) return undefined;
-  const { band_low: low, band_high: high, significant } = v as { band_low: unknown; band_high: unknown; significant: boolean };
-  return Number.isFinite(low) && Number.isFinite(high)
-    ? { low: low as number, high: high as number, flagged: significant }
-    : undefined;
+  const b: unknown = baseline;
+  if (!isObj(b) || !Array.isArray(b.vitals)) return undefined;
+  const v: unknown = b.vitals.find((x) => isObj(x) && x.vital === vital);
+  if (!isObj(v) || v.status !== "computed" || !isComputed(v) || !num(v.band_low) || !num(v.band_high)) return undefined;
+  return { low: v.band_low, high: v.band_high, flagged: v.significant };
 }
 
 // The read serves every stored bin, so the title says the span of what is drawn.
