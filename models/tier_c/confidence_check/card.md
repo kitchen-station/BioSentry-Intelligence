@@ -12,8 +12,9 @@
 
 Held-out ward-v2 seeds 11-30 were scored once, on 2026-11-13. The outputs are `heldout.txt` and `heldout.json` (format
 `biosentry-held-out/1`, full precision). The pre-registered target was MET for both variants, inside the simulator.
-Staying quiet removed about 6 in 10 of the student's alerting bins and lost 8 (`all`) and 9 (`no_temp`) episodes the
-student was alerting in. Added to NEWS2, the checked student gives no gain beyond noise.
+Staying quiet removed about 6 in 10 of the student's alerting bins. The checked rule is not alerting in 8 of the 61
+episodes the student was alerting in (`no_temp`: 9 of 62). Added to NEWS2, the checked student alerts in 6 more of 91
+episode windows at 1.06 times NEWS2's alerts; no gain beyond chance is shown.
 
 ## What the pitch line says and what is true now
 
@@ -22,8 +23,8 @@ student was alerting in. Added to NEWS2, the checked student gives no gain beyon
 - It binds for both variants. "Binding" means q is absent or q >= t; here q is above t, so some of the student's
   alerts become "not sure".
 - "Not sure" never alerts. That is true by construction: a bin alerts only if p >= t and p > q.
-- On held-out the achieved error was 0.0065 (`all`) and 0.0067 (`no_temp`) against alpha 0.01. The cost: 8 and 9
-  episodes the student was alerting in, the checked rule is not.
+- On held-out the achieved error was 0.0065 (`all`) and 0.0067 (`no_temp`) against alpha 0.01. The cost: the checked
+  rule is not alerting in 8 of the 61 episodes the student was alerting in (`no_temp` 9 of 62).
 
 "Nurses already get too many false alarms": the check does not fix that by itself. See the next section.
 
@@ -70,9 +71,9 @@ conformal p-value on 389,123 cases, with 0 mismatches. In its simulation, exchan
 0.0101 at alpha 0.01. With strongly dependent bins inside stays, one bin per stay held 0.0100, while pooling all bins
 reached 0.053 when long stays score lower. Before the held-out reads it also recomputed the calibration on its own:
 n 3,238, j 32, k 3,207 and q equal the files to full precision for both variants. There are 3,241 non-starting
-calibration stays; 3 have no negative bin. There are 1,257,362 negative bins. Its preview on the VALIDATION seeds 261-300 (not held-out):
-the stay-weighted share of negative bins with p > q is 0.00608 (`all`) and 0.00644 (`no_temp`). On the calibration
-stays themselves it is 0.00720 and 0.00765.
+calibration stays; 3 have no negative bin. There are 1,257,362 negative bins. Its preview on the VALIDATION seeds
+261-300 (not held-out): the stay-weighted share of negative bins with p > q is 0.00608 (`all`) and 0.00644
+(`no_temp`). On the calibration stays themselves it is 0.00720 and 0.00765.
 
 ## Held-out results (ward-v2 seeds 11-30, scored once on 2026-11-13)
 
@@ -123,13 +124,16 @@ What this shows:
   (0.0065). The upper ends, 0.0074 and 0.0076, are not. The same share is also below alpha on the calibration stays
   themselves (0.00720 and 0.00765, second agent), so a value below alpha is not special to held-out.
 - What staying quiet costs (`all`): it removes 27,523 of 46,103 alerting bins (0.597) and 4,317 of 6,247 new alerts.
-  Alerts per patient per 12 h fall from 0.413 to 0.128. It loses 8 episodes the student was alerting in (any-bin over
-  all episodes 0.670 to 0.582) and 13 episodes the student caught early. The checked rule's median lead is 20.5
-  minutes against the student's 59.5. `no_temp` is alike: 28,792 of 46,875 bins, 9 and 13 episodes.
-- Added to NEWS2, the checked student gives no gain beyond noise. NEWS2 OR student checked alerts in 0.692
-  (0.593-0.782) of all episodes against NEWS2's 0.626 (0.522-0.727). The intervals overlap. It costs 1.06 times NEWS2's
-  alerts (0.438 against 0.414), with chance 0.491 against 0.473 and excess +0.268 against +0.210. `no_temp`: 0.692
-  (0.593-0.782) at 0.433 alerts, 1.04 times.
+  Alerts per patient per 12 h fall from 0.413 to 0.128. The checked rule is not alerting in 8 of the 61 episodes
+  the student was alerting in (any-bin over all episodes 0.670 to 0.582). It loses 13 episodes the student caught
+  early. The checked rule's median lead is 20.5 minutes against the student's 59.5. `no_temp` is alike: 28,792 of
+  46,875 bins, 9 of 62 episodes, 13 early.
+- Added to NEWS2, the checked student alerts in 6 more of 91 episode windows (63 against 57) at 1.06 times NEWS2's
+  alerts (0.438 against 0.414). NEWS2 OR X can only add windows to NEWS2. Most of that is what the extra alerts give
+  by chance: chance rises from 0.473 to 0.491, and the excess over chance is +0.268 against +0.210 for NEWS2 alone.
+  Excess has no interval. No gain beyond chance is shown. `no_temp`: 6 more (63 against 57) at 1.04 times the
+  alerts, chance 0.491, excess +0.268. (As rates over all episodes: 0.692 (0.593-0.782) against 0.626 (0.522-0.727);
+  separate intervals do not test this paired gain.)
 - Hypotensive episodes (27; 17 with no cuff reading inside the window): the checked student is alerting in 0 of 27,
   any bin and new alert, for both variants. The unchecked student: any bin 7 and new alert 5 (`no_temp` 9 and 6).
   NEWS2: 9 and 2. NEWS2 OR student checked: 9 and 2 for both variants, the same as NEWS2 alone. So the check removes

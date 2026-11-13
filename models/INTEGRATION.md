@@ -425,8 +425,8 @@ class TierCSignal:
 
 The policy IS connected, as a flag (owner decision M-1). It can add a reason to a ward row; it never outranks or
 lowers a NEWS2 trigger; it changes no order (ruling 12). The row says what it is: "Alert policy flag (learned by
-reward; synthetic, not validated)" (ruling 11). Its measured result (no gain beyond noise) stays in the card and on
-the Analytics page.
+reward; synthetic, not validated)" (ruling 11). Its measured result (no gain beyond chance is shown) stays in
+the card and on the Analytics page.
 
 ### 5.1 The six numbers
 
@@ -515,7 +515,8 @@ held-out row. The table below is for reading the card, not for choosing. What th
 | NEWS2 OR policy: any-bin, all episodes (95% CI) | 0.626 (0.522-0.727) | 0.703 (0.608-0.798) | 0.692 (0.596-0.785) |
 | NEWS2 OR policy: alerts per patient per 12 h | 0.414 | 0.463 | 0.451 |
 
-- Added to NEWS2, neither policy gives a gain beyond noise: the intervals overlap. Both raise more alerts.
+- Added to NEWS2, no gain beyond chance is shown for either policy: each adds a few episode windows (7 and 6 of 91)
+  at more alerts (1.12 and 1.09 times), and chance rises with them (0.528 and 0.504 against 0.473).
 - With temperature, the policy alone alerts late (median lead -3.8 min). That is not early warning. Without
   temperature its median lead alone is 20.2 min. Neither fact chooses the variant (ruling 1).
 
@@ -942,5 +943,6 @@ G3. The backend builds the series differently from research (`grid()` with its 6
 
 The policy added to NEWS2: 0.703 against 0.626 (any-bin, all episodes) for 12% more alerts (0.463 against 0.414 per
 patient per 12 h), median lead alone -3.8 minutes (`models/tier_b/reward_policy/card.md`). The student added to
-NEWS2: 0.747 against 0.626 at 0.525 against 0.414 alerts (`models/tier_c/student_vitals/held_out.json`). No gain
-beyond noise for either: the intervals overlap.
+NEWS2: 0.747 against 0.626 at 0.525 against 0.414 alerts (`models/tier_c/student_vitals/held_out.json`). NEWS2 OR X
+can only add windows: the policy adds 7 and the student 11 of 91, at 1.12 and 1.27 times NEWS2's alerts, and chance
+rises with them (0.528 and 0.580 against 0.473). No gain beyond chance is shown for either.

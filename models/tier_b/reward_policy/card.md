@@ -16,9 +16,9 @@ Earlier ward-v1 and B6 results are in git history before this change.
   else did. Round 2 (16 selection trials) accepted nothing and was dropped. The outer loop
   stopped after 2 of the 4 allowed rounds: the research step read the records and proposed no
   third change.
-- Held-out, added to NEWS2: no gain beyond noise. NEWS2 OR final has any-bin over all episodes
-  0.703 (0.608-0.798) against NEWS2's 0.626 (0.522-0.727). The intervals overlap. It raises
-  more alerts (0.463 against 0.414 per patient per 12 h).
+- Held-out, added to NEWS2: no gain beyond chance is shown. NEWS2 OR final alerts in 7 more of
+  91 episode windows (64 against 57) at 1.12 times NEWS2's alerts (0.463 against 0.414 per
+  patient per 12 h). Chance rises from 0.473 to 0.528; excess is +0.244 against +0.210.
 - Held-out, alone: a quiet rule. 0.153 alerts per patient per 12 h (NEWS2 0.414), time in alert
   0.035 (NEWS2 0.158), any-bin 0.633 (NEWS2 0.684), median lead -3.8 min (NEWS2 +47.2). Its
   excess (+0.493) is above NEWS2's (+0.210), but excess is capped at 1 minus chance (chance 0.140
@@ -26,7 +26,8 @@ Earlier ward-v1 and B6 results are in git history before this change.
 - The old loop's ward-v2 policy sat in about the same place: 0.150 alerts, any-bin 0.646, chance
   0.120, excess +0.525, lead -11.2.
 - No temperature: generation 1 was accepted. Held-out alone: 0.131 alerts, time in alert 0.021,
-  any-bin 0.608, lead +20.2. NEWS2 OR it: any-bin all 0.692 (0.596-0.785), overlapping NEWS2's.
+  any-bin 0.608, lead +20.2. NEWS2 OR it: 6 more of 91 windows (63 against 57) at 1.09 times
+  NEWS2's alerts; chance 0.504, excess +0.256. No gain beyond chance is shown.
   On validation it scored above the with-temperature policy (1.343958 against 0.992414). That
   comparison was not pre-registered and reuses validation.
 
@@ -219,9 +220,14 @@ episodes):
 Chance rates and excess have no interval. The full output, with per-kind rows, is `held_out.txt`.
 
 What this shows:
-- Added to NEWS2, neither learned policy gives a gain beyond noise. Any-bin over all episodes:
-  0.703 (0.608-0.798) with temperature and 0.692 (0.596-0.785) without, against NEWS2's 0.626
-  (0.522-0.727). All three intervals overlap.
+- Added to NEWS2, the final policy with temperature alerts in 7 more of 91 episode windows (64
+  against 57) at 1.12 times NEWS2's alerts. Most of that is what the extra alerts give by chance:
+  chance rises from 0.473 to 0.528, and the excess over chance is +0.244 against +0.210 for NEWS2
+  alone. Excess has no interval. No gain beyond chance is shown.
+- Without temperature: 6 more of 91 (63 against 57) at 1.09 times the alerts; chance 0.504
+  against 0.473, excess +0.256 against +0.210. No gain beyond chance is shown.
+- NEWS2 OR X can only add windows to NEWS2. The separate intervals (0.703 (0.608-0.798), 0.692
+  (0.596-0.785), NEWS2 0.626 (0.522-0.727)) do not test that paired gain.
 - Learning made generation 0 quieter, beyond noise: alerts 0.429 (0.414-0.443) to 0.153
   (0.140-0.165) with temperature, 0.318 (0.302-0.334) to 0.131 (0.119-0.143) without. Any-bin over
   all episodes fell, 0.725 to 0.571 and 0.648 to 0.549, with overlapping intervals.

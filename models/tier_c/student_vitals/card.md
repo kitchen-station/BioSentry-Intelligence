@@ -11,8 +11,9 @@
 
 Held-out ward-v2 seeds 11-30 were scored once, on 2026-11-13. The outputs are `held_out.txt` (the printed table) and
 `held_out.json` (format `biosentry-held-out/1`, full precision). At NEWS2's alert count the student alerts in about as
-many episode windows as NEWS2, with less time in alert and a lower chance rate. Added to NEWS2 it gives no gain beyond
-noise. The old scikit-learn student (B5) and its numbers are in git history.
+many episode windows as NEWS2, with less time in alert and a lower chance rate. Added to NEWS2 it alerts in 11 more of
+91 episode windows at 1.27 times NEWS2's alerts; no gain beyond chance is shown. The old scikit-learn student (B5)
+and its numbers are in git history.
 
 ## What the pitch line says and what is true now
 
@@ -80,10 +81,11 @@ What this shows:
 - Its excess is higher, +0.415 against +0.210. But excess is capped at 1 minus chance: 0.681 for the student, 0.527
   for NEWS2. As a share of its cap, the student's excess is 0.61 and NEWS2's is 0.40. Because the caps differ, the
   two rules cannot be ranked by excess alone.
-- Added to NEWS2, the student gives no gain beyond noise. NEWS2 OR student alerts in 0.747 (0.655-0.831) of all
-  episodes against NEWS2's 0.626 (0.522-0.727). The intervals overlap. It costs 1.27 times NEWS2's alerts (0.525
-  against 0.414 per patient per 12 h). Its excess is +0.243 against NEWS2's +0.210, and its chance rate rises to
-  0.580.
+- Added to NEWS2, the student alerts in 11 more of 91 episode windows (68 against 57) at 1.27 times NEWS2's alerts
+  (0.525 against 0.414 per patient per 12 h). NEWS2 OR X can only add windows to NEWS2. Most of that is what the
+  extra alerts give by chance: chance rises from 0.473 to 0.580, and the excess over chance is +0.243 against +0.210
+  for NEWS2 alone. Excess has no interval. No gain beyond chance is shown. (As rates over all episodes: 0.747
+  (0.655-0.831) against 0.626 (0.522-0.727); separate intervals do not test this paired gain.)
 - Lead time: the student's median is 59.5 minutes before fully in (interquartile range 6.2 to 191.5, 51 episodes with
   a new alert), NEWS2's 47.2 (-6.8 to 458.5, 33 episodes). NEWS2 OR student is 66.0. Medians have no interval.
 - New alerts over all episodes: student 0.560 (0.460-0.663), NEWS2 0.363 (0.260-0.459). These intervals miss each
@@ -91,8 +93,9 @@ What this shows:
   the window by construction. Treat this as weak.
 - The teacher and the student are within noise of each other: any-bin over all episodes 0.648 (0.544-0.742) and
   0.670 (0.570-0.762), at 0.391 and 0.413 alerts. The teacher's better validation loss does not show here.
-- Without temperature the rows tell the same story: student `no_temp` 0.681 (0.576-0.773) at 0.409 alerts, NEWS2 OR
-  student `no_temp` 0.747 (0.651-0.835) at 0.512 alerts.
+- Without temperature the rows tell the same story: student `no_temp` 0.681 (0.576-0.773) at 0.409 alerts. Added to
+  NEWS2 it alerts in 11 more of 91 windows (68 against 57) at 1.24 times NEWS2's alerts; chance 0.577 against 0.473,
+  excess +0.246 against +0.210. No gain beyond chance is shown.
 - Hypotensive episodes (27; 17 with no cuff reading inside the window): any-bin NEWS2 9, student 7, NEWS2 OR student
   13; new alert NEWS2 2, student 5, NEWS2 OR student 4. Few events; no claim. With the confidence check the student
   alerts in 0 of 27 hypotensive episodes (both variants; see `tier_c/confidence_check/card.md`).
@@ -272,7 +275,7 @@ validation section above.
 - Circular and synthetic: the same simulator makes the data and the labels. Not validated. No claim about real
   patients.
 - Seeds 261-300 both early-stop and select, so the validation numbers are optimistic.
-- Held-out was scored once. Added to NEWS2, the student shows no gain beyond noise there.
+- Held-out was scored once. Added to NEWS2, no gain beyond chance is shown there.
 - "Consciousness not A" and the value-missing flags were constant 0 in training, so the student ignores them in
   practice.
 - Missing-flag artefact: the chosen inputs include z-missing flags (set while the baseline forms) and 1-hour and
