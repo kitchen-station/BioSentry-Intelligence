@@ -149,7 +149,7 @@ class WardService:
 
     def ward(self, clinician_id: str) -> WardResponse:
         ranked, abstained = self.compute(self.visible(clinician_id))
-        self._audit.append(clinician_id, "view_ward", self._store.ward, "ok")
+        self._audit.append_view(clinician_id, "view_ward", self._store.ward)
         return WardResponse(
             ward=self._store.ward,
             clinician=clinician_id,
@@ -172,7 +172,7 @@ class WardService:
         if row is None:  # NOT RANKED: no detail page (there is no score to explain)
             self._audit.append(clinician_id, "view_patient", patient_id, "not_found")
             return None
-        self._audit.append(clinician_id, "view_patient", patient_id, "ok")
+        self._audit.append_view(clinician_id, "view_patient", patient_id)
         state = states[patient_id]
         breakdown = TierBreakdown(
             tier_a=TierAScore(score=row.score, label=f"NEWS2 = {row.score}"),
@@ -192,7 +192,7 @@ class WardService:
         """The sim's live view: `shared` as stored, and only this clinician's patients' entries."""
         visible = self._store.assigned(clinician_id)  # an admin has no live view, whatever the route
         view = self._store.live_view() or {"shared": None, "patients": []}
-        self._audit.append(clinician_id, "view_live", self._store.ward, "ok")
+        self._audit.append_view(clinician_id, "view_live", self._store.ward)
         return LiveWard.model_validate(
             {
                 **view,

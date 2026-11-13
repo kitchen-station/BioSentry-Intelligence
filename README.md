@@ -210,7 +210,7 @@ applied to made-up patients.
 - **I4** Abstention is an output: NOT RANKED is a row with a reason and an instruction.
 - **I5** No training on BioSentry patients: local data calibrates and validates only.
 - **I6** The synthetic flag propagates: every fixture record says `synthetic: true`.
-- **I7** Privacy (RA 10173): one screen per clinician, their patients only, audit on every view.
+- **I7** Privacy (RA 10173): one screen per clinician, their patients only, audit on every view. A repeated read of the same page by the same clinician is recorded at most once a minute; the first read and every write and refusal are always recorded (the owner's decision for the automatic refresh).
 - **I8** Transport: BLE to a gateway, then Wi-Fi or 4G to the cloud. NB-IoT is excluded.
 
 ## Design rules

@@ -1547,6 +1547,7 @@ def test_the_live_view_is_scoped_audited_and_replaced_whole(api: Api) -> None:
     assert live(api, "rn-delacruz") == {**sent, "patients": sent["patients"][0:3:2]}
     assert live(api, "rn-manalo") == {**sent, "patients": sent["patients"][:3]}
 
+    api.wall.now += timedelta(seconds=61)  # a repeat inside a minute leaves no row; this one does
     gone = batch(minute=6, departures=[{"patient_id": "s-1", "minute": 6, "outcome": "discharged"}])
     assert api.post(f"/sim/runs/{run_id}/batch", gone).status_code == 204
     assert [p["id"] for p in live(api, "rn-manalo")["patients"]] == ["s-2", "s-3"]
@@ -1557,7 +1558,7 @@ def test_the_live_view_is_scoped_audited_and_replaced_whole(api: Api) -> None:
         "SELECT clinician_id, resource, outcome FROM audit_log WHERE action = 'view_live'"
     )
     assert [r["clinician_id"] for r in rows] == [
-        "rn-manalo", "rn-reyes", "rn-delacruz", "rn-manalo", "rn-manalo", "rn-manalo",
+        "rn-manalo", "rn-reyes", "rn-delacruz", "rn-manalo",
     ]  # fmt: skip
     assert {(r["resource"], r["outcome"]) for r in rows} == {("W4", "ok")}
 
