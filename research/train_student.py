@@ -166,7 +166,8 @@ def run_log(top: dict, built: Built, run_id: str | None, commit: str | None) -> 
         m = r.meta
         data["variants"][tag] = r.runlog["rows"]
         variants[tag] = {"fits": r.runlog["fits"], "references": {"constant": m["references"]["constant"], **r.runlog["references"]},
-                         "teacher_gate": m["teacher_gate"], "chosen": {"teacher": m["teacher"]["chosen"], "student": m["student"],
+                         "teacher_gate": m["teacher_gate"], "chosen": {"teacher": {**m["teacher"]["chosen"], "fit_index": r.runlog["fit_index"]["teacher"]},
+                                                                         "student": None if m["student"] is None else {**m["student"], "fit_index": r.runlog["fit_index"]["student"]},
                                                                          "shipped": m["shipped"], "distilled": m["distilled"]},
                          "thresholds": m["thresholds"], "parameters": m["parameters"]}
         times["fits"].update(r.times["fits"])

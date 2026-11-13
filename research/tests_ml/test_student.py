@@ -678,6 +678,23 @@ def test_the_metadata_names_mindspore_and_records_the_grid_gates_and_counts(buil
     assert "second" not in (tmp_path / "exports.json").read_text()
 
 
+@pytest.mark.parametrize("shipped", ["distilled_student", "hard_label_mlp"])
+def test_the_run_log_points_at_the_chosen_fits_by_index(tmp_path, monkeypatch, tfs, shipped):
+    monkeypatch.setattr(student, "decide", lambda *a: shipped)
+    b = student.build(tfs[:2], tfs[2:], TINY)
+    monkeypatch.setattr(train_student, "GRID", TINY)
+    top = train_student.write_outputs(tmp_path, b, tfs[:2], tfs[2:], {"ward_v2": [], "calibration": [305]}, True)
+    log = train_student.run_log(top, b, "t", "c")
+    for v in log["variants"].values():
+        t, st = v["chosen"]["teacher"], v["chosen"]["student"]
+        ft, fs = v["fits"][t["fit_index"]], v["fits"][st["fit_index"]]
+        assert (ft["kind"], ft["weight_decay"]) == ("teacher", t["weight_decay"])
+        assert (fs["kind"], fs["inputs"], fs["width"], fs["weight_decay"]) == (
+            {"distilled_student": "distilled", "hard_label_mlp": "hard_label"}[shipped], st["inputs"], st["width"], st["weight_decay"])
+        assert ft["best_epoch"] == t["best_epoch"] and fs["best_epoch"] == st["best_epoch"]
+    assert "fit_index" not in (tmp_path / "metadata.json").read_text()
+
+
 def _patch_run(monkeypatch, tfs, grid=TINY):
     monkeypatch.setattr(train_student, "load_for_training",
                         lambda folders, cache=None, workers=None: (tfs[:2], tfs[2:], {"ward_v2": [], "calibration": [305]}))

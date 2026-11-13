@@ -11,8 +11,8 @@ log, notebook and registry row are in `training/`.
 | `tier_a/news2/` | the NEWS2 card (the rule is code in `backend/`, there is no model file) |
 | `tier_b/baseline/` | `params.json` (the baseline rule's k and p) and its card |
 | `tier_b/reward_policy/` | `policy.json` (six numbers), `no_temperature/policy.json`, the card, `held_out.txt`, the ledger `experiments.jsonl`, and the generation records under `rounds/` and `no_temperature/generations/` |
-| `tier_c/student_vitals/` | the distilled student: `model.onnx`, `model.mindir`, `model.ms` (hand-run Lite step), `model.json` (plain export), the `_no_temp` versions, `metadata.json`, `exports.json`, `timing.json`, `convert_lite.sh`, the card |
-| `tier_c/confidence_check/` | `calibration.json` and `calibration_no_temp.json` (each with a `.sha256`), `heldout.txt` |
+| `tier_c/student_vitals/` | the distilled student: `model.onnx`, `model.mindir`, `model.ms` (hand-run Lite step), `model.json` (plain export), the `_no_temp` versions, `metadata.json`, `exports.json`, `timing.json`, `convert_lite.sh`, the card, `held_out.txt` and `held_out.json` (the held-out result, written once) |
+| `tier_c/confidence_check/` | `calibration.json` and `calibration_no_temp.json` (each with a `.sha256`), `heldout.txt` and `heldout.json` (the held-out result, written once) |
 | `data/` | dataset cards only (no data) |
 | `manifest.json` | one record per shipped model file: path, model, variant, framework and version, format, bytes, sha256, training seeds, run id, `commit_at_run` |
 
@@ -31,7 +31,7 @@ The rule for what counts as a shipped model file is fixed by folder and file nam
 - `tier_b/baseline/`: `params.json`.
 
 Everything else under `models/` must be a record: `*.md`, `*.txt`, `*.jsonl`, `*.sh`, `*.sha256`, the student's
-`metadata.json`, `exports.json` and `timing.json`, and anything under `rounds/` or `generations/`. A file that is
+`metadata.json`, `exports.json` and `timing.json`, the held-out results `held_out.json` and `heldout.json`, and anything under `rounds/` or `generations/`. A file that is
 neither is refused, so a new model file cannot be added without a line in the rule.
 
 Where a record's fields come from (a field recorded nowhere is `null`, never guessed):

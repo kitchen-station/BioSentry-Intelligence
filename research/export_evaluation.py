@@ -1,9 +1,9 @@
-"""The two exported files of the evaluation data contract (v3.1) that this repository owns, each written by one
+"""The two exported files of the evaluation data contract (v3.4) that this repository owns, each written by one
 command (standard library only).
 
     python -m research.export_evaluation registry    --date YYYY-MM-DD --commit <40 hex> [--source <text>]... --out <path>
     python -m research.export_evaluation evaluations --date YYYY-MM-DD --commit <40 hex> [--source <text>]...
-                                         --held-out <held-out.json>... [--drop-rule <id>]... --out <path>
+                                         --held-out <held-out.json>... [--drop-rule <id>]... [--confidence <heldout.json>] --out <path>
 
 The held-out JSON files are what `--json` of research.evaluate, research.evaluate_student,
 research.reward_loop --evaluate and research.confidence evaluate write. A text report is never a source here.
@@ -12,6 +12,7 @@ that has no plain spelling is refused and nothing is written. Exit 2 with one li
 """
 
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -20,7 +21,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
-FORMAT = "biosentry-evaluation/2"
+FORMATS = {"registry": "biosentry-evaluation/2", "evaluations": "biosentry-evaluation/4"}  # contract v3.6
 HELD_FORMAT = "biosentry-held-out/1"  # research/evaluate.py HELD_OUT_FORMAT
 EXPORTER = {"name": "research.export_evaluation", "version": "1"}
 REPO = "kitchen-station/BioSentry-Intelligence"
@@ -28,7 +29,7 @@ MAX_BYTES = 256 * 1024
 BANNED = ("ai predicts deterioration", "reinforcement learning", "self-learning", "conformal guarantee",
           "fewer false alarms than news2")
 VALIDATED = re.compile(r"(?<!not )(?<!un)\bvalidated\b")  # only a positive claim is banned
-RULE_CAP = 20
+RULE_CAP = 30  # contract v3.4
 
 
 class Refused(Exception):
@@ -186,6 +187,8 @@ def merge_held_out(files: list[dict], drop: list[str]) -> tuple[dict, list[dict]
     if len(out) > RULE_CAP:
         raise Refused(f"{len(out)} rules, the cap is {RULE_CAP}: name some with --drop-rule")
     notes = []
+    if drop:
+        notes.append("Rule rows dropped on request: " + ", ".join(drop) + ".")
     if not any("reward" in r["id"] for r in out):
         notes.append("The reward policy's rules are absent: its held-out result exists only as a text report, "
                      "and a text report is never a source of a number.")
@@ -218,11 +221,38 @@ def build_registry(root: Path) -> tuple[dict, list[str]]:
 
 # --- the evaluations file ---------------------------------------------------------------------------
 
-def build_evaluations(held: list[dict], drop: list[str]) -> tuple[dict, list[str], list[dict]]:
+def _d4(x):
+    """Every float at most 4 decimals; ints, text and booleans as they are."""
+    if isinstance(x, dict):
+        return {k: _d4(v) for k, v in x.items()}
+    if isinstance(x, float):
+        return _num(x, 4)
+    return x
+
+
+def confidence_block(path: str, root: Path) -> dict:
+    """A rounded copy of the held-out file's `confidence`, with the repository path and sha256 of the bytes read."""
+    f = Path(path)
+    try:
+        rel = (f if f.is_absolute() else Path.cwd() / f).resolve().relative_to(root.resolve())
+    except ValueError:
+        raise Refused("--confidence: the file must be inside the repository") from None
+    raw = read(f)
+    try:
+        obj = json.loads(raw)
+    except (ValueError, RecursionError):
+        raise Refused(f"{f.name}: not valid JSON") from None
+    if not isinstance(obj, dict) or obj.get("format") != HELD_FORMAT or not isinstance(obj.get("confidence"), dict):
+        raise Refused(f"{f.name}: not a held-out file with a confidence block")
+    return {"source": {"path": rel.as_posix(), "sha256": hashlib.sha256(raw).hexdigest()},
+            "variants": {k: _d4(v) for k, v in obj["confidence"].items() if k in ("all", "no_temp")}}
+
+
+def build_evaluations(held: list[dict], drop: list[str], confidence: dict | None = None) -> tuple[dict, list[str], list[dict]]:
     ctx, rules, seeds, notes = (None, None, [], []) if not held else merge_held_out(held, drop)
-    body = {"context": ctx, "rules": rules, "confidence": None}
-    notes.append("confidence is null: the check's pre-registered quantity is a stay-weighted mean share of negative "
-                 "bins with a supported alert, with a stay-bootstrap interval, not a covered count.")
+    body = {"context": ctx, "rules": rules, "confidence": confidence}
+    if confidence is None:
+        notes.append("confidence is null: no --confidence file was given.")
     return body, notes, ([{"role": "held out", "seeds": seeds}] if seeds else [])
 
 
@@ -235,7 +265,7 @@ def envelope(section: str, body: dict, notes: list[str], a, seeds: list[dict], d
     cap(seeds, 5, "provenance seeds")
     for s in seeds:
         cap(s["seeds"], 100, "provenance seeds")
-    obj = {"format": FORMAT, "section": section, "body": body, "notes": notes,
+    obj = {"format": FORMATS[section], "section": section, "body": body, "notes": notes,
            "provenance": {"repo": REPO, "commit": a.commit, "source": cap(list(a.source), 10, "--source"),
                           "exporter": EXPORTER, "date": a.date, "synthetic": True, "validated": False,
                           "data": data, "seeds": seeds}}
@@ -273,6 +303,7 @@ def _parser() -> argparse.ArgumentParser:
         if name == "evaluations":
             s.add_argument("--held-out", action="append", required=True)
             s.add_argument("--drop-rule", action="append", default=[])
+            s.add_argument("--confidence")
     return p
 
 
@@ -293,7 +324,7 @@ def run(argv: list[str]) -> None:
             if not isinstance(obj, dict) or "context" not in obj or "rules" not in obj:
                 raise Refused(f"{Path(f).name}: not a held-out file")
             held.append(obj)
-        body, notes, seeds = build_evaluations(held, a.drop_rule)
+        body, notes, seeds = build_evaluations(held, a.drop_rule, confidence_block(a.confidence, root) if a.confidence else None)
         data = envelope("evaluations", body, notes, a, seeds, "ward-v2 simulator trials")
     write(a.out, data)
 

@@ -61,7 +61,7 @@ def test_banned_words_are_refused_but_not_validated_passes(text):
 
 def test_caps():
     with pytest.raises(Refused):
-        ex.cap([0] * 21, 20, "rules")
+        ex.cap([0] * 31, 30, "rules")
     with pytest.raises(Refused):
         ex.short("x" * 301, 300, "note")
 
@@ -144,8 +144,9 @@ def test_evaluations_file_from_a_toy_held_out_json(tmp_path):
     text, result, path = toy_held_out(tmp_path)
     raw, obj = make(tmp_path, "evaluations", "--held-out", str(path))
     body = obj["body"]
-    assert obj["format"] == "biosentry-evaluation/2" and obj["section"] == "evaluations"
+    assert obj["format"] == "biosentry-evaluation/4" and obj["section"] == "evaluations"
     assert list(body) == ["confidence", "context", "rules"] and body["confidence"] is None
+    assert any("confidence is null" in n for n in obj["notes"])
     assert body["context"]["patient_days"] == ex.D1(result["context"]["patient_days"]) and body["context"]["trials"] == 1
     assert [r["id"] for r in body["rules"]] == [r["id"] for r in result["rules"]]
     r0 = body["rules"][0]
@@ -174,16 +175,42 @@ def test_evaluations_file_from_a_toy_held_out_json(tmp_path):
     assert not bad.exists()
 
 
-def test_a_reward_rule_removes_the_absence_note_and_more_than_twenty_rules_are_refused():
+def test_a_reward_rule_removes_the_absence_note_and_more_than_thirty_rules_are_refused():
     r = {"id": "x", "per_shift": {"value": 0.1, "lo": 0.1, "hi": 0.1}, "lead": {"n": 0, "median": None, "q1": None, "q3": None},
          **{k: {"n": 1, "d": 2, "rate": 0.5} for k in ("time_in_alert", "any_bin_not_cut_short", "chance_new", "chance_any")},
          **{k: {"n": 1, "d": 2, "rate": 0.5, "lo": None, "hi": None} for k in ("new_alert", "any_bin")},
          "excess_any_not_cut_short": None}
     res: dict = {}
     evaluate.run([str(TOY)], result=res)
-    f = {"format": "biosentry-held-out/1", "context": res["context"], "rules": [{**r, "id": f"r{i}"} for i in range(21)]}
-    with pytest.raises(Refused, match="21 rules"):
+    f = {"format": "biosentry-held-out/1", "context": res["context"], "rules": [{**r, "id": f"r{i}"} for i in range(31)]}
+    with pytest.raises(Refused, match="31 rules"):
         ex.merge_held_out([f], [])
-    assert len(ex.merge_held_out([f], ["r0"])[1]) == 20
+    kept = ex.merge_held_out([f], ["r0"])
+    assert len(kept[1]) == 30 and any("dropped" in n and "r0" in n for n in kept[3])
     g = {**f, "rules": [{**r, "id": "reward_final"}]}
     assert not any("absent" in n for n in ex.merge_held_out([g], [])[3])
+
+
+def test_the_confidence_block_is_a_rounded_copy_of_the_committed_file(tmp_path):
+    import hashlib
+    src = ROOT / "models" / "tier_c" / "confidence_check" / "heldout.json"
+    _, _, path = toy_held_out(tmp_path)
+    _, obj = make(tmp_path, "evaluations", "--held-out", str(path), "--confidence", str(src))
+    c, real = obj["body"]["confidence"], json.loads(src.read_bytes())["confidence"]
+    assert c["source"] == {"path": "models/tier_c/confidence_check/heldout.json", "sha256": hashlib.sha256(src.read_bytes()).hexdigest()}
+    assert set(c["variants"]) == set(real) == {"all", "no_temp"}
+
+    def walk(a, b):
+        assert type(a) is type(b) and (not isinstance(a, dict) or a.keys() == b.keys())
+        if isinstance(a, dict):
+            for k in a:
+                walk(a[k], b[k])
+        elif isinstance(a, float):
+            assert abs(a - b) <= 5e-5 and len(repr(a).split(".")[1]) <= 4 and "e" not in repr(a)
+        else:
+            assert a == b  # counts, text (the verdict as written) and booleans unchanged
+    walk(c["variants"], real)
+    assert c["variants"]["all"]["verdict"] in ("MET", "NOT MET")
+    outside = tmp_path / "elsewhere.json"
+    outside.write_bytes(src.read_bytes())
+    assert ex.main(["evaluations", *ARGS, "--held-out", str(path), "--confidence", str(outside), "--out", str(tmp_path / "x")]) == 2
