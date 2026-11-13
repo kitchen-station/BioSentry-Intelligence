@@ -42,15 +42,23 @@ class BaselineService:
         self._wards = wards
 
     def baseline(self, clinician_id: str, patient_id: str) -> BaselineResponse | None:
+        found = self.compute(clinician_id, patient_id)
+        if found is None:
+            self._audit.append(clinician_id, "view_baseline", patient_id, "not_found")
+            return None
+        self._audit.append(clinician_id, "view_baseline", patient_id, "ok")
+        return found
+
+    def compute(self, clinician_id: str, patient_id: str) -> BaselineResponse | None:
+        """The baseline, or None when the caller may not see the patient or they are NOT RANKED.
+        Writes no audit row: the caller audits."""
         state = (
             self._store.read(patient_id)
             if patient_id in self._wards.visible(clinician_id)
             else None
         )
         if state is None or isinstance(decide(state), NotRanked):
-            self._audit.append(clinician_id, "view_baseline", patient_id, "not_found")
             return None
-        self._audit.append(clinician_id, "view_baseline", patient_id, "ok")
         now = self._store.now()  # the clock `last_update_s` is measured on
         admitted_at = state.admitted_at
         vitals: list[BaselineComputed | BaselineForming | BaselineUnavailable] = []

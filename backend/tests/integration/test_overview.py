@@ -322,7 +322,7 @@ def _expected_resource(template: str) -> str:
 
 def _assert_every_write_refused(api: Api, headers: dict[str, str]) -> None:
     writes = _writes(api)
-    assert len(writes) == 10 and set(writes) == set(REFUSED_ACTIONS)
+    assert len(writes) == 11 and set(writes) == set(REFUSED_ACTIONS)
     before = snapshot(api)
     seq = _last_seq(api)
     for method, template in writes:
@@ -364,6 +364,7 @@ READS = [("GET", p) for p in (
     "/wards/{ward}/rows", "/wards/{ward}/stays", "/wards/{ward}/overview", "/wards/{ward}/live",
     "/wards/{ward}/lab/runs", "/wards/{ward}/lab/runs/{lab_run_id}", "/patients",
     "/patients/{patient_id}", "/patients/{patient_id}/baseline", "/patients/{patient_id}/notes",
+    "/patients/{patient_id}/questions", "/patients/{patient_id}/questions/{question_id}",
     "/acknowledgements", "/audit",
 )]
 PATIENT_READS = {
@@ -380,6 +381,12 @@ CLOSED_TO_ADMIN = {
     "/wards/{ward}/live": "view_live",
     "/wards/{ward}/lab/runs": "view_lab_runs",
     "/wards/{ward}/lab/runs/{lab_run_id}": "view_lab_run",
+}
+
+
+CLOSED_TO_ADMIN_BY_PATIENT = {
+    "/patients/{patient_id}/questions": "view_patient_questions",
+    "/patients/{patient_id}/questions/{question_id}": "view_patient_question",
 }
 
 
@@ -446,6 +453,8 @@ def test_the_role_matrix_over_every_route(api: Api, persona: str) -> None:
         mine = (who, role)
         if template in CLOSED_TO_ADMIN and is_admin:
             assert (status, rows) == (403, [(*mine, CLOSED_TO_ADMIN[template], ward, "denied")])
+        elif template in CLOSED_TO_ADMIN_BY_PATIENT and is_admin:
+            assert (status, rows) == (403, [(*mine, CLOSED_TO_ADMIN_BY_PATIENT[template], pid, "denied")])
         elif template == "/wards/{ward}/overview" and not is_admin:
             assert (status, rows) == (403, [(*mine, "view_overview", ward, "denied")])
         elif template in WARD_READS and ward != "W4":

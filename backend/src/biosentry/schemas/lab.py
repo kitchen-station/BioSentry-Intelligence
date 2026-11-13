@@ -1,13 +1,18 @@
 """Bodies of the Simulation lab (contract-d7): a clinician's request, the job the lab worker claims,
-the worker's report, and what a clinician reads back. Every value of a request is a
-fixed-list name or an integer in range, so a request holds no path, no free text and no patient."""
+the worker's report, and what a clinician reads back. Every value of a compare request is a
+fixed-list name or an integer in range. A patient question (contract-patient-ask) is one line of
+free text that the API stores and never reads, and the allow-listed data of one patient."""
 
 import re
 from typing import Annotated, Any, Literal, Self
 
-from pydantic import AfterValidator, Field, model_validator
+from pydantic import AfterValidator, Discriminator, Field, Tag, model_validator
 
-from .base import Contract
+from .base import Contract, Flag, NonNegNum, Percent
+from .baseline import BaselineComputed, BaselineForming, BaselineUnavailable, BaselineUsed
+from .clinical import VitalHistoryFull, Vitals
+from .common import Trend
+from .tiers import EscalationReason
 
 W4_RULES = (*(f"news2_total_ge_{k}" for k in range(1, 21)), "news2_chart_trigger")
 _TO_DOH = ("staffing=doh-standard", "nurses=doh-standard", "doctors=doh-standard")
@@ -34,6 +39,7 @@ def _clean(bad: re.Pattern[str]) -> Any:
 
 
 OneLine = Annotated[str, Field(min_length=1, max_length=300), _clean(_BAD_OR_LF)]
+Question = Annotated[str, Field(min_length=1, max_length=500), _clean(_BAD_OR_LF)]
 State = Literal["queued", "running", "done", "failed", "refused"]
 
 
@@ -82,7 +88,31 @@ class LabFailed(Contract):
     reason: OneLine
 
 
-LabReport = Annotated[LabDone | LabRefused | LabFailed, Field(discriminator="state")]
+class LabAnswer(Contract):
+    """A patient question's `done` (contract-patient-ask 6.1)."""
+
+    state: Literal["done"]
+    record_json: Annotated[str, Field(max_length=131072)]
+    answer: Annotated[str, Field(max_length=4000), _clean(_BAD)]  # LF allowed; empty is a service check
+
+
+def _report_shape(v: Any) -> str | None:
+    """`done` has two shapes, told apart by `record_json`. The service checks the shape against the row's kind."""
+    if not isinstance(v, dict):
+        return "answer" if isinstance(v, LabAnswer) else getattr(v, "state", None)
+    state = v.get("state")
+    if state == "done" and "record_json" in v:
+        return "answer"
+    return state if isinstance(state, str) else None
+
+
+LabReport = Annotated[
+    Annotated[LabDone, Tag("done")]
+    | Annotated[LabAnswer, Tag("answer")]
+    | Annotated[LabRefused, Tag("refused")]
+    | Annotated[LabFailed, Tag("failed")],
+    Discriminator(_report_shape),
+]
 
 
 class LabRunItem(Contract):
@@ -104,3 +134,68 @@ class LabRunItem(Contract):
 class LabRunDetail(LabRunItem):
     report: dict[str, Any] | None
     report_text: str | None
+
+
+class NewPatientQuestion(Contract):
+    question: Question  # the patient is the path
+
+
+class PatientContextDetail(Contract):
+    rank: Annotated[int, Field(strict=True, ge=1)]
+    score: Annotated[int, Field(strict=True, ge=0, le=20)]
+    trend: Trend
+    supporting: str
+    escalation_reasons: list[EscalationReason]
+    vitals: Vitals
+    signal_quality: Percent | None
+    last_update_s: NonNegNum | None
+    vital_history: VitalHistoryFull  # the last 72 hours, gaps kept as null
+
+
+class PatientContextBaseline(Contract):
+    admission_known: Flag
+    label: str
+    params: BaselineUsed
+    vitals: list[
+        Annotated[BaselineComputed | BaselineForming | BaselineUnavailable, Field(discriminator="status")]
+    ]
+
+
+class PatientContextAbstained(Contract):
+    reason: str
+    instruction: str
+
+
+class PatientContext(Contract):
+    """Everything the agent may see of one patient, and nothing else: the allow-list. No name, bed,
+    id, free text, note or lab, and nothing of another patient."""
+
+    format: Literal[1]
+    synthetic: Flag
+    as_of: str
+    detail: PatientContextDetail | None
+    baseline: PatientContextBaseline | None
+    abstained: PatientContextAbstained | None
+
+
+class PatientQuestionJob(Contract):
+    id: int
+    kind: Literal["patient_question"]
+    question: str
+    patient: PatientContext
+
+
+class PatientQuestionItem(Contract):
+    id: int
+    requested_by: str
+    requested_at: str
+    question: str
+    state: State
+    claimed_at: str | None
+    finished_at: str | None
+    reason: str | None
+
+
+class PatientQuestionDetail(PatientQuestionItem):
+    answer: str | None
+    report: dict[str, Any] | None

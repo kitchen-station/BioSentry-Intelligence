@@ -161,18 +161,18 @@ class WardService:
             abstained=abstained,
         )
 
-    def patient(self, clinician_id: str, patient_id: str) -> PatientDetail | None:
+    def detail_or_abstained(
+        self, clinician_id: str, patient_id: str
+    ) -> PatientDetail | AbstainedRow | None:
+        """The patient's detail, or the NOT RANKED row, or None when the caller may not see them.
+        Writes no audit row: the caller audits."""
         visible = self.visible(clinician_id)
         if patient_id not in visible:
-            # Missing and not-yours look identical to the caller (and in the log).
-            self._audit.append(clinician_id, "view_patient", patient_id, "not_found")
             return None
-        ranked, _, states = self._view(visible)
+        ranked, abstained, states = self._view(visible)
         row = next((r for r in ranked if r.id == patient_id), None)
-        if row is None:  # NOT RANKED: no detail page (there is no score to explain)
-            self._audit.append(clinician_id, "view_patient", patient_id, "not_found")
-            return None
-        self._audit.append(clinician_id, "view_patient", patient_id, "ok")
+        if row is None:
+            return next((a for a in abstained if a.id == patient_id), None)
         state = states[patient_id]
         breakdown = TierBreakdown(
             tier_a=TierAScore(score=row.score, label=f"NEWS2 = {row.score}"),
@@ -182,6 +182,15 @@ class WardService:
         return PatientDetail(
             **row.model_dump(), vital_history=state.vital_history, tier_breakdown=breakdown
         )
+
+    def patient(self, clinician_id: str, patient_id: str) -> PatientDetail | None:
+        found = self.detail_or_abstained(clinician_id, patient_id)
+        if not isinstance(found, PatientDetail):
+            # Missing, not-yours and NOT RANKED (no score to explain) look identical.
+            self._audit.append(clinician_id, "view_patient", patient_id, "not_found")
+            return None
+        self._audit.append(clinician_id, "view_patient", patient_id, "ok")
+        return found
 
     def stays(self, clinician_id: str) -> list[PatientStay]:
         ids = self._store.assigned(clinician_id, including_left=True)
