@@ -7,7 +7,7 @@
 | synthetic | yes, `synthetic: true` in every manifest. No real patient data |
 | validated | no |
 
-Seeds present when the models were trained: (filled in by the orchestrator)
+Seeds present when the models were trained: 61 to 160 and 261 to 600 (440 trials). Read: 61-160 (student training), 261-300 (student validation), 301-340 (confidence calibration), 341-400 (reward-loop validation), 401-500 (reward loop round 1; the no-temperature run read 401-480), 501-584 (round 2). Seeds 585-600 were generated and never read. Seeds 161-260 were not generated.
 
 ## How it was made
 
