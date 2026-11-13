@@ -118,6 +118,11 @@ describe("Overview", () => {
     expect(screen.queryByText("charge_rn")).toBeNull();
   });
 
+  it("links to the ward list", async () => {
+    show();
+    expect((await screen.findByRole("link", { name: "Ward list" })).getAttribute("href")).toBe("/ward");
+  });
+
   it("reads again once per Refresh click, disabled while loading, and never on a timer", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     show();

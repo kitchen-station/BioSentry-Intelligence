@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 /**
- * The session menu: it opens and closes, names the role and ward, offers the station only to a
- * physician or a charge nurse, and signing out calls back and returns to sign-in.
+ * The session menu: the top bar links only the pages the role can use (Ward, Station, Overview, and
+ * Analytics when the build sets a same-site path); the dropdown names the role and ward, holds the
+ * simulation lab, and signing out calls back and returns to sign-in.
  */
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -47,18 +48,86 @@ describe("SessionMenu", () => {
     expect(screen.queryByText("Ward W4")).toBeNull();
   });
 
-  it("offers the lab as a visible entry, outside the dropdown, and goes to it", async () => {
-    menu({ clinician_id: "rn-reyes", ward: "W4", role: "rn" });
-    await userEvent.click(screen.getByRole("link", { name: "Simulation lab" }));
-    expect(screen.getByText("at /lab")).toBeTruthy();
+  it("offers the lab as a dropdown item for every role, goes to it and closes the menu", async () => {
+    for (const role of ["rn", "charge_rn", "md", "admin"] as const) {
+      menu({ clinician_id: "x-1", ward: "W4", role });
+      expect(screen.queryByRole("link", { name: "Simulation lab" })).toBeNull();
+      await open("x-1");
+      await userEvent.click(screen.getByRole("link", { name: "Simulation lab" }));
+      expect(screen.getByText("at /lab")).toBeTruthy();
+      expect(screen.queryByText("Ward W4")).toBeNull();
+      cleanup();
+    }
   });
 
-  it("reads Back to the ward on a lab page and goes to the ward", async () => {
+  it("shows Ward in the bar on a lab page and goes to the ward", async () => {
     menu({ clinician_id: "rn-reyes", ward: "W4", role: "rn" }, "/lab/research");
-    expect(screen.queryByRole("link", { name: "Simulation lab" })).toBeNull();
-    await userEvent.click(screen.getByRole("link", { name: "Back to the ward" }));
+    await userEvent.click(screen.getByRole("link", { name: "Ward" }));
     expect(screen.getByText("at /ward")).toBeTruthy();
   });
+
+  it.each([
+    ["rn", ["Ward"]],
+    ["charge_rn", ["Ward", "Station"]],
+    ["md", ["Ward", "Station"]],
+    ["admin", ["Overview", "Ward"]],
+  ] as const)("shows %s only the bar links for routes it can use", (role, names) => {
+    menu({ clinician_id: "x-1", ward: "W4", role });
+    const bar = screen.getByRole("navigation", { name: "Pages" });
+    expect(within(bar).getAllByRole("link").map((l) => l.textContent)).toEqual(names);
+  });
+
+  it.each([
+    ["/ward", "Ward"],
+    ["/station", "Station"],
+    ["/patient/p1", null],
+  ] as const)("marks the current bar link on %s", (path, current) => {
+    menu({ clinician_id: "md-santos", ward: "W4", role: "md" }, path);
+    const mark = (n: string) => screen.getByRole("link", { name: n }).getAttribute("aria-current");
+    for (const n of ["Ward", "Station"]) expect(mark(n)).toBe(n === current ? "page" : null);
+  });
+
+  it("marks Overview for an admin on /overview", () => {
+    menu({ clinician_id: "admin-ruiz", ward: "W4", role: "admin" }, "/overview");
+    expect(screen.getByRole("link", { name: "Overview" }).getAttribute("aria-current")).toBe("page");
+  });
+
+  it.each(["md", "admin"] as const)("adds an Analytics link for %s when the build sets a same-site path", (role) => {
+    vi.stubEnv("VITE_ANALYTICS_URL", "/simulator/#analytics");
+    menu({ clinician_id: "x-1", ward: "W4", role });
+    const link = screen.getByRole("link", { name: "Analytics" });
+    expect(link.getAttribute("href")).toBe("/simulator/#analytics");
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+  });
+
+  it.each([
+    undefined, "", "//evil.example", "/\\evil.example", "https://x.example/a", "javascript:alert(1)", "simulator/", "/a b",
+    "/\t/evil.example", "/\n/evil.example", "/ok\n", " /x", "\uFEFF/x", "/a\\b",
+  ])(
+    "hides Analytics for the value %j",
+    (value) => {
+      if (value === undefined) vi.unstubAllEnvs();
+      else vi.stubEnv("VITE_ANALYTICS_URL", value);
+      menu({ clinician_id: "md-santos", ward: "W4", role: "md" });
+      expect(screen.queryByRole("link", { name: "Analytics" })).toBeNull();
+    },
+  );
+
+  it("shows Analytics for a path with a percent-escape: it stays on this site", () => {
+    vi.stubEnv("VITE_ANALYTICS_URL", "/%5Cevil.example");
+    menu({ clinician_id: "md-santos", ward: "W4", role: "md" });
+    expect(screen.getByRole("link", { name: "Analytics" }).getAttribute("href")).toBe("/%5Cevil.example");
+  });
+
+  it.each([["rn", "Staff Nurse"], ["charge_rn", "Charge Nurse"], ["md", "Attending Physician"], ["admin", "Administrator"]] as const)(
+    "names the role %s as %s in the dropdown",
+    async (role, label) => {
+      menu({ clinician_id: "x-1", ward: "W4", role });
+      await open("x-1");
+      expect(screen.getByText(label)).toBeTruthy();
+    },
+  );
 
   it("no longer lists research or the pipeline in the dropdown", async () => {
     menu({ clinician_id: "md-santos", ward: "W4", role: "md" });
@@ -76,25 +145,18 @@ describe("SessionMenu", () => {
     expect(screen.queryByText("Ward W4")).toBeNull();
   });
 
-  it("offers a staff nurse the ward only, and following it closes the menu", async () => {
-    menu({ clinician_id: "rn-reyes", ward: "W4", role: "rn" });
-    await open("rn-reyes");
-    expect(screen.queryByRole("link", { name: "Station" })).toBeNull();
-    await userEvent.click(screen.getByRole("link", { name: "Ward Monitor" }));
-    expect(screen.getByText("at /ward")).toBeTruthy();
-    expect(screen.queryByText("Ward W4")).toBeNull();
+  it("keeps Ward Monitor, Station and Overview out of the dropdown", async () => {
+    menu({ clinician_id: "md-santos", ward: "W4", role: "md" });
+    await open("md-santos");
+    expect(screen.queryByRole("link", { name: "Ward Monitor" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Overview" })).toBeNull();
+    expect(screen.getAllByRole("link", { name: "Station" })).toHaveLength(1);
   });
 
-  it.each([
-    ["md", "Attending Physician"],
-    ["charge_rn", "Charge Nurse"],
-  ] as const)("offers %s the station", async (role, label) => {
+  it.each(["md", "charge_rn"] as const)("sends %s to the station from the bar", async (role) => {
     menu({ clinician_id: "x-1", ward: "W4", role });
-    await open("x-1");
-    expect(screen.getByText(label)).toBeTruthy();
     await userEvent.click(screen.getByRole("link", { name: "Station" }));
     expect(screen.getByText("at /station")).toBeTruthy();
-    expect(screen.queryByText("Ward W4")).toBeNull();
   });
 
   it("shows an unknown role as written", async () => {
@@ -112,26 +174,17 @@ describe("SessionMenu", () => {
     expect(screen.queryByText("Ward W4")).toBeNull();
   });
 
-  it("gives an admin the overview and no ward or station", async () => {
-    menu({ clinician_id: "admin-ruiz", ward: "W4", role: "admin" });
-    await open("admin-ruiz");
-    expect(screen.getByText("Administrator")).toBeTruthy();
-    expect(screen.queryByRole("link", { name: "Ward Monitor" })).toBeNull();
+  it("gives an admin the overview and the ward in the bar, and no station", async () => {
+    menu({ clinician_id: "admin-ruiz", ward: "W4", role: "admin" }, "/lab");
+    expect(screen.getByRole("link", { name: "Ward" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Station" })).toBeNull();
     await userEvent.click(screen.getByRole("link", { name: "Overview" }));
     expect(screen.getByText("at /overview")).toBeTruthy();
   });
 
-  it("returns an admin from the lab to the overview", async () => {
-    menu({ clinician_id: "admin-ruiz", ward: "W4", role: "admin" }, "/lab");
-    expect(screen.queryByRole("link", { name: "Back to the ward" })).toBeNull();
-    await userEvent.click(screen.getByRole("link", { name: "Back to the overview" }));
-    expect(screen.getByText("at /overview")).toBeTruthy();
-  });
-
   beforeEach(() => vi.stubEnv("VITE_API_URL", "http://api.test"));
 
-  const NOTICE = "A ward administrator can see which beds you are assigned and counts of your actions from the last 24 hours.";
+  const NOTICE = "A ward administrator can see which beds you are assigned, counts of your actions from the last 24 hours, and every patient's page, including the notes you write.";
 
   it.each(["rn", "md", "charge_rn"] as const)("tells a %s on an API build that an administrator sees counts", async (role) => {
     menu({ clinician_id: "x-1", ward: "W4", role });

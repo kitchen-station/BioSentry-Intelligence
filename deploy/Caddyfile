@@ -5,6 +5,15 @@
 	admin off
 	auto_https off
 	persist_config off
+	# A client that sends its request too slowly is dropped: the address may be public (README, "Public
+	# mode"), and a held-open connection costs this small server memory.
+	servers {
+		timeouts {
+			read_header 10s
+			read_body 30s
+			idle 2m
+		}
+	}
 }
 
 # One browser app: its built files, and index.html for any other path (the app routes in the browser).
@@ -31,14 +40,23 @@
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
 		Referrer-Policy no-referrer
+		# The door in front (tailscale serve or funnel) is always HTTPS. A browser ignores this over
+		# plain HTTP, so a local stack on loopback is not affected.
+		Strict-Transport-Security max-age=31536000
 	}
 
 	# The API. It checks the clinician's token itself; this only passes the request on. The ingest
-	# door (/sim/*) is for the ward runner, which reaches the API inside compose and never through
-	# here: from this address it does not exist.
+	# door (/sim/*, which includes the lab worker's /sim/lab/*) is for the ward runner and the lab
+	# worker, which reach the API inside compose and never through here: from this address it does
+	# not exist.
 	handle_path /api/* {
 		@ingest path /sim /sim/*
 		respond @ingest 404
+		# The largest body a page sends is a few hundred characters. A bigger one is refused here
+		# (413) and never reaches the API.
+		request_body {
+			max_size 1MB
+		}
 		reverse_proxy api:8000
 	}
 

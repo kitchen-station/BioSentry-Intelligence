@@ -71,18 +71,24 @@ seeded before passphrases existed has none either: `make db-reset` seeds it agai
 
 **Admin (ward overview).** An admin sees every bed and its state, who is assigned, each clinician's patient
 count, and counts of each clinician's actions in the last 24 hours (by action and outcome; no patient and no
-time). No patient names or ids are shown. The role is granted only from a shell with database access, run from
+time); the Overview shows no patient name. The admin also reads the ward list and each ranked patient's page, read
+only, with every patient on the ward whoever is assigned. The admin can read the notes of every patient on the
+ward, a NOT RANKED one too (it has no page for anyone). Every view is in the audit log under
+the admin's id and every write stays refused. This reverses the earlier rule that the admin saw no patient
+name. The role is granted only from a shell with database access, run from
 `backend/`: `uv run python -m biosentry.db.admin grant admin-<name>`, then
 `uv run python -m biosentry.db.passphrase admin-<name>`. Revoke with
 `uv run python -m biosentry.db.admin revoke admin-<name>`. No route can grant or change a role. An admin cannot
 write anything and is never assigned to a patient. One admin id per person (for example `admin-santos`), never
 shared. Granting and revoking each write an audit row. Clinicians are told in their own menu that an
-administrator can see these counts. Only someone with database access can see who opened the overview: the
+administrator can see these counts, and every patient's page. Only someone with database access can see who opened the overview: the
 admin's own views are in the audit log, and no route shows them to anyone else.
 
 `make db-down` stops the database (the data stays in a Docker volume). The API reaches it through
 `BIOSENTRY_DATABASE_URL`, which defaults to the dev database in `compose.yaml` (its password is for
 that local container only).
+
+`npm run export:pipeline -- --date YYYY-MM-DD` (in `frontend/`) writes `frontend/src/data/evaluation/pipeline.json` from `src/data/pipeline.ts`; never edit that file by hand. A test fails when the file does not match a fresh export, and the Analytics page of the ward simulator reads it.
 
 `VITE_API_URL` is read when the dashboard is built or started: set, it talks to the API and carries
 no dataset; unset, it uses the fixture. The API allows the dashboard on `localhost` and `127.0.0.1`,
@@ -113,6 +119,8 @@ present before the run), and from the oldest bin still kept once the 7-day prune
 earlier ones, so a long stay is baselined on mid-stay data; the response says when the latest reading was
 taken (`latest_at`), where the baseline starts (`baseline_from`) and whether admission is known.
 
+`VITE_ANALYTICS_URL`, when set to a path on the same site (for example `/simulator/#analytics`), adds an Analytics link to the top bar; any other value hides it.
+
 `make check` runs lint, types and tests for both halves; the API tests need the database, so run
 `make db-up` first (each test works in its own copy of a seeded database and drops it). `make db-reset`
 drops every table and seeds again. `make contract` regenerates `frontend/src/types/generated.ts` from the Pydantic
@@ -134,16 +142,19 @@ schemas. Every target is in the [Makefile](Makefile).
 - **Overview:** for an admin only, read only, from the "Administration" entry at sign-in (shown when the
   dashboard talks to the API). Every bed and its state, who is assigned, each clinician's patient
   count, counts of their actions in the last 24 hours, and the simulator status. It reads again on Refresh, never on a timer, because every
-  view is recorded in the audit log. An admin lands here and has no ward or station.
+  view is recorded in the audit log. An admin lands here, with a "Ward list" link to the ward and
+  patient pages (read only: no alerts, no timer, a Refresh button, no write control; the notes load when the
+  drawer opens), and has no station.
 - **Station:** admit a patient, enter lab results, upload a document (extraction is a
   placeholder), or see patient flow: who came and went, length of stay and 14 days of bed use.
-- **Simulation lab:** one link in the top bar of every signed-in page. Research numbers, the pipeline and the research
+  A physician or the charge nurse switches between Ward and Station in the top bar.
+- **Simulation lab:** in the session menu of every signed-in page. Research numbers, the pipeline and the research
   agent's findings, under a label that it is not the ward. The one-address deployment also links the ward
   simulator from there.
   A physician or the charge nurse can ask for a simulated run: the simulator's compare runs two arms from one seed that differ in one change (partly paired in hospital mode), apart from the ward that is running. A lab worker beside the ward runner runs it; the
   API only stores the request and the result. Results are synthetic and not validated, and nothing in them changes a
   rank. Each clinician has one at a time and 10 in 24 hours; the ward has 5 waiting at most. No lab worker is deployed yet,
-  so a request fails after an hour until one is.
+  so a request fails after an hour until one is. The list reads again every 5 seconds while a run is queued or running, and stops when none is.
 
 ## What the database stores
 

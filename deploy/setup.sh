@@ -5,8 +5,10 @@
 #   -> makes deploy/.env, mode 600, if it does not exist (random Postgres password and ingest key,
 #      never printed; an existing one is kept, and its mode put right)
 #   -> clones the ward simulator beside this repository (SIM_DIR), or updates it if it is there
-#   -> builds the images (the API, the ward runner, and the web server with the two pages) and starts
+#   -> builds the images (the API, the ward runner and lab worker, and the web server with the two pages) and starts
 #      the stack, waiting until it is healthy.
+#   -> public mode, only when PUBLIC_HOST is set in deploy/.env (deploy/README.md, "Public mode"): it
+#      adds compose.public.yaml. This script never opens the address itself: it prints the command.
 #
 # Do not delete deploy/.env while the database volume exists: the volume keeps the password it was
 # first created with.
@@ -53,6 +55,36 @@ else
   git clone https://github.com/kitchen-station/biosentry-ward-sim.git "$SIM_DIR"
 fi
 
-docker compose up -d --build --wait
-echo "up: the team's address answers on this host at 127.0.0.1:8080 (the API alone at 127.0.0.1:8000) and nowhere else."
-echo "next: sudo tailscale serve --bg --https=443 http://127.0.0.1:8080, then set each clinician's passphrase."
+# Public mode is off unless PUBLIC_HOST is set in .env: the server's own name on the tailnet, which
+# `tailscale funnel` opens to the internet. Checked here because it is printed into commands below.
+public_host=$(sed -n 's/^PUBLIC_HOST=//p' .env | tail -n 1)
+# Another spelling that compose would read is refused, not taken as "private": the operator meant public.
+if ! grep -q '^PUBLIC_HOST=' .env && grep -Eq '^[[:space:]]*(export[[:space:]]+)?PUBLIC_HOST[[:space:]]*[=:]' .env; then
+  echo "PUBLIC_HOST in deploy/.env must be written as PUBLIC_HOST=name at the start of a line (no export, no spaces)" >&2
+  exit 1
+fi
+if [ -z "$public_host" ]; then
+  docker compose up -d --build --wait
+  echo "up: the team's address answers on this host at 127.0.0.1:8080 (the API alone at 127.0.0.1:8000) and nowhere else."
+  echo "next: sudo tailscale serve --bg --https=443 http://127.0.0.1:8080, then set each clinician's passphrase."
+  exit 0
+fi
+case "$public_host" in
+  *[!a-z0-9.-]* | .* | -* | *..*) public_host="" ;;
+  *.ts.net) ;;
+  *) public_host="" ;;
+esac
+if [ -z "$public_host" ]; then
+  echo "PUBLIC_HOST in deploy/.env must be this server's tailnet name, like server.tail1234.ts.net (lower case, no https://)" >&2
+  exit 1
+fi
+# Anyone on the internet could then watch the ward without signing in: never both.
+if grep -Eiq "^[[:space:]]*(export[[:space:]]+)?BIOSENTRY_OPEN_WARD_VIEW[[:space:]]*[=:][[:space:]\"']*true" .env; then
+  echo "PUBLIC_HOST and BIOSENTRY_OPEN_WARD_VIEW=true are both set in deploy/.env: remove one (a public address never shows the ward without a sign-in)" >&2
+  exit 1
+fi
+docker compose -f compose.yaml -f compose.public.yaml up -d --build --wait
+echo "up, set for a public address. The stack itself still answers on this host at 127.0.0.1:8080 and nowhere else."
+echo "to open it to the internet: sudo tailscale funnel --bg --https=443 http://127.0.0.1:8080"
+echo "to close it again:          sudo tailscale funnel reset && sudo tailscale serve --bg --https=443 http://127.0.0.1:8080"
+echo "the two public sites build with: VITE_API_URL=https://$public_host/api (dashboard) and VITE_VIEW_API_URL=https://$public_host/api (simulator)"

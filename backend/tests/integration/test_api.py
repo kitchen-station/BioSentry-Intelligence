@@ -115,8 +115,8 @@ def test_failed_authentication_is_audited_without_an_identity(
     client.get("/patients")
     client.get("/patients", headers=as_("rn-nobody"))
     records = trail(app_and_client)
+    # Two refusals in the same minute leave one row: a flood cannot fill the undeletable table.
     assert [(r.clinician_id, r.action, r.outcome) for r in records] == [
-        (None, "authenticate", "denied"),
         (None, "authenticate", "denied"),
     ]
 
@@ -1120,7 +1120,7 @@ def test_every_route_but_healthz_demands_identity_before_anything_else(
     assert {pid: c.store.notes(pid) for pid in ALL_IDS} == notes
     assert c.store.acknowledgements("rn-manalo") == []
     rows = c.audit.records()
-    assert len(rows) == attempts
+    assert attempts > 1 and len(rows) == 1  # one anonymous row a minute, however many refusals
     assert {(r.clinician_id, r.action, r.outcome) for r in rows} == {
         (None, "authenticate", "denied")
     }

@@ -26,18 +26,25 @@ MIN_LENGTH, MAX_LENGTH = 12, 256  # the API refuses a longer one before hashing 
 _MAXMEM = 2**26  # n=2**15, r=8 needs exactly hashlib's default 32 MiB limit, so ask for 64
 # Each scrypt takes 32 MiB and a core for ~100 ms, and sign-ins for distinct ids do not wait on
 # each other, so a flood of them would eat the machine. At most this many run at once, process-wide;
-# the rest wait. ponytail: the waiting sign-in keeps its request thread, its connection and its
-# per-id lock/transaction while it waits (the count must stay in the same transaction as the audit
-# row), so a flood still queues behind the semaphore and can use up the threadpool. Upgrade: count,
-# release, hash, then re-check under the lock; and a wait limit that answers 503.
+# the rest wait, at most SLOT_WAIT seconds: then `Busy` (the API answers 503), so a flood of sign-ins
+# cannot hold every request thread and connection while it queues.
+SLOT_WAIT = 2.0
 _SLOTS = threading.BoundedSemaphore(2)
 
 
+class Busy(RuntimeError):
+    """No scrypt slot came free in time. Nothing was hashed."""
+
+
 def _scrypt(passphrase: str, salt: bytes, n: int, r: int, p: int, length: int) -> bytes:
-    with _SLOTS:  # held only for the hash
+    if not _SLOTS.acquire(timeout=SLOT_WAIT):
+        raise Busy
+    try:  # held only for the hash
         return hashlib.scrypt(
             passphrase.encode(), salt=salt, n=n, r=r, p=p, maxmem=_MAXMEM, dklen=length
         )
+    finally:
+        _SLOTS.release()
 
 
 def _b64(raw: bytes) -> str:

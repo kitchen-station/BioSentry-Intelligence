@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import type { Session, WardOverview } from "../types";
 import { ApiError, getOverview, hasOverview } from "../api";
 import { SimulatedNote } from "../components/LabFrame";
@@ -89,6 +90,7 @@ export function Overview({ session, onSignOut }: { session: Session; onSignOut: 
               {data && <p>As of {when(data.as_of)}</p>}
               {sim && <p>Simulator: {formatSimClock(sim)}</p>}
               {data && !data.receiving_data && <p className={styles.warn}>Not receiving data</p>}
+              <Link to="/ward">Ward list</Link>
               <button type="button" className={styles.refresh} onClick={() => { setLoading(true); show(); }} disabled={loading}>
                 Refresh
               </button>

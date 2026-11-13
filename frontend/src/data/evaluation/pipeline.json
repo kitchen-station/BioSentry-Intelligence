@@ -1,0 +1,91 @@
+{
+ "body": {
+  "stages": [
+   {
+    "id": "news2",
+    "in": "Seven bedside observations and the SpO2 scale",
+    "links_to": "models",
+    "name": "NEWS2",
+    "out": "NEWS2 total and trigger level",
+    "state": "live in the ranking"
+   },
+   {
+    "id": "quality",
+    "in": "A device reading and its quality mark",
+    "links_to": null,
+    "name": "Signal quality check",
+    "out": "Scored as recorded, or NOT RANKED with the step to take",
+    "state": "live in the ranking"
+   },
+   {
+    "id": "baseline",
+    "in": "Heart rate, breathing rate and SpO2 against the patient's own first bins",
+    "links_to": "models",
+    "name": "Change from the patient's own baseline",
+    "out": "A reason on the ward row and a tie-break",
+    "state": "live in the ranking"
+   },
+   {
+    "id": "prediction",
+    "in": "Simulator readings grouped in fifteen-minute bins",
+    "links_to": "models",
+    "name": "Prediction model",
+    "out": "A score for each bin, offline only",
+    "state": "research only, offline"
+   },
+   {
+    "id": "reward",
+    "in": "Simulator trials and an alert rule of six numbers",
+    "links_to": "models",
+    "name": "Alert policy learned by reward",
+    "out": "A changed rule and its reward on trials, offline only",
+    "state": "research only, offline"
+   },
+   {
+    "id": "confidence",
+    "in": "A model score for one simulator bin",
+    "links_to": "models",
+    "name": "Confidence check",
+    "out": "Alert, not sure or quiet, offline only",
+    "state": "research only, offline"
+   },
+   {
+    "id": "agent",
+    "in": "A fixed experiment list or one of three fixed kinds of question",
+    "links_to": "research-agent",
+    "name": "Research agent",
+    "out": "Ledger entries and answers in fixed sentences",
+    "state": "research only, offline"
+   },
+   {
+    "id": "arbiter",
+    "in": "NEWS2 result and the own-baseline flag",
+    "links_to": null,
+    "name": "The arbiter",
+    "out": "Ranked list, or NOT RANKED with a reason",
+    "state": "live in the ranking"
+   }
+  ]
+ },
+ "format": "biosentry-evaluation/3",
+ "notes": [
+  "The commit is the main commit this file was exported on. The stage list changed in the same pull request."
+ ],
+ "provenance": {
+  "commit": "d5dde654f24ed84cc904f31e5e666591303ee324",
+  "data": "stage names, states and what goes in and out",
+  "date": "2026-11-13",
+  "exporter": {
+   "name": "npm run export:pipeline",
+   "version": "1"
+  },
+  "repo": "kitchen-station/BioSentry-Intelligence",
+  "seeds": [],
+  "source": [
+   "npm run export:pipeline -- --date 2026-11-13 --commit d5dde654f24ed84cc904f31e5e666591303ee324 --note \"The commit is the main commit this file was exported on. The stage list changed in the same pull request.\""
+  ],
+  "synthetic": true,
+  "validated": false
+ },
+ "section": "pipeline"
+}

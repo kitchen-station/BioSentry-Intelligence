@@ -17,7 +17,7 @@ describe("LabFrame", () => {
     );
     expect(screen.getByText(/BioSentry . Simulation lab/)).toBeTruthy();
     expect(screen.getByRole("note").textContent).toBe("Simulation lab: not the ward. Nothing here changes a patient's rank.");
-    expect(screen.getByRole("link", { name: "Back to the ward" }).getAttribute("href")).toBe("/ward");
+    expect(screen.getByRole("link", { name: "Ward" }).getAttribute("href")).toBe("/ward");
     expect(screen.getByText("inside")).toBeTruthy();
   });
 });

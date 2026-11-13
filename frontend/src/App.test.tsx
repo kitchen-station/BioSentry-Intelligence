@@ -21,11 +21,11 @@ vi.mock("./api", () => api);
 // The pages are stand-ins: these tests are about the shell, not what each page shows.
 vi.mock("./pages/SignIn", () => ({
   SignIn: ({ onSignIn }: { onSignIn: (s: Session) => void }) => {
-    const from = (useLocation().state as { from?: string } | null)?.from;
+    const { from, who } = (useLocation().state ?? {}) as { from?: string; who?: string };
     const navigate = useNavigate();
     return (
       <div>
-        <p>sign-in page{from ? ` from ${from}` : ""}</p>
+        <p>sign-in page{from ? ` from ${from}` : ""}{who ? ` by ${who}` : ""}</p>
         <button
           type="button"
           onClick={() => {
@@ -40,21 +40,27 @@ vi.mock("./pages/SignIn", () => ({
   },
 }));
 vi.mock("./pages/Ward", () => ({
-  Ward: ({ session, onSignOut }: { session: Session; onSignOut: () => void }) => (
+  Ward: ({ session, onSignOut }: { session: Session; onSignOut: (explicit?: boolean) => void }) => (
     <div>
       <p>ward page for {session.clinician_id}</p>
-      <button type="button" onClick={onSignOut}>
+      <button type="button" onClick={() => onSignOut(true)}>
         sign out
+      </button>
+      <button type="button" onClick={() => onSignOut()}>
+        session ends
       </button>
     </div>
   ),
 }));
 vi.mock("./pages/PatientDetail", () => ({
-  PatientDetail: ({ session, onSignOut }: { session: Session; onSignOut: () => void }) => (
+  PatientDetail: ({ session, onSignOut }: { session: Session; onSignOut: (explicit?: boolean) => void }) => (
     <div>
       <p>patient page for {session.clinician_id}</p>
-      <button type="button" onClick={onSignOut}>
+      <button type="button" onClick={() => onSignOut(true)}>
         sign out
+      </button>
+      <button type="button" onClick={() => onSignOut()}>
+        session ends
       </button>
     </div>
   ),
@@ -69,11 +75,14 @@ vi.mock("./pages/Pipeline", () => ({
   Pipeline: ({ session }: { session: Session }) => <p>pipeline page for {session.clinician_id}</p>,
 }));
 vi.mock("./pages/Station", () => ({
-  Station: ({ session, onSignOut }: { session: Session; onSignOut: () => void }) => (
+  Station: ({ session, onSignOut }: { session: Session; onSignOut: (explicit?: boolean) => void }) => (
     <div>
       <p>station page for {session.clinician_id}</p>
-      <button type="button" onClick={onSignOut}>
+      <button type="button" onClick={() => onSignOut(true)}>
         sign out
+      </button>
+      <button type="button" onClick={() => onSignOut()}>
+        session ends
       </button>
     </div>
   ),
@@ -160,10 +169,24 @@ describe("route guards", () => {
     expect(screen.getByText("patient page for rn-reyes")).toBeTruthy();
   });
 
-  it("signs out from the patient page", async () => {
+  // Rewritten: this used to expect "from /patient/p-001" after a chosen sign-out, which is the fault
+  // (the next person landed on the last page of the one who left).
+  it("signs out from the patient page and keeps no return page", async () => {
     store(nurse);
     at("/patient/p-001");
     await userEvent.click(screen.getByRole("button", { name: "sign out" }));
+    expect(screen.getByText("sign-in page")).toBeTruthy();
+  });
+
+  it("keeps the return page and who it belongs to when a session ends by itself", async () => {
+    store(nurse);
+    at("/patient/p-001");
+    await userEvent.click(screen.getByRole("button", { name: "session ends" }));
+    expect(screen.getByText("sign-in page from /patient/p-001 by rn-reyes")).toBeTruthy();
+  });
+
+  it("a fresh deep link has a return page and no owner", () => {
+    at("/patient/p-001");
     expect(screen.getByText("sign-in page from /patient/p-001")).toBeTruthy();
   });
 
@@ -208,9 +231,18 @@ describe("route guards", () => {
     expect(screen.getByText("lab page for admin-ruiz")).toBeTruthy();
   });
 
-  it.each(["/ward", "/station", "/patient/p-001"])("sends an admin from %s to the overview", (path) => {
+  it("lets an admin open the ward list and a patient page", () => {
     store(admin);
-    at(path);
+    at("/ward");
+    expect(screen.getByText("ward page for admin-ruiz")).toBeTruthy();
+    cleanup();
+    at("/patient/p-001");
+    expect(screen.getByText("patient page for admin-ruiz")).toBeTruthy();
+  });
+
+  it("still sends an admin from the station to the overview", () => {
+    store(admin);
+    at("/station");
     expect(screen.getByText("overview page for admin-ruiz")).toBeTruthy();
   });
 
