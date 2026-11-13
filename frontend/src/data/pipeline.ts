@@ -39,7 +39,7 @@ export const PIPELINE: readonly Stage[] = [
   },
   {
     id: "confidence", name: "Confidence check", state: "research only, offline",
-    text: ["A check on the student: a score too low to support an alert is marked not sure, and a not sure bin never alerts. On simulator trials its target was met: at most 1 in 100 checks on a patient who is not starting to deteriorate shows a supported alert.", "Not validated, and not connected to the API, the rank or the arbiter. The arbiter's slot for it changes nothing."],
+    text: ["A check on the student: a score too low to support an alert is marked not sure, and a not sure bin never alerts. On simulator trials it met its pre-registered target: on average over stays, 0.65 in 100 checks (95% interval 0.57 to 0.74) on patients who were not starting to deteriorate showed a supported alert, against a target of 1 in 100.", "Not validated, and not connected to the API, the rank or the arbiter. The arbiter's slot for it changes nothing."],
     evidence: "models/tier_c/confidence_check/card.md, research/confidence.py, domain/arbiter.py (Guarantees, _inert)",
   },
   {

@@ -7,7 +7,7 @@ export const RESEARCH_PROVENANCE = {
   date: "2026-11-13",
   trials: "ward-v2 simulator trials, held-out seeds 11 to 30, 1,873 patients, 91 episodes (79 not cut short)",
   tuning: "Detector settings k=4.0 p=8 were chosen on seeds 1 to 10.",
-  heldOutRead: "Each held-out set was read once.",
+  heldOutRead: "Each model was scored on the held-out seeds once, by procedure. The same seeds were used earlier for earlier models.",
   // The runs were squash-merged: the run id is the stable name, not a commit.
   studentRun: "m1-20261113-3d634f3",
   studentData: "trained with MindSpore 2.11.0 on ward-v2-ext seeds 61 to 160, chosen on seeds 261 to 300",
@@ -64,7 +64,7 @@ export interface LearnedRule {
   leadMedianMin: number;
 }
 
-// Transcribed by hand, ward-v2, held-out seeds 11 to 30, each set read once.
+// Transcribed by hand, ward-v2, held-out seeds 11 to 30, scored once by procedure.
 // Reference rows and student rows (teacher, student, with and without temperature): models/tier_c/student_vitals/held_out.json.
 // Student with the confidence check: models/tier_c/confidence_check/heldout.json (rules).
 // Reward-learned policy rows: models/tier_b/reward_policy/held_out.txt (printed table; its card.md repeats it).
@@ -122,6 +122,7 @@ export const CONFIDENCE_CHECK = {
   checkedAlertingBins: 18580, // alerting_bins.checked
   studentNewAlerts: 6247, // new_alerts.student
   checkedNewAlerts: 1930, // new_alerts.checked
+  studentAnyAll: 61, // any_bin.n of the student over all 91 evaluated episodes (base of lostAny)
   lostAny: 8, // lost.all.any: episodes the student caught in any bin and the checked rule did not
   lostEarly: 13, // lost.all.early: same, caught early (a new alert before fully in)
   evaluated: 91, // episodes_evaluated
@@ -143,6 +144,9 @@ export const MODEL_FACTS = {
   rewardCandidates: 30, // per generation
   rewardAcceptedSteps: 1,
   rewardRounds: 2, // of 4 allowed
+  // Episodes alerting in any bin, all 91 evaluated (any_bin.n): held_out.json and confidence_check/heldout.json
+  // (NEWS2 or student checked); NEWS2 or reward final: reward_policy/held_out.txt, "ALERTING in any bin ... / evaluated".
+  anyAllCounts: { news2: 57, news2OrStudent: 68, news2OrStudentChecked: 63, news2OrRewardFinal: 64 },
   anyAllIntervals: {
     news2: { rate: 0.626, lo: 0.522, hi: 0.727 },
     student: { rate: 0.67, lo: 0.57, hi: 0.762 },

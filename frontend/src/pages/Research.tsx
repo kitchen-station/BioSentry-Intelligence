@@ -12,6 +12,8 @@ interface Props {
 }
 
 const num = (x: number) => x.toLocaleString("en-US");
+const times = (id: string) => (rule(id).perShift / rule("ref_news2_chart_trigger").perShift).toFixed(2);
+const added = (n: number) => n - M.anyAllCounts.news2;
 const rule = (id: string) => LEARNED_RULES.find((r) => r.id === id)!;
 const signed = (x: number) => `${x < 0 ? "-" : "+"}${Math.abs(x).toFixed(3)}`;
 
@@ -115,13 +117,13 @@ export function Research({ session, onSignOut }: Props) {
           <p>
             What it removes: {num(C.notSureBins)} of the student&apos;s {num(C.studentAlertingBins)} alerting bins
             ({C.notSureShare.toFixed(3)}) became not sure, leaving {num(C.checkedAlertingBins)}. New alerts fell from {num(C.studentNewAlerts)} to {num(C.checkedNewAlerts)}.
-            What it costs: {C.lostAny} of {C.evaluated} episodes the student caught in some bin are no longer
-            caught in any bin, and {C.lostEarly} of the episodes the student caught early are not caught early.
+            What it costs: {C.lostAny} of the {C.studentAnyAll} episodes the student was alerting in are no longer
+            alerting in any bin, and {C.lostEarly} episodes with a new alert before fully in lose it.
           </p>
           <p>
             The target bounds false alerts among checks of patients who were not starting to deteriorate, on
             average over stays. It does not bound the share of alerts that are true, and most alerts can still be
-            false. It is a result inside the simulator, not a clinical guarantee.
+            false. It is a statement about simulator trials only. It promises nothing about patients.
           </p>
         </section>
 
@@ -182,9 +184,11 @@ export function Research({ session, onSignOut }: Props) {
             same rules.
           </p>
           <p>
-            On ward-v2, no rule here adds anything measurable to NEWS2. Added to NEWS2, the own baseline,
-            the student and the reward-learned policy each catch a few more episodes, and every interval overlaps
-            NEWS2&apos;s.
+            Added to NEWS2, the student alerts in {added(M.anyAllCounts.news2OrStudent)} more of {C.evaluated} episode windows at {times("news2_or_student")} times
+            NEWS2&apos;s alerts. Most of that is what the extra alerts give by chance: the excess over chance is {signed(rule("news2_or_student").excess)} against {signed(rule("ref_news2_chart_trigger").excess)} for
+            NEWS2 alone, and excess has no interval. No gain beyond chance is shown. With the confidence check it is {added(M.anyAllCounts.news2OrStudentChecked)} more
+            of {C.evaluated} at {times("news2_or_student_checked")} times the alerts, excess {signed(rule("news2_or_student_checked").excess)}. The reward-learned policy added to NEWS2 is {added(M.anyAllCounts.news2OrRewardFinal)} more
+            of {C.evaluated} at {times("news2_or_reward_final")} times the alerts, excess {signed(rule("news2_or_reward_final").excess)}.
           </p>
           <p>
             The prediction model is a small MindSpore network (one hidden layer, {num(M.studentParameters)} parameters)
@@ -197,12 +201,12 @@ export function Research({ session, onSignOut }: Props) {
             per patient per 12 hours). It alerts in {rule("student").episodes.n} of {rule("student").episodes.d} episode windows
             against NEWS2&apos;s {rule("ref_news2_chart_trigger").episodes.n} of {rule("ref_news2_chart_trigger").episodes.d}, and the intervals overlap. Its chance rate is lower
             ({rule("student").chance.rate.toFixed(3)} against {rule("ref_news2_chart_trigger").chance.rate.toFixed(3)}) and so is its time in alert
-            ({rule("student").timeInAlert.toFixed(3)} against {rule("ref_news2_chart_trigger").timeInAlert.toFixed(3)}). Added to NEWS2 the gain is not beyond noise.
+            ({rule("student").timeInAlert.toFixed(3)} against {rule("ref_news2_chart_trigger").timeInAlert.toFixed(3)}).
           </p>
           <p>
             The reward-learned policy was searched with {M.rewardCandidates} candidates per generation. A winner was kept
             only if it also beat the current policy on a second batch of new trials. {M.rewardAcceptedSteps} step was accepted,
-            and the outer loop stopped after {M.rewardRounds} rounds. Added to NEWS2 it gives no gain beyond noise. Alone it is a
+            and the outer loop stopped after {M.rewardRounds} rounds. Alone it is a
             quiet rule ({rule("reward_final").perShift.toFixed(3)} alerts per patient per 12 hours), with a median lead time that is
             negative ({rule("reward_final").leadMedianMin.toFixed(1)} minutes). The own baseline alone also catches fewer
             episodes than NEWS2, with far fewer alerts.

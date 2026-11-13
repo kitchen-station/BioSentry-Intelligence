@@ -129,14 +129,14 @@ describe("Research page", () => {
   it("states the findings, the provenance and that NEWS2 is unchanged", () => {
     show();
     expect(screen.getByText(/That rise has been removed, and temperature noise went from 0\.02 to 0\.1 C\./)).toBeTruthy();
-    expect(screen.getByText(/On ward-v2, no rule here adds anything measurable to NEWS2\./)).toBeTruthy();
+    expect(screen.getByText(/No gain beyond chance is shown\./)).toBeTruthy();
     expect(screen.getByText(/only 2 of 27 hypotensive episodes/)).toBeTruthy();
     expect(screen.getByText(/In 17 of 27, no cuff reading reached NEWS2 inside the window/)).toBeTruthy();
     expect(screen.getByText(/simulator commit f7647c5, scenario 95052d02/)).toBeTruthy();
     expect(screen.getByText(/Earlier run: ward-v1, simulator commit 3a15e01/)).toBeTruthy();
     expect(screen.getAllByRole("table")[0].querySelector("caption")!.textContent).toMatch(/^Synthetic simulator, not validated\./);
     expect(screen.getByText(/Source: evaluation on 2026-11-13, simulator commit f7647c5, scenario 95052d02\./)).toBeTruthy();
-    expect(screen.getByText(/Each held-out set was read once\. Student model \(run m1-20261113-3d634f3\): trained with MindSpore 2\.11\.0 on ward-v2-ext seeds 61 to 160, chosen on seeds 261 to 300\. Reward-learned policy \(run m2-20261113\): learned on ward-v2-ext seeds from 401, validation seeds 341 to 400\. Confidence check \(run m3-20261113-fbd39f2\): calibrated on ward-v2-ext seeds 301 to 340\./)).toBeTruthy();
+    expect(screen.getByText(/Each model was scored on the held-out seeds once, by procedure\. The same seeds were used earlier for earlier models\. Student model \(run m1-20261113-3d634f3\): trained with MindSpore 2\.11\.0 on ward-v2-ext seeds 61 to 160, chosen on seeds 261 to 300\. Reward-learned policy \(run m2-20261113\): learned on ward-v2-ext seeds from 401, validation seeds 341 to 400\. Confidence check \(run m3-20261113-fbd39f2\): calibrated on ward-v2-ext seeds 301 to 340\./)).toBeTruthy();
     expect(screen.getByText(/NEWS2 itself is never changed/)).toBeTruthy();
     expect(screen.getByText(/k=4.0 p=8 were chosen on seeds 1 to 10/)).toBeTruthy();
   });
@@ -165,10 +165,13 @@ describe("Research page", () => {
 
   it("states the learned-rule findings and the run ids", () => {
     show();
-    expect(screen.getByText(/Added to NEWS2, the own baseline,\s+the student and the reward-learned policy each catch a few more episodes, and every interval overlaps\s+NEWS2's\./)).toBeTruthy();
+    const text = document.body.textContent!.replace(/\s+/g, " ");
+    expect(text).toContain("Added to NEWS2, the student alerts in 11 more of 91 episode windows at 1.27 times NEWS2's alerts. Most of that is what the extra alerts give by chance: the excess over chance is +0.243 against +0.210 for NEWS2 alone, and excess has no interval. No gain beyond chance is shown. With the confidence check it is 6 more of 91 at 1.06 times the alerts, excess +0.268. The reward-learned policy added to NEWS2 is 7 more of 91 at 1.12 times the alerts, excess +0.244.");
+    const k = MODEL_FACTS.anyAllCounts;
+    expect([k.news2OrStudent - k.news2, k.news2OrStudentChecked - k.news2, k.news2OrRewardFinal - k.news2]).toEqual([11, 6, 7]);
     expect(screen.getByText(/Excess\s+cannot be more than 1 minus the chance rate, so it does not rank these rules\./)).toBeTruthy();
     expect(screen.getByText(/The gains the own baseline showed on ward-v1 went away on ward-v2\. Two things changed \(the temperature rise was removed and temperature noise went from 0\.02 to 0\.1 C\), and this run cannot say which one caused it\. The table above shows both runs\./)).toBeTruthy();
-    expect(screen.getByText(/a student model trained with MindSpore that exports as ONNX\. Each held-out set was read once\. Nothing was\s+tuned on the held-out trials\./)).toBeTruthy();
+    expect(screen.getByText(/a student model trained with MindSpore that exports as ONNX\. Each model was scored on the held-out seeds once, by procedure\. The same seeds were used earlier for earlier models\. Nothing was\s+tuned on the held-out trials\./)).toBeTruthy();
     expect(screen.queryByText(/not a bigger model/)).toBeNull();
     expect(screen.queryByText(/no usable threshold/)).toBeNull();
     expect(screen.getByText("None of these learned rules is used by the ward list, the rank or any alert.")).toBeTruthy();
@@ -184,7 +187,7 @@ describe("Research page", () => {
     expect(text).toContain("On validation its log loss (0.018969) is not better than the same small network fitted on the true labels (0.018925), so the larger network bought nothing measurable.");
     expect([MODEL_FACTS.studentParameters, MODEL_FACTS.teacherParameters]).toEqual([1185, 79873]);
     expect(MODEL_FACTS.studentValLogLoss).toBeGreaterThan(MODEL_FACTS.hardLabelValLogLoss);
-    expect(text).toContain("the student alerts about as often as NEWS2 (0.413 against 0.414 alerts per patient per 12 hours). It alerts in 58 of 79 episode windows against NEWS2's 54 of 79, and the intervals overlap. Its chance rate is lower (0.319 against 0.473) and so is its time in alert (0.064 against 0.158). Added to NEWS2 the gain is not beyond noise.");
+    expect(text).toContain("the student alerts about as often as NEWS2 (0.413 against 0.414 alerts per patient per 12 hours). It alerts in 58 of 79 episode windows against NEWS2's 54 of 79, and the intervals overlap. Its chance rate is lower (0.319 against 0.473) and so is its time in alert (0.064 against 0.158).");
     // The claims "intervals overlap" hold for the data.
     const I = MODEL_FACTS.anyAllIntervals;
     for (const x of [I.student, I.news2OrStudent, I.news2OrRewardFinal]) expect(x.lo <= I.news2.hi && I.news2.lo <= x.hi).toBe(true);
@@ -199,7 +202,7 @@ describe("Research page", () => {
   it("says what the reward-learned policy did, from the data file", () => {
     show();
     const text = document.body.textContent!.replace(/\s+/g, " ");
-    expect(text).toContain("searched with 30 candidates per generation. A winner was kept only if it also beat the current policy on a second batch of new trials. 1 step was accepted, and the outer loop stopped after 2 rounds. Added to NEWS2 it gives no gain beyond noise. Alone it is a quiet rule (0.153 alerts per patient per 12 hours), with a median lead time that is negative (-3.8 minutes).");
+    expect(text).toContain("searched with 30 candidates per generation. A winner was kept only if it also beat the current policy on a second batch of new trials. 1 step was accepted, and the outer loop stopped after 2 rounds. Alone it is a quiet rule (0.153 alerts per patient per 12 hours), with a median lead time that is negative (-3.8 minutes).");
   });
 
   it("shows the confidence check: target, result, cost and its limits", () => {
@@ -207,7 +210,7 @@ describe("Research page", () => {
     expect(CONFIDENCE_CHECK).toMatchObject({
       targetOneIn: 100, achievedPct: 0.65, achievedLoPct: 0.57, achievedHiPct: 0.74, verdict: "MET",
       notSureBins: 27523, studentAlertingBins: 46103, notSureShare: 0.597, checkedAlertingBins: 18580,
-      studentNewAlerts: 6247, checkedNewAlerts: 1930, lostAny: 8, lostEarly: 13, evaluated: 91,
+      studentNewAlerts: 6247, checkedNewAlerts: 1930, studentAnyAll: 61, lostAny: 8, lostEarly: 13, evaluated: 91,
     });
     // Not sure bins = student alerting bins minus checked ones; the share is rounded from the counts.
     expect(CONFIDENCE_CHECK.studentAlertingBins - CONFIDENCE_CHECK.checkedAlertingBins).toBe(CONFIDENCE_CHECK.notSureBins);
@@ -219,14 +222,14 @@ describe("Research page", () => {
     expect(text).toContain("The target was 1 false alert in 100 checks on patients who were not starting to deteriorate, on average over stays.");
     expect(text).toContain("the target was met (MET): the achieved share was 0.65% (95% interval 0.57% to 0.74%).");
     expect(text).toContain("27,523 of the student's 46,103 alerting bins (0.597) became not sure, leaving 18,580. New alerts fell from 6,247 to 1,930.");
-    expect(text).toContain("8 of 91 episodes the student caught in some bin are no longer caught in any bin, and 13 of the episodes the student caught early are not caught early.");
-    expect(text).toContain("It does not bound the share of alerts that are true, and most alerts can still be false. It is a result inside the simulator, not a clinical guarantee.");
+    expect(text).toContain("8 of the 61 episodes the student was alerting in are no longer alerting in any bin, and 13 episodes with a new alert before fully in lose it.");
+    expect(text).toContain("It does not bound the share of alerts that are true, and most alerts can still be false. It is a statement about simulator trials only. It promises nothing about patients.");
   });
 
   it("uses none of the banned claims", () => {
     show();
     const text = document.body.textContent!;
-    expect(text.match(/guarantee/gi)).toHaveLength(1);
+    expect(text).not.toMatch(/guarantee/i);
     for (const w of [/reinforcement learning/i, /self-learning/i, /predicts deterioration/i, /fewer false alarms than NEWS2/i]) expect(text).not.toMatch(w);
     expect(text).not.toMatch(/\b(is|are|was|were) validated\b/i);
   });
