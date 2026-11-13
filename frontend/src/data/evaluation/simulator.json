@@ -1,0 +1,987 @@
+{
+ "body": {
+  "compare": {
+   "baseline": "news2_total_ge_5",
+   "change": "news2_chart_trigger",
+   "days": 30,
+   "mode": "w4_seeds",
+   "notes": [
+    "nothing in the run responds to a warning: a staff review does not change vitals and the rule is never fed back into the run; the outcome block above is a labelled model assumption computed from the timing, not something that happens to a patient",
+    "starting patients (admit minute 0) are in the alert burden; their episodes are not evaluated; p-001 has a scripted worsening that is not an episode",
+    "lead = fully-in minute minus the first new alert in the window; positive means the alert came before the episode was fully in",
+    "alerts re-arm after 16 bins (4 h) not alerting; window = episode_start to fully in + 120 min (both are judgement values taken from BioSentry-Intelligence research/)",
+    "alert delay = first new alert in the window minus episode start (when the rule first flags, not when anyone acts); an episode with no new alert has no delay and is counted, not filled in",
+    "the paired figure is the same episode under both rules, pooled over the seeds of this report (each episode counted once; its sd treats episodes as independent); episodes with a new alert under one rule only are left out (see episodes_with_new_alert); the lead and delay medians of an arm, and their difference column, are over that arm's own alerted episodes, which can differ between arms; alert minutes are 15-minute bins, so each paired difference is a multiple of 15 min",
+    "a rule that alerts more can show fewer new alerts in a window: an alert before the window keeps the patient un-armed until 16 quiet bins pass",
+    "spread is across seeds: each seed is one simulated run of one ward; it says nothing when seeds_with_value is below 2; a difference whose min and max have opposite signs is not a finding, and one whose signs agree is only what this model does"
+   ],
+   "paired": [
+    {
+     "kind": "int",
+     "metric": "episodes_with_new_alert_under_both",
+     "value": 40
+    },
+    {
+     "kind": "int",
+     "metric": "change_earlier",
+     "value": 9
+    },
+    {
+     "kind": "int",
+     "metric": "same_bin",
+     "value": 31
+    },
+    {
+     "kind": "int",
+     "metric": "change_later",
+     "value": 0
+    },
+    {
+     "kind": "d4",
+     "metric": "min",
+     "value": -225
+    },
+    {
+     "kind": "d4",
+     "metric": "median",
+     "value": 0
+    },
+    {
+     "kind": "d4",
+     "metric": "max",
+     "value": 0
+    },
+    {
+     "kind": "d4",
+     "metric": "mean",
+     "value": -16.125
+    },
+    {
+     "kind": "d4",
+     "metric": "sd",
+     "value": 42.4791
+    }
+   ],
+   "pairing_status": "one cohort for both arms, for each of 20 seeds",
+   "pooled": [
+    {
+     "baseline": 5334,
+     "change": 6307,
+     "difference": 973,
+     "kind": "int",
+     "metric": "alerts"
+    },
+    {
+     "baseline": 0.3483,
+     "change": 0.4119,
+     "difference": 0.0636,
+     "kind": "d4",
+     "metric": "alerts_per_patient_per_12h_shift"
+    },
+    {
+     "baseline": 100,
+     "change": 100,
+     "difference": 0,
+     "kind": "int",
+     "metric": "episodes_evaluated"
+    },
+    {
+     "baseline": 47,
+     "change": 47,
+     "difference": 0,
+     "kind": "int",
+     "metric": "episodes_with_new_alert"
+    },
+    {
+     "baseline": 0.47,
+     "change": 0.47,
+     "difference": 0,
+     "kind": "d4",
+     "metric": "episodes_with_new_alert_share"
+    },
+    {
+     "baseline": 53,
+     "change": 53,
+     "difference": 0,
+     "kind": "int",
+     "metric": "episodes_no_new_alert"
+    },
+    {
+     "baseline": 65,
+     "change": 72,
+     "difference": 7,
+     "kind": "int",
+     "metric": "episodes_alerting_any_bin"
+    },
+    {
+     "baseline": 5281,
+     "change": 6253,
+     "difference": 972,
+     "kind": "int",
+     "metric": "alerts_outside_episode_windows"
+    },
+    {
+     "baseline": 56.5176,
+     "change": 56.5176,
+     "difference": 0,
+     "kind": "d4",
+     "metric": "lead_median_minutes"
+    },
+    {
+     "baseline": 186.0759,
+     "change": 141.0759,
+     "difference": -45,
+     "kind": "d4",
+     "metric": "delay_median_minutes"
+    },
+    {
+     "baseline": 734772,
+     "change": 734772,
+     "difference": 0,
+     "kind": "int",
+     "metric": "bins"
+    },
+    {
+     "baseline": 86955,
+     "change": 115012,
+     "difference": 28057,
+     "kind": "int",
+     "metric": "bins_alerting"
+    }
+   ],
+   "seeds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20
+   ],
+   "spread": [
+    {
+     "max": 200.9882,
+     "mean": 13.3762,
+     "median": 0,
+     "metric": "lead_median_minutes",
+     "min": -229.4489,
+     "sd": 84.6536,
+     "seeds_with_value": 17
+    },
+    {
+     "max": 197.8962,
+     "mean": -13.4808,
+     "median": 0,
+     "metric": "delay_median_minutes",
+     "min": -354.3618,
+     "sd": 118.7815,
+     "seeds_with_value": 17
+    },
+    {
+     "max": 0.1075,
+     "mean": 0.0629,
+     "median": 0.0646,
+     "metric": "alerts_per_patient_per_12h_shift",
+     "min": 0.01,
+     "sd": 0.0277,
+     "seeds_with_value": 20
+    },
+    {
+     "max": 0.4,
+     "mean": -0.0094,
+     "median": 0,
+     "metric": "episodes_with_new_alert_share",
+     "min": -0.5,
+     "sd": 0.2172,
+     "seeds_with_value": 20
+    }
+   ]
+  },
+  "node_major": 25,
+  "outcome": {
+   "arms": {
+    "baseline": {
+     "alerts": 5334,
+     "bins_alerting": 86955,
+     "episodes_evaluated": 100,
+     "modelled_excess_bad_outcomes_per_100_episodes": 0.8352,
+     "recognised_by_round": 51,
+     "recognised_by_rule": 42,
+     "recognised_by_rule_without_new_alert": 15,
+     "recognition_delay_mean_hours": 2.1979,
+     "recognition_delay_median_hours": 1.3112,
+     "unrecognised_at_leave_or_run_end": 7
+    },
+    "change": {
+     "alerts": 6307,
+     "bins_alerting": 115012,
+     "episodes_evaluated": 100,
+     "modelled_excess_bad_outcomes_per_100_episodes": 0.7382,
+     "recognised_by_round": 44,
+     "recognised_by_rule": 51,
+     "recognised_by_rule_without_new_alert": 23,
+     "recognition_delay_mean_hours": 1.9438,
+     "recognition_delay_median_hours": 1.0727,
+     "unrecognised_at_leave_or_run_end": 5
+    }
+   },
+   "assumption": "under the assumption that each hour from the true start of an episode to its recognition multiplies the odds of a bad outcome by 1.02, and that an episode recognised after 6.3 h carries the cited cohort's 27.4% hospital mortality (that anchoring is judgement), which sets the size of every per-100 figure; the 1.02 is the association between the time from a high NEWS to critical care and hospital mortality in one London cohort, an association in other patients, not a measured effect of earlier recognition",
+   "difference": {
+    "alerts": 973,
+    "bins_alerting": 28057,
+    "episodes_evaluated": 0,
+    "modelled_excess_bad_outcomes_per_100_episodes": -0.097,
+    "recognised_by_round": -7,
+    "recognised_by_rule": 9,
+    "recognised_by_rule_without_new_alert": 8,
+    "recognition_delay_mean_hours": -0.2541,
+    "recognition_delay_median_hours": -0.2385,
+    "unrecognised_at_leave_or_run_end": -2
+   },
+   "label": "MODEL ASSUMPTION, not evidence about patients",
+   "notes": [
+    "in the hospital model W4 counts as monitored and is outside its late-recognition rule (a deterioration on W4 is one of W4's own episodes, with no notice event); this model instead assumes recognition at the next NEWS2 round when no rule bin comes first",
+    "no patient changes: nobody dies on W4, no vital sign is altered and no recovery is drawn; each figure is a computed expectation per episode, in this report only",
+    "recognition here needs only a bin where the rule is true, not a new alert, and costs nothing. These two rules are nested: the change rule is true in every bin the other is. So the change rule is never recognised later, its modelled excess is never higher, and the spread of the difference cannot cross zero: that is the construction, not a finding. The alerts and bins_alerting, change minus baseline, are 973 and 28057 (the change rule alerts more); this block does not weigh them",
+    "only modelled_excess_bad_outcomes_per_100_episodes is the modelled outcome; the recognition delays and the counts by rule, by round and at leaving are timing figures and do not depend on the odds ratio, and alerts and bins_alerting are the same counts as the main table",
+    "an episode the patient left, or the run ended, before recognition is scored at that shorter delay, which understates it",
+    "W4 episodes are vital-sign offsets fitted from ICU records (eICU), not illnesses with a known risk of a bad outcome",
+    "the odds ratio is an observational association in another population (sustained NEWS 7 or more, admitted to critical care, London 2017-2021), timed from a high score to critical care arrival, not from a true onset to recognition",
+    "recognised by a round: 51 of 100 episodes (baseline) and 44 of 100 (change); left or run ended first: 7 and 5",
+    "round frequency from NEWS2 Chart 4 (RCP 2017): 12 h at 0, 4 h at 1-4 (band start), 1 h at 5 or more or a 3 in one parameter; \"continuous\" at 7 or more is taken as the next 15-minute bin and NOT RANKED as 4 h (both judgement)",
+    "the 27.4% at 6.3 h is the cited cohort's own hospital mortality, in patients admitted to critical care; anchoring it at that median and applying it to every W4 episode are judgement, and every per-100 figure scales with it (about p(1 - p)), so a lower-risk ward would give smaller figures; the sensitivity table varies only the odds ratio",
+    "the cited 95% CI 1.0-1.04 runs from the zero row (1) to just under the double row (1.0404) of the sensitivity table; a difference whose spread crosses zero is not a finding, and at an odds ratio of 1 the difference is exactly zero",
+    "the minimums of 20 seeds (derived from the lead difference in 30-day runs) and 30 evaluated episodes are judgement; a seed with no evaluated episode has no value in the spread (see seeds_with_value)"
+   ],
+   "paired_episodes": {
+    "change_earlier": 20,
+    "change_later": 0,
+    "delay_difference_hours": {
+     "max": 0,
+     "mean": -0.2542,
+     "median": 0,
+     "min": -5.85,
+     "sd": 0.8963
+    },
+    "episodes_paired": 100,
+    "excess_difference_per_100": {
+     "max": 0,
+     "mean": -0.097,
+     "median": 0,
+     "min": -2.2572,
+     "sd": 0.3436
+    },
+    "same_minute": 80
+   },
+   "parameter": {
+    "anchor_tag": "judgement",
+    "applied_to_tag": "judgement",
+    "baseline_risk": 0.274,
+    "baseline_risk_at_hours": 6.3,
+    "interval_95": [
+     1,
+     1.04
+    ],
+    "name": "odds_ratio_per_hour_of_recognition_delay",
+    "reference": "Whebell SF et al., Crit Care 2021;25:226, doi:10.1186/s13054-021-03650-1: adjusted odds ratio 1.02 (95% CI 1.0-1.04) for the time from a first sustained NEWS of 7 or more (not falling below 5 before admission) to critical care admission, which the paper measures in hours (it does not print the words \"per hour\"); secondary outcome hospital mortality (adjusted OR 1.02, 95% CI 1.0-1.04, p = 0.026; the primary outcome, critical care mortality, gave the same OR), 27.4% of 632 patients, median time 6.3 h",
+    "tag": "cited",
+    "value": 1.02
+   },
+   "recognition_rule": "recognition = the first 15-minute bin in the episode window where the rule is true, or the next scheduled NEWS2 round, whichever comes first (or the patient leaving, or the run ending); a round is taken to recognise the episode whatever the score at that round shows (a perfect round, judgement), which shortens delays in both arms; modelled excess = the modelled risk at the recognition delay minus the modelled risk at zero delay, per 100 episodes",
+   "seeds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20
+   ],
+   "sensitivity": [
+    {
+     "assumption": "zero",
+     "baseline": 0,
+     "change": 0,
+     "difference": 0,
+     "odds_ratio_per_hour": 1
+    },
+    {
+     "assumption": "half",
+     "baseline": 0.4253,
+     "change": 0.376,
+     "difference": -0.0493,
+     "odds_ratio_per_hour": 1.01
+    },
+    {
+     "assumption": "central",
+     "baseline": 0.8352,
+     "change": 0.7382,
+     "difference": -0.097,
+     "odds_ratio_per_hour": 1.02
+    },
+    {
+     "assumption": "double",
+     "baseline": 1.6071,
+     "change": 1.4196,
+     "difference": -0.1875,
+     "odds_ratio_per_hour": 1.0404
+    }
+   ],
+   "spread": {
+    "modelled_excess_bad_outcomes_per_100_episodes": {
+     "max": 0,
+     "mean": -0.0742,
+     "median": -0.0146,
+     "min": -0.4054,
+     "sd": 0.1163,
+     "seeds_with_value": 20
+    },
+    "recognition_delay_mean_hours": {
+     "max": 0,
+     "mean": -0.1947,
+     "median": -0.0387,
+     "min": -1.0566,
+     "sd": 0.3037,
+     "seeds_with_value": 20
+    }
+   }
+  },
+  "realism": {
+   "notes": [
+    "synthetic, not validated",
+    "held out: eICU-CRD Demo 2.0.1 hospitals not used to fit src/sim/fitted.json (46 of 186)",
+    "calibration rows: stays held out from src/sim/calibration.json only, not from the fit in src/sim/fitted.json (another hospital split)",
+    "published: Welch 2015 (US monitored wards) and RCP 2012, never used for fitting",
+    "fitted target: the simulator was set from this number, so agreement is by construction",
+    "fitted from: adult ICU (eICU-CRD Demo, BIDMC) and Holter and AF (MIT-BIH, AFDB, LTAFDB) recordings; not a general ward, not the Philippines",
+    "only ward W4 has vitals; summary statistics only; fitted and calibration data ODbL v1.0, see NOTICE.md"
+   ],
+   "rows": [
+    {
+     "check": "A1",
+     "real": "6.07",
+     "real_data": "eICU held-out hospitals",
+     "signal": "heart rate",
+     "sim": "6.12",
+     "statistic": "sd, 5-min reads",
+     "tolerance": "ratio 0.75-1.25",
+     "verdict": "pass"
+    },
+    {
+     "check": "A1",
+     "real": "0.813",
+     "real_data": "eICU held-out hospitals",
+     "signal": "heart rate",
+     "sim": "0.709",
+     "statistic": "lag-1 (5 min) autocorrelation",
+     "tolerance": "abs diff < 0.2",
+     "verdict": "pass"
+    },
+    {
+     "check": "C1",
+     "real": "2.30-4.30",
+     "real_data": "eICU calibration hold-out",
+     "signal": "heart rate",
+     "sim": "3.12",
+     "statistic": "change sd, lag 5 min",
+     "tolerance": "inside p25-p75",
+     "verdict": "pass"
+    },
+    {
+     "check": "C2",
+     "real": "3.37-5.93",
+     "real_data": "eICU calibration hold-out",
+     "signal": "heart rate",
+     "sim": "5.02",
+     "statistic": "change sd, lag 15 min",
+     "tolerance": "inside p25-p75",
+     "verdict": "pass"
+    },
+    {
+     "check": "C3",
+     "real": "4.67-8.19",
+     "real_data": "eICU calibration hold-out",
+     "signal": "heart rate",
+     "sim": "7.48",
+     "statistic": "change sd, lag 60 min",
+     "tolerance": "inside p25-p75",
+     "verdict": "pass"
+    },
+    {
+     "check": "C4",
+     "real": "5.06-8.60",
+     "real_data": "eICU calibration hold-out",
+     "signal": "heart rate",
+     "sim": "7.38",
+     "statistic": "change sd, lag 180 min",
+     "tolerance": "inside p25-p75",
+     "verdict": "pass"
+    },
+    {
+     "check": "D1",
+     "real": "50",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "heart rate",
+     "sim": "51.45",
+     "statistic": "p1, 5-min held values",
+     "tolerance": "abs diff <= 10",
+     "verdict": "pass"
+    },
+    {
+     "check": "D1",
+     "real": "58",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "heart rate",
+     "sim": "59.80",
+     "statistic": "p5, 5-min held values",
+     "tolerance": "abs diff <= 10",
+     "verdict": "pass"
+    },
+    {
+     "check": "D1",
+     "real": "63",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "heart rate",
+     "sim": "65.00",
+     "statistic": "p10, 5-min held values",
+     "tolerance": "abs diff <= 10",
+     "verdict": "pass"
+    },
+    {
+     "check": "D1",
+     "real": "81",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "heart rate",
+     "sim": "84.66",
+     "statistic": "p50, 5-min held values",
+     "tolerance": "abs diff <= 10",
+     "verdict": "pass"
+    },
+    {
+     "check": "D1",
+     "real": "105",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "heart rate",
+     "sim": "104.02",
+     "statistic": "p90, 5-min held values",
+     "tolerance": "abs diff <= 10",
+     "verdict": "pass"
+    },
+    {
+     "check": "D1",
+     "real": "112",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "heart rate",
+     "sim": "108.95",
+     "statistic": "p95, 5-min held values",
+     "tolerance": "abs diff <= 10",
+     "verdict": "pass"
+    },
+    {
+     "check": "D1",
+     "real": "128",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "heart rate",
+     "sim": "118.33",
+     "statistic": "p99, 5-min held values",
+     "tolerance": "abs diff <= 10",
+     "verdict": "pass"
+    },
+    {
+     "check": "A2",
+     "real": "3.00",
+     "real_data": "eICU held-out hospitals",
+     "signal": "breathing",
+     "sim": "2.69",
+     "statistic": "sd, 5-min reads",
+     "tolerance": "ratio 0.75-1.25",
+     "verdict": "pass"
+    },
+    {
+     "check": "A2",
+     "real": "0.567",
+     "real_data": "eICU held-out hospitals",
+     "signal": "breathing",
+     "sim": "0.531",
+     "statistic": "lag-1 (5 min) autocorrelation",
+     "tolerance": "abs diff < 0.2",
+     "verdict": "pass"
+    },
+    {
+     "check": "C5",
+     "real": "1.96-3.08",
+     "real_data": "eICU calibration hold-out",
+     "signal": "breathing",
+     "sim": "1.71",
+     "statistic": "change sd, lag 5 min",
+     "tolerance": "inside p25-p75",
+     "verdict": "known miss"
+    },
+    {
+     "check": "C6",
+     "real": "2.39-3.67",
+     "real_data": "eICU calibration hold-out",
+     "signal": "breathing",
+     "sim": "2.56",
+     "statistic": "change sd, lag 15 min",
+     "tolerance": "inside p25-p75",
+     "verdict": "pass"
+    },
+    {
+     "check": "C7",
+     "real": "2.80-4.58",
+     "real_data": "eICU calibration hold-out",
+     "signal": "breathing",
+     "sim": "3.47",
+     "statistic": "change sd, lag 60 min",
+     "tolerance": "inside p25-p75",
+     "verdict": "pass"
+    },
+    {
+     "check": "C8",
+     "real": "2.84-4.70",
+     "real_data": "eICU calibration hold-out",
+     "signal": "breathing",
+     "sim": "3.33",
+     "statistic": "change sd, lag 180 min",
+     "tolerance": "inside p25-p75",
+     "verdict": "pass"
+    },
+    {
+     "check": "D2",
+     "real": "7",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "breathing",
+     "sim": "9.51",
+     "statistic": "p1, 5-min held values",
+     "tolerance": "abs diff <= 3",
+     "verdict": "pass"
+    },
+    {
+     "check": "D2",
+     "real": "10",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "breathing",
+     "sim": "11.82",
+     "statistic": "p5, 5-min held values",
+     "tolerance": "abs diff <= 3",
+     "verdict": "pass"
+    },
+    {
+     "check": "D2",
+     "real": "11",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "breathing",
+     "sim": "13.06",
+     "statistic": "p10, 5-min held values",
+     "tolerance": "abs diff <= 3",
+     "verdict": "pass"
+    },
+    {
+     "check": "D2",
+     "real": "16",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "breathing",
+     "sim": "18.19",
+     "statistic": "p50, 5-min held values",
+     "tolerance": "abs diff <= 3",
+     "verdict": "pass"
+    },
+    {
+     "check": "D2",
+     "real": "23",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "breathing",
+     "sim": "23.66",
+     "statistic": "p90, 5-min held values",
+     "tolerance": "abs diff <= 3",
+     "verdict": "pass"
+    },
+    {
+     "check": "D2",
+     "real": "25",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "breathing",
+     "sim": "25.21",
+     "statistic": "p95, 5-min held values",
+     "tolerance": "abs diff <= 3",
+     "verdict": "pass"
+    },
+    {
+     "check": "D2",
+     "real": "30",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "breathing",
+     "sim": "28.59",
+     "statistic": "p99, 5-min held values",
+     "tolerance": "abs diff <= 3",
+     "verdict": "pass"
+    },
+    {
+     "check": "A3",
+     "real": "1.78",
+     "real_data": "eICU held-out hospitals",
+     "signal": "SpO2",
+     "sim": "1.52",
+     "statistic": "sd, 5-min reads",
+     "tolerance": "ratio 0.75-1.25",
+     "verdict": "pass"
+    },
+    {
+     "check": "A3",
+     "real": "0.641",
+     "real_data": "eICU held-out hospitals",
+     "signal": "SpO2",
+     "sim": "0.614",
+     "statistic": "lag-1 (5 min) autocorrelation",
+     "tolerance": "abs diff < 0.2",
+     "verdict": "pass"
+    },
+    {
+     "check": "C9",
+     "real": "0.94-1.63",
+     "real_data": "eICU calibration hold-out",
+     "signal": "SpO2",
+     "sim": "0.92",
+     "statistic": "change sd, lag 5 min",
+     "tolerance": "inside p25-p75",
+     "verdict": "known miss"
+    },
+    {
+     "check": "C10",
+     "real": "1.20-2.08",
+     "real_data": "eICU calibration hold-out",
+     "signal": "SpO2",
+     "sim": "1.50",
+     "statistic": "change sd, lag 15 min",
+     "tolerance": "inside p25-p75",
+     "verdict": "pass"
+    },
+    {
+     "check": "C11",
+     "real": "1.61-2.57",
+     "real_data": "eICU calibration hold-out",
+     "signal": "SpO2",
+     "sim": "1.92",
+     "statistic": "change sd, lag 60 min",
+     "tolerance": "inside p25-p75",
+     "verdict": "pass"
+    },
+    {
+     "check": "C12",
+     "real": "1.68-2.72",
+     "real_data": "eICU calibration hold-out",
+     "signal": "SpO2",
+     "sim": "1.89",
+     "statistic": "change sd, lag 180 min",
+     "tolerance": "inside p25-p75",
+     "verdict": "pass"
+    },
+    {
+     "check": "D3",
+     "real": "86",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "SpO2",
+     "sim": "90.30",
+     "statistic": "p1, 5-min held values",
+     "tolerance": "abs diff <= 3",
+     "verdict": "known miss"
+    },
+    {
+     "check": "D3",
+     "real": "89",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "SpO2",
+     "sim": "92.63",
+     "statistic": "p5, 5-min held values",
+     "tolerance": "abs diff <= 3",
+     "verdict": "known miss"
+    },
+    {
+     "check": "D3",
+     "real": "91",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "SpO2",
+     "sim": "93.66",
+     "statistic": "p10, 5-min held values",
+     "tolerance": "abs diff <= 3",
+     "verdict": "pass"
+    },
+    {
+     "check": "D3",
+     "real": "95",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "SpO2",
+     "sim": "97.12",
+     "statistic": "p50, 5-min held values",
+     "tolerance": "abs diff <= 3",
+     "verdict": "pass"
+    },
+    {
+     "check": "D3",
+     "real": "99",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "SpO2",
+     "sim": "100.00",
+     "statistic": "p90, 5-min held values",
+     "tolerance": "abs diff <= 3",
+     "verdict": "pass"
+    },
+    {
+     "check": "D3",
+     "real": "100",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "SpO2",
+     "sim": "100.00",
+     "statistic": "p95, 5-min held values",
+     "tolerance": "abs diff <= 3",
+     "verdict": "pass"
+    },
+    {
+     "check": "D3",
+     "real": "100",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "SpO2",
+     "sim": "100.00",
+     "statistic": "p99, 5-min held values",
+     "tolerance": "abs diff <= 3",
+     "verdict": "pass"
+    },
+    {
+     "check": "H1",
+     "real": "-",
+     "real_data": "none",
+     "signal": "temperature",
+     "sim": "-",
+     "statistic": "fitted from eICU; not tested",
+     "tolerance": "-",
+     "verdict": "no real comparison"
+    },
+    {
+     "check": "B1",
+     "real": "15.28",
+     "real_data": "eICU held-out hospitals",
+     "signal": "blood pressure (systolic)",
+     "sim": "16.65",
+     "statistic": "cuff step sd, 30 min",
+     "tolerance": "ratio 0.75-1.25",
+     "verdict": "pass"
+    },
+    {
+     "check": "B2",
+     "real": "19.94",
+     "real_data": "eICU held-out hospitals",
+     "signal": "blood pressure (systolic)",
+     "sim": "20.48",
+     "statistic": "cuff step sd, 180 min",
+     "tolerance": "ratio 0.75-1.25",
+     "verdict": "pass"
+    },
+    {
+     "check": "D4",
+     "real": "83",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "blood pressure (systolic)",
+     "sim": "74.00",
+     "statistic": "p1, 5-min held values",
+     "tolerance": "abs diff <= 15",
+     "verdict": "pass"
+    },
+    {
+     "check": "D4",
+     "real": "93",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "blood pressure (systolic)",
+     "sim": "92.00",
+     "statistic": "p5, 5-min held values",
+     "tolerance": "abs diff <= 15",
+     "verdict": "pass"
+    },
+    {
+     "check": "D4",
+     "real": "98",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "blood pressure (systolic)",
+     "sim": "98.00",
+     "statistic": "p10, 5-min held values",
+     "tolerance": "abs diff <= 15",
+     "verdict": "pass"
+    },
+    {
+     "check": "D4",
+     "real": "121",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "blood pressure (systolic)",
+     "sim": "120.00",
+     "statistic": "p50, 5-min held values",
+     "tolerance": "abs diff <= 15",
+     "verdict": "pass"
+    },
+    {
+     "check": "D4",
+     "real": "151",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "blood pressure (systolic)",
+     "sim": "150.00",
+     "statistic": "p90, 5-min held values",
+     "tolerance": "abs diff <= 15",
+     "verdict": "pass"
+    },
+    {
+     "check": "D4",
+     "real": "161",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "blood pressure (systolic)",
+     "sim": "160.00",
+     "statistic": "p95, 5-min held values",
+     "tolerance": "abs diff <= 15",
+     "verdict": "pass"
+    },
+    {
+     "check": "D4",
+     "real": "180",
+     "real_data": "Welch 2015 (monitored wards)",
+     "signal": "blood pressure (systolic)",
+     "sim": "178.00",
+     "statistic": "p99, 5-min held values",
+     "tolerance": "abs diff <= 15",
+     "verdict": "pass"
+    },
+    {
+     "check": "B3",
+     "real": "-",
+     "real_data": "none",
+     "signal": "blood pressure (diastolic)",
+     "sim": "-",
+     "statistic": "fitted from eICU; not tested",
+     "tolerance": "-",
+     "verdict": "no real comparison"
+    },
+    {
+     "check": "R1",
+     "real": "-",
+     "real_data": "none",
+     "signal": "heart rhythm",
+     "sim": "-",
+     "statistic": "fitted from MIT-BIH, AFDB, LTAFDB; not tested",
+     "tolerance": "-",
+     "verdict": "no real comparison"
+    },
+    {
+     "check": "E1",
+     "real": "20",
+     "real_data": "RCP 2012 (medical wards)",
+     "signal": "NEWS2",
+     "sim": "34.66",
+     "statistic": "% of sets at 5+",
+     "tolerance": "abs diff <= 7",
+     "verdict": "known miss"
+    },
+    {
+     "check": "E2",
+     "real": "10",
+     "real_data": "RCP 2012 (medical wards)",
+     "signal": "NEWS2",
+     "sim": "16.25",
+     "statistic": "% of sets at 7+",
+     "tolerance": "abs diff <= 5",
+     "verdict": "known miss"
+    },
+    {
+     "check": "F1",
+     "real": "6.90",
+     "real_data": "van Goor 2022 (set from)",
+     "signal": "heart rate",
+     "sim": "6.77",
+     "statistic": "24-h swing",
+     "tolerance": "abs diff <= 1.5",
+     "verdict": "fitted target"
+    },
+    {
+     "check": "F2",
+     "real": "1.00",
+     "real_data": "van Goor 2022 (set from)",
+     "signal": "breathing",
+     "sim": "0.97",
+     "statistic": "24-h swing",
+     "tolerance": "abs diff <= 0.5",
+     "verdict": "fitted target"
+    }
+   ]
+  }
+ },
+ "format": "biosentry-evaluation/3",
+ "notes": [
+  "realism: the rows and footer of npm run realism, run by this export at provenance.commit; its seeds are fixed in src/realism.ts and are not listed in seeds"
+ ],
+ "provenance": {
+  "commit": "54fcbd03da3bcda171c8f566695ce90477fec938",
+  "data": "biosentry-ward-sim ward W4 runs and realism checks",
+  "date": "2026-11-13",
+  "exporter": {
+   "name": "npm run export:evaluation",
+   "version": "1"
+  },
+  "repo": "kitchen-station/biosentry-ward-sim",
+  "seeds": [
+   {
+    "role": "compare",
+    "seeds": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19,
+     20
+    ]
+   }
+  ],
+  "source": [
+   "npm run compare -- --seed 1 --seeds 20 --days 30 --baseline rule=news2_total_ge_5 --change rule=news2_chart_trigger --outcome-model --out trials/compare-outcome",
+   "npm run realism"
+  ],
+  "synthetic": true,
+  "validated": false
+ },
+ "section": "simulator"
+}
