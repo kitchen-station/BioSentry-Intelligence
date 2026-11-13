@@ -298,6 +298,16 @@ def test_the_times_are_the_bin_start_and_the_age_counts_from_the_stored_bin_time
     assert datetime.fromisoformat(hr["baseline_from"]) == first - timedelta(minutes=15)
 
 
+def test_on_the_seeded_ward_the_latest_bin_ends_at_the_wards_own_time(api: Api) -> None:
+    # No posted run: the ward's time is the fixture's as_of, and the seed stores each bin's END.
+    (run,) = api.sql("SELECT as_of, last_batch_at FROM run")
+    assert run["last_batch_at"] is None
+    hr = {v["vital"]: v for v in get(api, "p-001", "rn-manalo").json()["vitals"]}["heart_rate"]
+    assert hr["status"] == "computed"
+    assert datetime.fromisoformat(hr["latest_at"]) == run["as_of"] - timedelta(minutes=15)
+    assert hr["latest_age_s"] == 0
+
+
 def test_the_age_is_never_negative_when_the_servers_clock_is_behind(api: Api) -> None:
     run_id = start(api, patients=[patient(bins=rows("s-1", "heart_rate", [*BASE, 90.0]))])
     assert api.post(f"/sim/runs/{run_id}/batch", batch(minute=24 * 15)).status_code == 204

@@ -15,7 +15,7 @@ from .common import (
 class VitalHistory(Contract):
     """One 15-minute bin of a vital. `value` is null for a gap: never zero, never filled (I1)."""
 
-    time: AwareDatetime  # start of the bin, ISO 8601 with a timezone
+    time: AwareDatetime  # END of the 15-minute bin, ISO 8601 with a timezone
     value: Num | None
 
 
