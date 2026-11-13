@@ -116,19 +116,33 @@ def check_job(job: dict) -> str | None:
     return None
 
 
-def _record(out: dict, commit: str | None) -> str:
+def tuned_dirs(env) -> tuple[str, str, str | None] | None:
+    """(base folder, adapter folder, the model's Python or None) when the model mode is asked for, None when
+    neither folder is set. BIOSENTRY_AGENT_TUNED_PYTHON is the interpreter of the optional MindSpore environment;
+    unset, the worker's own Python runs the model."""
+    env = os.environ if env is None else env
+    base, adapter = env.get("BIOSENTRY_AGENT_TUNED_BASE") or "", env.get("BIOSENTRY_AGENT_TUNED_ADAPTER") or ""
+    if bool(base) != bool(adapter):
+        raise AgentError("BIOSENTRY_AGENT_TUNED_BASE and BIOSENTRY_AGENT_TUNED_ADAPTER must be set together")
+    return (base, adapter, env.get("BIOSENTRY_AGENT_TUNED_PYTHON") or None) if base else None
+
+
+def _record(out: dict, commit: str | None, adapter_sha: str | None = None) -> str:
+    agent = {"ask": out.get("planner", "keywords"), "step": out["step"], "commit": commit}
+    if agent["ask"] == "tuned-model":
+        agent["adapter_sha256"] = adapter_sha
     return json.dumps({
         "question_format": 1, "synthetic": True, "grounding": "ok",
-        "agent": {"ask": "keywords", "step": out["step"], "commit": commit},
+        "agent": agent,
         "experiment": {"template": out["template"], "tool": "evaluate_rules", "args": out["args"],
                        "result_sha256": out["result_sha256"], "result": out["result"]},
         "numbers": out["numbers"]}, allow_nan=False)  # the API parser refuses NaN
 
 
-def report_for(cfg: Config, job: dict, commit: str | None) -> dict:
+def report_for(cfg: Config, job: dict, commit: str | None, route=None, adapter_sha: str | None = None) -> dict:
     """The report body for a checked job. No exception text, no outside text, goes into it."""
     try:
-        out = asking.answer(cfg, job["question"])
+        out = asking.answer(cfg, job["question"], route) if route else asking.answer(cfg, job["question"])
     except ToolError:
         return {"state": "failed", "reason": R_TOOL}
     except LedgerError:
@@ -142,7 +156,7 @@ def report_for(cfg: Config, job: dict, commit: str | None) -> dict:
     if out["status"] != "answered":  # `done` is never the default
         return {"state": "failed", "reason": R_ERROR}
     try:
-        record = _record(out, commit)
+        record = _record(out, commit, adapter_sha)
     except Exception:  # noqa: BLE001
         return {"state": "failed", "reason": R_ERROR}
     text = out["text"]
@@ -154,8 +168,9 @@ def report_for(cfg: Config, job: dict, commit: str | None) -> dict:
 
 
 class Worker:
-    def __init__(self, cfg, base, key, commit, transport, sleep, clock, log):
+    def __init__(self, cfg, base, key, commit, transport, sleep, clock, log, route=None, adapter_sha=None):
         self.cfg, self.base, self.commit = cfg, base, commit
+        self.route, self.adapter_sha = route, adapter_sha
         self.headers = {"X-Ingest-Key": key}
         self.transport, self.sleep, self.clock, self.log = transport, sleep, clock, log
         self.conn = None
@@ -221,7 +236,7 @@ class Worker:
         if len(self.handled) > HANDLED_KEEP:
             del self.handled[next(iter(self.handled))]
         reason = check_job(job)
-        body = {"state": "refused", "reason": reason} if reason else report_for(self.cfg, job, self.commit)
+        body = {"state": "refused", "reason": reason} if reason else report_for(self.cfg, job, self.commit, self.route, self.adapter_sha)
         state = body["state"] if self.deliver(jid, body) else "report not delivered"
         self.log(f"job {jid}: {state}")
         if reason == R_KIND:  # an API that ignores ?kind=question would hand out compare runs: stop, never claim again
@@ -257,9 +272,26 @@ def run(cfg: Config, args: list[str], env=None, transport=None, sleep=None, cloc
     if args not in ([], ["--once"]):
         raise AgentError("usage: worker [--once]")
     base, key, commit = read_env(env)
+    tuned = tuned_dirs(env)
     log = log or (lambda line: print(line, file=sys.stderr, flush=True))
     parts = urlsplit(base)
     log(f"worker started: {parts.scheme}://{parts.hostname}")
-    Worker(cfg, base, key, commit, transport or urllib_transport, sleep or time.sleep, clock or time.monotonic,
-           log).loop(once=bool(args), max_polls=max_polls)
+    router = route = None
+    if tuned:
+        from research.agent_tuning.route import Router  # only in model mode: the rules-only worker imports nothing of it
+
+        router = Router(tuned[0], tuned[1], log, python=tuned[2])
+        log("model mode: on" if router.on else "model mode: off (the weights check failed)")
+
+        def route(question):
+            try:
+                return router.route(question)
+            except Exception:  # noqa: BLE001 - a router failure never fails a job: the rules answer
+                return None
+    try:
+        Worker(cfg, base, key, commit, transport or urllib_transport, sleep or time.sleep, clock or time.monotonic,
+               log, route, router and router.adapter_sha256).loop(once=bool(args), max_polls=max_polls)
+    finally:
+        if router:
+            router.close()
     return ""

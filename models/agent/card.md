@@ -4,7 +4,8 @@
 |---|---|
 | id | `agent` |
 | what it is for | one narrow job for `research/agent/`: pick the next experiment as one JSON tool call, or route a doctor's question to one of three fixed experiments or refuse |
-| status | optional and not wired in. `research/agent/` runs with no model at all (rule planner, keyword matcher). Nothing here touches the API, the rank or the arbiter. The tuned adapter is not loaded by any product code |
+| status | optional, and off unless two environment values are set. `research/agent/` runs with no model at all (rule planner, keyword matcher). With the values set, the question worker asks the tuned model first and the guard decides; where the guard refuses, the keyword matcher answers as before (`research/README.md`, "Model mode"). Nothing here touches the rank or the arbiter |
+| storage | now: a private Hugging Face model repository (free), adapter only; prepared, nothing uploaded yet. Final plan: a Huawei Cloud OBS bucket, when a paid account exists. On the server the worker reads read-only local copies, checked by sha256 (`research/agent_tuning/SERVER.md`) |
 | model that was tuned | `Qwen/Qwen2.5-0.5B-Instruct`, Apache-2.0, 0.49 billion parameters. Fallback `Qwen/Qwen3-0.6B`, Apache-2.0, not downloaded |
 | hosted target | `deepseek-v4-flash` on Huawei Cloud MaaS (CN-Hong Kong). Open weights, MIT. Never called: there is no Huawei Cloud account yet |
 | framework | MindSpore 2.7.0 as the backend, through MindNLP (pinned as `mindnlp==0.5.1`; the installed library reports itself as 0.5.0rc2). No other framework trained anything |
@@ -131,6 +132,8 @@ beforehand.
   for its hardware (the pins here are the CPU build) and the two folders mounted.
 - The agent's model planner speaks the OpenAI-compatible API that MaaS documents. It is off unless
   three environment variables are set. The call to `deepseek-v4-flash` has never been made.
+- Storage of the weights: the final plan is a Huawei Cloud OBS bucket. A free private Hugging Face
+  repository comes first, because there is no paid Huawei Cloud account. Neither holds a file yet.
 - Serving a tuned small model on Huawei Cloud was not found in any page that could be opened
   (registry, sections 10 and 11).
 
