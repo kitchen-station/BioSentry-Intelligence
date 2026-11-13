@@ -29,18 +29,18 @@ export const PIPELINE: readonly Stage[] = [
   },
   {
     id: "prediction", name: "Prediction model", state: "research only, offline",
-    text: ["A small learned model gives a score for each 15-minute bin of simulator data.", "Trained and judged on the same simulator. It is not connected to the API, the rank or the arbiter."],
-    evidence: "models/tier_c/student_vitals/card.md",
+    text: ["A small MindSpore network (one hidden layer, 1,185 parameters) gives a score for each 15-minute bin of simulator data. It is fitted to the outputs of a larger network, which bought nothing measurable on validation.", "Trained and judged on the same simulator, not validated. It is not connected to the API, the rank or the arbiter."],
+    evidence: "models/tier_c/student_vitals/card.md, research/README.md, frontend/src/data/researchResults.ts",
   },
   {
     id: "reward", name: "Alert policy learned by reward", state: "research only, offline",
-    text: ["An alert rule of six numbers, changed step by step and kept only when it scored a higher reward on simulator trials.", "Learned on synthetic trials, not validated, and not connected to the API, the rank or the arbiter."],
+    text: ["An alert rule of six numbers. Each generation tries 30 candidates and keeps a winner only if it also beats the current rule on a second batch of new simulator trials.", "Learned on synthetic trials, not validated, and not connected to the API, the rank or the arbiter."],
     evidence: "models/tier_b/reward_policy/card.md, research/README.md, frontend/src/data/researchResults.ts",
   },
   {
-    id: "confidence", name: "Confidence check", state: "planned",
-    text: ["A check that a model's output is still inside the range it was tested on before it may count.", "Not built. The arbiter has an empty slot for it that changes nothing."],
-    evidence: "domain/arbiter.py (Guarantees, _inert), README Pending",
+    id: "confidence", name: "Confidence check", state: "research only, offline",
+    text: ["A check on the student: a score too low to support an alert is marked not sure, and a not sure bin never alerts. On simulator trials its target was met: at most 1 in 100 checks on a patient who is not starting to deteriorate shows a supported alert.", "Not validated, and not connected to the API, the rank or the arbiter. The arbiter's slot for it changes nothing."],
+    evidence: "models/tier_c/confidence_check/card.md, research/confidence.py, domain/arbiter.py (Guarantees, _inert)",
   },
   {
     id: "agent", name: "Research agent", state: "research only, offline",

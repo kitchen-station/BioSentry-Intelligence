@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const api = vi.hoisted(() => ({ getStays: vi.fn(), getWard: vi.fn(), restoreSession: vi.fn(), clearSession: vi.fn() }));
 vi.mock("../api", () => api);
 
-import { LEARNED_RULES, RESEARCH_PROVENANCE, RESEARCH_RESULTS, RUN_COMPARISON } from "../data/researchResults";
+import { CONFIDENCE_CHECK, LEARNED_RULES, MODEL_FACTS, RESEARCH_PROVENANCE, RESEARCH_RESULTS, RUN_COMPARISON } from "../data/researchResults";
 import { Research } from "./Research";
 
 afterEach(cleanup);
@@ -50,30 +50,34 @@ describe("research results data", () => {
 });
 
 describe("learned rules data", () => {
-  it("pins every row as transcribed from the cards", () => {
+  it("pins every row as transcribed from the held-out files", () => {
     expect(LEARNED_RULES.map((r) => [r.name, r.perShift, r.timeInAlert, r.episodes.rate, r.chance.rate, r.excess, r.leadMedianMin])).toEqual([
       ["NEWS2 chart trigger (reference)", 0.414, 0.158, 0.684, 0.473, 0.21, 47.2],
       ["Own baseline alone (reference)", 0.042, 0.012, 0.278, 0.032, 0.246, -82.5],
-      ["Student model", 0.088, 0.019, 0.367, 0.058, 0.309, 5.2],
-      ["NEWS2 or student", 0.429, 0.165, 0.709, 0.486, 0.223, 47.2],
+      ["Teacher model (the larger network)", 0.391, 0.069, 0.709, 0.307, 0.401, 49.6],
+      ["Student model", 0.413, 0.064, 0.734, 0.319, 0.415, 59.5],
+      ["NEWS2 or student", 0.525, 0.185, 0.823, 0.58, 0.243, 66.0],
+      ["Student model with the confidence check", 0.128, 0.026, 0.633, 0.089, 0.544, 20.5],
+      ["NEWS2 or student with the confidence check", 0.438, 0.165, 0.759, 0.491, 0.268, 44.6],
       ["Reward-learned policy, generation 0", 0.429, 0.123, 0.785, 0.435, 0.35, 23.0],
-      ["Reward-learned policy, final", 0.15, 0.029, 0.646, 0.12, 0.525, -11.2],
+      ["Reward-learned policy, final", 0.153, 0.035, 0.633, 0.14, 0.493, -3.8],
       ["NEWS2 or reward-learned policy, generation 0", 0.535, 0.248, 0.861, 0.666, 0.195, 67.9],
-      ["NEWS2 or reward-learned policy, final", 0.465, 0.173, 0.772, 0.516, 0.256, 61.5],
-      ["Reward-learned policy without temperature, final", 0.061, 0.017, 0.519, 0.05, 0.469, -38.7],
-      ["NEWS2 or reward-learned policy without temperature, final", 0.434, 0.166, 0.722, 0.492, 0.229, 60.9],
+      ["NEWS2 or reward-learned policy, final", 0.463, 0.178, 0.772, 0.528, 0.244, 73.2],
+      ["Student model without temperature", 0.409, 0.065, 0.747, 0.329, 0.418, 48.8],
+      ["NEWS2 or student without temperature", 0.512, 0.183, 0.823, 0.577, 0.246, 66.0],
+      ["Student model with the confidence check, without temperature", 0.127, 0.025, 0.633, 0.091, 0.542, 16.1],
+      ["NEWS2 or student with the confidence check, without temperature", 0.433, 0.165, 0.759, 0.491, 0.268, 44.6],
+      ["Reward-learned policy without temperature, final", 0.131, 0.021, 0.608, 0.091, 0.516, 20.2],
+      ["NEWS2 or reward-learned policy without temperature, final", 0.451, 0.166, 0.759, 0.504, 0.256, 56.5],
     ]);
   });
 
-  it("counts exist only for the reference rows; their rate = n/d rounded to 3 decimals", () => {
+  it("every row has counts, and its rates equal n/d rounded to 3 decimals", () => {
     for (const r of LEARNED_RULES) {
-      const ref = r.id.startsWith("ref_");
-      expect(r.episodes.n !== undefined, r.id).toBe(ref);
-      expect(r.chance.n !== undefined, r.id).toBe(ref);
-      if (ref) {
-        expect(r.episodes.rate, r.id).toBe(round3(r.episodes.n! / r.episodes.d!));
-        expect(r.chance.rate, r.id).toBe(round3(r.chance.n! / r.chance.d!));
-      }
+      expect(r.episodes.d, r.id).toBe(79);
+      expect(r.chance.d, r.id).toBe(4678);
+      expect(r.episodes.rate, r.id).toBe(round3(r.episodes.n! / r.episodes.d!));
+      expect(r.chance.rate, r.id).toBe(round3(r.chance.n! / r.chance.d!));
     }
   });
 
@@ -131,7 +135,8 @@ describe("Research page", () => {
     expect(screen.getByText(/simulator commit f7647c5, scenario 95052d02/)).toBeTruthy();
     expect(screen.getByText(/Earlier run: ward-v1, simulator commit 3a15e01/)).toBeTruthy();
     expect(screen.getAllByRole("table")[0].querySelector("caption")!.textContent).toMatch(/^Synthetic simulator, not validated\./);
-    expect(screen.getByText(/commit a9a7c36 plus the ward-v2 params and models \(branch lane-c\/ward-v2\), 2026-11-12/)).toBeTruthy();
+    expect(screen.getByText(/Source: evaluation on 2026-11-13, simulator commit f7647c5, scenario 95052d02\./)).toBeTruthy();
+    expect(screen.getByText(/Each held-out set was read once\. Student model \(run m1-20261113-3d634f3\): trained with MindSpore 2\.11\.0 on ward-v2-ext seeds 61 to 160, chosen on seeds 261 to 300\. Reward-learned policy \(run m2-20261113\): learned on ward-v2-ext seeds from 401, validation seeds 341 to 400\. Confidence check \(run m3-20261113-fbd39f2\): calibrated on ward-v2-ext seeds 301 to 340\./)).toBeTruthy();
     expect(screen.getByText(/NEWS2 itself is never changed/)).toBeTruthy();
     expect(screen.getByText(/k=4.0 p=8 were chosen on seeds 1 to 10/)).toBeTruthy();
   });
@@ -149,38 +154,81 @@ describe("Research page", () => {
     const cells = (i: number) => within(rows[i]).getAllByRole("cell").map((c) => c.textContent);
     expect(cells(0)).toEqual(["0.414", "0.158", "0.684 (54/79)", "0.473 (2215/4678)", "+0.210", "47.2"]);
     expect(cells(1)).toEqual(["0.042", "0.012", "0.278 (22/79)", "0.032 (150/4678)", "+0.246", "-82.5"]);
-    expect(cells(2)).toEqual(["0.088", "0.019", "0.367", "0.058", "+0.309", "5.2"]);
-    expect(cells(3)).toEqual(["0.429", "0.165", "0.709", "0.486", "+0.223", "47.2"]);
-    expect(cells(4)).toEqual(["0.429", "0.123", "0.785", "0.435", "+0.350", "23.0"]);
-    expect(cells(5)).toEqual(["0.150", "0.029", "0.646", "0.120", "+0.525", "-11.2"]);
-    expect(cells(6)).toEqual(["0.535", "0.248", "0.861", "0.666", "+0.195", "67.9"]);
-    expect(cells(7)).toEqual(["0.465", "0.173", "0.772", "0.516", "+0.256", "61.5"]);
-    expect(cells(8)).toEqual(["0.061", "0.017", "0.519", "0.050", "+0.469", "-38.7"]);
-    expect(cells(9)).toEqual(["0.434", "0.166", "0.722", "0.492", "+0.229", "60.9"]);
+    expect(cells(3)).toEqual(["0.413", "0.064", "0.734 (58/79)", "0.319 (1493/4678)", "+0.415", "59.5"]);
+    expect(cells(5)).toEqual(["0.128", "0.026", "0.633 (50/79)", "0.089 (415/4678)", "+0.544", "20.5"]);
+    expect(cells(8)).toEqual(["0.153", "0.035", "0.633 (50/79)", "0.140 (656/4678)", "+0.493", "-3.8"]);
+    expect(cells(16)).toEqual(["0.451", "0.166", "0.759 (60/79)", "0.504 (2357/4678)", "+0.256", "56.5"]);
     const first = within(tables[0]);
     expect(first.getAllByRole("columnheader")[2].textContent).toBe(within(table).getAllByRole("columnheader")[3].textContent);
     expect(first.getAllByRole("columnheader")[3].textContent).toBe(within(table).getAllByRole("columnheader")[4].textContent);
-    expect(screen.getByText(
-      "The student model without temperature, alone or with NEWS2, has no usable threshold: its alert stays open about 80% of the time, so it is not a working rule.",
-    )).toBeTruthy();
   });
 
-  it("states the learned-rule findings and their commits", () => {
+  it("states the learned-rule findings and the run ids", () => {
     show();
     expect(screen.getByText(/Added to NEWS2, the own baseline,\s+the student and the reward-learned policy each catch a few more episodes, and every interval overlaps\s+NEWS2's\./)).toBeTruthy();
-    expect(screen.getByText(/Alone, the own baseline and the student catch fewer episodes than NEWS2, with far fewer alerts\./)).toBeTruthy();
-    expect(screen.getByText(/reward-learned policy alone catches about as many as NEWS2 with about a third of the alerts, but\s+later: its median lead time is negative\./)).toBeTruthy();
     expect(screen.getByText(/Excess\s+cannot be more than 1 minus the chance rate, so it does not rank these rules\./)).toBeTruthy();
-    expect(screen.getByText("The gains seen on ward-v1 went away on ward-v2. Two things changed (the temperature rise was removed and temperature noise went from 0.02 to 0.1 C), and this run cannot say which one caused it. The table above shows both runs.")).toBeTruthy();
-    expect(screen.getByText(/What exists and works: features with no look-ahead, clean splits between training and held-out\s+trials, and a student model that exports as ONNX, the form Huawei's converter reads \(conversion\s+not yet done\)\./)).toBeTruthy();
-    expect(screen.getByText(/nothing was tuned\s+to rescue a result\./)).toBeTruthy();
+    expect(screen.getByText(/The gains the own baseline showed on ward-v1 went away on ward-v2\. Two things changed \(the temperature rise was removed and temperature noise went from 0\.02 to 0\.1 C\), and this run cannot say which one caused it\. The table above shows both runs\./)).toBeTruthy();
+    expect(screen.getByText(/a student model trained with MindSpore that exports as ONNX\. Each held-out set was read once\. Nothing was\s+tuned on the held-out trials\./)).toBeTruthy();
     expect(screen.queryByText(/not a bigger model/)).toBeNull();
+    expect(screen.queryByText(/no usable threshold/)).toBeNull();
     expect(screen.getByText("None of these learned rules is used by the ward list, the rank or any alert.")).toBeTruthy();
     expect(screen.getByText("Time in alert: the share of patient time with an alert open.")).toBeTruthy();
     expect(screen.getByText(/it cannot be\s+more than 1 minus the chance rate\./)).toBeTruthy();
-    expect(RESEARCH_PROVENANCE.studentCommit).toBe("a9a7c36 plus the ward-v2 params and models (branch lane-c/ward-v2)");
-    expect(RESEARCH_PROVENANCE.rewardCommit).toBe("a9a7c36 plus the ward-v2 params and models (branch lane-c/ward-v2)");
-    expect(screen.getByText(/Student model numbers: commit a9a7c36 plus the ward-v2 params and models \(branch lane-c\/ward-v2\)\. Reward-learned policy numbers: commit a9a7c36 plus/)).toBeTruthy();
+    expect(Object.keys(RESEARCH_PROVENANCE)).not.toContain("studentCommit");
+  });
+
+  it("says what the prediction model is, from the data file", () => {
+    show();
+    const text = document.body.textContent!.replace(/\s+/g, " ");
+    expect(text).toContain("The prediction model is a small MindSpore network (one hidden layer, 1,185 parameters) fitted to the outputs of a larger one (79,873 parameters).");
+    expect(text).toContain("On validation its log loss (0.018969) is not better than the same small network fitted on the true labels (0.018925), so the larger network bought nothing measurable.");
+    expect([MODEL_FACTS.studentParameters, MODEL_FACTS.teacherParameters]).toEqual([1185, 79873]);
+    expect(MODEL_FACTS.studentValLogLoss).toBeGreaterThan(MODEL_FACTS.hardLabelValLogLoss);
+    expect(text).toContain("the student alerts about as often as NEWS2 (0.413 against 0.414 alerts per patient per 12 hours). It alerts in 58 of 79 episode windows against NEWS2's 54 of 79, and the intervals overlap. Its chance rate is lower (0.319 against 0.473) and so is its time in alert (0.064 against 0.158). Added to NEWS2 the gain is not beyond noise.");
+    // The claims "intervals overlap" hold for the data.
+    const I = MODEL_FACTS.anyAllIntervals;
+    for (const x of [I.student, I.news2OrStudent, I.news2OrRewardFinal]) expect(x.lo <= I.news2.hi && I.news2.lo <= x.hi).toBe(true);
+    expect(I.news2).toEqual({ rate: RUN_COMPARISON[0].v2.anyAll, lo: RUN_COMPARISON[0].v2.lo, hi: RUN_COMPARISON[0].v2.hi });
+    const student = LEARNED_RULES.find((r) => r.id === "student")!;
+    const news2 = LEARNED_RULES.find((r) => r.id === "ref_news2_chart_trigger")!;
+    expect(Math.abs(student.perShift - news2.perShift)).toBeLessThan(0.01);
+    expect(student.chance.rate).toBeLessThan(news2.chance.rate);
+    expect(student.timeInAlert).toBeLessThan(news2.timeInAlert);
+  });
+
+  it("says what the reward-learned policy did, from the data file", () => {
+    show();
+    const text = document.body.textContent!.replace(/\s+/g, " ");
+    expect(text).toContain("searched with 30 candidates per generation. A winner was kept only if it also beat the current policy on a second batch of new trials. 1 step was accepted, and the outer loop stopped after 2 rounds. Added to NEWS2 it gives no gain beyond noise. Alone it is a quiet rule (0.153 alerts per patient per 12 hours), with a median lead time that is negative (-3.8 minutes).");
+  });
+
+  it("shows the confidence check: target, result, cost and its limits", () => {
+    show();
+    expect(CONFIDENCE_CHECK).toMatchObject({
+      targetOneIn: 100, achievedPct: 0.65, achievedLoPct: 0.57, achievedHiPct: 0.74, verdict: "MET",
+      notSureBins: 27523, studentAlertingBins: 46103, notSureShare: 0.597, checkedAlertingBins: 18580,
+      studentNewAlerts: 6247, checkedNewAlerts: 1930, lostAny: 8, lostEarly: 13, evaluated: 91,
+    });
+    // Not sure bins = student alerting bins minus checked ones; the share is rounded from the counts.
+    expect(CONFIDENCE_CHECK.studentAlertingBins - CONFIDENCE_CHECK.checkedAlertingBins).toBe(CONFIDENCE_CHECK.notSureBins);
+    expect(CONFIDENCE_CHECK.notSureShare).toBe(round3(CONFIDENCE_CHECK.notSureBins / CONFIDENCE_CHECK.studentAlertingBins));
+    expect(CONFIDENCE_CHECK.achievedHiPct).toBeLessThan(100 / CONFIDENCE_CHECK.targetOneIn);
+    const section = within(screen.getByRole("heading", { level: 2, name: "Confidence check on the student" }).closest("section")!);
+    const text = section.getByText(/The check marks a student alert/).closest("section")!.textContent!.replace(/\s+/g, " ");
+    expect(text).toContain('A "not sure" bin never alerts.');
+    expect(text).toContain("The target was 1 false alert in 100 checks on patients who were not starting to deteriorate, on average over stays.");
+    expect(text).toContain("the target was met (MET): the achieved share was 0.65% (95% interval 0.57% to 0.74%).");
+    expect(text).toContain("27,523 of the student's 46,103 alerting bins (0.597) became not sure, leaving 18,580. New alerts fell from 6,247 to 1,930.");
+    expect(text).toContain("8 of 91 episodes the student caught in some bin are no longer caught in any bin, and 13 of the episodes the student caught early are not caught early.");
+    expect(text).toContain("It does not bound the share of alerts that are true, and most alerts can still be false. It is a result inside the simulator, not a clinical guarantee.");
+  });
+
+  it("uses none of the banned claims", () => {
+    show();
+    const text = document.body.textContent!;
+    expect(text.match(/guarantee/gi)).toHaveLength(1);
+    for (const w of [/reinforcement learning/i, /self-learning/i, /predicts deterioration/i, /fewer false alarms than NEWS2/i]) expect(text).not.toMatch(w);
+    expect(text).not.toMatch(/\b(is|are|was|were) validated\b/i);
   });
 
   it("compares ward-v1 and ward-v2 in a third captioned table", () => {
@@ -192,16 +240,16 @@ describe("Research page", () => {
     expect(rows.map((r) => within(r).getByRole("rowheader").textContent)).toEqual(RUN_COMPARISON.map((r) => r.name));
     const cells = (i: number) => within(rows[i]).getAllByRole("cell").map((c) => c.textContent);
     expect(cells(0)).toEqual(["0.413", "0.414", "0.648 (0.545 to 0.745)", "0.626 (0.522 to 0.727)", "+0.237", "+0.210"]);
-    expect(cells(3)).toEqual(["0.226", "0.088", "0.637 (0.527 to 0.731)", "0.352 (0.250 to 0.452)", "+0.539", "+0.309"]);
-    expect(cells(5)).toEqual(["0.179", "0.150", "0.769 (0.676 to 0.852)", "0.582 (0.464 to 0.678)", "+0.700", "+0.525"]);
+    expect(cells(1)).toEqual(["0.189", "0.042", "0.769 (0.677 to 0.851)", "0.264 (0.174 to 0.360)", "+0.670", "+0.246"]);
+    expect(rows).toHaveLength(3);
+    expect(screen.getByText(/The student and the reward-learned policy were trained again after this change, so they are not compared across the two simulators here\./)).toBeTruthy();
   });
 
   it("comparison rows: ward-v2 equals the tables above, intervals contain their rate", () => {
     const cmp = (id: string) => RUN_COMPARISON.find((r) => r.id === id)!;
     expect(cmp("news2_chart_trigger").v2.excess).toBe(cell("news2_chart_trigger").excess);
     expect(cmp("baseline_alone").v2.excess).toBe(cell("baseline_alone").excess);
-    expect(cmp("student").v2.excess).toBe(LEARNED_RULES.find((r) => r.id === "student")!.excess);
-    expect(cmp("reward_final").v2.perShift).toBe(LEARNED_RULES.find((r) => r.id === "reward_final")!.perShift);
+    expect(cmp("news2_or_baseline").v2.perShift).toBe(cell("news2_or_baseline").perShift);
     for (const r of RUN_COMPARISON) for (const s of [r.v1, r.v2]) expect(s.lo <= s.anyAll && s.anyAll <= s.hi, r.id).toBe(true);
   });
 

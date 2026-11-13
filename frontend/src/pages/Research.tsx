@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import type { Session } from "../types";
 import { LabFrame } from "../components/LabFrame";
-import { LEARNED_RULES, RESEARCH_PROVENANCE as P, RESEARCH_RESULTS, RUN_COMPARISON } from "../data/researchResults";
+import { CONFIDENCE_CHECK as C, LEARNED_RULES, MODEL_FACTS as M, RESEARCH_PROVENANCE as P, RESEARCH_RESULTS, RUN_COMPARISON } from "../data/researchResults";
 import { ResearchAgentSection } from "./ResearchAgentSection";
 import styles from "./Research.module.css";
 
@@ -11,6 +11,8 @@ interface Props {
   onSignOut: () => void;
 }
 
+const num = (x: number) => x.toLocaleString("en-US");
+const rule = (id: string) => LEARNED_RULES.find((r) => r.id === id)!;
 const signed = (x: number) => `${x < 0 ? "-" : "+"}${Math.abs(x).toFixed(3)}`;
 
 const Rate = ({ rate, n, d }: { rate: number; n?: number; d?: number }) => (
@@ -99,9 +101,27 @@ export function Research({ session, onSignOut }: Props) {
             </table>
           </div>
           <p>None of these learned rules is used by the ward list, the rank or any alert.</p>
+        </section>
+
+        <section className={styles.card} aria-labelledby="check">
+          <h2 id="check" className={styles.heading}>Confidence check on the student</h2>
           <p>
-            The student model without temperature, alone or with NEWS2, has no usable threshold: its alert
-            stays open about 80% of the time, so it is not a working rule.
+            The check marks a student alert &quot;not sure&quot; when the student&apos;s score is too low to
+            support it. A &quot;not sure&quot; bin never alerts. The target was 1 false alert in {C.targetOneIn} checks
+            on patients who were not starting to deteriorate, on average over stays. On the held-out trials,
+            inside the simulator, the target was met ({C.verdict}): the achieved share was {C.achievedPct.toFixed(2)}%
+            (95% interval {C.achievedLoPct.toFixed(2)}% to {C.achievedHiPct.toFixed(2)}%).
+          </p>
+          <p>
+            What it removes: {num(C.notSureBins)} of the student&apos;s {num(C.studentAlertingBins)} alerting bins
+            ({C.notSureShare.toFixed(3)}) became not sure, leaving {num(C.checkedAlertingBins)}. New alerts fell from {num(C.studentNewAlerts)} to {num(C.checkedNewAlerts)}.
+            What it costs: {C.lostAny} of {C.evaluated} episodes the student caught in some bin are no longer
+            caught in any bin, and {C.lostEarly} of the episodes the student caught early are not caught early.
+          </p>
+          <p>
+            The target bounds false alerts among checks of patients who were not starting to deteriorate, on
+            average over stays. It does not bound the share of alerts that are true, and most alerts can still be
+            false. It is a result inside the simulator, not a clinical guarantee.
           </p>
         </section>
 
@@ -136,6 +156,7 @@ export function Research({ session, onSignOut }: Props) {
               </tbody>
             </table>
           </div>
+          <p>The student and the reward-learned policy were trained again after this change, so they are not compared across the two simulators here.</p>
         </section>
 
         <section className={styles.card} aria-labelledby="read">
@@ -166,9 +187,25 @@ export function Research({ session, onSignOut }: Props) {
             NEWS2&apos;s.
           </p>
           <p>
-            Alone, the own baseline and the student catch fewer episodes than NEWS2, with far fewer alerts. The
-            reward-learned policy alone catches about as many as NEWS2 with about a third of the alerts, but
-            later: its median lead time is negative.
+            The prediction model is a small MindSpore network (one hidden layer, {num(M.studentParameters)} parameters)
+            fitted to the outputs of a larger one ({num(M.teacherParameters)} parameters). On validation its log loss
+            ({M.studentValLogLoss}) is not better than the same small network fitted on the true labels
+            ({M.hardLabelValLogLoss}), so the larger network bought nothing measurable.
+          </p>
+          <p>
+            On held-out trials the student alerts about as often as NEWS2 ({rule("student").perShift.toFixed(3)} against {rule("ref_news2_chart_trigger").perShift.toFixed(3)} alerts
+            per patient per 12 hours). It alerts in {rule("student").episodes.n} of {rule("student").episodes.d} episode windows
+            against NEWS2&apos;s {rule("ref_news2_chart_trigger").episodes.n} of {rule("ref_news2_chart_trigger").episodes.d}, and the intervals overlap. Its chance rate is lower
+            ({rule("student").chance.rate.toFixed(3)} against {rule("ref_news2_chart_trigger").chance.rate.toFixed(3)}) and so is its time in alert
+            ({rule("student").timeInAlert.toFixed(3)} against {rule("ref_news2_chart_trigger").timeInAlert.toFixed(3)}). Added to NEWS2 the gain is not beyond noise.
+          </p>
+          <p>
+            The reward-learned policy was searched with {M.rewardCandidates} candidates per generation. A winner was kept
+            only if it also beat the current policy on a second batch of new trials. {M.rewardAcceptedSteps} step was accepted,
+            and the outer loop stopped after {M.rewardRounds} rounds. Added to NEWS2 it gives no gain beyond noise. Alone it is a
+            quiet rule ({rule("reward_final").perShift.toFixed(3)} alerts per patient per 12 hours), with a median lead time that is
+            negative ({rule("reward_final").leadMedianMin.toFixed(1)} minutes). The own baseline alone also catches fewer
+            episodes than NEWS2, with far fewer alerts.
           </p>
           <p>
             Their excess over chance is higher than NEWS2&apos;s only alongside much lower chance rates. Excess
@@ -179,19 +216,18 @@ export function Research({ session, onSignOut }: Props) {
             table&apos;s measure). In 17 of 27, no cuff reading reached NEWS2 inside the window, so it saw no
             new blood pressure.
           </p>
-          <p>The gains seen on ward-v1 went away on ward-v2. Two things changed (the temperature rise was removed and temperature noise went from 0.02 to 0.1 C), and this run cannot say which one caused it. The table above shows both runs.</p>
+          <p>The gains the own baseline showed on ward-v1 went away on ward-v2. Two things changed (the temperature rise was removed and temperature noise went from 0.02 to 0.1 C), and this run cannot say which one caused it. The table above shows both runs.</p>
           <p>
             What exists and works: features with no look-ahead, clean splits between training and held-out
-            trials, and a student model that exports as ONNX, the form Huawei&apos;s converter reads (conversion
-            not yet done). Every model was re-run on the new trials with the same harness, and nothing was tuned
-            to rescue a result.
+            trials, and a student model trained with MindSpore that exports as ONNX. {P.heldOutRead} Nothing was
+            tuned on the held-out trials.
           </p>
         </section>
 
         <ResearchAgentSection />
 
         <p className={styles.small}>
-          Source: evaluation at commit {P.commit}, {P.date}, simulator commit {P.simCommit}, scenario {P.scenario}. {P.trials}. {P.tuning} Student model numbers: commit {P.studentCommit}. Reward-learned policy numbers: commit {P.rewardCommit}. Earlier run: {P.previous}. NEWS2 itself is never
+          Source: evaluation on {P.date}, simulator commit {P.simCommit}, scenario {P.scenario}. {P.trials}. {P.tuning} {P.heldOutRead} Student model (run {P.studentRun}): {P.studentData}. Reward-learned policy (run {P.rewardRun}): {P.rewardData}. Confidence check (run {P.checkRun}): {P.checkData}. Earlier run: {P.previous}. NEWS2 itself is never
           changed by any of this.
         </p>
       </main>
