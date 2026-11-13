@@ -140,7 +140,7 @@ function AdmitForm() {
     };
 
     const row = await admitPatient(input);
-    setResult(`Admitted ${row.name} as ${row.id} -- Bed ${row.bed}. Status: NOT RANKED (patch not yet applied).`);
+    setResult(`Admitted ${row.name} as ${row.id} -- Bed ${row.bed}. Status: NOT RANKED until every NEWS2 input is recorded.`);
     setLastName(""); setFirstName(""); setMiddleName("");
     setDob(""); setAge(""); setSex(""); setContactNumber("");
     setBed(""); setChiefComplaint(""); setContext(""); setAllergies("");
@@ -152,7 +152,7 @@ function AdmitForm() {
     <form className={styles.form} onSubmit={handleSubmit}>
       <p className={styles.formTitle}>Admit patient</p>
       <p className={styles.formSub}>
-        New patients are added as NOT RANKED until a chest patch is applied and signal is verified.
+        New patients are added as NOT RANKED until every NEWS2 input is recorded, by a chest patch or by entering the observations.
       </p>
 
       {result && (
@@ -347,7 +347,7 @@ function LabForm() {
     <form className={styles.form} onSubmit={handleSubmit}>
       <p className={styles.formTitle}>Enter lab results</p>
       <p className={styles.formSub}>
-        Select a ranked patient and enter one or more lab values. Lab entry for non-ranked patients will be available once they have an active patch.
+        Select a ranked patient and enter one or more lab values. Lab entry for non-ranked patients will be available once they are ranked.
       </p>
 
       {result && (
@@ -367,7 +367,7 @@ function LabForm() {
             </option>
           ))}
           {patients.filter((p) => !p.ranked).length > 0 && (
-            <optgroup label="Not ranked (lab entry pending patch)">
+            <optgroup label="Not ranked (lab entry once ranked)">
               {patients.filter((p) => !p.ranked).map((p) => (
                 <option key={p.id} value={p.id} disabled>
                   {p.name} -- Bed {p.bed} ({p.id})
@@ -526,7 +526,7 @@ function UploadForm() {
     };
 
     const row = await admitPatient(input);
-    setResult(`Admitted ${row.name} as ${row.id} -- Bed ${row.bed}. Status: NOT RANKED (patch not yet applied).`);
+    setResult(`Admitted ${row.name} as ${row.id} -- Bed ${row.bed}. Status: NOT RANKED until every NEWS2 input is recorded.`);
     setStep("done");
     setSubmitting(false);
   };

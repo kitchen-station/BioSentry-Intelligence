@@ -32,6 +32,10 @@ from biosentry.schemas import ClinicalNote, LabPanel, TierStatus, UnscoredPatien
 LIVE_WITHIN = timedelta(seconds=30)  # a sim run whose last batch is older is not "receiving data"
 CONTROL_ROLES = ("md", "charge_rn")  # the roles that may send commands to the ward simulation
 SESSION_TTL = timedelta(hours=12)
+# judgement: RCP NEWS2 (2017) chart, "minimum 12 hourly" at aggregate 0, used for every score.
+# A nurse-typed device value counts for this long. It is the nurse's own word, not a patch reading.
+NURSE_VALID = timedelta(hours=12)
+OUT_OF_DATE = "out_of_date"
 TREND_BINS = 12
 DEVICE_VITALS = ("heart_rate", "respiratory_rate", "spo2", "temperature")
 VITALS = (*DEVICE_VITALS, "blood_pressure", "consciousness", "supplemental_o2", "spo2_scale")
@@ -398,6 +402,34 @@ class PostgresStore:
             },
         }
 
+    def _newest_device_or_nurse(
+        self, rows: list[dict[str, Any]], sample: datetime | None
+    ) -> dict[str, Any]:
+        """The row that counts for a device vital: a valid nurse value, else the device's row."""
+        nurse = next((r for r in rows if r["source"] == "nurse" and r["absent_reason"] is None), None)
+        other = next((r for r in rows if r is not nurse), None)
+        if nurse is None:
+            assert other is not None
+            return other
+        newer = other is None or (nurse["observed_at"], nurse["id"]) > (
+            other["observed_at"],
+            other["id"],
+        )
+        valid = self.run_now - nurse["observed_at"] <= NURSE_VALID
+        # sampled_since: the simulator sends a device row only on change, so an unchanged live
+        # value keeps an old time. A later sample means the patch is live.
+        sampled_since = sample is not None and sample > nurse["observed_at"]
+        other_has_value = other is not None and other["absent_reason"] is None
+        if valid and (not other_has_value or (newer and not sampled_since)):
+            return nurse
+        if other_has_value:
+            assert other is not None
+            return other
+        if newer:
+            return {**nurse, "absent_reason": OUT_OF_DATE, "quality": "missing"}
+        assert other is not None
+        return other
+
     def read(self, patient_id: str) -> UnscoredPatient | None:
         # ponytail: the reads below are not one snapshot, so a batch landing mid-read can mix two
         # sim minutes in one patient. Upgrade: a read transaction (BEGIN) around each request.
@@ -406,14 +438,23 @@ class PostgresStore:
         ).fetchone()
         if p is None:
             return None
+        by_code: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for r in self.conn.execute(
+            "SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY code,"
+            " (source = 'nurse' AND absent_reason IS NULL)"
+            " ORDER BY observed_at DESC, id DESC) AS n FROM observation"
+            " WHERE run_id = %s AND patient_id = %s) AS latest WHERE n = 1",
+            (self.run_id, patient_id),
+        ):
+            by_code[r["code"]].append(r)
+        sample = p["last_sample_at"]
         latest = {
-            r["code"]: r
-            for r in self.conn.execute(
-                "SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY code"
-                " ORDER BY observed_at DESC, id DESC) AS n FROM observation"
-                " WHERE run_id = %s AND patient_id = %s) AS latest WHERE n = 1",
-                (self.run_id, patient_id),
+            code: (
+                self._newest_device_or_nurse(rows, sample)
+                if code in DEVICE_VITALS
+                else max(rows, key=lambda r: (r["observed_at"], r["id"]))
             )
+            for code, rows in by_code.items()
         }
         bins: dict[str, list[tuple[datetime, float | None]]] = defaultdict(list)
         for b in self.conn.execute(
@@ -433,7 +474,6 @@ class PostgresStore:
             name: self._measurement(name, latest[name]) if name in latest else None for name in LABS
         }
         labs["freshness_hours"] = round(max(ages), 1) if ages else None
-        sample = p["last_sample_at"]
         return UnscoredPatient.model_validate(
             {
                 "id": patient_id,

@@ -36,16 +36,21 @@ const OBS_INTERVAL_MIN: Record<Exclude<Band, "high">, number> = { medium: 60, "l
 
 /**
  * When the next full set of observations is due, in epoch ms, or "continuous" for a high-risk
- * patient. The clock starts at the oldest nurse-entered NEWS2 input (BP, consciousness): the
- * patch streams the rest. A missing input is never observed, so the set is due now (I1).
+ * patient. The clock starts at the oldest nurse-entered NEWS2 input: BP and consciousness, and
+ * heart rate, respiratory rate, SpO2 or temperature when a nurse typed it. The patch streams
+ * the rest. A missing input is never observed, so the set is due now (I1).
  */
 export function obsDue(row: Pick<ScoreRow, "score" | "escalation_reasons" | "vitals">): number | "continuous" {
   const b = band(row);
   if (b === "high") return "continuous";
   const minutes = b === "low" && row.score === 0 ? 720 : OBS_INTERVAL_MIN[b];
+  const { heart_rate, respiratory_rate, spo2, temperature } = row.vitals;
+  const typed = [heart_rate, respiratory_rate, spo2, temperature].filter(
+    (m) => m?.data.present && m.provenance.source === "nurse",
+  );
   const last = Math.min(
-    ...[row.vitals.blood_pressure, row.vitals.consciousness].map((m) =>
-      m.data.present ? Date.parse(m.provenance.observed_at) : -Infinity,
+    ...[row.vitals.blood_pressure, row.vitals.consciousness, ...typed].map((m) =>
+      m!.data.present ? Date.parse(m!.provenance.observed_at) : -Infinity,
     ),
   );
   return last + minutes * 60_000;

@@ -16,7 +16,7 @@
       "age": 58,
       "bed": "3B",
       "id": "p-005",
-      "instruction": "Apply the patch and verify the signal",
+      "instruction": "Apply the patch and verify the signal, or enter the observations",
       "name": "de Leon, Isabel",
       "reason": "No device data",
       "sex": "F",

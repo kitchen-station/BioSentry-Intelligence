@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import type { ClinicalNote, PatientDetail as PatientDetailType, Session, SessionRole, TierBFinding } from "../types";
-import { getPatient, getNotes, addNote } from "../api";
+import type { ClinicalNote, PatientDetail as PatientDetailType, Session, SessionRole, TierBFinding, VitalsRecorded } from "../types";
+import { getPatient, getNotes, addNote, canRecordVitals } from "../api";
 import { BaselinePanel } from "../components/BaselinePanel";
 import { useBaseline } from "../components/useBaseline";
 import { CurrentVitals, VitalRow } from "../components/CurrentVitals";
 import { TrendChart } from "../components/TrendChart";
 import { band, response } from "../components/risk";
+import { VitalsEntry } from "../components/VitalsEntry";
+import { standing } from "../components/vitalsDraft";
 import styles from "./PatientDetail.module.css";
 
 // --- Shared sub-components ---
@@ -63,6 +65,9 @@ export function PatientDetail({ session }: { session: Session }) {
   const [drawer, setDrawer] = useState<Drawer>(null);
   const [loadError, setLoadError] = useState(false);
   const [noteError, setNoteError] = useState<string | null>(null);
+  const [entering, setEntering] = useState(false);
+  const [unranked, setUnranked] = useState<string | null>(null);
+  const [refreshFailed, setRefreshFailed] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -89,6 +94,16 @@ export function PatientDetail({ session }: { session: Session }) {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleRecorded = (recorded: VitalsRecorded) => {
+    // A patient who is now NOT RANKED has no patient read: it would 404 and say "not found".
+    if (!id) return;
+    setRefreshFailed(false);
+    if (recorded.ranked) {
+      setUnranked(null);
+      getPatient(id).then((p) => p && setPatient(p)).catch(() => setRefreshFailed(true));
+    } else setUnranked(`Recorded. ${standing(recorded)}`);
   };
 
   const toggleDrawer = (d: Drawer) => setDrawer((prev) => prev === d ? null : d);
@@ -128,7 +143,7 @@ export function PatientDetail({ session }: { session: Session }) {
           <Link to="/ward" className={styles.back}>&larr; Ward view</Link>
           <div className={styles.stripRight}>
             <span className={styles.stripSignal}>
-              Signal {patient.signal_quality}%
+              {patient.signal_quality === null ? "No patch signal" : `Signal ${patient.signal_quality}%`}
             </span>
             <span className={styles.stripUpdate}>
               {now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
@@ -140,6 +155,9 @@ export function PatientDetail({ session }: { session: Session }) {
 
       {/* Summary bar: NEWS2 + escalation reasons (no rank, no tier badge) */}
       <div className={styles.summaryBar}>
+        {unranked !== null && (
+          <p className={styles.summaryLabel}>No longer ranked. The figures below are from before this entry.</p>
+        )}
         <div className={styles.summaryRow}>
           <div className={styles.summaryInner}>
             <div className={styles.summaryBlock} data-band={band(patient)}>
@@ -152,9 +170,9 @@ export function PatientDetail({ session }: { session: Session }) {
                 <span className={styles.responseText}>{response(band(patient), role)}</span>
               </div>
             )}
-            <div className={styles.summaryBlock} data-signal={patient.signal_quality > 90 ? "good" : "degraded"}>
+            <div className={styles.summaryBlock} data-signal={patient.signal_quality === null ? "none" : patient.signal_quality > 90 ? "good" : "degraded"}>
               <span className={styles.summaryLabel}>Signal</span>
-              <span className={styles.summaryBig}>{patient.signal_quality}%</span>
+              <span className={styles.summaryBig}>{patient.signal_quality === null ? "No patch" : `${patient.signal_quality}%`}</span>
             </div>
             <div className={styles.reasonBlock}>
               <span className={styles.summaryLabel}>Why this patient is up</span>
@@ -269,6 +287,9 @@ export function PatientDetail({ session }: { session: Session }) {
                   unit="%"
                   warningLow={94}
                 />
+                <p className={styles.pending}>
+                  Charts show patch data only. Values entered by a nurse are not plotted.
+                </p>
               </div>
             )}
           </div>
@@ -347,6 +368,28 @@ export function PatientDetail({ session }: { session: Session }) {
             <div className={styles.vitalsGrid}>
               <CurrentVitals vitals={patient.vitals} />
             </div>
+            {canRecordVitals && (
+              <button type="button" className={styles.drawerBtn} aria-expanded={entering} onClick={() => setEntering((open) => !open)}>
+                Record vitals
+              </button>
+            )}
+            {canRecordVitals && entering && (
+              <VitalsEntry
+                patientId={patient.id}
+                patientName={patient.name}
+                clinicianId={session.clinician_id}
+                onRecorded={handleRecorded}
+                onClose={() => setEntering(false)}
+              />
+            )}
+            {refreshFailed && (
+              <p role="alert">Recorded. The page could not refresh; reload to see the new score.</p>
+            )}
+            {unranked !== null && (
+              <p role="status">
+                {unranked} <Link to="/ward">Back to ward</Link>
+              </p>
+            )}
           </div>
 
           <div className={styles.panel}>

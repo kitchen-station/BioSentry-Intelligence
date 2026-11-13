@@ -1,4 +1,4 @@
-import type { BloodPressure, Spo2Scale } from "../types";
+import type { BloodPressure, Spo2Scale, Vitals } from "../types";
 
 /**
  * "88/52": the display text of a structured blood pressure. Display only: the string is
@@ -30,6 +30,28 @@ export function formatAge(seconds: number): string {
 /** "07:40": wall-clock hour and minute, for due times and last-update stamps. */
 export function formatClock(ms: number): string {
   return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+/**
+ * "Entered by a nurse at 07:40", with the day when it is not today: blood pressure and
+ * consciousness do not expire, so an old entry must not read as today's.
+ */
+export function enteredByNurse(ms: number, now: number = Date.now()): string {
+  const day = new Date(ms).toDateString() === new Date(now).toDateString()
+    ? ""
+    : `, ${new Date(ms).toLocaleDateString([], { day: "numeric", month: "short" })}`;
+  return `Entered by a nurse at ${formatClock(ms)}${day}`;
+}
+
+/**
+ * "Entered by a nurse at 07:40" when a patch value (heart rate, respiratory rate, SpO2 or
+ * temperature) was typed by a nurse. It names the earliest time, the one that expires first.
+ */
+export function nurseEntryText(vitals: Vitals): string | null {
+  const times = [vitals.heart_rate, vitals.respiratory_rate, vitals.spo2, vitals.temperature]
+    .filter((m) => m !== null && m.data.present && m.provenance.source === "nurse")
+    .map((m) => Date.parse(m!.provenance.observed_at));
+  return times.length > 0 ? enteredByNurse(Math.min(...times)) : null;
 }
 
 /** What the ward simulator publishes in the live view's `shared`, for the status line. */

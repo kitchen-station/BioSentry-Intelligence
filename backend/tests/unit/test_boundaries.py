@@ -40,12 +40,11 @@ def test_a_blood_pressure_that_is_not_systolic_slash_diastolic_is_rejected(text:
         split_blood_pressure(text)
 
 
-def test_a_ranked_row_needs_a_patch_signal() -> None:
+def test_a_ranked_row_may_have_no_patch_signal() -> None:
     payload = unscored()
     payload["vitals"]["supplemental_o2"] = measurement(present(False))
     payload["vitals"]["spo2_scale"] = measurement(present(1))
     state = UnscoredPatient.model_validate({**payload, "signal_quality": None})
     decision = decide(state)
     assert isinstance(decision, Ranked)
-    with pytest.raises(ValueError, match="ranked without a patch signal"):
-        score_row(state, 1, decision, [])
+    assert score_row(state, 1, decision, []).signal_quality is None

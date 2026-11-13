@@ -16,7 +16,14 @@ import { describe, expect, it } from "vitest";
 import synthetic from "../data/synthetic.json";
 import type { AdmitPatientInput } from "../types";
 import { EMPTY_DRAFT, check } from "../components/vitalsDraft";
-import { DIASTOLIC_BOUNDS, SYSTOLIC_BOUNDS } from "./bounds";
+import {
+  DIASTOLIC_BOUNDS,
+  HEART_RATE_BOUNDS,
+  RESPIRATORY_RATE_BOUNDS,
+  SPO2_BOUNDS,
+  SYSTOLIC_BOUNDS,
+  TEMPERATURE_BOUNDS,
+} from "./bounds";
 import { openSession, setAuthToken } from "./client";
 import type { ApiProvider } from "./contract";
 import { fixtureProvider, setActiveClinician } from "./providers/fixture";
@@ -319,6 +326,25 @@ describe.skipIf(!API_URL)("http provider: nurse-recorded vitals", () => {
       }).ok;
       const serverOk = (await attempt(() => httpProvider.recordVitals("p-004", { systolic, diastolic }))).ok;
       expect(clientOk, `${systolic}/${diastolic}`).toBe(serverOk);
+    }
+  });
+
+  it("the form's check agrees with the server on the four patch values", async () => {
+    httpSignIn("rn-delacruz");
+    const fields = [
+      ["heartRate", "heart_rate", HEART_RATE_BOUNDS, ["72.5"]],
+      ["respiratoryRate", "respiratory_rate", RESPIRATORY_RATE_BOUNDS, ["24.5"]],
+      ["spo2", "spo2", SPO2_BOUNDS, ["91.5"]],
+      ["temperature", "temperature", TEMPERATURE_BOUNDS, ["37.25", "38.4"]],
+    ] as const;
+    for (const [key, field, { min, max }, others] of fields) {
+      for (const text of [String(min), String(min - 1), String(max), String(max + 1), "0", ...others]) {
+        const clientOk = check({ ...EMPTY_DRAFT, [key]: text }).ok;
+        const serverOk = (
+          await attempt(() => httpProvider.recordVitals("p-004", { [field]: Number(text) }))
+        ).ok;
+        expect(clientOk, `${field} ${text}`).toBe(serverOk);
+      }
     }
   });
 

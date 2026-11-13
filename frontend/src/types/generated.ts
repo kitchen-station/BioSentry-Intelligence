@@ -321,10 +321,10 @@ export interface components {
          * @description Nurse-entered NEWS2 inputs (POST /patients/{id}/vitals): any subset, at least one.
          *
          *     Blood pressure is a pair. Omitted means not entered (the stored value is left alone);
-         *     there is no default and nothing is clamped: an impossible value is rejected. Device-sourced
-         *     values (heart rate, respiratory rate, SpO2, temperature) are not accepted here. A stored
-         *     value carries source `nurse`, a manual clinician entry; the audit row for the write
-         *     records the clinician's id and role.
+         *     there is no default and nothing is clamped: an impossible value is rejected. Device
+         *     values may be typed here too (heart rate, respiratory rate, SpO2, temperature) when there
+         *     is no patch. A stored value carries source `nurse`, a manual clinician entry; the audit row
+         *     for the write records the clinician's id and role.
          */
         readonly NurseVitalsInput: {
             /** @default null */
@@ -332,11 +332,19 @@ export interface components {
             /** @default null */
             readonly diastolic?: number | null;
             /** @default null */
+            readonly heart_rate?: number | null;
+            /** @default null */
             readonly on_oxygen?: boolean | null;
+            /** @default null */
+            readonly respiratory_rate?: number | null;
+            /** @default null */
+            readonly spo2?: number | null;
             /** @default null */
             readonly spo2_scale?: components["schemas"]["Spo2Scale"] | null;
             /** @default null */
             readonly systolic?: number | null;
+            /** @default null */
+            readonly temperature?: number | null;
         };
         /**
          * PartialAdmitPatientInput
@@ -442,13 +450,13 @@ export interface components {
             readonly escalation_reasons: readonly components["schemas"]["EscalationReason"][];
             readonly id: string;
             readonly labs: components["schemas"]["LabPanel"];
-            readonly last_update_s: number;
+            readonly last_update_s: number | null;
             readonly mechanism: string;
             readonly name: string;
             readonly rank: number;
             readonly score: number;
             readonly sex: string | null;
-            readonly signal_quality: number;
+            readonly signal_quality: number | null;
             readonly sort_tier: components["schemas"]["Tier"];
             readonly supporting: string;
             readonly synthetic: boolean;
@@ -542,13 +550,13 @@ export interface components {
             readonly escalation_reasons: readonly components["schemas"]["EscalationReason"][];
             readonly id: string;
             readonly labs: components["schemas"]["LabPanel"];
-            readonly last_update_s: number;
+            readonly last_update_s: number | null;
             readonly mechanism: string;
             readonly name: string;
             readonly rank: number;
             readonly score: number;
             readonly sex: string | null;
-            readonly signal_quality: number;
+            readonly signal_quality: number | null;
             readonly sort_tier: components["schemas"]["Tier"];
             readonly supporting: string;
             readonly synthetic: boolean;
@@ -726,14 +734,18 @@ export interface components {
         readonly VitalsRecorded: {
             readonly blood_pressure: components["schemas"]["BloodPressureMeasurement"] | null;
             readonly consciousness: components["schemas"]["AcvpuMeasurement"] | null;
+            readonly heart_rate: components["schemas"]["NumberMeasurement"] | null;
             readonly not_ranked_instruction: string | null;
             readonly not_ranked_reason: string | null;
             readonly patient_id: string;
             readonly rank: number | null;
             readonly ranked: boolean;
+            readonly respiratory_rate: components["schemas"]["NumberMeasurement"] | null;
             readonly score: number | null;
+            readonly spo2: components["schemas"]["NumberMeasurement"] | null;
             readonly spo2_scale: components["schemas"]["Spo2ScaleMeasurement"] | null;
             readonly supplemental_o2: components["schemas"]["FlagMeasurement"] | null;
+            readonly temperature: components["schemas"]["NumberMeasurement"] | null;
         };
         /**
          * VitalTrends

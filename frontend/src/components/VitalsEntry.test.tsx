@@ -84,6 +84,6 @@ describe("the vitals entry form", () => {
     const out = html({ busy: true });
     expect(out).toContain("Recording…");
     expect(out).toMatch(/<button type="submit"[^>]*disabled/);
-    expect(out.match(/<fieldset[^>]*disabled/g)).toHaveLength(4);
+    expect(out.match(/<fieldset[^>]*disabled/g)).toHaveLength(5);
   });
 });

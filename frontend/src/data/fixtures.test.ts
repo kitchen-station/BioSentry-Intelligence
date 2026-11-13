@@ -274,11 +274,11 @@ describe("fixture clock", () => {
     setActiveClinician("md-santos");
     const first = (await getWard()).ranked[0];
     const observed = Date.parse(first.vitals.heart_rate.provenance.observed_at);
-    expect(Math.abs(Date.now() - first.last_update_s * 1000 - observed)).toBeLessThan(120_000);
+    expect(Math.abs(Date.now() - first.last_update_s! * 1000 - observed)).toBeLessThan(120_000);
     vi.useFakeTimers({ now: Date.now() + 60_000 });
     try {
       const later = (await getWard()).ranked[0];
-      expect(later.last_update_s - first.last_update_s).toBeGreaterThanOrEqual(59);
+      expect(later.last_update_s! - first.last_update_s!).toBeGreaterThanOrEqual(59);
     } finally {
       vi.useRealTimers();
     }

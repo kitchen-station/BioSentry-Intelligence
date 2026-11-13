@@ -971,6 +971,250 @@ def test_an_unknown_patient_reads_as_none_and_a_never_recorded_input_is_missing(
     assert "Heart rate missing" in row["reason"] and "Level of consciousness missing" in row["reason"]
 
 
+# --- A nurse-typed device value: valid for 12 hours, never erased by an absent device row -------
+
+FOUR = {"heart_rate": 118, "respiratory_rate": 24, "spo2": 93, "temperature": 38.5}
+HOUR12 = timedelta(hours=12)
+
+
+def hr_of(api: Api) -> Any:
+    """The stored heart rate measurement as the services read it."""
+    from biosentry.repositories.postgres import PostgresStore
+
+    with connect(api.url) as conn:
+        state = PostgresStore(conn, api.wall).read("s-1")
+    assert state is not None
+    return state.vitals.heart_rate
+
+
+def record_hr(api: Api, value: int = 100) -> None:
+    post = api.client.post(
+        "/patients/s-1/vitals", headers=api.as_("rn-delacruz"), json={"heart_rate": value}
+    )
+    assert post.status_code == 200
+
+
+def at(api: Api, minute: int) -> None:
+    api.wall.now = NOW + timedelta(minutes=minute)
+    api.tokens.clear()  # a session lasts as long as a nurse value: sign in again
+
+
+def test_a_nurse_value_ranks_a_patient_with_no_patch_for_twelve_hours(api: Api) -> None:
+    patient = sim_patient()
+    patient["observations"] = [o for o in patient["observations"] if o["source"] == "nurse"]
+    patient["bins"] = []
+    start(api, patients=[patient])
+    (row,) = api.ward("rn-delacruz")["abstained"]
+    assert row["reason"] == "No device data"
+    post = api.client.post("/patients/s-1/vitals", headers=api.as_("rn-delacruz"), json=FOUR)
+    assert post.status_code == 200 and post.json()["ranked"] is True
+    ranked = api.ward("rn-delacruz")["ranked"][0]
+    assert ranked["last_update_s"] is None
+    api.wall.now += HOUR12
+    api.tokens.clear()
+    assert [r["id"] for r in api.ward("rn-delacruz")["ranked"]] == ["s-1"]
+    api.wall.now += timedelta(seconds=1)
+    api.tokens.clear()
+    ward = api.ward("rn-delacruz")
+    assert ward["ranked"] == []
+    (row,) = ward["abstained"]
+    assert row["reason"] == (
+        "No device data; Heart rate, Respiratory rate, SpO2, Temperature out of date"
+    )
+    assert row["instruction"] == "Apply the patch and verify the signal, or enter the observations"
+
+
+def test_one_expired_nurse_value_is_named_and_the_others_are_not(api: Api) -> None:
+    patient = sim_patient()
+    patient["observations"] = [o for o in patient["observations"] if o["code"] != "heart_rate"]
+    start(api, patients=[patient])
+    record_hr(api)
+    api.wall.now += HOUR12 + timedelta(seconds=1)
+    api.tokens.clear()
+    (row,) = api.ward("rn-delacruz")["abstained"]
+    assert row["reason"] == "Heart rate out of date"
+    assert row["instruction"].endswith(", or enter the observations")
+    m = hr_of(api)
+    assert (m.data.reason, m.provenance.source.value) == ("out_of_date", "nurse")
+
+
+def test_a_newer_device_value_beats_an_older_nurse_value(api: Api) -> None:
+    run_id = start(api)
+    record_hr(api)  # newer than the device row at minute -2
+    assert hr_of(api).data.value == 100
+    at(api, 5)
+    batch_5 = batch(minute=5, observations=[obs("s-1", "heart_rate", 5, num=125)])
+    assert api.post(f"/sim/runs/{run_id}/batch", batch_5).status_code == 204
+    assert hr_of(api).data.value == 125
+
+
+def test_a_patch_that_has_sampled_since_beats_an_older_nurse_value(api: Api) -> None:
+    run_id = start(api)
+    record_hr(api)
+    at(api, 5)  # the patch sampled again, its unchanged heart rate sends no row
+    empty = batch(minute=5, observations=[])
+    assert api.post(f"/sim/runs/{run_id}/batch", empty).status_code == 204
+    assert hr_of(api).data.value == 118
+
+
+def test_an_absent_device_row_does_not_erase_a_valid_nurse_value(api: Api) -> None:
+    run_id = start(api)
+    record_hr(api)
+    at(api, 5)
+    gone = obs("s-1", "heart_rate", 5, absent_reason="No usable reading yet")
+    patient = {"id": "s-1", "trend": "stable", "signal_quality": 0, "last_sample_minute": -2}
+    body = batch(minute=5, observations=[gone], patients=[patient])
+    assert api.post(f"/sim/runs/{run_id}/batch", body).status_code == 204
+    assert hr_of(api).data.value == 100
+
+
+def test_an_expired_nurse_value_over_a_present_device_value_serves_the_device_value(
+    api: Api,
+) -> None:
+    start(api)
+    record_hr(api)
+    api.wall.now += HOUR12 + timedelta(seconds=1)
+    assert hr_of(api).data.value == 118
+
+
+def test_an_expired_nurse_value_then_a_newer_absent_device_row_serves_the_device_reason(
+    api: Api,
+) -> None:
+    run_id = start(api)
+    record_hr(api)
+    at(api, 13 * 60)
+    gone = obs("s-1", "heart_rate", 13 * 60, absent_reason="No usable reading for 5 min")
+    patient = {"id": "s-1", "trend": "stable", "signal_quality": 0, "last_sample_minute": -2}
+    body = batch(minute=13 * 60, observations=[gone], patients=[patient])
+    assert api.post(f"/sim/runs/{run_id}/batch", body).status_code == 204
+    m = hr_of(api)
+    assert (m.data.reason, m.provenance.source.value) == ("No usable reading for 5 min", "device")
+
+
+def vital_of(api: Api, code: str) -> Any:
+    from biosentry.repositories.postgres import PostgresStore
+
+    with connect(api.url) as conn:
+        state = PostgresStore(conn, api.wall).read("s-1")
+    assert state is not None
+    return getattr(state.vitals, code)
+
+
+def drop(patient: dict, *codes: str) -> None:
+    patient["observations"] = [o for o in patient["observations"] if o["code"] not in codes]
+
+
+def expire(api: Api) -> None:
+    api.wall.now += HOUR12 + timedelta(seconds=1)
+    api.tokens.clear()
+
+
+def test_an_out_of_date_measurement_is_missing_nurse_and_keeps_the_entry_time(api: Api) -> None:
+    patient = sim_patient()
+    drop(patient, "heart_rate")
+    start(api, patients=[patient])
+    record_hr(api)
+    entered = hr_of(api).provenance.observed_at
+    expire(api)
+    m = hr_of(api)
+    assert m.provenance.quality.value == "missing"
+    assert m.provenance.source.value == "nurse"
+    assert m.provenance.observed_at == entered
+
+
+def test_an_expired_heart_rate_beside_a_missing_acvpu_names_both(api: Api) -> None:
+    patient = sim_patient()
+    drop(patient, "heart_rate", "consciousness")
+    start(api, patients=[patient])
+    record_hr(api)
+    expire(api)
+    (row,) = api.ward("rn-delacruz")["abstained"]
+    assert row["reason"] == "Heart rate out of date, Level of consciousness missing"
+
+
+def test_an_expired_spo2_beside_a_missing_scale_names_both_and_a_missing_scale_alone_is_not_old(
+    api: Api,
+) -> None:
+    patient = sim_patient()
+    drop(patient, "spo2", "spo2_scale")
+    start(api, patients=[patient])
+    h = api.as_("rn-delacruz")
+    post = api.client.post("/patients/s-1/vitals", headers=h, json={"spo2": 93})
+    assert post.status_code == 200
+    expire(api)
+    (row,) = api.ward("rn-delacruz")["abstained"]
+    assert row["reason"] == "SpO2 out of date, SpO2 scale missing"
+
+
+def test_a_missing_spo2_scale_alone_is_not_called_out_of_date(api: Api) -> None:
+    patient = sim_patient()
+    drop(patient, "spo2_scale")
+    start(api, patients=[patient])
+    (row,) = api.ward("rn-delacruz")["abstained"]
+    assert "SpO2 scale missing" in row["reason"]
+    assert "out of date" not in row["reason"]
+
+
+def test_two_expired_and_two_never_recorded_with_no_patch_name_only_the_expired(api: Api) -> None:
+    patient = sim_patient()
+    patient["observations"] = [o for o in patient["observations"] if o["source"] == "nurse"]
+    patient["bins"] = []
+    start(api, patients=[patient])
+    body = {"heart_rate": 118, "temperature": 38.5}
+    post = api.client.post("/patients/s-1/vitals", headers=api.as_("rn-delacruz"), json=body)
+    assert post.status_code == 200
+    expire(api)
+    (row,) = api.ward("rn-delacruz")["abstained"]
+    assert row["reason"] == "No device data; Heart rate, Temperature out of date"
+
+
+def test_a_newer_nurse_absent_row_does_not_hide_a_valid_nurse_value(api: Api) -> None:
+    run_id = start(api)
+    record_hr(api)
+    at(api, 5)
+    gone = obs("s-1", "heart_rate", 5, "nurse", absent_reason="Entered in error")
+    sent = api.post(f"/sim/runs/{run_id}/batch", batch(minute=5, observations=[gone]))
+    assert sent.status_code == 204
+    m = hr_of(api)
+    assert m.data.value == 100
+    assert m.provenance.source.value == "nurse"
+
+
+def test_a_newer_nurse_absent_blood_pressure_row_serves_absent(api: Api) -> None:
+    run_id = start(api)
+    at(api, 5)
+    gone = obs("s-1", "blood_pressure", 5, "nurse", absent_reason="Cuff refused")
+    sent = api.post(f"/sim/runs/{run_id}/batch", batch(minute=5, observations=[gone]))
+    assert sent.status_code == 204
+    m = vital_of(api, "blood_pressure")
+    assert (m.data.present, m.data.reason) == (False, "Cuff refused")
+
+
+@pytest.mark.parametrize("nurse_first", [True, False])
+def test_two_blood_pressure_rows_with_one_time_are_decided_by_the_higher_id(
+    api: Api, nurse_first: bool
+) -> None:
+    run_id = start(api)
+    at(api, 5)
+    nurse = obs("s-1", "blood_pressure", 5, "nurse", num=120, num2=80)
+    device = obs("s-1", "blood_pressure", 5, "device", num=100, num2=60)
+    rows = [nurse, device] if nurse_first else [device, nurse]
+    sent = api.post(f"/sim/runs/{run_id}/batch", batch(minute=5, observations=rows))
+    assert sent.status_code == 204
+    m = vital_of(api, "blood_pressure")
+    assert m.provenance.source.value == ("device" if nurse_first else "nurse")
+
+
+def test_the_feed_row_of_only_the_new_keys_is_served(api: Api) -> None:
+    run_id = start(api)
+    post = api.client.post("/patients/s-1/vitals", headers=api.as_("rn-delacruz"), json=FOUR)
+    assert post.status_code == 200
+    (row,) = feed(api, run_id)
+    row.pop("seq")
+    base = {**NOT_APPLICABLE, "clinician_id": "rn-delacruz", "kind": "record_vitals"}
+    assert row == {**base, "patient_id": "s-1", **FOUR}
+
+
 # --- One shared ward ---------------------------------------------------------------------------
 
 LIVE = "Another ward simulation is live"
@@ -1328,6 +1572,7 @@ def test_a_live_view_at_the_size_limit_is_stored(api: Api) -> None:
 NOTE = {"author": "a", "role": "RN", "content": "SECRET-NOTE-TEXT"}
 NOT_APPLICABLE = dict.fromkeys(
     ("score", "systolic", "diastolic", "acvpu", "on_oxygen", "spo2_scale")
+    + ("heart_rate", "respiratory_rate", "spo2", "temperature")
     + ("name", "age", "sex", "bed", "context")
 )
 

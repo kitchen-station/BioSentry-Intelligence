@@ -670,7 +670,7 @@ def test_a_recorded_value_re_ranks_through_the_real_arbiter(client: TestClient) 
     ]
 
 
-def test_a_patient_without_a_patch_stays_not_ranked_whatever_the_nurse_records(
+def test_a_patient_without_a_patch_stays_not_ranked_on_the_blood_pressure_alone(
     client: TestClient,
 ) -> None:
     response = client.post(
@@ -683,7 +683,30 @@ def test_a_patient_without_a_patch_stays_not_ranked_whatever_the_nurse_records(
     assert recorded.rank is None
     assert recorded.score is None
     assert recorded.not_ranked_reason == "No device data"
-    assert recorded.not_ranked_instruction == "Apply the patch and verify the signal"
+    assert (
+        recorded.not_ranked_instruction
+        == "Apply the patch and verify the signal, or enter the observations"
+    )
+
+
+def test_a_patient_without_a_patch_is_ranked_once_the_nurse_records_every_input(
+    client: TestClient,
+) -> None:
+    body = {
+        "heart_rate": 118, "respiratory_rate": 24, "spo2": 91, "temperature": 38.4,
+        "systolic": 118, "diastolic": 74, "acvpu": "A", "on_oxygen": False, "spo2_scale": 1,
+    }  # fmt: skip
+    response = client.post("/patients/p-005/vitals", headers=as_("rn-reyes"), json=body)
+    assert response.status_code == 200
+    recorded = VitalsRecorded.model_validate(response.json())
+    assert recorded.ranked is True
+    assert recorded.score is not None
+    assert recorded.heart_rate is not None
+    assert recorded.heart_rate.provenance.source == "nurse"
+    assert recorded.temperature is not None
+    assert recorded.temperature.data.present is True
+    assert recorded.temperature.data.value == 38.4
+    assert "p-005" in {r.id for r in _ward(client, "rn-reyes").ranked}
 
 
 @pytest.mark.parametrize(
@@ -728,10 +751,6 @@ def test_an_implausible_or_incomplete_record_is_rejected_and_stores_nothing(
 @pytest.mark.parametrize(
     "extra",
     [
-        {"heart_rate": 70},
-        {"respiratory_rate": 16},
-        {"spo2": 97},
-        {"temperature": 37.0},
         {"entered_by": "rn-delacruz"},
         {"unknown_key": 1},
     ],
@@ -740,7 +759,7 @@ def test_an_implausible_or_incomplete_record_is_rejected_and_stores_nothing(
 def test_a_field_the_nurse_cannot_record_is_refused_and_the_valid_part_is_not_stored(
     app_and_client: tuple[Any, TestClient], extra: dict[str, Any]
 ) -> None:
-    """Device-sourced values and unknown keys are 422 even beside a perfectly valid BP."""
+    """An unknown key is 422 even beside a perfectly valid BP."""
     _, client = app_and_client
     before = _ward(client, "rn-delacruz").model_dump()
     body = {"systolic": 130, "diastolic": 84, **extra}
@@ -750,6 +769,97 @@ def test_a_field_the_nurse_cannot_record_is_refused_and_the_valid_part_is_not_st
     state = ctx(app_and_client).store.read("p-004")
     assert state is not None
     assert state.vitals.blood_pressure.data.present is False
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"heart_rate": 0}, {"heart_rate": 301}, {"heart_rate": 70.5}, {"heart_rate": True},
+        {"heart_rate": "70"},
+        {"respiratory_rate": 0}, {"respiratory_rate": 101}, {"respiratory_rate": 16.5},
+        {"respiratory_rate": True}, {"respiratory_rate": "16"},
+        {"spo2": 0}, {"spo2": 101}, {"spo2": 97.5}, {"spo2": True}, {"spo2": "97"},
+        {"temperature": 0}, {"temperature": 19.9}, {"temperature": 45.1},
+        {"temperature": 37.25}, {"temperature": True}, {"temperature": "37"},
+    ],
+    ids=lambda b: json.dumps(b),
+)  # fmt: skip
+def test_a_bad_device_value_is_rejected_audited_and_stores_nothing(
+    app_and_client: tuple[Any, TestClient], bad: dict[str, Any]
+) -> None:
+    _, client = app_and_client
+    h = as_("rn-reyes")
+    body = {"systolic": 130, "diastolic": 84, **bad}
+    response = client.post("/patients/p-005/vitals", headers=h, json=body)
+    assert response.status_code == 422
+    state = ctx(app_and_client).store.read("p-005")
+    assert state is not None
+    for code in ("heart_rate", "respiratory_rate", "spo2", "temperature"):
+        assert getattr(state.vitals, code).data.present is False
+    assert state.vitals.blood_pressure.data.value.systolic == 118  # type: ignore[union-attr]
+    assert [(r.action, r.outcome) for r in trail(app_and_client, "rn-reyes")] == [
+        ("record_vitals", "rejected")
+    ]
+
+
+@pytest.mark.parametrize("field", ["heart_rate", "respiratory_rate", "spo2", "temperature"])
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "70.0", "NaN", "Infinity", "-Infinity", "1e400", "-5", "1e23", "37.05", "20.000000001",
+        "45.000000001", "-0.0", "[70]", "{}", "false",
+    ],
+)  # fmt: skip
+def test_a_raw_json_device_value_that_is_not_a_plain_in_range_number_is_rejected(
+    app_and_client: tuple[Any, TestClient], field: str, raw: str
+) -> None:
+    _, client = app_and_client
+    response = client.post(
+        "/patients/p-005/vitals",
+        headers={**as_("rn-reyes"), "Content-Type": "application/json"},
+        content=f'{{"{field}": {raw}}}',
+    )
+    assert response.status_code == 422
+    state = ctx(app_and_client).store.read("p-005")
+    assert state is not None
+    for code in ("heart_rate", "respiratory_rate", "spo2", "temperature"):
+        assert getattr(state.vitals, code).data.present is False
+    assert [(r.action, r.outcome) for r in trail(app_and_client, "rn-reyes")] == [
+        ("record_vitals", "rejected")
+    ]
+
+
+@pytest.mark.parametrize(
+    "good",
+    [
+        {"heart_rate": 1}, {"heart_rate": 300}, {"respiratory_rate": 1}, {"respiratory_rate": 100},
+        {"spo2": 1}, {"spo2": 100}, {"temperature": 20}, {"temperature": 20.0},
+        {"temperature": 45.0}, {"temperature": 36.6},
+    ],
+    ids=lambda b: json.dumps(b),
+)  # fmt: skip
+def test_a_device_value_at_the_floor_or_ceiling_is_recorded_as_entered(
+    client: TestClient, good: dict[str, Any]
+) -> None:
+    response = client.post("/patients/p-005/vitals", headers=as_("rn-reyes"), json=good)
+    assert response.status_code == 200
+    (name, value), = good.items()
+    echoed = response.json()[name]
+    assert echoed["data"]["value"] == value
+    assert echoed["provenance"]["source"] == "nurse"
+
+
+def test_a_device_value_for_a_patient_that_is_not_yours_is_not_found_before_any_bound(
+    app_and_client: tuple[Any, TestClient],
+) -> None:
+    _, client = app_and_client
+    h = as_("md-aquino")
+    response = client.post("/patients/p-005/vitals", headers=h, json={"heart_rate": 0})
+    assert response.status_code == 404
+    assert "outside" not in response.text
+    assert [(r.action, r.outcome) for r in trail(app_and_client, "md-aquino")] == [
+        ("record_vitals", "not_found")
+    ]
 
 
 @pytest.mark.parametrize(("systolic", "diastolic"), [(20, 10), (45, 20), (300, 200)])
@@ -839,7 +949,7 @@ def test_a_newly_admitted_patient_can_be_recorded_but_stays_not_ranked_without_a
         {"systolic": "9187x", "diastolic": 80},  # wrong type
         {"systolic": 130},  # half a pair
         {"acvpu": "ZZZ-leak"},
-        {"systolic": 130, "diastolic": 84, "heart_rate": 70},
+        {"systolic": 130, "diastolic": 84, "heart_rate": 700},
     ],
     ids=lambda b: json.dumps(b),
 )
@@ -854,7 +964,7 @@ def test_a_rejected_record_leaves_exactly_one_audit_row_and_no_values(
         ("rn-delacruz", "rn", "record_vitals", "p-004", "rejected")
     ]
     leaked = repr(rows) + client.get("/audit", headers=as_("rn-delacruz")).text
-    for value in ("9187x", "ZZZ-leak", "heart_rate"):
+    for value in ("9187x", "ZZZ-leak", "heart_rate", "700"):
         assert value not in leaked
 
 

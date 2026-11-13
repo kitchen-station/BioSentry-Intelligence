@@ -10,7 +10,7 @@ record, including reads that find nothing.
 from biosentry.core.audit import AuditLog
 from biosentry.domain.arbiter import NotRanked, Ranked, rank_ward
 from biosentry.domain.scoring.tier_a import News2Score
-from biosentry.repositories.postgres import PostgresStore
+from biosentry.repositories.postgres import OUT_OF_DATE, PostgresStore
 from biosentry.schemas import (
     AbstainedRow,
     PatientDetail,
@@ -54,8 +54,6 @@ def supporting(news2: News2Score) -> str:
 def score_row(
     state: UnscoredPatient, rank: int, decision: Ranked, tiers: list[TierStatus]
 ) -> ScoreRow:
-    if state.signal_quality is None or state.last_update_s is None:
-        raise ValueError(f"{state.id} was ranked without a patch signal")
     return ScoreRow(
         id=state.id,
         rank=rank,
@@ -82,6 +80,28 @@ def score_row(
     )
 
 
+_LABEL = {
+    "heart_rate": "Heart rate",
+    "respiratory_rate": "Respiratory rate",
+    "spo2": "SpO2",
+    "temperature": "Temperature",
+}
+
+
+def _reason(state: UnscoredPatient, reason: str) -> str:
+    """Say "out of date" for a nurse value that expired. The arbiter only knows it is missing."""
+    old = [
+        label
+        for code, label in _LABEL.items()
+        if getattr(getattr(state.vitals, code).data, "reason", None) == OUT_OF_DATE
+    ]
+    if reason.startswith("No device data"):
+        return f"{reason}; {', '.join(old)} out of date" if old else reason
+    for label in old:
+        reason = reason.replace(f"{label} missing", f"{label} out of date")
+    return reason
+
+
 def abstained_row(state: UnscoredPatient, decision: NotRanked) -> AbstainedRow:
     return AbstainedRow(
         id=state.id,
@@ -90,7 +110,7 @@ def abstained_row(state: UnscoredPatient, decision: NotRanked) -> AbstainedRow:
         sex=state.sex,
         bed=state.bed,
         admitting_context=state.admitting_context,
-        reason=decision.reason,
+        reason=_reason(state, decision.reason),
         instruction=decision.instruction,
         synthetic=state.synthetic,
     )
