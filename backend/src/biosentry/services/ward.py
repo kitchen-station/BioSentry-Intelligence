@@ -190,7 +190,7 @@ class WardService:
 
     def live(self, clinician_id: str) -> LiveWard:
         """The sim's live view: `shared` as stored, and only this clinician's patients' entries."""
-        visible = self.visible(clinician_id)
+        visible = self._store.assigned(clinician_id)  # an admin has no live view, whatever the route
         view = self._store.live_view() or {"shared": None, "patients": []}
         self._audit.append(clinician_id, "view_live", self._store.ward, "ok")
         return LiveWard.model_validate(

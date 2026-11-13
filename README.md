@@ -71,8 +71,9 @@ seeded before passphrases existed has none either: `make db-reset` seeds it agai
 
 **Admin (ward overview).** An admin sees every bed and its state, who is assigned, each clinician's patient
 count, and counts of each clinician's actions in the last 24 hours (by action and outcome; no patient and no
-time); the Overview shows no patient name. The admin also reads the ward list and each patient page, read
-only, with every patient on the ward whoever is assigned (notes included). Every view is in the audit log under
+time); the Overview shows no patient name. The admin also reads the ward list and each ranked patient's page, read
+only, with every patient on the ward whoever is assigned. The admin can read the notes of every patient on the
+ward, a NOT RANKED one too (it has no page for anyone). Every view is in the audit log under
 the admin's id and every write stays refused. This reverses the earlier rule that the admin saw no patient
 name. The role is granted only from a shell with database access, run from
 `backend/`: `uv run python -m biosentry.db.admin grant admin-<name>`, then

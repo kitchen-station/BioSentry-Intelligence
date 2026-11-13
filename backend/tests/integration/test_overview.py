@@ -27,6 +27,8 @@ from biosentry.db.passphrase import hash_passphrase
 from biosentry.db.seed import DEV_PASSPHRASE
 from biosentry.repositories.postgres import PostgresStore, connect
 from biosentry.schemas import WardOverview
+from biosentry.schemas import NewNote, NurseVitalsInput, PartialLabInput
+from biosentry.services.patients import PatientService
 from biosentry.services.ward import WardService
 
 ADMIN = "admin-santos"
@@ -450,6 +452,8 @@ def test_the_role_matrix_over_every_route(api: Api, persona: str) -> None:
             assert (status, rows) == (404, [(*mine, WARD_READS[template], ward, "not_found")])
         elif template in WARD_READS:
             assert (status, rows) == (200, [(*mine, WARD_READS[template], ward, "ok")])
+            if template == "/wards/{ward}/stays" and is_admin:  # discharged patients stay out of reach
+                assert response.json() == []
         elif template in PATIENT_READS:
             ok = may_read  # a patient route has no ward in its path
             assert (status, rows) == (
@@ -458,6 +462,10 @@ def test_the_role_matrix_over_every_route(api: Api, persona: str) -> None:
             ), (persona, template)
         elif template == "/patients":
             assert (status, rows) == (200, [(*mine, "list_patients", "-", "ok")])
+            if is_admin:  # exactly the ward, with the fields a charge nurse gets
+                charge = api.client.get("/patients", headers=api.as_("rn-manalo")).json()
+                assert sorted(p["id"] for p in response.json()) == sorted(IDS)
+                assert response.json() == charge
         elif template == "/acknowledgements":
             assert (status, rows) == (200, [(*mine, "list_acknowledgements", "-", "ok")])
             assert response.json() == []
@@ -561,8 +569,11 @@ def test_reads_of_an_unknown_a_left_and_an_unranked_patient_are_the_same_404(api
         assert len(seen) == 1 and next(iter(seen))[0] == 404, template
     seen = set()
     for pid in ("p-zzz", "p-002"):  # notes: a NOT RANKED patient is on the ward, so is readable
-        seen.add((api.client.get(f"/patients/{pid}/notes", headers=headers).status_code,))
-    assert seen == {(404,)}
+        seq = _last_seq(api)
+        response = api.client.get(f"/patients/{pid}/notes", headers=headers)
+        assert [r[2:] for r in _rows_since(api, seq)] == [("view_notes", pid, "not_found")]
+        seen.add((response.status_code, response.text))
+    assert len(seen) == 1 and next(iter(seen))[0] == 404
     assert api.client.get("/patients/p-004/notes", headers=headers).status_code == 200
 
 
@@ -746,3 +757,99 @@ def test_the_command_runs_as_a_module(cli: Api, monkeypatch: pytest.MonkeyPatch)
         runpy.run_module("biosentry.db.admin", run_name="__main__")
     assert exited.value.code == 0
     assert cli.sql("SELECT role FROM clinician WHERE id = 'admin-mod'") == [{"role": "admin"}]
+
+
+def test_an_admin_never_reads_a_discharged_patient_and_stays_is_still_empty(api: Api) -> None:
+    headers = add_admin(api)
+    write(api, "UPDATE patient SET left_at = %s, outcome = 'discharged' WHERE id = 'p-001'", NOW)
+    assert api.client.get("/wards/W4/stays", headers=headers).json() == []
+    rows = api.client.get("/wards/W4/rows", headers=headers).json()
+    assert "p-001" not in {r["id"] for k in ("ranked", "abstained") for r in rows[k]}
+    for suffix in ("", "/notes", "/baseline"):
+        seq = _last_seq(api)
+        assert api.client.get(f"/patients/p-001{suffix}", headers=headers).status_code == 404
+        action = {"": "view_patient", "/notes": "view_notes", "/baseline": "view_baseline"}[suffix]
+        assert [r[2:] for r in _rows_since(api, seq)] == [(action, "p-001", "not_found")]
+
+
+def _services(api: Api) -> tuple[PostgresStore, WardService, PatientService]:
+    store = PostgresStore(connect(api.url), api.wall)
+    audit = AuditLog(store.conn, api.wall, store.role_of)
+    wards = WardService(store, audit)
+    return store, wards, PatientService(store, audit, wards)
+
+
+def test_the_live_view_of_an_admin_has_no_patient_even_without_the_route_check(api: Api) -> None:
+    add_admin(api)
+    write(
+        api,
+        "UPDATE run SET live_view = %s::jsonb WHERE id = (SELECT max(id) FROM run)",
+        json.dumps({"shared": GOOD, "patients": [{"id": "p-001", "view": {"bed": "p-001"}}]}),
+    )
+    _, wards, _ = _services(api)
+    admin = wards.live(ADMIN).model_dump()
+    stranger = wards.live("rn-reyes").model_dump()  # p-001 is not his
+    assert admin["patients"] == [] and admin == stranger
+    assert [p.id for p in wards.live("md-santos").patients] == ["p-001"]  # a clinician: as before
+
+
+def test_every_patient_write_refuses_the_admin_as_it_refuses_an_unassigned_clinician(
+    api: Api,
+) -> None:
+    add_admin(api)
+    _, _, patients = _services(api)
+    calls = {
+        "add_note": lambda who: patients.add_note(who, "p-001", NewNote(author="a", role="RN", content="c")),
+        "delete_note": lambda who: patients.delete_note(who, "p-001", "n-001"),
+        "acknowledge": lambda who: patients.acknowledge(who, "p-001", 3),
+        "enter_labs": lambda who: patients.enter_labs(who, "p-001", PartialLabInput(potassium=4.0)),
+        "record_vitals": lambda who: patients.record_vitals(
+            who, "p-001", NurseVitalsInput(systolic=120, diastolic=80)
+        ),
+    }
+    stranger = "rn-reyes"  # p-001 is not his
+    before = snapshot(api)
+    for action, call in calls.items():
+        seq = _last_seq(api)
+        result_admin = call(ADMIN)
+        result_stranger = call(stranger)
+        assert result_admin == result_stranger and not result_admin, action
+        assert [(r[0], *r[2:]) for r in _rows_since(api, seq)] == [
+            (ADMIN, action, "p-001", "not_found"),
+            (stranger, action, "p-001", "not_found"),
+        ], action
+    assert snapshot(api) == before
+
+
+def test_an_older_runs_patient_is_a_404_for_the_admin_and_rows_lists_only_the_new_run(
+    api: Api,
+) -> None:
+    headers = add_admin(api)
+    response = api.post("/sim/runs", new_run())
+    assert response.status_code == 201, response.text
+    rows = api.client.get("/wards/W4/rows", headers=headers).json()
+    assert {r["id"] for k in ("ranked", "abstained") for r in rows[k]} == {"s-1"}
+    for suffix, action in (("", "view_patient"), ("/notes", "view_notes"), ("/baseline", "view_baseline")):
+        seq = _last_seq(api)
+        assert api.client.get(f"/patients/p-001{suffix}", headers=headers).status_code == 404
+        assert [r[2:] for r in _rows_since(api, seq)] == [(action, "p-001", "not_found")]
+
+
+@pytest.mark.parametrize(
+    "pid",
+    ["p-zzz", "p" * 300, "p-001%20", "P-001", "%00"],
+    ids=["unknown", "300-chars", "trailing-space", "upper-case", "nul"],
+)
+@pytest.mark.parametrize("suffix", ["", "/notes", "/baseline"])
+def test_an_odd_patient_id_is_a_404_for_the_admin_with_one_row(api: Api, pid: str, suffix: str) -> None:
+    headers = add_admin(api)
+    seq = _last_seq(api)
+    response = api.client.get(f"/patients/{pid}{suffix}", headers=headers)
+    assert response.status_code == 404
+    rows = _rows_since(api, seq)
+    action = {"": "view_patient", "/notes": "view_notes", "/baseline": "view_baseline"}[suffix]
+    if pid == "%00":  # refused as a `request` before the handler: the id is never an id
+        assert [(r[0], r[2], r[4]) for r in rows] == [(ADMIN, "request", "not_found")]
+    else:  # the handler writes the row, naming the id as sent (decoded)
+        assert [(r[0], r[2], r[4]) for r in rows] == [(ADMIN, action, "not_found")]
+        assert rows[0][3] == pid.replace("%20", " ")[:200]  # the log cuts a resource at 200
