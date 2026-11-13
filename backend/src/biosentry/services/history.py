@@ -27,7 +27,7 @@ from biosentry.schemas.history import (
 )
 
 from .as_of import news2_as_of
-from .model_signals import bin_window, prepare_series
+from .model_signals import NO_BINS, NOT_ALIGNED, PAST_CAP, bin_window, prepare_series
 from .scoring import BIN, decide
 from .ward import WardService
 
@@ -37,6 +37,7 @@ NOT_REBUILT = "A value the bin needs is not stored"
 NO_READING = "No usable heart rate reading"
 LEVEL = {Risk.low_medium: "single_3", Risk.medium: "medium", Risk.high: "high"}
 ROLES = {"rn", "md", "charge_rn"}
+UNAVAILABLE = {NO_BINS: "no_bins", PAST_CAP: "past_cap", NOT_ALIGNED: "not_aligned"}
 State = Literal["alert", "quiet", "not_ranked", "not_rebuilt", "no_reading"]
 
 
@@ -72,7 +73,9 @@ def fold(bins: Sequence[BinState], start: datetime, computed_at: datetime, synth
     stored bin_at of bin 0. A quiet bin ends a run and is not returned."""
     provenance = HistoryProvenance(source="derived", tier="A", rule="news2_as_of_bins", computed_at=computed_at, synthetic=synthetic)
     runs = []
-    for state, group in groupby(enumerate(bins), key=lambda p: p[1].state):
+    # A NOT RANKED run ends when its reason changes: the missing input is the fact a nurse acts on.
+    same = lambda p: (p[1].state, p[1].reasons if p[1].state == "not_ranked" else ())  # noqa: E731
+    for (state, _), group in groupby(enumerate(bins), key=same):
         ks = [k for k, _ in group]
         if state == "quiet":
             continue
@@ -105,13 +108,17 @@ def events(
 ) -> tuple[list[HistoryEvent], bool]:
     """What was done, oldest first, the newest MAX_EVENTS kept. `stored` is `history_events`. A nurse's
     blood pressure is charted when a row of that code has source nurse and a value. The admission is the
-    start of the stay, so it is kept when it is not after the grid's end."""
+    start of the stay, so it is kept when it is not after `end`. `end` is the later of the grid's end and
+    now: what was done after the last stored bin is part of the stay too."""
     found = [
         HistoryEvent(kind="bp_charted", at=o.observed_at, by=None, role=None, score=None, note_id=None, source="observation")
         for o in rows
         if o.code == "blood_pressure" and o.source == "nurse" and o.absent_reason is None and o.num is not None
         and start <= o.observed_at <= end
     ]
+    # A value recorded in the app is one act: its blood pressure row is not listed a second time.
+    recorded = {s["at"] for s in stored if s["kind"] == "record_vitals"}
+    found = [e for e in found if e.at not in recorded]
     kinds = {"acknowledge": "acknowledged", "record_vitals": "vitals_recorded", "add_note": "note_added"}
     found += [
         HistoryEvent(
@@ -157,19 +164,24 @@ class HistoryService:
         points = {"heart_rate": h.heart_rate, "respiratory_rate": h.respiratory_rate, "spo2": h.spo2, "temperature": temperature}
         prep = prepare_series(points, state.admitted_at)
         whole = dict(patient_id=patient_id, synthetic=state.synthetic, label=HISTORY_LABEL)
-        if isinstance(prep, NotComputed):  # no stored bins, or more than the grid can hold
-            return PatientHistory(**whole, grid_from=None, grid_to=None, bins=0, runs=[], runs_cut=False, events=[], events_cut=False)
+        if isinstance(prep, NotComputed):  # no history, and the answer says why
+            return PatientHistory(
+                **whole, unavailable=UNAVAILABLE[prep.reason], grid_from=None, grid_to=None, bins=0,
+                runs=[], runs_cut=False, events=[], events_cut=False,
+            )
         start, end = bin_window(prep.at(0))[0], bin_window(prep.at(prep.last))[1]
         # From 12 hours before the first bin's end: the rebuild's own window (a nurse-typed device value).
-        rows = store.observations_between([(patient_id, bin_window(prep.at(0))[1] - NURSE_VALID, end)]).get(patient_id, [])
+        # To now, not only to the last bin's end: a row after it is no input of any bin, but it is an event.
+        until = max(end, store.now())
+        rows = store.observations_between([(patient_id, bin_window(prep.at(0))[1] - NURSE_VALID, until)]).get(patient_id, [])
         bins = [
             classify(prep.device(k), rows, bin_window(prep.at(k))[1], earlier=k < prep.last, patient_id=patient_id)
             for k in range(prep.last + 1)
         ]
         runs, runs_cut = fold(bins, prep.start, store.now(), state.synthetic)
-        stored = store.history_events(patient_id, start, end, MAX_EVENTS + 1)
-        done, events_cut = events(state.admitted_at, rows, stored, start, end)
+        stored = store.history_events(patient_id, start, until, MAX_EVENTS + 1)
+        done, events_cut = events(state.admitted_at, rows, stored, start, until)
         return PatientHistory(
-            **whole, grid_from=start, grid_to=end, bins=prep.last + 1,
+            **whole, unavailable=None, grid_from=start, grid_to=end, bins=prep.last + 1,
             runs=runs, runs_cut=runs_cut, events=done, events_cut=events_cut,
         )

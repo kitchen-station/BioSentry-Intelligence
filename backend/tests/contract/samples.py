@@ -430,6 +430,7 @@ _BUILDERS: dict[type[BaseModel], Any] = {
     PatientHistory: lambda: {
         "patient_id": "p-001", "synthetic": True,
         "label": "Rebuilt from stored 15-minute bins. It can differ from the score shown at the time.",
+        "unavailable": None,
         "grid_from": "2026-09-03T00:00:00Z", "grid_to": "2026-09-03T06:00:00Z", "bins": 24,
         "runs": [_BUILDERS[HistoryRun]()], "runs_cut": False,
         "events": [_BUILDERS[HistoryEvent]()], "events_cut": False,

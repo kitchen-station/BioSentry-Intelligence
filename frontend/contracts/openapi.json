@@ -2770,12 +2770,28 @@
           },
           "synthetic": {
             "type": "boolean"
+          },
+          "unavailable": {
+            "anyOf": [
+              {
+                "enum": [
+                  "no_bins",
+                  "past_cap",
+                  "not_aligned"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
           "patient_id",
           "synthetic",
           "label",
+          "unavailable",
           "grid_from",
           "grid_to",
           "bins",

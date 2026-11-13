@@ -159,10 +159,11 @@ def test_the_answer_of_an_older_run_with_the_same_patient_id_never_appears(api: 
     old = sick_bins(stay("s-1", 20), {8: SICK, 9: SICK})
     start(api, patients=[old])
     old_run = api.sql("SELECT max(id) AS i FROM run")[0]["i"]
+    inside = datetime.fromisoformat(ORIGIN) + timedelta(minutes=60)  # run time, inside the new run's window
     write(api, "INSERT INTO clinician_action (run_id, kind, patient_id, clinician_id, at, data)"
-              " VALUES (%s, 'acknowledge', 's-1', 'rn-delacruz', %s, '{\"score\": 9}')", old_run, NOW)
+              " VALUES (%s, 'acknowledge', 's-1', 'rn-delacruz', %s, '{\"score\": 9}')", old_run, inside)
     write(api, "INSERT INTO clinical_note (run_id, id, patient_id, author, role, timestamp, content, synthetic)"
-              " VALUES (%s, 'n-900', 's-1', 'a', 'rn', %s, 'OLD-RUN-NOTE', true)", old_run, NOW)
+              " VALUES (%s, 'n-900', 's-1', 'a', 'rn', %s, 'OLD-RUN-NOTE', true)", old_run, inside)
     start(api, patients=[stay("s-1", 20)])
     got = history(api)
     assert got["runs"] == [] and got["events"] == [] and "OLD-RUN" not in json.dumps(got)
@@ -172,7 +173,9 @@ def test_the_answer_of_an_older_run_with_the_same_patient_id_never_appears(api: 
 
 
 def test_each_event_kind_carries_its_fields_and_no_note_text_and_nothing_of_another_patient(api: Api) -> None:
-    start(api, patients=[stay("s-1", 20), stay("s-2", 20)])
+    cuff = stay("s-1", 20)
+    cuff["observations"].append(obs("s-1", "blood_pressure", 45, "nurse", num=110, num2=70))  # charted at the bedside
+    start(api, patients=[cuff, stay("s-2", 20)])
     run_id = api.sql("SELECT max(id) AS i FROM run")[0]["i"]
     write(api, "UPDATE patient SET admitted_at = %s WHERE run_id = %s AND id IN ('s-1', 's-2')",
           datetime.fromisoformat(ORIGIN), run_id)  # run time: served time is this plus the run's shift
@@ -209,10 +212,10 @@ def test_each_event_kind_carries_its_fields_and_no_note_text_and_nothing_of_anot
         assert text not in response.text
     events = response.json()["events"]
     assert [(e["kind"], e["at"]) for e in events] == [
-        ("admitted", served(api, 0)), ("acknowledged", served(api, 60)), ("bp_charted", served(api, 90)),
+        ("admitted", served(api, 0)), ("bp_charted", served(api, 45)), ("acknowledged", served(api, 60)),
         ("vitals_recorded", served(api, 90)), ("note_added", served(api, 120)),
-    ]
-    admitted, ack, bp, vitals, note = events
+    ]  # the pressure typed in the app at 90 is one act: no second entry for its row
+    admitted, bp, ack, vitals, note = events
     assert (admitted["by"], admitted["source"]) == (None, "patient")
     assert (ack["by"], ack["score"], ack["role"], ack["note_id"], ack["source"]) == ("rn-delacruz", 7, None, None, "clinician_action")
     assert (vitals["by"], vitals["score"], vitals["source"]) == ("rn-delacruz", None, "clinician_action")
@@ -220,6 +223,10 @@ def test_each_event_kind_carries_its_fields_and_no_note_text_and_nothing_of_anot
     assert (note["by"], note["role"], note["note_id"], note["source"]) == (None, "md", kept.json()["id"], "clinical_note")
     assert set(note) == {"kind", "at", "by", "role", "score", "note_id", "source"}
     assert [e["kind"] for e in response.json()["events"] if e["score"] == 5] == []
+    at(450)  # read again later: what was done after the last stored bin is part of the stay
+    later = get(api).json()
+    assert [(e["kind"], e["at"], e["score"]) for e in later["events"]][-1] == ("acknowledged", served(api, 400), 9)
+    assert later["grid_to"] == response.json()["grid_to"] and later["runs"] == response.json()["runs"]
 
 
 # --- The ward read, and the cost --------------------------------------------------------------------
@@ -272,3 +279,20 @@ def test_a_patient_with_no_stored_bins_has_an_empty_grid(api: Api) -> None:
     start(api, patients=[stay("s-1", 0)])
     got = history(api)
     assert (got["grid_from"], got["grid_to"], got["bins"], got["runs"], got["events"]) == (None, None, 0, [], [])
+    assert got["unavailable"] == "no_bins"
+
+
+def test_a_stay_with_more_bins_than_the_grid_says_so_and_a_quiet_stay_says_nothing(api: Api) -> None:
+    start(api, patients=[stay("s-1", 673), stay("s-2", 20)])
+    long = history(api)
+    assert (long["unavailable"], long["bins"], long["runs"], long["grid_to"]) == ("past_cap", 0, [], None)
+    quiet = history(api, "s-2")
+    assert (quiet["unavailable"], quiet["bins"], quiet["runs"]) == (None, 20, [])
+
+
+def test_a_caller_who_may_not_see_the_patient_reads_nothing_of_the_patient(api: Api) -> None:
+    start(api, patients=[stay("s-1", 20)])
+    ran = statements(api, lambda s, a, w: HistoryService(s, a, w).compute("rn-reyes", "s-1"))
+    assert len(ran) == 2  # the scope only: no read of the patient, the bins, the observations or the events
+    for table in ("vital_bin", "observation", "clinician_action", "clinical_note"):
+        assert not any(table in q for q in ran)

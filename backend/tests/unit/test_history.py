@@ -162,3 +162,13 @@ def test_the_admission_is_kept_while_it_is_not_after_the_grid_and_the_newest_300
     done, cut = events(START - timedelta(days=1), [], many, START, STOP)
     assert cut and len(done) == MAX_EVENTS and done[-1].at == many[-1]["at"]
     assert done[0].at == many[1]["at"]  # the admission and the oldest one were dropped
+
+
+def test_a_not_ranked_run_ends_when_its_reason_changes() -> None:
+    other = BinState("not_ranked", reasons=("Level of consciousness missing",))
+    first, second = runs([NR, NR, other, Q])
+    assert (first.state, first.bins, first.reasons) == ("not_ranked", 2, ["Blood pressure missing"])
+    assert (second.state, second.bins, second.reasons) == ("not_ranked", 1, ["Level of consciousness missing"])
+    assert second.start == first.end
+    (alert,) = runs([MEDIUM, HIGH])  # an alert run does not split on its reasons
+    assert alert.bins == 2

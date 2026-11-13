@@ -50,7 +50,10 @@ class PatientHistory(Contract):
     patient_id: Id
     synthetic: Flag
     label: Literal["Rebuilt from stored 15-minute bins. It can differ from the score shown at the time."]
-    grid_from: AwareDatetime | None  # the start of the first bin; null: no stored bins
+    # Why there is no history to show: no bin is stored, the stay holds more bins than the grid, or the
+    # four series do not line up. Null when there is one. An empty history with this null is a quiet stay.
+    unavailable: Literal["no_bins", "past_cap", "not_aligned"] | None
+    grid_from: AwareDatetime | None  # the start of the first bin; null: no history
     grid_to: AwareDatetime | None  # the end of the latest bin
     bins: Annotated[int, Field(strict=True, ge=0, le=672)]
     runs: Annotated[list[HistoryRun], Field(max_length=200)]  # oldest first; the newest 200 kept

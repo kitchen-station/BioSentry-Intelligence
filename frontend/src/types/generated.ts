@@ -649,6 +649,7 @@ export interface components {
             readonly runs: readonly components["schemas"]["HistoryRun"][];
             readonly runs_cut: boolean;
             readonly synthetic: boolean;
+            readonly unavailable: ("no_bins" | "past_cap" | "not_aligned") | null;
         };
         /** PatientQuestionDetail */
         readonly PatientQuestionDetail: {
