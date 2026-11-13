@@ -34,7 +34,10 @@ describe("research agent section", () => {
   it("shows the only sign-off verbatim, with the proposal id and the source", () => {
     show();
     expect(screen.getByText("Proposal P-0001")).toBeTruthy();
-    expect(screen.getByText("Signed off by Unattended demo run - not a person, then applied.")).toBeTruthy();
+    expect(screen.getByText("Signed off by Unattended demo run - not a person, then applied to the models folder that run was given.")).toBeTruthy();
+    expect(screen.getByText(/This page cannot ask it anything yet/)).toBeTruthy();
+    expect(screen.getByText(/typed by the unattended run, not by a doctor/)).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 3, name: "Proposals" })).toBeTruthy();
     expect(screen.getByText(/^Source: Transcript in the description of pull request 19 \(merged into main as c8f0ce8;/).textContent).toMatch(/ 21 ledger records, hand-exported from the transcript, 2026-11-13\.$/);
     expect(screen.getByText(/^Synthetic, not validated\./)).toBeTruthy();
   });

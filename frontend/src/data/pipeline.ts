@@ -44,7 +44,7 @@ export const PIPELINE: readonly Stage[] = [
   },
   {
     id: "agent", name: "Research agent", state: "research only, offline",
-    text: ["Run by hand, offline, on simulated trials: it picks the next experiment from a fixed list and answers three fixed kinds of question in fixed sentences, each with a chance control.", "Every step goes to a ledger, and a person signs off before a proposal changes any file. It is not connected to the API, the rank or the arbiter."],
+    text: ["Run by hand on simulated trials: it picks the next experiment from a fixed list and answers three fixed kinds of question in fixed sentences, each with a chance control. An optional model planner, off unless set up and off in the recorded run, may only reorder that list.", "Every step goes to a ledger, and a proposal changes no file until a sign-off is recorded. It is not connected to the API, the rank or the arbiter, and the dashboard cannot ask it a question."],
     evidence: "research/agent/ (on main since #19), frontend/src/data/research-agent.json",
   },
   {

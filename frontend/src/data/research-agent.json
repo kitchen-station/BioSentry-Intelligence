@@ -1,6 +1,6 @@
 {
   "provenance": {
-    "source": "Transcript in the description of pull request 19 (merged into main as c8f0ce8; no ledger is committed). Run from a snapshot of commit 3405cd3 on ward-v2 simulator trials, unattended, with a scratch agent home and an empty scratch models folder, so no file in this repository's models/ changed. The sweep's k 4.0, p 8 is already in models/tier_b/baseline/params.json; against that folder nothing would have been proposed. Question ids are worked out from the record counts; the transcript does not print them.",
+    "source": "Transcript in the description of pull request 19 (merged into main as c8f0ce8; no ledger is committed). Run from a snapshot of commit 3405cd3 on ward-v2 simulator trials, unattended, with a scratch agent home and an empty scratch models folder, so no file in this repository's models/ changed. The sweep's k 4.0, p 8 is already in models/tier_b/baseline/params.json; against that folder nothing would have been proposed. Nobody was at the keyboard: the questions and the sign-off were typed by the unattended run, not by a doctor, and the sign-off is not a person's sign-off of anything. Question ids are worked out from the record counts; the transcript does not print them.",
     "records": 21,
     "exportedBy": "hand-exported from the transcript",
     "date": "2026-11-13"

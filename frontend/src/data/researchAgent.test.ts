@@ -25,10 +25,12 @@ describe("research agent export", () => {
     expect(Number.isFinite(Date.parse(A.provenance.date))).toBe(true);
     for (const q of A.questions) {
       expect(ASK_STATUSES).toContain(q.status);
+      expect(["news2_threshold", "baseline_vs_news2", "alerts_per_nurse", "none"]).toContain(q.template);
       expect(finiteOrNull(q.askedAt)).toBe(true);
     }
     for (const p of A.proposals) {
       expect(PROPOSAL_STATES).toContain(p.state);
+      expect(["set_baseline_params", "adopt_reward_policy"]).toContain(p.action);
       expect(finiteOrNull(p.approvedAt)).toBe(true);
     }
   });
@@ -38,6 +40,8 @@ describe("research agent export", () => {
       expect(q.answer.at(-1), q.id).toBe(LAST);
       if (q.status === "refused") {
         expect(q.numbers, q.id).toEqual([]);
+        expect(q.answer, q.id).toHaveLength(2);
+        expect(q.answer[0], q.id).toMatch(/^I can run three things on the simulated ward.*I did not run anything for this question\.$/);
         continue;
       }
       expect(q.answer[1], q.id).toMatch(/^Chance control:/);
