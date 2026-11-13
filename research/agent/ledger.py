@@ -96,8 +96,8 @@ def read(cfg: Config) -> list[dict]:
 
 # shortcut: the last line has no later record to vouch for it, so editing only that line is not
 # caught, upgrade by keeping the head hash somewhere else
-def append(cfg: Config, rtype: str, fields: dict) -> dict:
-    """One record, one write. The lock covers the read and the write, so two writers cannot clash."""
+def _append(cfg: Config, rtype: str, fields: dict) -> dict:
+    """Private: only the functions of this module write records. One record, one write. The lock covers the read and the write, so two writers cannot clash."""
     try:
         cfg.home.mkdir(parents=True, exist_ok=True)
         fd = os.open(cfg.home / LEDGER, os.O_RDWR | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o600)
@@ -136,7 +136,7 @@ def begin_step(cfg: Config, kind: str, text: str, plan: dict) -> str:
     if kind not in ("round", "ask"):
         raise LedgerError("bad step")
     key = "goal" if kind == "round" else "question"
-    return append(cfg, "start", {"kind": kind, key: clean(text, 500), "plan": plan})["id"]
+    return _append(cfg, "start", {"kind": kind, key: clean(text, 500), "plan": plan})["id"]
 
 
 def add_step(cfg: Config, step_id: str, calls: list, conclusion: str, grounding: str | None = None) -> dict:
@@ -148,11 +148,11 @@ def add_step(cfg: Config, step_id: str, calls: list, conclusion: str, grounding:
     fields = {k: start[k] for k in ("id", "kind", "goal", "question", "plan") if k in start}
     if grounding is not None:
         fields["grounding"] = grounding
-    return append(cfg, "step", {**fields, "calls": calls, "conclusion": clean(conclusion, 2000)})
+    return _append(cfg, "step", {**fields, "calls": calls, "conclusion": clean(conclusion, 2000)})
 
 
 def add_fallback(cfg: Config, reason: str, host: str, shown: str = "") -> dict:
-    return append(cfg, "planner_fallback", {"reason": reason, "host": clean(host, 100), "shown": clean(shown, 200)})
+    return _append(cfg, "planner_fallback", {"reason": reason, "host": clean(host, 100), "shown": clean(shown, 200)})
 
 
 # --- proposals ----------------------------------------------------------------------------------------
@@ -198,6 +198,23 @@ def _source(cfg: Config, rel: str) -> bytes:
     return data
 
 
+def installed(cfg: Config, rel: str) -> bytes | None:
+    """Read only: a file under the models folder, or None when there is none."""
+    try:
+        fd = os.open(cfg.models / rel, os.O_RDONLY | os.O_NOFOLLOW)
+    except FileNotFoundError:
+        return None
+    except OSError:
+        raise LedgerError(f"{show(rel)}: cannot be read") from None
+    try:
+        data = os.read(fd, MAX_SOURCE + 1)
+    finally:
+        os.close(fd)
+    if len(data) > MAX_SOURCE:
+        raise LedgerError(f"{show(rel)}: larger than {MAX_SOURCE} bytes")
+    return data
+
+
 def _read_policy(cfg: Config, source: str) -> None:
     try:
         reward_loop.read_policy(cfg.home / source, "/no_temperature/" not in source)
@@ -227,7 +244,7 @@ def propose(cfg: Config, action: str, step_id: str, run_dir_rel: str, no_tempera
         if r["type"] == "proposal" and r["action"] == action and status(records, r["id"]) == "proposed" \
                 and {f["target"] for f in r["files"]} == targets:
             raise LedgerError(f"{r['id']} already proposes this and is waiting for a person")
-    return append(cfg, "proposal", {"action": action, "step": step_id, "files": files, "evidence": evidence})["id"]
+    return _append(cfg, "proposal", {"action": action, "step": step_id, "files": files, "evidence": evidence})["id"]
 
 
 def _os_user() -> str:
@@ -248,7 +265,7 @@ def approve(cfg: Config, proposal_id: str, by: str | None = None) -> dict:
         raise LedgerError(f"no proposal {show(proposal_id)}")
     if state != "proposed":
         raise LedgerError(f"{proposal_id} is already {state}")
-    return append(cfg, "approval", {"proposal": proposal_id, "by": by, "os_user": user})
+    return _append(cfg, "approval", {"proposal": proposal_id, "by": by, "os_user": user})
 
 
 def _destination(models, target: str):
@@ -270,6 +287,10 @@ def apply(cfg: Config, proposal_id: str) -> dict:
     models = cfg.models.resolve()
     plan = []
     try:
+        if not any(r["type"] == "step" and r["id"] == prop["step"] for r in records):
+            raise LedgerError(f"{proposal_id}: its step is not in the ledger")
+        if len({f["source"][:11] for f in prop["files"]}) != 1:  # "runs/S-NNNN"
+            raise LedgerError(f"{proposal_id}: its files come from more than one run")
         for f in prop["files"]:
             if _target(prop["action"], f["source"]) != f["target"]:
                 raise LedgerError(f"{show(f['target'])}: does not match the action")
@@ -285,6 +306,9 @@ def apply(cfg: Config, proposal_id: str) -> dict:
         raise LedgerError(f"{proposal_id}: the proposal record is malformed")
     if policies:
         _read_policy(cfg, policies[0])
+    # The record of what was written must fit: checked now, not after the copy.
+    if (cfg.home / LEDGER).stat().st_size + 512 * (len(plan) + 2) > MAX_FILE:
+        raise LedgerError("ledger is full; nothing was written")
     done = []
     try:
         for f, data, dest, before in sorted(plan, key=lambda p: p[0]["target"].endswith("policy.json")):
@@ -295,5 +319,7 @@ def apply(cfg: Config, proposal_id: str) -> dict:
             os.replace(tmp, dest)
             done.append({"target": f["target"], "sha256_before": before, "sha256_after": _sha(dest.read_bytes())})
     except OSError:
-        raise LedgerError("a file could not be written; nothing was recorded as applied") from None
-    return append(cfg, "applied", {"proposal": proposal_id, "files": done})
+        _append(cfg, "apply_failed", {"proposal": proposal_id, "files": done})
+        raise LedgerError(f"a file could not be written; {len(done)} of {len(plan)} files were written and are "
+                          "recorded as apply_failed; run apply again once the cause is fixed") from None
+    return _append(cfg, "applied", {"proposal": proposal_id, "files": done})

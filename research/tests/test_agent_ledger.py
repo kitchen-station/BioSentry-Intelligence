@@ -1,4 +1,5 @@
 import hashlib
+import re
 from pathlib import Path
 
 import pytest
@@ -100,15 +101,16 @@ def test_untrusted_text_is_capped_and_cleaned_and_the_model_key_never_gets_in(tm
         ledger.add_fallback(cfg, "bad_json", "api.example.com", "sk-secret-123")
     assert "sk-secret-123" not in (cfg.home / "ledger.jsonl").read_text()
     with pytest.raises(LedgerError, match="256 KiB"):
-        ledger.append(cfg, "step", {"big": "x" * ledger.MAX_LINE})
+        ledger._append(cfg, "step", {"big": "x" * ledger.MAX_LINE})
 
 
 def test_a_symlinked_ledger_is_refused(tmp_path, cfg):
     cfg.home.mkdir()
     (tmp_path / "other").write_text("")
     (cfg.home / "ledger.jsonl").symlink_to(tmp_path / "other")
-    with pytest.raises(LedgerError):
+    with pytest.raises(LedgerError, match="cannot open the ledger"):
         step(cfg)
+    assert (tmp_path / "other").read_text() == ""
 
 
 # --- proposals ------------------------------------------------------------------------------------------
@@ -228,6 +230,58 @@ def test_apply_after_approval_changes_only_the_mapped_targets(cfg):
     assert not list(cfg.models.rglob("*.tmp"))
     with pytest.raises(LedgerError, match="already applied"):
         ledger.apply(cfg, pid)
+
+
+def test_a_failed_copy_is_recorded_with_what_was_written_and_can_be_run_again(cfg):
+    pid = proposed(cfg)
+    ledger.approve(cfg, pid, "Ada Lovelace")
+    block = cfg.models / "tier_b" / "reward_policy" / "policy.json.tmp"
+    block.mkdir(parents=True)  # the last copy (policy.json) cannot open its temp file
+    with pytest.raises(LedgerError, match="2 of 3 files were written and are recorded as apply_failed"):
+        ledger.apply(cfg, pid)
+    records = ledger.read(cfg)
+    assert records[-1]["type"] == "apply_failed" and records[-1]["proposal"] == pid
+    assert [f["target"] for f in records[-1]["files"]] == [
+        "tier_b/reward_policy/generations/gen-00.json", "tier_b/reward_policy/generations/gen-01.json"]
+    assert ledger.status(records, pid) == "approved"
+    block.rmdir()
+    assert len(ledger.apply(cfg, pid)["files"]) == 3 and ledger.status(ledger.read(cfg), pid) == "applied"
+
+
+def test_a_ledger_with_no_room_for_the_record_stops_apply_before_any_write(cfg, monkeypatch):
+    pid = proposed(cfg)
+    ledger.approve(cfg, pid, "Ada Lovelace")
+    monkeypatch.setattr(ledger, "MAX_FILE", (cfg.home / "ledger.jsonl").stat().st_size + 100)
+    with pytest.raises(LedgerError, match="ledger is full; nothing was written"):
+        ledger.apply(cfg, pid)
+    assert not cfg.models.exists()
+
+
+def test_a_forged_proposal_is_refused_by_apply(cfg):
+    """Records written past the public functions (the private writer, used here on purpose) still
+    cannot move files from two runs, or name a step that is not in the ledger."""
+    make_run(cfg, "S-0001")
+    make_run(cfg, "S-0002")
+    sid = step(cfg)
+    sha = lambda rel: hashlib.sha256((cfg.home / rel).read_bytes()).hexdigest()  # noqa: E731
+    a, b = "runs/S-0001/reward_policy/policy.json", "runs/S-0002/reward_policy/generations/gen-01.json"
+    files = [{"source": s, "sha256": sha(s), "target": ledger._target("adopt_reward_policy", s)} for s in (a, b)]
+    for step_id, why in ((sid, "more than one run"), ("S-9999", "its step is not in the ledger")):
+        pid = ledger._append(cfg, "proposal", {"action": "adopt_reward_policy", "step": step_id, "files": files,
+                                                "evidence": {}})["id"]
+        ledger.approve(cfg, pid, "Ada Lovelace")
+        with pytest.raises(LedgerError, match=why):
+            ledger.apply(cfg, pid)
+    assert not cfg.models.exists()
+
+
+def test_the_planner_the_loop_and_ask_cannot_reach_the_sign_off():
+    """approve and apply are commands a person types. No agent module names them or the private writer."""
+    folder = Path(research.agent.__file__).parent
+    for name in ("planner.py", "loop.py", "ask.py", "tools.py", "config.py"):
+        text = (folder / name).read_text()
+        assert not re.search(r"ledger\s*\.\s*(approve|apply|_append)\b|\b_append\b|getattr\(", text), name
+        assert not re.search(r"import[^\n]*\b(approve|apply)\b", text), name
 
 
 def test_a_source_changed_after_approval_is_refused_and_nothing_is_written(cfg):
