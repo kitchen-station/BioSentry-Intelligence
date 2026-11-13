@@ -627,7 +627,7 @@ describe("PatientDetail follows the ward's speed", () => {
     await loaded();
     api.getPatient.mockResolvedValue(null);
     await advance(2_100);
-    expect((await screen.findByText(/No longer ranked\. Figures from/)).textContent).toMatch(/\d{2}:\d{2}/);
+    expect((await screen.findByText(/No longer on your ranked list\. Figures from/)).textContent).toMatch(/\d{2}:\d{2}/);
     expect(screen.getByRole("link", { name: "Back to ward" }).getAttribute("href")).toBe("/ward");
     expect(screen.queryByText("Patient not found.")).toBeNull();
     api.getPatient.mockClear();
@@ -646,6 +646,92 @@ describe("PatientDetail follows the ward's speed", () => {
     api.getPatient.mockResolvedValue(base);
     await advance(5_100);
     await waitFor(() => expect(screen.queryByText(/Cannot reach the ward server since/)).toBeNull());
+  });
+
+  const summaryBar = () => document.querySelector('[class*="summaryBar"]') as HTMLElement;
+
+  it("puts the stale lines in the summary bar, beside the score", async () => {
+    page();
+    await loaded();
+    api.getPatient.mockRejectedValue(new Error("down"));
+    await advance(2_100);
+    const failed = await screen.findByText(/Cannot reach the ward server since/);
+    expect(summaryBar().contains(failed)).toBe(true);
+    api.getPatient.mockResolvedValue(null);
+    await advance(5_100);
+    const gone = await screen.findByText(/No longer on your ranked list\. Figures from/);
+    expect(summaryBar().contains(gone)).toBe(true);
+  });
+
+  it("shows the Cannot reach line in an open drawer's header too", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    page();
+    await loaded();
+    await user.click(screen.getByRole("button", { name: /Charts/ }));
+    api.getPatient.mockRejectedValue(new Error("down"));
+    await advance(2_100);
+    const overlay = document.querySelector('[class*="overlayHeader"]') as HTMLElement;
+    await waitFor(() => expect(within(overlay).getByText(/Cannot reach the ward server since/)).toBeTruthy());
+  });
+
+  it("leaves the open charts drawer alone while the data does not change", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    page();
+    await loaded();
+    await user.click(screen.getByRole("button", { name: /Charts/ }));
+    await advance(900); // the first draw-on (700 ms) has finished
+    const grid = document.querySelector('[class*="chartGrid"]') as HTMLElement;
+    const before = grid.innerHTML;
+    await advance(4_200);
+    expect(api.getPatient.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(document.querySelector('[class*="chartGrid"]')).toBe(grid);
+    expect(grid.innerHTML).toBe(before);
+  });
+
+  it("drops a slow old answer that lands after a newer one", async () => {
+    api.canRecordVitals = true;
+    api.recordVitals.mockResolvedValue({
+      patient_id: "p-001", blood_pressure: null, consciousness: null, supplemental_o2: null, spo2_scale: null,
+      heart_rate: null, respiratory_rate: null, spo2: null, temperature: null,
+      ranked: true, rank: 1, score: 4, not_ranked_reason: null, not_ranked_instruction: null,
+    });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    page();
+    await loaded();
+    let late!: (p: Detail) => void;
+    api.getPatient.mockReturnValueOnce(new Promise((res) => (late = res)));
+    await advance(2_100); // a timed round starts and hangs
+    api.getPatient.mockResolvedValue({ ...base, name: "Newer, Pat" });
+    await user.click(screen.getByRole("button", { name: "Record vitals" }));
+    await user.type(screen.getByLabelText("Heart rate (bpm)"), "118");
+    await user.click(screen.getByRole("button", { name: "Record" })); // the save's read is answered first
+    expect(await screen.findByText("Newer, Pat")).toBeTruthy();
+    await act(async () => late({ ...base, name: "Older, Pat" }));
+    expect(screen.queryByText("Older, Pat")).toBeNull();
+    expect(screen.getByText("Newer, Pat")).toBeTruthy();
+  });
+
+  it("after null, recorded vitals and ranked again, the stale line is gone and the timer reads again", async () => {
+    api.canRecordVitals = true;
+    api.recordVitals.mockResolvedValue({
+      patient_id: "p-001", blood_pressure: null, consciousness: null, supplemental_o2: null, spo2_scale: null,
+      heart_rate: null, respiratory_rate: null, spo2: null, temperature: null,
+      ranked: true, rank: 1, score: 9, not_ranked_reason: null, not_ranked_instruction: null,
+    });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    page();
+    await loaded();
+    api.getPatient.mockResolvedValue(null);
+    await advance(2_100);
+    expect(await screen.findByText(/No longer on your ranked list/)).toBeTruthy();
+    api.getPatient.mockClear().mockResolvedValue(base);
+    await user.click(screen.getByRole("button", { name: "Record vitals" }));
+    await user.type(screen.getByLabelText("Heart rate (bpm)"), "118");
+    await user.click(screen.getByRole("button", { name: "Record" }));
+    await waitFor(() => expect(screen.queryByText(/No longer on your ranked list/)).toBeNull());
+    api.getPatient.mockClear();
+    await advance(2_100);
+    expect(api.getPatient).toHaveBeenCalledTimes(1);
   });
 
   it("does not ask again, or for the live view, for an administrator", async () => {

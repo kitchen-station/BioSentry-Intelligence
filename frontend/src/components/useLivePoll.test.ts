@@ -31,6 +31,10 @@ describe("pollEvery", () => {
     expect(pollEvery(s, hidden)).toBe(ms);
   });
 
+  it("is 5 s while the last round failed, even at 60x", () => {
+    expect(pollEvery(sim(60), false, true)).toBe(5_000);
+  });
+
   it("is 15 s in the demo build, whatever the speed", () => {
     build.usesServer = false;
     expect(pollEvery(sim(60), false)).toBe(15_000);

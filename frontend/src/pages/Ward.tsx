@@ -65,18 +65,27 @@ export function Ward({ session, onSignOut }: Props) {
   const [acked, setAcked] = useState<ReadonlyMap<string, number> | null>(null);
   const alerted = useRef(new Set<string>());
 
-  // Keeps the last good ward on screen when a fetch fails, and says since when.
-  const load = useCallback(
-    () =>
-      getWard()
-        .then((w) => {
-          setData(w);
-          setFetchedAt(Date.now());
-          setFailedSince(null);
-        })
-        .catch(() => setFailedSince((t) => t ?? Date.now())),
-    [],
-  );
+  // Keeps the last good ward on screen when a fetch fails, and says since when. Each request takes
+  // the next number and an answer counts only if no later request was answered first: a slow old
+  // answer never brings back an older ward.
+  const issued = useRef(0);
+  const applied = useRef(0);
+  const load = useCallback(async () => {
+    const n = ++issued.current;
+    try {
+      const w = await getWard();
+      if (n > applied.current) {
+        applied.current = n;
+        setData(w);
+        setFetchedAt(Date.now());
+        setFailedSince(null);
+      }
+      return true;
+    } catch {
+      if (n > applied.current) setFailedSince((t) => t ?? Date.now());
+      return false;
+    }
+  }, []);
   // The speed comes from the live view read in the same round: see useLivePoll.
   const { sim, refresh, pollMs } = useLivePoll(load, !readOnly);
 

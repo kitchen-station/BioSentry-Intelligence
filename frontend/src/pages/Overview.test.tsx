@@ -76,7 +76,7 @@ describe("Overview", () => {
     expect(screen.getByText("Read-only. Every view is recorded in the audit log.")).toBeTruthy();
     expect(screen.getByText("Simulated patients until a hospital is connected.")).toBeTruthy();
     expect(await screen.findByText(AS_OF)).toBeTruthy();
-    expect(screen.getByText(`Simulator: 4 ${SEP}, 15:10 \u00b7 10x`)).toBeTruthy();
+    expect(screen.getByText(`Simulator: 4 ${SEP}, 15:10 \u00b7 10x \u00b7 5 received \u00b7 0 rejected \u00b7 1 abstained`)).toBeTruthy();
     expect(screen.queryByText("Not receiving data")).toBeNull();
   });
 

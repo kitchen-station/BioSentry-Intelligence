@@ -101,10 +101,17 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
   const [staleSince, setStaleSince] = useState<number | null>(null);
   const [lastGood, setLastGood] = useState<number | null>(null);
   const [failedSince, setFailedSince] = useState<number | null>(null);
-  const loadPatient = useCallback(() => {
-    if (!id) return Promise.resolve();
-    return getPatient(id)
-      .then((p) => {
+  // Each request takes the next number and an answer counts only if no later request was answered
+  // first: a slow old answer never brings back an older score. The timer and a saved entry share it.
+  const issued = useRef(0);
+  const applied = useRef(0);
+  const loadPatient = useCallback(async () => {
+    if (!id) return;
+    const n = ++issued.current;
+    try {
+      const p = await getPatient(id);
+      if (n > applied.current) {
+        applied.current = n;
         const first = shown.current !== id;
         if (p) {
           shown.current = id;
@@ -114,11 +121,15 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
           setStaleSince(null);
         } else if (first) setNotFound(true);
         else setStaleSince(Date.now());
-      })
-      .catch(() => {
+      }
+      return true;
+    } catch {
+      if (n > applied.current) {
         if (shown.current !== id) setLoadError(true);
         else setFailedSince((t) => t ?? Date.now());
-      });
+      }
+      return false;
+    }
   }, [id]);
   const { sim } = useLivePoll(loadPatient, usesServer && !readOnly, staleSince !== null || unranked !== null);
 
@@ -155,7 +166,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
     setSaves((n) => n + 1);
     if (recorded.ranked) {
       setUnranked(null);
-      getPatient(id).then((p) => p && setPatient(p)).catch(() => setRefreshFailed(true));
+      void loadPatient().then((ok) => ok === false && setRefreshFailed(true));
     } else setUnranked(`Recorded. ${standing(recorded)}`);
   };
 
@@ -218,6 +229,16 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
       <div className={styles.summaryBar}>
         {unranked !== null && (
           <p className={styles.summaryLabel}>No longer ranked. The figures below are from before this entry.</p>
+        )}
+        {/* Here, not in a panel: the big score must not look current when it is not. */}
+        {failedSince !== null && (
+          <p className={styles.summaryLabel} role="status">Cannot reach the ward server since {formatClock(failedSince)}.</p>
+        )}
+        {staleSince !== null && unranked === null && (
+          <p className={styles.summaryLabel} role="status">
+            No longer on your ranked list. Figures from {formatClock(lastGood ?? staleSince)}.{" "}
+            <Link to="/ward">Back to ward</Link>
+          </p>
         )}
         <div className={styles.summaryRow}>
           <div className={styles.summaryInner}>
@@ -286,6 +307,9 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
               <span className={styles.overlayTitle}>
                 {drawer === "notes" ? `Clinical notes${notes.length > 0 ? ` \u00b7 ${notes.length}` : ""}` : "Vital trends -- last 6 hours"}
               </span>
+              {failedSince !== null && (
+                <span role="status">Cannot reach the ward server since {formatClock(failedSince)}.</span>
+              )}
               <button type="button" className={styles.overlayClose} onClick={() => setDrawer(null)}>&times;</button>
             </div>
 
@@ -452,15 +476,6 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
             )}
             {refreshFailed && (
               <p role="alert">Recorded. The page could not refresh; reload to see the new score.</p>
-            )}
-            {failedSince !== null && (
-              <p role="status">Cannot reach the ward server since {formatClock(failedSince)}.</p>
-            )}
-            {staleSince !== null && unranked === null && (
-              <p role="status">
-                No longer ranked. Figures from {formatClock(lastGood ?? staleSince)}.{" "}
-                <Link to="/ward">Back to ward</Link>
-              </p>
             )}
             {unranked !== null && (
               <p role="status">

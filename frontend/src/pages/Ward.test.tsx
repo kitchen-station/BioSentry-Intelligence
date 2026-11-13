@@ -156,6 +156,13 @@ describe("the ward's clock and speed in the bar", () => {
     expect(screen.queryByText(/Simulator:/)).toBeNull(); // the old counts line is gone
   });
 
+  it("says the clock literally for one time and speed", async () => {
+    api.getLiveWard.mockResolvedValue(published({ clockS: 109_200, speed: 10 }));
+    page();
+    const text = (await clock()).textContent;
+    expect(text).toMatch(/^Ward clock4 Sept?, 21:20 \u00b7 10x$/); // 06:20 on day 2 of a run that starts 15:00 on 3 Sep
+  });
+
   it.each([
     [{ speed: 60 }, `4 ${SEP}, 21:20 \u00b7 60x`],
     [{ speed: 1 }, `4 ${SEP}, 21:20 \u00b7 1x`],
@@ -301,14 +308,62 @@ describe("how often the ward follows the run's speed", () => {
     expect(api.getWard).not.toHaveBeenCalled();
   });
 
-  it("keeps one round in flight: a slow answer makes the next ticks do nothing", async () => {
+  // The API client fails a read that has not answered in 10 s (api/client.test.ts); the mock does the same.
+  const hangsFor = (ms: number) =>
+    new Promise((_, reject) => setTimeout(() => reject(new Error("timed out")), ms));
+
+  it("keeps one round in flight: a round not yet timed out makes the next ticks do nothing", async () => {
     await start({ speed: 60 });
-    api.getWard.mockReturnValue(new Promise(() => undefined));
+    api.getWard.mockReturnValue(hangsFor(10_000));
     await advance(2_100);
     expect(api.getWard).toHaveBeenCalledTimes(1);
-    await advance(20_000);
+    await advance(6_000);
     expect(api.getWard).toHaveBeenCalledTimes(1);
     expect(api.getLiveWard).toHaveBeenCalledTimes(2);
+  });
+
+  it("a round that hangs until the read timeout fails, says so, and the next tick asks again", async () => {
+    await start({ speed: 60 });
+    api.getWard.mockReturnValueOnce(hangsFor(10_000));
+    // Step in small slices to the instant the read times out, so no tick lands in the same slice.
+    for (let ms = 0; ms < 11_000 && !screen.queryByText(/Cannot reach the ward server since/); ms += 100) await advance(100);
+    expect(screen.getByText(/Cannot reach the ward server since/)).toBeTruthy();
+    api.getWard.mockClear().mockResolvedValue(ward());
+    await advance(5_100);
+    expect(api.getWard).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.queryByText(/Cannot reach the ward server since/)).toBeNull());
+  });
+
+  it("asks a failing ward every 5 seconds at 60x, and says so", async () => {
+    await start({ speed: 60 });
+    api.getWard.mockRejectedValue(new Error("down"));
+    await advance(2_100); // the round that fails
+    expect(await screen.findByText(/Retrying every 5 seconds\./)).toBeTruthy();
+    api.getWard.mockClear();
+    await advance(2_500);
+    expect(api.getWard).not.toHaveBeenCalled();
+    await advance(2_700);
+    expect(api.getWard).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("an old answer never replaces a newer one", () => {
+  it("drops a slow answer that lands after a later Refresh was answered", async () => {
+    api.build.usesServer = true;
+    const user = userEvent.setup();
+    page(admin);
+    await screen.findByText(/Priority queue/);
+    const named = (name: string): WardResponse => ({ ...ward(), ranked: [{ ...rows[0], name }] });
+    let late!: (w: WardResponse) => void;
+    api.getWard
+      .mockReturnValueOnce(new Promise((res) => (late = res)))
+      .mockResolvedValueOnce(named("Newer, Pat"));
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(await screen.findByText(/Newer, Pat/)).toBeTruthy();
+    await act(async () => late(named("Older, Pat")));
+    expect(screen.queryByText(/Older, Pat/)).toBeNull();
+    expect(screen.getByText(/Newer, Pat/)).toBeTruthy();
   });
 });
 
