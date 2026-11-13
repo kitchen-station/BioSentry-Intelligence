@@ -488,13 +488,24 @@ def test_no_token_a_revoked_admin_and_an_unknown_token_get_401_on_every_route(
         write(api, "DELETE FROM clinician WHERE id = %s", ADMIN)
     seq = _last_seq(api)
     routes = [r for r in _route_table(api.client.app) if r not in PUBLIC_ROUTES]
-    for method, template in routes:
-        body = VALID_BODIES.get((method, template))
-        response = api.client.request(method, template.format(**PATH_VALUES), headers=headers, json=body)
-        assert response.status_code == 401, (method, template)
-    rows = _rows_since(api, seq)
-    assert len(rows) == len(routes)
-    assert {(r[0], r[1], r[2], r[4]) for r in rows} == {(None, None, "authenticate", "denied")}
+    denied = (None, None, "authenticate", "-", "denied")
+
+    def refused_on_every_route(*, a_minute_apart: bool) -> None:
+        for method, template in routes:
+            if a_minute_apart:
+                api.wall.now += timedelta(minutes=1, seconds=1)
+            body = VALID_BODIES.get((method, template))
+            response = api.client.request(method, template.format(**PATH_VALUES), headers=headers, json=body)
+            assert response.status_code == 401, (method, template)
+
+    # Every route refuses. Nobody was identified, so the refusals of one minute leave ONE row:
+    # a flood of anonymous requests cannot fill a table that nothing can delete from.
+    refused_on_every_route(a_minute_apart=False)
+    assert len(routes) > 1 and _rows_since(api, seq) == [denied]
+    # The limit is on the row, not on the route: a refusal more than a minute after the last row is
+    # recorded again, on every route.
+    refused_on_every_route(a_minute_apart=True)
+    assert _rows_since(api, seq) == [denied] * (1 + len(routes))
 
 
 def test_the_admin_sees_what_the_charge_nurse_sees_except_the_clinician_field(api: Api) -> None:
