@@ -848,8 +848,9 @@ Two facts the dashboard session reported:
   the deployed API shows both models as not computed, with a reason (ruling 13).
 
 1. Golden fixture. `research/tests/data/wiring/golden.json`, written by `python -m research.wiring_fixture`, format
-   `"biosentry-wiring-golden/1"`: the toy stays plus one synthetic 94-bin stay (a gap, a NOT RANKED bin after bin
-   24, changing nurse inputs). Per bin: minute (the END of the bin), row, news2, baseline_formed; per scored bin and
+   `"biosentry-wiring-golden/1"`: the toy stays plus one synthetic 94-bin stay (two gaps at bins 30 and 84, two NOT RANKED
+   bins at bins 45 and 78, changing nurse inputs; the later gap and NOT RANKED bin fall inside an alerting run, so the
+   policy's run reset is tested). Per bin: minute (the END of the bin), row, news2, baseline_formed; per scored bin and
    variant: the student features (float32 repr), p and check; the policy's z, score and alerting. Research values,
    no product gates. Its reference is the `research/README.md` section "Golden fixture for the wiring slice".
    Test plan item 3 uses it.
