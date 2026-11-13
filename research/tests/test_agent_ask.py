@@ -263,7 +263,7 @@ def test_a_tool_failure_is_exit_2_with_one_refused_line_and_the_step_is_still_wr
 
 # --- answer(): the record the worker needs ---------------------------------------------------------------------
 
-KEYS = {"status", "text", "step", "template", "args", "result", "result_sha256", "numbers"}
+KEYS = {"status", "text", "step", "planner","template", "args", "result", "result_sha256", "numbers"}
 
 
 def test_answer_returns_the_record_and_ask_returns_its_text(cfg):
@@ -282,7 +282,7 @@ def test_answer_no_template_runs_no_tool_and_writes_the_same_step(cfg, monkeypat
     monkeypatch.setattr(tools, "call", lambda *a, **k: pytest.fail("a tool was called"))
     got = ask.answer(cfg, "What is the capital of France?")
     assert set(got) == KEYS and got["status"] == "no_template" and got["text"] == ask.REFUSAL
-    assert got["step"] == "S-0001" and all(got[k] is None for k in KEYS - {"status", "text", "step"})
+    assert got["step"] == "S-0001" and all(got[k] is None for k in KEYS - {"status", "text", "step", "planner"})
     step, = steps(cfg)
     assert step["calls"] == [] and step["conclusion"] == "Refused: no template fits this question."
 
@@ -304,3 +304,29 @@ def test_answer_raises_the_tool_error_after_its_step(tmp_path, monkeypatch):
         ask.answer(empty, "What if we alerted at a NEWS2 total of 5 or more?")
     step, = steps(empty)
     assert step["calls"][0]["ok"] is False
+
+
+# --- the model route ----------------------------------------------------------------------------------------------
+
+QUIET = "How noisy is the ward for nurses?"  # the matcher is silent on it
+
+
+def test_without_a_route_the_planner_is_keywords_and_the_ledger_says_so(cfg):
+    out = ask.answer(cfg, "What if we alerted at a NEWS2 total of 5 or more?")
+    assert out["planner"] == "keywords" and out["status"] == "answered"
+    assert steps(cfg)[0]["plan"]["planner"] == "keywords" and steps(cfg)[0]["plan"]["reason"] == "matched a fixed template"
+
+
+def test_a_route_pick_is_used_where_the_matcher_is_silent(cfg):
+    assert ask.match(QUIET) == (None, None)
+    out = ask.answer(cfg, QUIET, lambda q: ("alerts_per_nurse", None))
+    assert out["planner"] == "tuned-model" and out["status"] == "answered" and out["template"] == "alerts_per_nurse"
+    plan = steps(cfg)[0]["plan"]
+    assert plan["planner"] == "tuned-model" and plan["reason"] == "the tuned model's answer passed the guard"
+
+
+def test_no_pick_means_the_matcher_decides(cfg):
+    out = ask.answer(cfg, "What if we alerted at a NEWS2 total of 5 or more?", lambda q: None)
+    assert out["planner"] == "keywords" and out["template"] == "news2_threshold"
+    out = ask.answer(cfg, QUIET, lambda q: None)
+    assert out["status"] == "no_template" and out["text"] == ask.REFUSAL and out["planner"] == "keywords"

@@ -222,19 +222,22 @@ def ask(cfg: Config, question: str) -> str:
     return answer(cfg, question)["text"]
 
 
-def answer(cfg: Config, question: str) -> dict:
+def answer(cfg: Config, question: str, route=None) -> dict:
     """What `ask` does, with the record: status answered | no_template | ungrounded, the text, the ledger step id,
-    and the template, args, result, result_sha256 and numbers (None when no tool ran)."""
-    template, threshold = match(question)
+    the planner (keywords | tuned-model), and the template, args, result, result_sha256 and numbers (None when no
+    tool ran). `route(question)` gives a (template, threshold) the guard passed, or None: then the matcher decides."""
+    picked = route(question) if route else None
+    planner, why = ("tuned-model", "the tuned model's answer passed the guard") if picked else ("keywords", None)
+    template, threshold = picked or match(question)
     args = None
     if template:
         args = {"dataset": "ward-v2", "seeds": list(range(1, 11)), "window": "early",
                 "rules": _rules(template, threshold, question)}
     sid = ledger.begin_step(cfg, "ask", question, {
-        "planner": "keywords", "rule": template or "none",
-        "reason": "matched a fixed template" if template else "no template fits",
+        "planner": planner, "rule": template or "none",
+        "reason": why or ("matched a fixed template" if template else "no template fits"),
         "tool": "evaluate_rules" if template else None, "args": args})
-    out = {"status": "no_template", "text": REFUSAL, "step": sid, "template": None, "args": None,
+    out = {"status": "no_template", "text": REFUSAL, "step": sid, "planner": planner, "template": None, "args": None,
            "result": None, "result_sha256": None, "numbers": None}
     if not template:
         ledger.add_step(cfg, sid, [], "Refused: no template fits this question.")
