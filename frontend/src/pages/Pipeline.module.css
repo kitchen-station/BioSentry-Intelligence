@@ -1,15 +1,23 @@
 .stages {
   display: grid;
-  gap: var(--sp-3);
+  gap: var(--sp-5);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+.stages li {
+  position: relative;
+  margin: 0;
+}
+
 .stages li + li::before {
   content: "\2193" / "";
-  display: block;
-  margin-bottom: var(--sp-3);
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  left: 0;
+  line-height: var(--sp-5);
   text-align: center;
   color: var(--label);
 }
