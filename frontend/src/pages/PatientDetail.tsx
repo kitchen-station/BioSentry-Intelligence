@@ -76,6 +76,7 @@ function Bare({ session, onSignOut, children }: { session: Session; onSignOut: (
 
 export function PatientDetail({ session, onSignOut }: { session: Session; onSignOut: () => void }) {
   const role = session.role;
+  const readOnly = role === "admin"; // an admin reads the page: every write control is absent
   const { id } = useParams<{ id: string }>();
   const [saves, setSaves] = useState(0);
   const baseline = useBaseline(id, saves);
@@ -100,8 +101,14 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
         else setNotFound(true);
       })
       .catch(() => setLoadError(true));
+    if (!readOnly) getNotes(id).then(setNotes).catch(() => setNoteError("Notes could not be loaded."));
+  }, [id, readOnly]);
+
+  // An admin's page reads the notes only when the drawer opens: one audited read per real look.
+  useEffect(() => {
+    if (!readOnly || drawer !== "notes" || !id) return;
     getNotes(id).then(setNotes).catch(() => setNoteError("Notes could not be loaded."));
-  }, [id]);
+  }, [readOnly, drawer, id]);
 
   const handleAddNote = async () => {
     if (!id || !noteText.trim() || submitting) return;
@@ -241,6 +248,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
           </div>
         </div>
       </div>
+      {readOnly && <p className={styles.readOnly}>Read-only. Every view is recorded in the audit log.</p>}
 
       {/* Overlay panels */}
       {drawer && (
@@ -256,7 +264,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
 
             {drawer === "notes" && (
               <>
-                <div className={styles.noteInput}>
+                {!readOnly && <div className={styles.noteInput}>
                   <textarea
                     className={styles.noteTextarea}
                     placeholder="Add a clinical note..."
@@ -274,7 +282,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
                   >
                     Add note
                   </button>
-                </div>
+                </div>}
                 {noteError !== null && <p role="alert">{noteError}</p>}
                 {notes.length > 0 && (
                   <div className={styles.notesList}>
@@ -401,12 +409,12 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
             <div className={styles.vitalsGrid}>
               <CurrentVitals vitals={patient.vitals} />
             </div>
-            {canRecordVitals && (
+            {canRecordVitals && !readOnly && (
               <button type="button" className={styles.drawerBtn} aria-expanded={entering} onClick={() => setEntering((open) => !open)}>
                 Record vitals
               </button>
             )}
-            {canRecordVitals && entering && (
+            {canRecordVitals && !readOnly && entering && (
               <VitalsEntry
                 patientId={patient.id}
                 patientName={patient.name}

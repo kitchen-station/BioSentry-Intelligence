@@ -32,7 +32,7 @@ from biosentry.schemas import ClinicalNote, LabPanel, TierStatus, UnscoredPatien
 
 LIVE_WITHIN = timedelta(seconds=30)  # a sim run whose last batch is older is not "receiving data"
 CONTROL_ROLES = ("md", "charge_rn")  # the roles that may send commands to the ward simulation
-ADMIN_ROLE = "admin"  # reads the ward overview, writes nothing, is never assigned to a patient
+ADMIN_ROLE = "admin"  # reads the ward and its patients, writes nothing, is never assigned
 SESSION_TTL = timedelta(hours=12)
 # judgement: RCP NEWS2 (2017) chart, "minimum 12 hourly" at aggregate 0, used for every score.
 # A nurse-typed device value counts for this long. It is the nurse's own word, not a patch reading.
@@ -325,7 +325,7 @@ class PostgresStore:
         return self.role_of(clinician_id) == ADMIN_ROLE
 
     def on_ward(self) -> frozenset[str]:
-        """Every patient still on the ward, whoever is assigned. For the admin overview only."""
+        """Every patient still on the ward, whoever is assigned. For the admin's read-only views."""
         rows = self.conn.execute(
             "SELECT id FROM patient WHERE run_id = %s AND left_at IS NULL", (self.run_id,)
         )

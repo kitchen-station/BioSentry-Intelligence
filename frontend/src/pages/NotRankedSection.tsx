@@ -6,6 +6,7 @@ import styles from "./Ward.module.css";
 interface Props {
   readonly rows: readonly AbstainedRowType[];
   readonly clinicianId: string;
+  readonly readOnly?: boolean;
   readonly onRecorded: (row: AbstainedRowType, recorded: VitalsRecorded) => void;
 }
 
@@ -13,7 +14,7 @@ interface Props {
  * The NOT RANKED list. Whether a row offers vitals entry is decided here, once, from the
  * build's capability: only the API can re-rank, so the fixture build offers none (D4).
  */
-export function NotRankedSection({ rows, clinicianId, onRecorded }: Props) {
+export function NotRankedSection({ rows, clinicianId, readOnly = false, onRecorded }: Props) {
   if (rows.length === 0) return null;
   return (
     <>
@@ -26,7 +27,7 @@ export function NotRankedSection({ rows, clinicianId, onRecorded }: Props) {
           <AbstainedRow
             key={row.id}
             row={row}
-            canRecord={canRecordVitals}
+            canRecord={canRecordVitals && !readOnly}
             clinicianId={clinicianId}
             onRecorded={onRecorded}
           />

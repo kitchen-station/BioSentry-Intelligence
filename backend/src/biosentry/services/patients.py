@@ -87,7 +87,8 @@ class PatientService:
     # --- notes -----------------------------------------------------------------------------
 
     def notes(self, clinician_id: str, patient_id: str) -> list[ClinicalNote] | None:
-        if not self._visible(clinician_id, patient_id, "view_notes"):
+        if patient_id not in self._wards.visible(clinician_id):  # an admin reads, never writes
+            self._audit.append(clinician_id, "view_notes", patient_id, "not_found")
             return None
         self._audit.append(clinician_id, "view_notes", patient_id, "ok")
         return self._store.notes(patient_id)

@@ -18,11 +18,13 @@ const api = vi.hoisted(() => ({
   getAcknowledgements: vi.fn(),
   acknowledge: vi.fn(),
   getLiveWard: vi.fn(),
-  build: { usesServer: false },
+  build: { usesServer: false, canRecord: false },
 }));
 vi.mock("../api", () => ({
   ...api,
-  canRecordVitals: false,
+  get canRecordVitals() {
+    return api.build.canRecord;
+  },
   recordVitals: vi.fn(),
   get usesServer() {
     return api.build.usesServer;
@@ -42,10 +44,11 @@ const ward = (): WardResponse => ({
   abstained: [],
 });
 const session: Session = { clinician_id: "rn-manalo", ward: "W4", role: "charge_rn" };
-const page = () =>
+const admin: Session = { clinician_id: "admin-santos", ward: "W4", role: "admin" };
+const page = (who: Session = session) =>
   render(
     <MemoryRouter initialEntries={["/ward"]}>
-      <Ward session={session} onSignOut={() => undefined} />
+      <Ward session={who} onSignOut={() => undefined} />
     </MemoryRouter>,
   );
 
@@ -55,6 +58,7 @@ beforeEach(() => {
   api.acknowledge.mockReset().mockResolvedValue(undefined);
   api.getLiveWard.mockReset().mockResolvedValue(null);
   api.build.usesServer = false;
+  api.build.canRecord = false;
 });
 afterEach(() => {
   cleanup();
@@ -223,5 +227,61 @@ describe("how often the ward is asked for", () => {
     const offline = await screen.findByText(new RegExp(`Retrying every ${ms / 1000} seconds\\.`));
     const note = screen.getByText("Simulated patients until a hospital is connected.");
     expect(offline.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
+describe("an administrator's ward page (read only)", () => {
+  const unranked = synthetic.abstained as unknown as WardResponse["abstained"];
+  beforeEach(() => {
+    api.build.usesServer = true;
+    api.build.canRecord = true;
+    api.getWard.mockResolvedValue({ ...ward(), abstained: unranked.slice(0, 1) });
+  });
+
+  it("shows the list and the read-only line, with no write control, alert or acknowledgement call", async () => {
+    page(admin);
+    expect(await screen.findByText(/Priority queue/)).toBeTruthy();
+    expect(screen.getByText(/Read-only\. Every view is recorded in the audit log\./)).toBeTruthy();
+    expect(screen.getByText(/Not ranked \(1\)/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Acknowledge" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Record/ })).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(document.title).toBe("BioSentry");
+    expect(api.getAcknowledgements).not.toHaveBeenCalled();
+    expect(api.getLiveWard).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Simulator:/)).toBeNull();
+  });
+
+  it("asks once, never on a timer, and again only on Refresh", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    page(admin);
+    await screen.findByText(/Priority queue/);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(api.getWard).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(api.getWard).toHaveBeenCalledTimes(2);
+    expect(api.getLiveWard).not.toHaveBeenCalled();
+  });
+
+  it("tells the admin to use Refresh when the server cannot be reached, and when it was", async () => {
+    api.getWard.mockReset().mockRejectedValue(new Error("down"));
+    const user = userEvent.setup();
+    page(admin);
+    expect(await screen.findByText("The ward server cannot be reached. Use Refresh to try again.")).toBeTruthy();
+    api.getWard.mockResolvedValue(ward());
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await screen.findByText(/Priority queue/);
+    api.getWard.mockRejectedValue(new Error("down"));
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(await screen.findByText(/Use Refresh to try again\./)).toBeTruthy();
+  });
+
+  it("leaves a clinician's page as it was: Record is offered", async () => {
+    page();
+    await screen.findByText(/Not ranked \(1\)/);
+    expect(screen.getAllByRole("button", { name: "Record vitals" }).length).toBeGreaterThan(0);
   });
 });

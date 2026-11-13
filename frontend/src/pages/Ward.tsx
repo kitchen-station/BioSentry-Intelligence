@@ -56,6 +56,8 @@ function Bar({ session, onSignOut, left }: { session: Session; onSignOut: () => 
 }
 
 export function Ward({ session, onSignOut }: Props) {
+  // An admin reads the ward: loaded once and on Refresh, no timer, no alerts, no write control.
+  const readOnly = session.role === "admin";
   const [data, setData] = useState<WardResponse | null>(null);
   const [fetchedAt, setFetchedAt] = useState<number | null>(null);
   const [failedSince, setFailedSince] = useState<number | null>(null);
@@ -74,7 +76,7 @@ export function Ward({ session, onSignOut }: Props) {
   // line when that fetch fails or `shared` is not what the simulator publishes. The fixture has no
   // simulator and is not asked.
   const refresh = useCallback(() => {
-    if (usesServer) {
+    if (usesServer && !readOnly) {
       getLiveWard().then(
         (live) => setSim(simStatus(live?.shared)),
         () => setSim(null),
@@ -87,13 +89,14 @@ export function Ward({ session, onSignOut }: Props) {
         setFailedSince(null);
       })
       .catch(() => setFailedSince((t) => t ?? Date.now()));
-  }, []);
+  }, [readOnly]);
 
   useEffect(() => {
     refresh();
+    if (readOnly) return;
     const t = setInterval(refresh, pollMs);
     return () => clearInterval(t);
-  }, [refresh, pollMs]);
+  }, [refresh, pollMs, readOnly]);
 
   // A recorded value changes a patient's standing, which only the server can compute: say
   // what it said, then fetch the ward again so the ranking on screen is the server's.
@@ -104,6 +107,7 @@ export function Ward({ session, onSignOut }: Props) {
 
   // If they cannot be loaded every alert stays open: showing one twice is safer than hiding one.
   useEffect(() => {
+    if (readOnly) return;
     getAcknowledgements().then(
       (list) => setAcked(new Map(list.map((a) => [a.patient_id, a.score]))),
       () => {
@@ -111,7 +115,7 @@ export function Ward({ session, onSignOut }: Props) {
         setNotice("Could not load your acknowledgements. Alerts you already acknowledged may show again.");
       },
     );
-  }, []);
+  }, [readOnly]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -139,6 +143,8 @@ export function Ward({ session, onSignOut }: Props) {
     );
   };
 
+  const retry = readOnly ? "Use Refresh to try again." : `Retrying every ${pollMs / 1000} seconds.`;
+
   if (!data) {
     return (
       <div className={styles.page}>
@@ -146,9 +152,10 @@ export function Ward({ session, onSignOut }: Props) {
         <main className={styles.container}>
           <p role={failedSince ? "alert" : "status"}>
             {failedSince
-              ? `The ward server cannot be reached. Retrying every ${pollMs / 1000} seconds.`
+              ? `The ward server cannot be reached. ${retry}`
               : "Loading ward…"}
           </p>
+          {readOnly && failedSince && <button type="button" onClick={refresh}>Refresh</button>}
         </main>
         <SimulatedNote />
       </div>
@@ -191,7 +198,7 @@ export function Ward({ session, onSignOut }: Props) {
       {failedSince && (
         <p className={styles.offline} role="status">
           Cannot reach the ward server since {formatClock(failedSince)}. Showing data from{" "}
-          {fetchedAt ? formatClock(fetchedAt) : "--"}; ages below keep counting. Retrying every {pollMs / 1000} seconds.
+          {fetchedAt ? formatClock(fetchedAt) : "--"}; ages below keep counting. {retry}
         </p>
       )}
       <SimulatedNote />
@@ -230,6 +237,13 @@ export function Ward({ session, onSignOut }: Props) {
             Sorted on {liveTiers.map((t) => t.label).join(", ") || `Tier ${data.sort_tier}`}
           </p>
         </div>
+
+        {readOnly && (
+          <p className={styles.notice}>
+            Read-only. Every view is recorded in the audit log.{" "}
+            <button type="button" className={styles.noticeClose} onClick={refresh}>Refresh</button>
+          </p>
+        )}
 
         {alerts.length > 0 && (
           <div className={styles.alerts}>
@@ -272,6 +286,7 @@ export function Ward({ session, onSignOut }: Props) {
         <NotRankedSection
           rows={data.abstained}
           clinicianId={session.clinician_id}
+          readOnly={readOnly}
           onRecorded={handleRecorded}
         />
       </main>
