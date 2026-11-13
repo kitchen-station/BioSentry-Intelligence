@@ -20,7 +20,8 @@ export const stateText = (q: QuestionItem, refused = "Refused"): string =>
     queued: "Waiting",
     running: q.claimed_at ? `Working since ${clock(q.claimed_at)}` : "Working",
     done: "Answered",
-    refused: said(refused, q.reason),
+    // The long word is for the agent's own refusals, which all begin "Refused: "; the worker's refusals say plain "Refused".
+    refused: said(q.reason?.startsWith("Refused: ") ? refused : "Refused", q.reason),
     failed: said("Failed", q.reason),
   })[q.state] ?? q.state; // a state from a newer server is shown as it came
 
@@ -75,6 +76,7 @@ export function useQuestions({ list, ask, read, clinicianId, onSignOut, errors }
         setError(null);
       })
       .catch((failure: unknown) => {
+        if (n !== round.current) return;
         setStalled(true);
         fail(failure);
       })

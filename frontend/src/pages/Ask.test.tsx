@@ -130,10 +130,13 @@ describe("the list", () => {
       item({ id: 2, state: "running", claimed_at: "2026-11-13T09:31:00Z" }),
       item({ id: 3, state: "running" }),
       item({ id: 4, state: "done", requested_by: "rn-manalo" }),
-      item({ id: 5, state: "refused", reason: "fits none of the experiments" }),
+      item({ id: 5, state: "refused", reason: "Refused: no template fits this question." }),
       item({ id: 6, state: "failed", reason: "no worker claimed it within an hour" }),
       item({ id: 7, state: "failed" }),
-      item({ id: 8, state: "refused", reason: "Refused: no such rule" }),
+      item({ id: 8, state: "refused", reason: "Refused: a number in the answer is not in the tool result." }),
+      item({ id: 10, state: "refused", reason: "the worker does not accept this job: question" }),
+      item({ id: 11, state: "refused" }),
+      item({ id: 12, state: "failed", reason: "the tool said Failed: x" }),
       item({ id: 9, state: "paused" as QuestionItem["state"] }),
     ]);
     page();
@@ -147,12 +150,17 @@ describe("the list", () => {
     expect(rows[2]).not.toContain("since");
     expect(rows[3]).toContain("asked by rn-manalo");
     expect(rows[3]).toContain("Answered");
-    expect(rows[4]).toContain("Refused by the research agent: fits none of the experiments");
+    expect(rows[4]).toContain("Refused by the research agent: no template fits this question.");
     expect(rows[5]).toContain("Failed: no worker claimed it within an hour");
     expect(rows[6]).toContain("Failed: no reason given");
-    expect(rows[7]).toContain("· Refused by the research agent: no such rule"); // the word once
+    expect(rows[7]).toContain("· Refused by the research agent: a number in the answer is not in the tool result."); // the word once
     expect(rows[7]).not.toContain("Refused: ");
-    expect(rows[8]).toContain("· paused");
+    expect(rows[8]).toContain("· Refused: the worker does not accept this job: question");
+    expect(rows[8]).not.toContain("research agent");
+    expect(rows[9]).toContain("· Refused: no reason given");
+    expect(rows[9]).not.toContain("research agent");
+    expect(rows[10]).toContain("· Failed: the tool said Failed: x"); // only a leading word is dropped
+    expect(rows[11]).toContain("· paused");
     expect(screen.getAllByText(/Waiting/)[0].getAttribute("aria-live")).toBe("polite");
   });
 
@@ -220,7 +228,7 @@ describe("sending", () => {
   });
 
   it.each([
-    [429, "Question limit reached: one open question at a time, ten a day. Try again later."],
+    [429, "Question limit reached: one open question each, ten a day each, five waiting on the ward. Try again later."],
     [403, "Only a physician or a charge nurse can ask."],
     [404, "This ward is not on this server."],
     [422, "The question could not be sent. Use one line, up to 500 characters."],
@@ -420,6 +428,56 @@ describe("the timer", () => {
     await tick(0);
     expect(screen.getByText("Mine?")).toBeTruthy();
     expect(ask().disabled).toBe(true);
+  });
+
+  it("does not let a failure that comes late stop the timer or show an error", async () => {
+    let late: (e: Error) => void = () => {};
+    const both = [item({ id: 2, state: "queued", question: "Mine?" }), item({ id: 1, state: "queued", requested_by: "rn-manalo" })];
+    api.getLabQuestions
+      .mockResolvedValueOnce([item({ id: 1, state: "queued", requested_by: "rn-manalo" })])
+      .mockReturnValueOnce(new Promise((_, r) => { late = r; }))
+      .mockResolvedValue(both);
+    api.askLab.mockResolvedValue(both[0]);
+    await start();
+    await tick(5_000); // the timed read is in flight
+    fireEvent.change(input(), { target: { value: "Mine?" } });
+    fireEvent.click(ask());
+    await tick(0); // the send, then a newer read that works
+    late(new MockApiError(500)); // the older read fails now
+    await tick(0);
+    expect(screen.queryByRole("alert")).toBeNull();
+    const before = api.getLabQuestions.mock.calls.length;
+    await tick(5_000);
+    expect(api.getLabQuestions.mock.calls.length).toBe(before + 1);
+  });
+
+  it("ends the session on a 401 in the first read", async () => {
+    api.getLabQuestions.mockRejectedValue(new MockApiError(401));
+    await start();
+    expect(signOut).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("alert").textContent).toBe("Your session has ended. Sign in again.");
+  });
+
+  it("ends the session on a 401 in a timed read and stops", async () => {
+    api.getLabQuestions.mockResolvedValueOnce(open).mockRejectedValue(new MockApiError(401));
+    await start();
+    await tick(5_000);
+    expect(signOut).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("alert").textContent).toBe("Your session has ended. Sign in again.");
+    await tick(60_000);
+    expect(api.getLabQuestions).toHaveBeenCalledTimes(2);
+  });
+
+  it("reads no more after the page closes", async () => {
+    api.getLabQuestions.mockResolvedValue(open);
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const view = page();
+    await tick(0);
+    await tick(5_000);
+    expect(api.getLabQuestions).toHaveBeenCalledTimes(2);
+    view.unmount();
+    await tick(60_000);
+    expect(api.getLabQuestions).toHaveBeenCalledTimes(2);
   });
 
   it("stops after a failed read; Refresh starts it again", async () => {

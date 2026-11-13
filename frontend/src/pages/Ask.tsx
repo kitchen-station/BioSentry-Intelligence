@@ -13,7 +13,7 @@ const ERRORS = {
   403: "Only a physician or a charge nurse can ask.",
   404: "This ward is not on this server.",
   422: "The question could not be sent. Use one line, up to 500 characters.",
-  429: "Question limit reached: one open question at a time, ten a day. Try again later.",
+  429: "Question limit reached: one open question each, ten a day each, five waiting on the ward. Try again later.",
 };
 
 // The stored record comes from another machine, so every read here tolerates a missing key or a value of any type.
