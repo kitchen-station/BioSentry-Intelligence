@@ -5,14 +5,14 @@ import process from "node:process";
 import { parseArgs } from "node:util";
 import { pipelineFile, serialize } from "../src/data/evaluation/pipelineFile.ts";
 
-const { values } = parseArgs({ options: { date: { type: "string" }, commit: { type: "string" }, out: { type: "string" } } });
+const { values } = parseArgs({ options: { date: { type: "string" }, commit: { type: "string" }, note: { type: "string" }, out: { type: "string" } } });
 if (!values.date) {
-  console.error("usage: npm run export:pipeline -- --date YYYY-MM-DD [--commit <40 hex>] [--out <path>]");
+  console.error("usage: npm run export:pipeline -- --date YYYY-MM-DD [--commit <40 hex>] [--note <text>] [--out <path>]");
   process.exit(2);
 }
 try {
   const commit = values.commit ?? execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
-  writeFileSync(values.out ?? "src/data/evaluation/pipeline.json", serialize(pipelineFile({ date: values.date, commit })));
+  writeFileSync(values.out ?? "src/data/evaluation/pipeline.json", serialize(pipelineFile({ date: values.date, commit, note: values.note })));
 } catch (e) {
   console.error(e instanceof Error ? e.message : String(e));
   process.exit(1);
