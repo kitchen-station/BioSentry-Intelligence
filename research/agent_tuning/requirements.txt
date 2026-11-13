@@ -4,6 +4,9 @@
 # (as of MindNLP 0.5.1's release, so a newer torch with GPU libraries is not pulled in).
 # The same list resolved on macOS arm64 and on Linux aarch64. `torch` is installed because `peft`
 # needs it to be present; at run time MindNLP's own `torch` module (MindSpore ops) is used.
+# The last block is only for executing training/agent/notebooks/finetune.ipynb (nbclient, ipykernel, nbformat and
+# what they need), added the same way with the same date. No plotting library: the notebook draws its own SVG.
+# appnope is macOS only.
 accelerate==1.11.0
 addict==2.4.0
 aiohappyeyeballs==2.6.1
@@ -79,3 +82,34 @@ wheel==0.45.1
 xxhash==3.6.0
 yarl==1.22.0
 zipp==3.23.0
+# --- notebook execution only ---
+appnope==0.1.4
+comm==0.2.3
+debugpy==1.8.17
+decorator==5.2.1
+executing==2.2.1
+fastjsonschema==2.21.2
+ipykernel==7.1.0
+ipython==9.7.0
+ipython-pygments-lexers==1.1.1
+jedi==0.19.2
+jsonschema==4.25.1
+jsonschema-specifications==2025.9.1
+jupyter-client==8.6.3
+jupyter-core==5.9.1
+matplotlib-inline==0.2.1
+nbclient==0.10.2
+nbformat==5.10.4
+nest-asyncio==1.6.0
+parso==0.8.5
+pexpect==4.9.0
+platformdirs==4.5.0
+prompt-toolkit==3.0.52
+ptyprocess==0.7.0
+pure-eval==0.2.3
+pyzmq==27.1.0
+referencing==0.37.0
+rpds-py==0.28.0
+stack-data==0.6.3
+tornado==6.5.2
+traitlets==5.14.3
