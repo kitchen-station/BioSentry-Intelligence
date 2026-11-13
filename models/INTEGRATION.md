@@ -710,12 +710,14 @@ inputs from `research.student.stay_features(rows)` then `research.student.view(x
 after float32 rounding for values, flags, d1h and d4h; an absolute tolerance of 1e-6 for each z. Use a
 ward-v2-ext training seed (61-160); never a held-out seed (ward-v2 11-30) or a calibration seed (301-340).
 
-(b) Cases where backend and research features differ BY DESIGN. Each is not computed, never approximated:
+(b) Cases where backend and research features differ BY DESIGN. Each is not computed, never approximated, except
+the two that rulings 16 and 17 settle as stated in their rows:
 
 | Case | Why they differ | Product result |
 |---|---|---|
 | A stay past 672 bins | `grid()` keeps the newest 672 slots, so the baseline anchor would move; research uses the whole stay | not computed |
-| A physically impossible value | `possible()` makes it a gap in `grid()`; research keeps the stored value | in the current bin: NOT RANKED anyway (`possible()` uses NEWS2's own bounds for these vitals). In an earlier bin: open; see question 10 (a recommendation awaiting the orchestrator) |
+| A physically impossible device value (ruling 16) | `possible()` makes it a gap in `grid()`; research keeps the stored value | in the current bin: NOT RANKED anyway (`possible()` uses NEWS2's own bounds for these vitals). In an earlier bin: a missing value; the baseline skips it as `baseline_finding` does; the student is not computed only when it is one of its two lag bins (t-4, t-16). Where it falls in the baseline window the baseline differs from research by design. Simulator data has no such value, so no evaluated number changes |
+| An earlier bin scored on a nurse-typed device vital (ruling 17) | the 12-hour rule (`NURSE_VALID`) concerns only nurse-typed device vitals, and such a value is not in the stored bins, so the bin cannot be rebuilt; research has the row's value | that bin is not rebuilt and the policy is not computed there (the dashboard session's stated handling). The difference only removes flags. Blood pressure, consciousness, oxygen and SpO2 scale are rebuilt as newest at or before the bin's end, no age limit: the research rule, no difference |
 | A stale patch or a nurse-typed live value | `counted()` is False; research has no such rule | not computed |
 | An earlier bin whose scored status cannot be rebuilt from stored inputs | research has every row's `ranked`; the product rebuilds it on read (ruling 6) | the policy is not computed |
 | The baseline still forming, for any vital whose history the wiring reads | research scored these bins with their z-missing flags set | not computed (ruling 10) |
@@ -813,6 +815,13 @@ library (`struct` for the float32 step included), and the baseline is already th
     24 valid bins but temperature (read from the stored bins with the extra query) has 23 gives
     `NotComputed("baseline forming")` on both hooks (ruling 10). The same with SpO2 at 23 and the other three at
     24.
+14. Dropped earlier value (ruling 16): a stay with one physically impossible heart rate stored in an earlier bin
+    gives a baseline that skips it (equal to `baseline_finding` on the series with None there); the student is
+    `NotComputed(...)` at t exactly when that bin is t-4 or t-16, and `Computed(p)` otherwise.
+15. Earlier bins and the nurse rule (ruling 17): (a) an earlier bin inside the policy's window that was scored on a
+    nurse-typed device vital is not rebuilt, and the policy is `NotComputed(...)` at t; (b) an earlier bin whose
+    blood pressure, ACVPU, oxygen or SpO2 scale was charted more than 12 hours before the bin's end is rebuilt with
+    that value (no age limit) and matches the fixture; never a flag where research has none.
 
 ## 11. Limits and what was not checked
 
@@ -855,9 +864,15 @@ Two facts the dashboard session reported:
    states it. The simulator's code was not read for an expiry.
    Checked: `research/rescore.py` `score_row` builds `News2Inputs` from the row's `respiratory_rate`, `spo2`,
    `Spo2Scale(spo2_scale)`, `on_oxygen`, `systolic`, `heart_rate`, `consciousness` and `temperature`; `bp_minute`
-   is never read, so no age limit applies. Note that the backend's live read does apply one: `NURSE_VALID = 12 h`
-   for a nurse-typed value (`repositories/postgres.py`). Rebuilding an earlier bin's inputs (ruling 6) must say
-   which rule it uses; the fixture follows research.
+   is never read, so no age limit applies. The 12-hour rule (`NURSE_VALID`, `repositories/postgres.py`, used in `_newest_device_or_nurse`) covers only a
+   nurse-typed DEVICE vital (heart rate, respiratory rate, SpO2, temperature). Blood pressure, consciousness, oxygen
+   and the SpO2 scale never expire in the live read: `read` takes the newest stored row by (`observed_at`, `id`) for
+   every code that is not a device vital.
+   So for the four charted inputs the as-of rebuild is "newest at or before the bin's end, no age limit", which IS
+   the research rule and the fixture's. Settled by ruling 17 (section 8.4 (b)): the 12-hour rule matters only for a
+   nurse-typed device vital, and an earlier bin scored on one is not rebuilt; the policy is not computed there.
+   (An earlier note here said the live read applies the 12-hour rule to nurse-typed values in general; that was
+   corrected after ruling 17 was given, and the coordinating session has been told.)
 4. The bin minute. `minute` is the END of the 15-minute window; the backend's `bin_at` (the start) = minute - 15.
    Checked: consistent with the repository. The README's definitions count "the bin ending at or after the start";
    the toy trial's patient admitted at minute 0 has its first row at minute 15, with `bp_minute` 5; the reader
@@ -892,7 +907,7 @@ Two facts the dashboard session reported:
 9. Run ids. Per file, its manifest record's `run_id`: `m1-20261113-3d634f3` (student), `m3-20261113-fbd39f2`
    (calibration), `m2-20261113` (policy).
    Checked: matches `models/manifest.json`, for both variants.
-10. A physically impossible value (a recommendation, not a ruling; awaiting the orchestrator). The current bin's own
+10. A physically impossible value (settled by ruling 16). The current bin's own
     value dropped as impossible: student and policy not computed at that bin. An earlier bin's dropped value: a
     missing value in the series (the baseline treats it as None). If it is a student lag bin (t-4 or t-16), the
     student is not computed at t.
@@ -900,8 +915,13 @@ Two facts the dashboard session reported:
     in the latest bin gives `NotComputed("latest bin missing")`. The current-bin part agrees with ruling 7; it is NOT
     RANKED anyway, because `possible()` uses NEWS2's own bounds for these vitals. The earlier-bin part approximates
     (research keeps the raw value in the baseline), so it is not what ruling 7 says ("not computed, not
-    approximated") when the dropped value falls in the baseline window, and the recommendation does not cover the
-    policy's earlier bins (t-(p-1)..t-1). The by-design table (section 8.4) marks this case open.
+    approximated") when the dropped value falls in the baseline window.
+    Settled by ruling 16: an earlier bin's dropped value is a missing value; the baseline skips it as
+    `baseline_finding` does; the student is not computed only when the dropped value is one of its two lag bins.
+    Where the value falls in the baseline window this is a by-design difference from research (section 8.4 (b));
+    simulator data has no such value, so no evaluated number changes. For the policy's earlier bins
+    (t-(p-1)..t-1) the same stored value fails NEWS2's bounds when the bin is rebuilt, so that bin is NOT RANKED and
+    ends the run.
 11. Patient-page lines. "Prediction model (synthetic, not validated). On simulator trials, added to NEWS2 it showed
     no gain beyond chance." / "Alert policy, learned by reward (synthetic, not validated). On simulator trials it
     alerted late (first alert a median of 3.8 minutes after the episode was fully in) and, added to NEWS2, showed no
@@ -1021,6 +1041,28 @@ recorded; a missing or bad model file means not computed, never a default.
 15. Open: how a per-bin failure is logged.
     Ruling: Once per reason per process, with a count.
     For the code: section 8.5.
+16. Open: an earlier bin's device value that `possible()` drops.
+    Ruling: (b) An earlier bin's device value that `possible()` drops is a missing value: the baseline skips it as
+    `baseline_finding` already does, and the student is not computed only when the dropped value is one of its two
+    lag bins. State in the document that this is a by-design difference from research where the value falls in the
+    baseline window, and that simulator data has no such value, so no evaluated number changes.
+    For the code: `grid()` already gives None for it, and `baseline_finding` skips a None; the student checks only
+    `x_v[t-4]` and `x_v[t-16]` for a dropped value and gives `NotComputed(...)` then (section 8.4 (b), question 10).
+17. Open: which rule rebuilds an earlier bin's NEWS2 inputs.
+    Ruling: (a) Rebuild earlier bins with the product's own 12-hour rule for a nurse-typed value. A bin whose
+    reading is older is NOT RANKED and breaks the policy's run. The product's rule decides what counts as scored;
+    the difference from research only removes flags, and the document lists it with the other by-design
+    differences.
+    What it means given the code (a fact corrected after the ruling was given; the coordinating session has been
+    told): The 12-hour rule (`NURSE_VALID`, `repositories/postgres.py`, used in `_newest_device_or_nurse`) covers only a
+    nurse-typed DEVICE vital (heart rate, respiratory rate, SpO2, temperature). Blood pressure, consciousness, oxygen
+    and the SpO2 scale never expire in the live read: `read` takes the newest stored row by (`observed_at`, `id`) for
+    every code that is not a device vital. So: blood pressure, consciousness, oxygen and scale are rebuilt
+    for each of bins t - p + 1 to t - 1 as the newest stored row at or before the bin's end, with no age limit, as in
+    research. A bin that was scored on a nurse-typed device vital has that value outside the stored bins, so it is
+    not rebuilt and the policy is not computed there (the dashboard session's stated handling). Otherwise run
+    `score_news2` on the rebuilt inputs and treat `News2Abstained` as NOT RANKED (the run restarts) (section 8.4
+    (b), question 3).
 
 ### The three gaps
 
