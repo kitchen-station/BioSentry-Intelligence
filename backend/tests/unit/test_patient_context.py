@@ -9,7 +9,14 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 from samples import sample  # isort: skip
 
-from biosentry.schemas import AbstainedRow, BaselineResponse, PatientDetail
+from biosentry.schemas import (
+    AbstainedRow,
+    BaselineComputed,
+    BaselineForming,
+    BaselineResponse,
+    BaselineUnavailable,
+    PatientDetail,
+)
 from biosentry.schemas.lab import LabAnswer, LabReport
 from biosentry.services.patient_ask import build, canonical
 
@@ -43,6 +50,46 @@ def test_the_context_holds_exactly_the_listed_keys_at_every_level() -> None:
     assert set(context["baseline"]) == BASELINE
     assert set(context["baseline"]["params"]) == {"window_bins", "k", "p"}
     assert context["abstained"] is None and context["format"] == 1 and context["as_of"] == "2026-09-03T07:00:00Z"
+
+
+PROVENANCE = {"source", "tier", "observed_at", "computed_at", "model_id", "quality", "synthetic"}
+# Every key path of the context, from contract-patient-ask section 5. `*` is a vital's name, `[]` a list.
+PATHS = (
+    {"format", "synthetic", "as_of", "abstained"}
+    | {f"detail.{k}" for k in ("rank", "score", "trend", "supporting", "signal_quality", "last_update_s")}
+    | {f"detail.escalation_reasons[].{k}" for k in ("rule", "text", "pathway")}
+    | {f"detail.vitals.*.data.{k}" for k in ("present", "value", "reason", "value.systolic", "value.diastolic")}
+    | {f"detail.vitals.*.provenance.{k}" for k in PROVENANCE}
+    | {f"detail.vital_history.*[].{k}" for k in ("time", "value")}
+    | {"baseline.admission_known", "baseline.label"}
+    | {f"baseline.params.{k}" for k in ("window_bins", "k", "p")}
+    | {
+        f"baseline.vitals[].{k}"
+        for k in (
+            "vital", "status", "baseline_median", "latest", "latest_at", "latest_age_s", "baseline_from",
+            "anchored_at", "delta", "z", "run_bins", "since", "significant", "direction", "pathway", "unit",
+            "bins_valid", "bins_needed", "reason",
+        )  # computed, forming and unavailable together
+    }  # fmt: skip
+)
+
+
+def paths(value: Any, at: str = "") -> set[str]:
+    if isinstance(value, dict):
+        names = at in ("detail.vitals", "detail.vital_history")  # their keys are vital names
+        return set().union(*(paths(v, f"{at}.{'*' if names else k}".lstrip(".")) for k, v in value.items()))
+    if isinstance(value, list):
+        return set().union(*(paths(v, at + "[]") for v in value))
+    return {at}
+
+
+def test_every_key_path_of_the_context_is_one_the_contract_lists() -> None:
+    """A field added to a nested model (a measurement's provenance, a reason, a baseline finding)
+    would reach the context and its hash. This fails then: widen the contract first, or leave it out."""
+    vitals = [sample(BaselineComputed), sample(BaselineForming), sample(BaselineUnavailable)]
+    full = BaselineResponse.model_validate({**sample(BaselineResponse), "vitals": vitals})
+    context = build(detail(), full, AS_OF).model_dump(mode="json")
+    assert paths(context) == PATHS
 
 
 def test_a_not_ranked_patient_has_the_abstained_form_only() -> None:

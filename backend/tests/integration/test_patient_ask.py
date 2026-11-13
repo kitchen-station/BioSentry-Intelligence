@@ -13,7 +13,7 @@ from conftest import together
 from test_lab import CHARGE, MD, RN, WORKER, ask, done, running
 from test_lab import claim as claim_compare
 from test_overview import ADMIN, add_admin, audit_of, write
-from test_store import Api, api  # noqa: F401 (api: fixture)
+from test_store import Api, api, sim_patient, start  # noqa: F401 (api: fixture)
 
 from biosentry.services import patient_ask
 
@@ -162,6 +162,15 @@ def test_a_question_is_read_only_through_its_own_patient(api: Api) -> None:
     put(api, MD, "p-001")
     assert one(api, MD, "p-002", 1).status_code == 404
     assert listing(api, MD, "p-002").json() == []
+
+
+def test_a_question_of_an_older_run_is_not_listed_or_read(api: Api) -> None:
+    """A new run uses the same patient ids again: a question stays with its run."""
+    assert put(api, MD, "p-001").status_code == 201
+    start(api, patients=[sim_patient("p-001", md=MD)])
+    assert (listing(api, MD, "p-001").status_code, listing(api, MD, "p-001").json()) == (200, [])
+    assert one(api, MD, "p-001", 1).status_code == 404
+    assert put(api, MD, "p-001").status_code == 201  # the older run's open question does not count here
 
 
 def test_a_not_ranked_patient_may_be_asked_about(api: Api) -> None:
