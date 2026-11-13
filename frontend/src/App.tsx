@@ -9,12 +9,13 @@ import { Station } from "./pages/Station";
 import { Pipeline } from "./pages/Pipeline";
 import { Research } from "./pages/Research";
 import { Lab } from "./pages/Lab";
+import { Overview } from "./pages/Overview";
 
 // Per tab, gone when the tab closes. Only who is signed in is kept here, never a token: with the
 // API the token lives in memory, so a reload returns to sign-in (restoreSession says false). With
 // fixtures (no server) a reload keeps the clinician signed in.
 const SESSION_KEY = "biosentry.session";
-const ROLES = new Set(["rn", "md", "charge_rn"]);
+const ROLES = new Set(["rn", "md", "charge_rn", "admin"]);
 
 function loadSession(): Session | null {
   try {
@@ -78,18 +79,26 @@ export function App() {
       />
       <Route
         path="/ward"
-        element={session ? <Ward session={session} onSignOut={signOut} /> : <ToSignIn />}
+        element={session?.role === "admin" ? <Navigate to="/overview" replace /> : session ? <Ward session={session} onSignOut={signOut} /> : <ToSignIn />}
       />
       <Route
         path="/patient/:id"
-        element={session ? <PatientDetail session={session} onSignOut={signOut} /> : <ToSignIn />}
+        element={session?.role === "admin" ? <Navigate to="/overview" replace /> : session ? <PatientDetail session={session} onSignOut={signOut} /> : <ToSignIn />}
       />
       <Route
         path="/station"
         element={
           session && (session.role === "md" || session.role === "charge_rn")
             ? <Station session={session} onSignOut={signOut} />
-            : session ? <Navigate to="/ward" replace /> : <ToSignIn />
+            : session ? <Navigate to={session.role === "admin" ? "/overview" : "/ward"} replace /> : <ToSignIn />
+        }
+      />
+      <Route
+        path="/overview"
+        element={
+          session?.role === "admin"
+            ? <Overview session={session} onSignOut={signOut} />
+            : session ? <p>Not available for this account.</p> : <ToSignIn />
         }
       />
       <Route

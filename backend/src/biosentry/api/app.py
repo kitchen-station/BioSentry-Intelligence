@@ -52,8 +52,10 @@ from biosentry.schemas import (
     PatientStay,
     PatientSummary,
     SessionRequest,
+    SessionRole,
     SessionToken,
     VitalsRecorded,
+    WardOverview,
     WardResponse,
 )
 from biosentry.schemas.ingest import (
@@ -68,6 +70,7 @@ from biosentry.schemas.ingest import (
 )
 from biosentry.services import ingest
 from biosentry.services.baseline import BaselineService
+from biosentry.services.overview import OverviewService
 from biosentry.services.patients import PatientService, RejectedError
 from biosentry.services.ward import WardService
 
@@ -84,6 +87,13 @@ WRITE_ACTIONS = {
     ("POST", "/patients/{patient_id}/vitals"): "record_vitals",
     ("POST", "/patients/{patient_id}/acknowledgement"): "acknowledge",
     ("POST", "/wards/{ward}/sim/commands"): "sim_command",
+}
+# Every write route that has no body or is not in WRITE_ACTIONS, so an admin is refused on it too.
+REFUSED_ACTIONS = {
+    **WRITE_ACTIONS,
+    ("DELETE", "/patients/{patient_id}/notes/{note_id}"): "delete_note",
+    ("POST", "/extract/labs"): "extract_labs",
+    ("POST", "/extract/patient"): "extract_patient",
 }
 # Routes that are not behind a bearer token: sign-in, and the sim's ingest key. All but the sim's
 # two reads carry a body.
@@ -107,6 +117,7 @@ class Context:
     wards: WardService
     patients: PatientService
     baselines: BaselineService
+    overview: OverviewService
 
     def close(self) -> None:
         self.conn.close()
@@ -165,6 +176,24 @@ def clinician(
 Who = Annotated[str, Depends(clinician)]
 
 
+def refuse_admin(ctx: Context, who: str, request: Request) -> None:
+    """An admin writes nothing: 403 and one `denied` row, before any handler or body check."""
+    if ctx.store.is_admin(who):
+        route = request.scope["route"]
+        params = request.path_params
+        resource = str(params.get("patient_id") or params.get("ward") or "-")
+        ctx.audit.append(who, REFUSED_ACTIONS[(request.method, route.path)], resource, "denied")
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+
+def writer(ctx: Ctx, request: Request, who: Who) -> str:
+    refuse_admin(ctx, who, request)
+    return who
+
+
+Writer = Annotated[str, Depends(writer)]
+
+
 def unprocessable(exc: RequestValidationError) -> JSONResponse:
     """FastAPI's 422 body without `input` and `ctx`: a rejected value (a PIN) is never echoed."""
     errors = [{k: v for k, v in e.items() if k not in ("input", "ctx")} for e in exc.errors()]
@@ -190,6 +219,7 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
                 wards,
                 PatientService(store, audit, wards),
                 BaselineService(store, audit, wards),
+                OverviewService(store, audit, wards),
             )
         except BaseException:
             conn.close()
@@ -246,6 +276,7 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
         ctx = open_ctx()
         try:
             who = identify(ctx, request.headers.get("authorization"))
+            refuse_admin(ctx, who, request)  # an admin's bad body is refused, not explained
             action = WRITE_ACTIONS.get(key)
             if action is not None:  # ids and outcome only: the rejected values are never logged
                 resource = str(request.path_params.get("patient_id", "-"))
@@ -298,7 +329,9 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
             )
         if token is None:
             raise HTTPException(status_code=401, detail="Sign-in failed")
-        return SessionToken(token=token)
+        role = ctx.store.role_of(body.clinician_id)
+        assert role is not None  # a token exists only for a known clinician
+        return SessionToken(token=token, role=SessionRole(role))
 
     @app.get("/wards/{ward}/rows", response_model=WardResponse)
     def ward_rows(ward: str, ctx: Ctx, who: Who) -> WardResponse:
@@ -314,6 +347,16 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return ctx.wards.stays(who)
 
+    @app.get("/wards/{ward}/overview", response_model=WardOverview)
+    def ward_overview(ward: str, ctx: Ctx, who: Who) -> WardOverview:
+        if not ctx.store.is_admin(who):  # on every call: the role is read from the database
+            ctx.audit.append(who, "view_overview", ward, "denied")
+            raise HTTPException(status_code=403, detail="Forbidden")
+        if ward != ctx.store.ward:
+            ctx.audit.append(who, "view_overview", ward, "not_found")
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return ctx.overview.overview(who)
+
     @app.get("/wards/{ward}/live", response_model=LiveWard)
     def ward_live(ward: str, ctx: Ctx, who: Who) -> LiveWard:
         if ward != ctx.store.ward:
@@ -322,7 +365,7 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
         return ctx.wards.live(who)
 
     @app.post("/wards/{ward}/sim/commands", status_code=204)
-    def send_sim_command(ward: str, body: NewCommand, ctx: Ctx, who: Who) -> Response:
+    def send_sim_command(ward: str, body: NewCommand, ctx: Ctx, who: Writer) -> Response:
         if ward != ctx.store.ward:
             ctx.audit.append(who, "sim_command", ward, "not_found")
             raise HTTPException(status_code=404, detail=NOT_FOUND)
@@ -352,7 +395,7 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
         return found
 
     @app.post("/patients", response_model=AbstainedRow, status_code=201)
-    def admit_patient(form: AdmitPatientInput, ctx: Ctx, who: Who) -> AbstainedRow:
+    def admit_patient(form: AdmitPatientInput, ctx: Ctx, who: Writer) -> AbstainedRow:
         return ctx.patients.admit(who, form)
 
     @app.get("/patients/{patient_id}/notes", response_model=list[ClinicalNote])
@@ -363,20 +406,20 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
         return notes
 
     @app.post("/patients/{patient_id}/notes", response_model=ClinicalNote, status_code=201)
-    def add_note(patient_id: str, body: NewNote, ctx: Ctx, who: Who) -> ClinicalNote:
+    def add_note(patient_id: str, body: NewNote, ctx: Ctx, who: Writer) -> ClinicalNote:
         note = ctx.patients.add_note(who, patient_id, body)
         if note is None:
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return note
 
     @app.delete("/patients/{patient_id}/notes/{note_id}", status_code=204)
-    def delete_note(patient_id: str, note_id: str, ctx: Ctx, who: Who) -> Response:
+    def delete_note(patient_id: str, note_id: str, ctx: Ctx, who: Writer) -> Response:
         if not ctx.patients.delete_note(who, patient_id, note_id):
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return Response(status_code=204)
 
     @app.post("/patients/{patient_id}/labs", response_model=LabPanel)
-    def enter_labs(patient_id: str, labs: PartialLabInput, ctx: Ctx, who: Who) -> LabPanel:
+    def enter_labs(patient_id: str, labs: PartialLabInput, ctx: Ctx, who: Writer) -> LabPanel:
         panel = ctx.patients.enter_labs(who, patient_id, labs)
         if panel is None:
             raise HTTPException(status_code=404, detail=NOT_FOUND)
@@ -384,7 +427,7 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
 
     @app.post("/patients/{patient_id}/vitals", response_model=VitalsRecorded)
     def record_vitals(
-        patient_id: str, body: NurseVitalsInput, ctx: Ctx, who: Who
+        patient_id: str, body: NurseVitalsInput, ctx: Ctx, who: Writer
     ) -> VitalsRecorded:
         recorded = ctx.patients.record_vitals(who, patient_id, body)
         if recorded is None:
@@ -396,19 +439,19 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
         return ctx.patients.acknowledgements(who)
 
     @app.post("/patients/{patient_id}/acknowledgement", status_code=204)
-    def acknowledge(patient_id: str, body: NewAcknowledgement, ctx: Ctx, who: Who) -> Response:
+    def acknowledge(patient_id: str, body: NewAcknowledgement, ctx: Ctx, who: Writer) -> Response:
         if not ctx.patients.acknowledge(who, patient_id, body.score):
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return Response(status_code=204)
 
     @app.post("/extract/labs", status_code=501)
-    def extract_labs(who: Who) -> JSONResponse:
+    def extract_labs(who: Writer) -> JSONResponse:
         return JSONResponse(
             status_code=501, content={"detail": "Document extraction is not implemented (v2)"}
         )
 
     @app.post("/extract/patient", status_code=501)
-    def extract_patient(who: Who) -> JSONResponse:
+    def extract_patient(who: Writer) -> JSONResponse:
         return JSONResponse(
             status_code=501, content={"detail": "Document extraction is not implemented (v2)"}
         )

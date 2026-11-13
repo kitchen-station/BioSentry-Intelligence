@@ -346,6 +346,32 @@ export interface components {
             /** @default null */
             readonly temperature?: number | null;
         };
+        /** OverviewActivity */
+        readonly OverviewActivity: {
+            readonly action: string;
+            readonly at: string;
+            readonly clinician_id: string;
+            readonly outcome: string;
+            readonly resource: string;
+            readonly seq: number;
+        };
+        /** OverviewClinician */
+        readonly OverviewClinician: {
+            readonly id: string;
+            readonly patients: number;
+            readonly role: components["schemas"]["SessionRole"];
+        };
+        /** OverviewPatient */
+        readonly OverviewPatient: {
+            readonly bed: string;
+            readonly care: readonly string[];
+            readonly id: string;
+            readonly reason: string | null;
+            readonly score: number | null;
+            /** @enum {string} */
+            readonly state: "ranked" | "not_ranked";
+            readonly synthetic: boolean;
+        };
         /**
          * PartialAdmitPatientInput
          * @description AdmitPatientInput with every field optional (extraction results).
@@ -577,7 +603,7 @@ export interface components {
          * SessionRole
          * @enum {string}
          */
-        readonly SessionRole: "rn" | "md" | "charge_rn";
+        readonly SessionRole: "rn" | "md" | "charge_rn" | "admin";
         /**
          * Sex
          * @enum {string}
@@ -758,6 +784,19 @@ export interface components {
             readonly spo2: readonly (number | null)[];
             readonly temperature: readonly (number | null)[];
         };
+        /** WardOverview */
+        readonly WardOverview: {
+            readonly activity: readonly components["schemas"]["OverviewActivity"][];
+            readonly as_of: string;
+            readonly clinicians: readonly components["schemas"]["OverviewClinician"][];
+            readonly patients: readonly components["schemas"]["OverviewPatient"][];
+            readonly receiving_data: boolean;
+            readonly shared: {
+                readonly [key: string]: components["schemas"]["JsonValue"];
+            } | null;
+            readonly synthetic: boolean;
+            readonly ward: string;
+        };
         /** WardResponse */
         readonly WardResponse: {
             readonly abstained: readonly components["schemas"]["AbstainedRow"][];
@@ -808,6 +847,9 @@ export type NewNote = components['schemas']['NewNote'];
 export type NumberMeasurement = components['schemas']['NumberMeasurement'];
 export type NumberPresent = components['schemas']['NumberPresent'];
 export type NurseVitalsInput = components['schemas']['NurseVitalsInput'];
+export type OverviewActivity = components['schemas']['OverviewActivity'];
+export type OverviewClinician = components['schemas']['OverviewClinician'];
+export type OverviewPatient = components['schemas']['OverviewPatient'];
 export type PartialAdmitPatientInput = components['schemas']['PartialAdmitPatientInput'];
 export type PartialLabInput = components['schemas']['PartialLabInput'];
 export type PatientDetail = components['schemas']['PatientDetail'];
@@ -841,6 +883,7 @@ export type VitalHistoryFull = components['schemas']['VitalHistoryFull'];
 export type Vitals = components['schemas']['Vitals'];
 export type VitalsRecorded = components['schemas']['VitalsRecorded'];
 export type VitalTrends = components['schemas']['VitalTrends'];
+export type WardOverview = components['schemas']['WardOverview'];
 export type WardResponse = components['schemas']['WardResponse'];
 export type $defs = Record<string, never>;
 export type operations = Record<string, never>;

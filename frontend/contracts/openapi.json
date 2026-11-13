@@ -1314,6 +1314,118 @@
         "title": "NurseVitalsInput",
         "type": "object"
       },
+      "OverviewActivity": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string"
+          },
+          "clinician_id": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "resource": {
+            "type": "string"
+          },
+          "seq": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "seq",
+          "at",
+          "clinician_id",
+          "action",
+          "resource",
+          "outcome"
+        ],
+        "title": "OverviewActivity",
+        "type": "object"
+      },
+      "OverviewClinician": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "patients": {
+            "type": "integer"
+          },
+          "role": {
+            "$ref": "#/components/schemas/SessionRole"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "patients"
+        ],
+        "title": "OverviewClinician",
+        "type": "object"
+      },
+      "OverviewPatient": {
+        "additionalProperties": false,
+        "properties": {
+          "bed": {
+            "type": "string"
+          },
+          "care": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "enum": [
+              "ranked",
+              "not_ranked"
+            ],
+            "type": "string"
+          },
+          "synthetic": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "bed",
+          "state",
+          "score",
+          "reason",
+          "care",
+          "synthetic"
+        ],
+        "title": "OverviewPatient",
+        "type": "object"
+      },
       "PartialAdmitPatientInput": {
         "additionalProperties": false,
         "description": "AdmitPatientInput with every field optional (extraction results).",
@@ -2365,7 +2477,8 @@
         "enum": [
           "rn",
           "md",
-          "charge_rn"
+          "charge_rn",
+          "admin"
         ],
         "title": "SessionRole",
         "type": "string"
@@ -3163,6 +3276,66 @@
           "not_ranked_instruction"
         ],
         "title": "VitalsRecorded",
+        "type": "object"
+      },
+      "WardOverview": {
+        "additionalProperties": false,
+        "properties": {
+          "activity": {
+            "items": {
+              "$ref": "#/components/schemas/OverviewActivity"
+            },
+            "type": "array"
+          },
+          "as_of": {
+            "type": "string"
+          },
+          "clinicians": {
+            "items": {
+              "$ref": "#/components/schemas/OverviewClinician"
+            },
+            "type": "array"
+          },
+          "patients": {
+            "items": {
+              "$ref": "#/components/schemas/OverviewPatient"
+            },
+            "type": "array"
+          },
+          "receiving_data": {
+            "type": "boolean"
+          },
+          "shared": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "synthetic": {
+            "type": "boolean"
+          },
+          "ward": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ward",
+          "as_of",
+          "receiving_data",
+          "synthetic",
+          "shared",
+          "patients",
+          "clinicians",
+          "activity"
+        ],
+        "title": "WardOverview",
         "type": "object"
       },
       "WardResponse": {

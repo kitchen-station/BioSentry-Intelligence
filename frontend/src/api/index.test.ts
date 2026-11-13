@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const fixture = vi.hoisted(() => {
   // Each method and how many arguments it takes (ApiProvider in contract.ts).
   const arity = {
-    getWard: 0, getPatient: 1, getBaseline: 1, getNotes: 1, addNote: 4, deleteNote: 2, listAllPatients: 0, getStays: 0, getLiveWard: 0,
+    getWard: 0, getPatient: 1, getBaseline: 1, getNotes: 1, addNote: 4, deleteNote: 2, listAllPatients: 0, getStays: 0, getLiveWard: 0, getOverview: 0,
     admitPatient: 1, enterLabResults: 2, recordVitals: 2, getAcknowledgements: 0, acknowledge: 2,
     extractLabsFromFile: 1, extractPatientFromFile: 1,
   } as const;
@@ -23,7 +23,7 @@ vi.mock("./providers/fixture", () => ({
 }));
 
 const client = vi.hoisted(() => ({
-  openSession: vi.fn(async () => undefined),
+  openSession: vi.fn(async () => "rn" as const),
   setAuthToken: vi.fn(),
   getAuthToken: vi.fn((): string | null => null),
 }));
@@ -55,7 +55,7 @@ describe("fixture mode", () => {
   it("has no server: any passphrase signs in, by setting the fixture's active clinician", async () => {
     const api = await load("");
     expect(api.usesServer).toBe(false);
-    await api.signIn("rn-manalo", "whatever");
+    await expect(api.signIn("rn-manalo", "whatever")).resolves.toBeNull();
     expect(fixture.setActiveClinician).toHaveBeenLastCalledWith("rn-manalo");
     await api.signIn("rn-manalo", "");
     expect(fixture.setActiveClinician).toHaveBeenCalledTimes(2);
@@ -78,7 +78,7 @@ describe("HTTP mode", () => {
   it("signs in by asking the API for a token with the passphrase, and rejects when it refuses", async () => {
     const api = await load("http://127.0.0.1:8000");
     expect(api.usesServer).toBe(true);
-    await api.signIn("rn-manalo", "a passphrase");
+    await expect(api.signIn("rn-manalo", "a passphrase")).resolves.toBe("rn");
     expect(client.openSession).toHaveBeenCalledWith("rn-manalo", "a passphrase");
     expect(fixture.setActiveClinician).not.toHaveBeenCalled();
     client.openSession.mockRejectedValueOnce(new Error("401"));

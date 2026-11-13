@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ApiError, signIn, usesServer } from "../api";
+import { ApiError, clearSession, signIn, usesServer } from "../api";
 import type { Session, SessionRole } from "../types";
 import ch from "../components/Crosshair.module.css";
 import styles from "./SignIn.module.css";
@@ -11,7 +11,7 @@ interface Props {
   onSignIn: (session: Session) => void;
 }
 
-type Department = "nursing" | "medical";
+type Department = "nursing" | "medical" | "admin";
 type Phase = "department" | "profile" | "auth" | "destination";
 
 interface Profile {
@@ -96,6 +96,7 @@ export function SignIn({ onSignIn }: Props) {
   const from: unknown = (useLocation().state as { from?: unknown } | null)?.from;
   const [department, setDepartment] = useState<Department | null>(null);
   const [selected, setSelected] = useState<Profile | null>(null);
+  const [adminId, setAdminId] = useState("");
   // Only the public demo (no server) prefills one: nothing is checked there.
   const [passphrase, setPassphrase] = useState(usesServer ? "" : "anything");
   const [error, setError] = useState<string | null>(null);
@@ -114,7 +115,7 @@ export function SignIn({ onSignIn }: Props) {
   const handlePickDepartment = (dept: Department) => {
     setDepartment(dept);
     setSelected(null);
-    setPhase("profile");
+    setPhase(dept === "admin" ? "auth" : "profile");
   };
 
   const handleSelectProfile = (p: Profile) => {
@@ -124,11 +125,25 @@ export function SignIn({ onSignIn }: Props) {
 
   const handleAuth = async (e: FormEvent) => {
     e.preventDefault();
-    if (!selected || busy) return;
+    if ((!selected && department !== "admin") || busy) return;
     setBusy(true);
     setError(null);
     try {
-      await signIn(selected.id, passphrase);
+      if (department === "admin") {
+        // The role comes only from the server's answer: no card or typed id can make an admin.
+        const role = await signIn(adminId, passphrase);
+        if (role !== "admin") {
+          clearSession();
+          setError("This account is not an administrator. Sign in from Nursing or Medical.");
+          return;
+        }
+        onSignIn({ clinician_id: adminId, ward: "W4", role });
+        navigate("/overview");
+        return;
+      }
+      const role = await signIn(selected!.id, passphrase);
+      // The server's role wins over the card's.
+      if (role) setSelected({ ...selected!, sessionRole: role });
       setPhase("destination");
     } catch (failure) {
       setError(refusal(failure));
@@ -146,7 +161,8 @@ export function SignIn({ onSignIn }: Props) {
     } else if (phase === "auth") {
       setSelected(null);
       setError(null);
-      setPhase("profile");
+      if (department === "admin") setDepartment(null);
+      setPhase(department === "admin" ? "department" : "profile");
     } else if (phase === "destination") {
       setPhase("auth");
     }
@@ -201,6 +217,17 @@ export function SignIn({ onSignIn }: Props) {
                   Attending Physician, Consultant
                 </span>
               </button>
+              {usesServer && (
+                <button
+                  type="button"
+                  className={`${ch.box} ${styles.roleCard}`}
+                  onClick={() => handlePickDepartment("admin")}
+                >
+                  <div className={ch.inner} />
+                  <span className={styles.roleTitle}>Administration</span>
+                  <span className={styles.roleDesc}>Ward overview, read only</span>
+                </button>
+              )}
             </div>
           </>
         )}
@@ -240,15 +267,35 @@ export function SignIn({ onSignIn }: Props) {
         )}
 
         {/* Phase 3: Auth */}
-        {phase === "auth" && selected && (
+        {phase === "auth" && (selected || department === "admin") && (
           <form onSubmit={handleAuth} className={styles.form}>
-            <div className={styles.selectedInfo}>
-              <span className={styles.selectedName}>{selected.label}</span>
-              <span className={styles.selectedDetail}>
-                {selected.role} &middot; Ward {selected.ward} &middot;{" "}
-                {selected.patients} patients
-              </span>
-            </div>
+            {selected ? (
+              <div className={styles.selectedInfo}>
+                <span className={styles.selectedName}>{selected.label}</span>
+                <span className={styles.selectedDetail}>
+                  {selected.role} &middot; Ward {selected.ward} &middot;{" "}
+                  {selected.patients} patients
+                </span>
+              </div>
+            ) : (
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor="admin-id">
+                  Administrator id
+                </label>
+                <div className={ch.box}>
+                  <div className={ch.inner} />
+                  <input
+                    className={styles.input}
+                    id="admin-id"
+                    value={adminId}
+                    onChange={(e) => setAdminId(e.target.value)}
+                    autoComplete="off"
+                    maxLength={64}
+                    required
+                  />
+                </div>
+              </div>
+            )}
 
             <div className={styles.field}>
               <label className={styles.label} htmlFor="passphrase">

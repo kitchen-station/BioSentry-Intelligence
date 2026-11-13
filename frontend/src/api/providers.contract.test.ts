@@ -366,4 +366,8 @@ describe("the fixture provider", () => {
       "Recording vitals needs the API",
     );
   });
+
+  it("has no overview: it needs the API", async () => {
+    await expect(fixtureProvider.getOverview()).rejects.toThrow("The overview needs the API");
+  });
 });

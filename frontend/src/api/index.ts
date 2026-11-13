@@ -11,6 +11,7 @@
  */
 
 import type { ApiProvider } from "./contract";
+import type { SessionRole } from "../types";
 import { httpProvider } from "./providers/http";
 import { getAuthToken, openSession, setAuthToken } from "./client";
 
@@ -40,6 +41,7 @@ function lazyFixtureProvider(): ApiProvider {
     listAllPatients: () => fixtures().then((m) => m.fixtureProvider.listAllPatients()),
     getStays: () => fixtures().then((m) => m.fixtureProvider.getStays()),
     getLiveWard: () => fixtures().then((m) => m.fixtureProvider.getLiveWard()),
+    getOverview: () => fixtures().then((m) => m.fixtureProvider.getOverview()),
     admitPatient: (input) => fixtures().then((m) => m.fixtureProvider.admitPatient(input)),
     enterLabResults: (patientId, labs) =>
       fixtures().then((m) => m.fixtureProvider.enterLabResults(patientId, labs)),
@@ -66,6 +68,7 @@ export const deleteNote = provider.deleteNote;
 export const listAllPatients = provider.listAllPatients;
 export const getStays = provider.getStays;
 export const getLiveWard = provider.getLiveWard;
+export const getOverview = provider.getOverview;
 export const admitPatient = provider.admitPatient;
 export const enterLabResults = provider.enterLabResults;
 export const recordVitals = provider.recordVitals;
@@ -77,6 +80,8 @@ export const acknowledge = provider.acknowledge;
  * never computes a score), so the fixture provider offers no entry; it rejects the call.
  */
 export const canRecordVitals = !USE_FIXTURES;
+/** Whether this build can show the admin overview. Only the API knows who is assigned and what was done. */
+export const hasOverview = !USE_FIXTURES;
 export const extractLabsFromFile = provider.extractLabsFromFile;
 export const extractPatientFromFile = provider.extractPatientFromFile;
 
@@ -86,15 +91,16 @@ export const usesServer = !USE_FIXTURES;
 /**
  * Sign in. With the API: asks for a token with the passphrase, and rejects with an ApiError when
  * refused (401 or 429). With fixtures there is no server and nothing is checked: it only sets
- * the clinician filter, whatever the passphrase is.
+ * the clinician filter, whatever the passphrase is. Returns the role the server holds for the
+ * clinician (null with fixtures); the page must use it, never its own idea of the role.
  */
-export async function signIn(clinicianId: string, passphrase: string): Promise<void> {
+export async function signIn(clinicianId: string, passphrase: string): Promise<SessionRole | null> {
   if (USE_FIXTURES) {
     const m = await fixtures();
     m.setActiveClinician(clinicianId);
-  } else {
-    await openSession(clinicianId, passphrase);
+    return null;
   }
+  return openSession(clinicianId, passphrase);
 }
 
 /**

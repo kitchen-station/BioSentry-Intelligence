@@ -12,17 +12,20 @@ const ROLE_LABELS: Record<string, string> = {
   rn: "Staff Nurse",
   md: "Attending Physician",
   charge_rn: "Charge Nurse",
+  admin: "Administrator",
 };
 
 export function SessionMenu({ session, onSignOut }: Props) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const inLab = useLocation().pathname.startsWith("/lab");
+  const admin = session.role === "admin";
+  const home = admin ? "/overview" : "/ward";
 
   return (
     <div className={styles.wrapper}>
-      <Link to={inLab ? "/ward" : "/lab"} className={styles.place}>
-        {inLab ? "Back to the ward" : "Simulation lab"}
+      <Link to={inLab ? home : "/lab"} className={styles.place}>
+        {inLab ? (admin ? "Back to the overview" : "Back to the ward") : "Simulation lab"}
       </Link>
       <button
         type="button"
@@ -44,9 +47,16 @@ export function SessionMenu({ session, onSignOut }: Props) {
 
             <div className={styles.divider} />
 
-            <Link to="/ward" className={styles.menuItem} onClick={() => setOpen(false)}>
-              Ward Monitor
-            </Link>
+            {admin && (
+              <Link to="/overview" className={styles.menuItem} onClick={() => setOpen(false)}>
+                Overview
+              </Link>
+            )}
+            {!admin && (
+              <Link to="/ward" className={styles.menuItem} onClick={() => setOpen(false)}>
+                Ward Monitor
+              </Link>
+            )}
             {(session.role === "md" || session.role === "charge_rn") && (
               <Link to="/station" className={styles.menuItem} onClick={() => setOpen(false)}>
                 Station

@@ -10,7 +10,7 @@ hash-chained form comes later. `resource` comes from the caller, so it is cut at
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Any, Literal
 
 from biosentry.repositories.postgres import Conn, whole
 
@@ -89,3 +89,20 @@ class AuditLog:
 
     def for_clinician(self, clinician_id: str) -> tuple[AuditRecord, ...]:
         return self.records(clinician_id)
+
+    def recent(self, since: datetime, per_clinician: int) -> list[dict[str, Any]]:
+        """What nurses and physicians did after `since`, the newest `per_clinician` each, by
+        clinician id then newest first. Sign-in rows are left out (they are logged under the id
+        that was tried, not the person who tried). `resource` is "-" unless the outcome is ok:
+        on the other rows it is whatever the caller typed."""
+        # shortcut: no index on audit_log (at), the window query scans the table; add an index on
+        # (at) when the log passes about a million rows.
+        return self._conn.execute(
+            "SELECT seq, at, clinician_id, action, outcome,"
+            " CASE WHEN outcome = 'ok' THEN resource ELSE '-' END AS resource FROM ("
+            " SELECT *, row_number() OVER (PARTITION BY clinician_id ORDER BY seq DESC) AS n"
+            " FROM audit_log WHERE at > %s AND role IN ('rn', 'md', 'charge_rn')"
+            " AND action NOT IN ('sign_in', 'authenticate')) t"
+            " WHERE n <= %s ORDER BY clinician_id, seq DESC",
+            (whole(since), per_clinician),
+        ).fetchall()

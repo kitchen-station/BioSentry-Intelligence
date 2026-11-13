@@ -52,7 +52,7 @@ const SECONDARY_AXES = new Set(["hrv"]);
 
 type Drawer = "notes" | "charts" | null;
 
-const ROLE_LABEL: Record<SessionRole, string> = { rn: "RN", charge_rn: "Charge RN", md: "MD" };
+const ROLE_LABEL: Record<SessionRole, string> = { rn: "RN", charge_rn: "Charge RN", md: "MD", admin: "Admin" };
 
 // The top strip and quiet line for the states with no patient to show.
 function Bare({ session, onSignOut, children }: { session: Session; onSignOut: () => void; children?: ReactNode }) {

@@ -79,7 +79,12 @@ vi.mock("./pages/Station", () => ({
   ),
 }));
 
+vi.mock("./pages/Overview", () => ({
+  Overview: ({ session }: { session: Session }) => <p>overview page for {session.clinician_id}</p>,
+}));
+
 const KEY = "biosentry.session";
+const admin: Session = { clinician_id: "admin-ruiz", ward: "W4", role: "admin" };
 const nurse: Session = { clinician_id: "rn-reyes", ward: "W4", role: "rn" };
 const charge: Session = { clinician_id: "rn-manalo", ward: "W4", role: "charge_rn" };
 
@@ -120,7 +125,7 @@ describe("restoring the session", () => {
 
   it.each([
     ["malformed JSON", "{not json"],
-    ["an unknown role", JSON.stringify({ ...nurse, role: "admin" })],
+    ["an unknown role", JSON.stringify({ ...nurse, role: "root" })],
     ["a missing ward", JSON.stringify({ clinician_id: "rn-reyes", role: "rn" })],
     ["a non-string clinician id", JSON.stringify({ ...nurse, clinician_id: 7 })],
     ["null", "null"],
@@ -192,6 +197,31 @@ describe("route guards", () => {
   it("sends a signed-out visitor of an old address to sign-in", () => {
     at("/research");
     expect(screen.getByText("sign-in page from /research")).toBeTruthy();
+  });
+
+  it("shows the overview to an admin, who may also open the lab", () => {
+    store(admin);
+    at("/overview");
+    expect(screen.getByText("overview page for admin-ruiz")).toBeTruthy();
+    cleanup();
+    at("/lab");
+    expect(screen.getByText("lab page for admin-ruiz")).toBeTruthy();
+  });
+
+  it.each(["/ward", "/station", "/patient/p-001"])("sends an admin from %s to the overview", (path) => {
+    store(admin);
+    at(path);
+    expect(screen.getByText("overview page for admin-ruiz")).toBeTruthy();
+  });
+
+  it("tells any other role the overview is not available, and a signed-out visitor to sign in", () => {
+    store(nurse);
+    at("/overview");
+    expect(screen.getByText("Not available for this account.")).toBeTruthy();
+    cleanup();
+    sessionStorage.clear();
+    at("/overview");
+    expect(screen.getByText("sign-in page from /overview")).toBeTruthy();
   });
 
   it("keeps a staff nurse out of the station: back to the ward", () => {

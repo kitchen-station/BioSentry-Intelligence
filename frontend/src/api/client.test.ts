@@ -23,8 +23,8 @@ const sent = (i = 0) => fetchMock.mock.calls[i] as [string, RequestInit];
 
 describe("the session token", () => {
   it("is what sign-in returned, and gone after sign-out", async () => {
-    fetchMock.mockResolvedValue(Response.json({ token: "t-1" }));
-    await openSession("rn-manalo", "a passphrase");
+    fetchMock.mockResolvedValue(Response.json({ token: "t-1", role: "charge_rn" }));
+    await expect(openSession("rn-manalo", "a passphrase")).resolves.toBe("charge_rn"); // the server's role
     expect(getAuthToken()).toBe("t-1");
     setAuthToken(null);
     expect(getAuthToken()).toBeNull();

@@ -19,6 +19,7 @@ import type {
   PatientExtractionResult,
   PatientStay,
   VitalsRecorded,
+  WardOverview,
   WardResponse,
 } from "../types";
 
@@ -45,6 +46,8 @@ export interface ApiProvider {
   getStays(): Promise<PatientStay[]>;
   /** What the ward simulator last published, for the caller. Null when there is no simulator (fixture mode). */
   getLiveWard(): Promise<LiveWard | null>;
+  /** The admin's read-only ward overview. Only the API has one; any other caller is refused (403). */
+  getOverview(): Promise<WardOverview>;
   admitPatient(input: AdmitPatientInput): Promise<AbstainedRow>;
   enterLabResults(
     patientId: string,

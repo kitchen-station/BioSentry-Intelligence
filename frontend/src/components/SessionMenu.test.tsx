@@ -108,4 +108,21 @@ describe("SessionMenu", () => {
     expect(screen.getByText("at /")).toBeTruthy();
     expect(screen.queryByText("Ward W4")).toBeNull();
   });
+
+  it("gives an admin the overview and no ward or station", async () => {
+    menu({ clinician_id: "admin-ruiz", ward: "W4", role: "admin" });
+    await open("admin-ruiz");
+    expect(screen.getByText("Administrator")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Ward Monitor" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Station" })).toBeNull();
+    await userEvent.click(screen.getByRole("link", { name: "Overview" }));
+    expect(screen.getByText("at /overview")).toBeTruthy();
+  });
+
+  it("returns an admin from the lab to the overview", async () => {
+    menu({ clinician_id: "admin-ruiz", ward: "W4", role: "admin" }, "/lab");
+    expect(screen.queryByRole("link", { name: "Back to the ward" })).toBeNull();
+    await userEvent.click(screen.getByRole("link", { name: "Back to the overview" }));
+    expect(screen.getByText("at /overview")).toBeTruthy();
+  });
 });
