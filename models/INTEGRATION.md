@@ -13,6 +13,9 @@ Three offline research models:
 |---|---|---|---|
 | Distilled vitals student | `models/tier_c/student_vitals/` | a probability p | `TierCSignal.probability: Result[float]` |
 | Confidence check on the student | `models/tier_c/confidence_check/` | `alert`, `not_sure` or `quiet`, from p | a new field on `TierCSignal` (ruling 3); `Guarantees.conformal_certificate_current` (ruling 4) |
+
+Each model ships in two variants, with and without temperature. Exactly one variant of all three is wired; ruling 1
+says which, from what the backend stores, never from a held-out row. Both variants are documented in full here.
 | Reward-driven alerting policy | `models/tier_b/reward_policy/` | alerting or not (a bool) | `PolicySignal.alert: Result[bool]` |
 
 - All three are research only. They were trained and judged on synthetic simulator trials. They are not
@@ -36,23 +39,29 @@ backend dependency is added. Every later section describes this path.
 
 ### 2.1 What the API image holds and loads, once, at start
 
-The files are copied into the API image at build and verified at start (ruling 13). The with-temperature files are
-the wired set (ruling 1):
+The files are copied into the API image at build and verified at start (ruling 13). The image holds the wired
+variant (ruling 1) and the manifest, nothing else:
 
-| File | What it is |
-|---|---|
-| `models/tier_c/student_vitals/model.json` | the student (`all`) as plain JSON weights, format `biosentry-plain-mlp-1` |
-| `models/tier_c/confidence_check/calibration.json` and `models/tier_c/confidence_check/calibration.json.sha256` | q and its bindings, for that student |
-| `models/tier_b/reward_policy/policy.json` | the policy's six numbers and config (with temperature) |
-| `models/manifest.json` | the path, bytes and sha256 of every shipped model file |
+| File | With temperature (wired unless the backend keeps no temperature history) | No temperature (wired only if the backend keeps no temperature history) |
+|---|---|---|
+| Student, plain JSON weights, format `biosentry-plain-mlp-1` | `models/tier_c/student_vitals/model.json` (`all`) | `models/tier_c/student_vitals/model_no_temp.json` (`no_temp`) |
+| q and its bindings, for that student | `models/tier_c/confidence_check/calibration.json` and its `.sha256` | `models/tier_c/confidence_check/calibration_no_temp.json` and its `.sha256` |
+| The policy's six numbers and config | `models/tier_b/reward_policy/policy.json` | `models/tier_b/reward_policy/no_temperature/policy.json` |
+| Checksums | `models/manifest.json` | `models/manifest.json` |
+
+The three model files always come from one column. What the backend stores today: `repositories/postgres.py`
+`HISTORY_VITALS = ("heart_rate", "respiratory_rate", "spo2")`, the vitals whose full history reaches scoring as
+`vital_history`. Temperature is in `DEVICE_VITALS` and its bins are read only for the 12-bin sparkline
+(`TREND_BINS = 12`); the seed (`db/seed.py`) writes only its last 12 bins. The dashboard session checks whether
+temperature history exists in the backend at all; if it does not, the no-temperature column is wired, for that
+reason only.
 
 Nothing else. The API does not load the ONNX, MindIR or `.ms` files, and it does not import onnxruntime,
 MindSpore or numpy. The ONNX sha256 is needed only as a value: it is inside `model.json` (`source.onnx_sha256`) and
 inside the calibration file, and the two are compared.
 
-Not wired (ruling 1), documented for reference only: `model_no_temp.json`, `calibration_no_temp.json` with its
-`.sha256`, and `no_temperature/policy.json`. The API never picks a variant by its held-out row and never switches
-files per row.
+The API never picks a variant by its held-out row, never loads files of two variants, and never switches files
+per row.
 
 ### 2.2 The checksum rule
 
@@ -66,10 +75,12 @@ At start, before any use, for each loaded file:
    - Student: the `plain_student.parse` rules (section 4.6).
    - Calibration: its sha256 must equal the text of its `.sha256` sibling, and every check of section 6.3 must
      pass, including: `onnx_sha256` equals `model.json` `source.onnx_sha256`; `t` equals `model.json`
-     `threshold`; `alpha` is `"0.01"`; `draw_seed` is 20261113; `variant` equals `model.json` `variant` (`all`).
+     `threshold`; `alpha` is `"0.01"`; `draw_seed` is 20261113; `variant` equals the student file's `variant`
+     (`all` or `no_temp`).
    - Policy: its content sha256 as `research/reward_loop.py` `load_policy` checks it (section 5.1): the sha256 of
      `json.dumps(body, sort_keys=True, separators=(",", ":"))`, where body is the object without `"sha256"`, must
-     equal the file's `"sha256"`; plus the `temperature`, `Params` and `config_sha256` checks.
+     equal the file's `"sha256"`; plus the `temperature`, `Params` and `config_sha256` checks. ("`model.json`"
+     in this list means the wired student file.)
 
 Current values, read from `models/manifest.json` in this worktree on 2026-11-13 and recomputed with
 `shasum -a 256`. This table is a snapshot. `python -m research.manifest --write` regenerates the manifest when a file
@@ -79,10 +90,16 @@ changes; the manifest is the source, not this table.
 |---|---|---|---|---|
 | `models/tier_c/student_vitals/model.json` | 34949 | `d05d75ee0ad8da0db138a74f3a9796c98de6b8af5dfea513789d5521f1768af6` | `m1-20261113-3d634f3` | `source.onnx_sha256` `d1ae4e881732922024b08c6cf9c37adbd8b01c48bc8390ee22b28ab802ddfdbc`, threshold 0.006 |
 | `models/tier_c/confidence_check/calibration.json` | 660 | `7815bd3885c794fafa38e8384d6837300c163738dbb6a0a7a126c4dca2484f11` | `m3-20261113-fbd39f2` | `.sha256` sibling holds the same value; `onnx_sha256` `d1ae4e88...ddfdbc`, t 0.006, alpha "0.01", variant `all` |
-| `models/tier_b/reward_policy/policy.json` | 5064 | `21cf038e4ab699906eeab87d56ddbd39965915a8ec085e75f56ca99501114775` | `m2-20261113` | content sha256 `b364a680b989a659ae747f929806a65a9f828a0e412ba89d35ca72dd840f804f` |
+| `models/tier_b/reward_policy/policy.json` | 5064 | `21cf038e4ab699906eeab87d56ddbd39965915a8ec085e75f56ca99501114775` | `m2-20261113` | content sha256 `b364a680b989a659ae747f929806a65a9f828a0e412ba89d35ca72dd840f804f`, `temperature` true |
+| `models/tier_c/student_vitals/model_no_temp.json` | 14903 | `d041b6584edc7d67c54dcdb03e81f0c1a58f51282a3cf02fbc3e869ff53cb2fc` | `m1-20261113-3d634f3` | `source.onnx_sha256` `e6b6ae44c11aa38fc38a961eebaf3e3bd51b1b5812b9e200d31d8c04101869ee`, threshold 0.006 |
+| `models/tier_c/confidence_check/calibration_no_temp.json` | 664 | `4a3de9544cce7e6cc838837bb2c1646261d85d1f41bef35f84135509fa0729bb` | `m3-20261113-fbd39f2` | `.sha256` sibling holds the same value; `onnx_sha256` `e6b6ae44...69ee`, t 0.006, alpha "0.01", variant `no_temp` |
+| `models/tier_b/reward_policy/no_temperature/policy.json` | 4916 | `522195aa8104271d3bfec0e87ab1f37e07b074dccbd5a347d05191905a12a3b3` | `m2-20261113` | content sha256 `ef60e564de8e3176d87fe78eabc3fc366e6b802ff0a9034e46122dc78090e020`, `temperature` false, temperature weight 0.0 |
 
-The `.sha256` sibling is a record, not a model file, so the manifest has no entry for it; it is checked against
-the calibration file's bytes. The manifest has no checksum of itself (snapshot: 6706 bytes, sha256
+The first three rows are the with-temperature variant, the last three the no-temperature variant; only the wired
+variant's three are checked and loaded (ruling 1).
+
+The `.sha256` siblings are records, not model files, so the manifest has no entry for them; each is checked against
+its calibration file's bytes. The manifest has no checksum of itself (snapshot: 6706 bytes, sha256
 `20b3b81aeb9d327f49bb6f5edfbc1749757ecd01524f4aca5d26ee1aec1dfe76`). A person who changes a file and the manifest
 together is not detected; the review of the pull request is the guard.
 
@@ -98,14 +115,14 @@ unchanged. No flag is shown for a not-computed signal.
 
 | Case | `TierCSignal.probability` | `TierCSignal.check` | `PolicySignal.alert` |
 |---|---|---|---|
-| `model.json` missing, unreadable, over its cap, wrong sha256, no manifest record, wrong `format`, unknown keys, a non-finite number | `NotComputed("student not loaded")` | `NotComputed("student not loaded")` (nothing to check) | unaffected |
+| Student file missing, unreadable, over its cap, wrong sha256, no manifest record, wrong `format`, unknown keys, a non-finite number | `NotComputed("student not loaded")` | `NotComputed("student not loaded")` (nothing to check) | unaffected |
 | Calibration or its `.sha256` missing, unreadable, over its cap, wrong sha256, or a binding mismatch (`onnx_sha256`, t, alpha, draw seed, variant) | `Computed(p)` | `NotComputed("calibration not loaded")`: no flag (ruling 14) | unaffected |
-| `policy.json` missing, unreadable, over its cap, wrong file or content sha256, wrong `temperature` flag, bad params or config | unaffected | unaffected | `NotComputed("policy not loaded")` |
+| Policy file missing, unreadable, over its cap, wrong file or content sha256, wrong `temperature` flag, bad params or config | unaffected | unaffected | `NotComputed("policy not loaded")` |
 | An input vector of the wrong length, or a non-finite or bool feature, at score time | `NotComputed(<fixed reason>)` for that bin | `NotComputed(<same reason>)` | unaffected |
 | A NOT RANKED bin (ruling 2) | `NotComputed("not ranked")` | `NotComputed("not ranked")` | `NotComputed("not ranked")` |
 | Baseline still forming (ruling 10) | `NotComputed("baseline forming")` | `NotComputed("baseline forming")` | `NotComputed("baseline forming")` |
 | Stay past 672 bins (ruling 7) | `NotComputed("stay past 672 bins")` | same | same |
-| An earlier bin's scored status not stored (ruling 6) | unaffected | unaffected | `NotComputed("earlier bin not stored")` |
+| An earlier bin's scored status cannot be rebuilt from stored inputs (ruling 6) | unaffected | unaffected | `NotComputed("earlier bin not stored")` |
 
 - Load failures are found once, at start: one warning line per failed file with the file and the reason. The load
   result is fixed for the life of the process; a new file needs a new image and a restart.
@@ -129,7 +146,7 @@ unchanged. No flag is shown for a not-computed signal.
 
 Measured on this project's Docker image on an Apple Silicon Mac (Python 3.11.18, aarch64, one process, 20,000
 calls after 2,000 warm-up calls, a plain valid row). Figures as reported for this hand-off; they depend on the
-machine and its load. The `model_no_temp.json` column is for reference; that file is not wired.
+machine and its load. Only the wired variant's column applies (ruling 1).
 
 | | `model.json` (35 inputs) | `model_no_temp.json` (27 inputs) |
 |---|---|---|
@@ -173,7 +190,7 @@ and to a possible ward hub. The in-process path does not use them, and nothing i
   present, because NEWS2 needs them. A scored bin never has a missing device vital. The value-missing flags are
   therefore always 0 on scored bins (and were constant 0 in training, section 4.5). With temperature missing in a
   bin, NEWS2 abstains, so the bin is NOT RANKED and nothing is computed; a temperature gap in an earlier bin only
-  sets that lag's missing flag, which is what the trained model does (ruling 1).
+  sets that lag's missing flag, which is what the trained model does (ruling 1). Files are never switched per row.
 - Stay: one patient's admission, from the first bin to the last. All history below is of the same stay only.
 - History the features need, with the constants from the code:
 
@@ -183,15 +200,18 @@ and to a possible ward hub. The in-process path does not use them, and nothing i
 | "Forming" period | z is not computed until the stay has 24 valid values of that vital, counting the current bin (6 hours with no gaps) | `baseline_finding` returns `NotComputed("baseline forming, n of 24 bins")` |
 | 1-hour lag | 4 bins earlier | `student.py` `LAG_1H = 4` |
 | 4-hour lag | 16 bins earlier | `student.py` `LAG_4H = 16` |
-| Policy persistence | the last p bins (p = 5 for the wired policy), each scored, with no gap | `policy.json` `params.p` |
+| Policy persistence | the last p bins (p = 5 with temperature, 3 without), each scored, with no gap | the policy file's `params.p` |
 | Cap on the stay | 672 bins (7 days); past it, not computed | backend `services/scoring.py` `MAX_BINS` (ruling 7) |
 | Alert re-arm | 16 bins not alerting: an evaluation convention only, not used by the product | `alerts.py` `REARM_BINS = 16` (ruling 5) |
 
 - A valid bin for the baseline is a value that is not None, not a bool and finite (`baseline._valid`). Values of
   NOT RANKED bins count: they feed the baseline and the lags even though the bin itself is not scored.
 - So the feature code needs the stay's grid for each device vital from `grid()` (the baseline anchor is the first
-  24 valid bins), the current bin's stored NEWS2 inputs, and, for the policy only, the stored scored status of the
-  p - 1 bins before the current one. Nothing is stored between reads (ruling 5).
+  24 valid bins), the current bin's stored NEWS2 inputs, and, for the policy only, the scored status of the p - 1
+  bins before the current one, rebuilt on read from their stored inputs (ruling 6). Scores are never stored; nothing
+  is stored between reads (ruling 5).
+- "The baseline has formed" (ruling 10) means formed for every vital in `HISTORY_VITALS` (today heart rate,
+  respiratory rate and SpO2). It gates both the student and the policy.
 
 ## 4. The student (`TierCSignal`)
 
@@ -199,8 +219,8 @@ and to a possible ward hub. The in-process path does not use them, and nothing i
 
 | Variant | Plain file | ONNX file (sha256 binding) | Inputs | Hidden width | Parameters | Threshold t | Status |
 |---|---|---|---|---|---|---|---|
-| `all` (with temperature) | `model.json` | `model.onnx` | 35 | 32 | 1,185 | 0.006 | wired (ruling 1) |
-| `no_temp` | `model_no_temp.json` | `model_no_temp.onnx` | 27 | 16 | 465 | 0.006 | not wired; reference only |
+| `all` (with temperature) | `model.json` | `model.onnx` | 35 | 32 | 1,185 | 0.006 | the wired variant (ruling 1) unless the backend keeps no temperature history |
+| `no_temp` | `model_no_temp.json` | `model_no_temp.onnx` | 27 | 16 | 465 | 0.006 | the wired variant (ruling 1) only if the backend keeps no temperature history |
 
 Both shipped students are `inputs: "trend"` (base plus trend), distilled, loss MSE on the teacher's logits
 (`metadata.json` `variants.*.student`). The input names below were printed from `metadata.json`
@@ -214,10 +234,11 @@ slot), or None for a gap. t is the current, scored bin. `series_v = [x_v[0], ...
 and with the values of NOT RANKED bins included. `B_v = baseline_finding(v, series_v, DEFAULTS)` (backend
 `domain/scoring/tier_b/baseline.py`). `S = score_news2(stored inputs at bin t)`, a `News2Score` because t is scored.
 
-### 4.3 The input vector, variant `all` (35 inputs, wired)
+### 4.3 The input vector, variant `all` (35 inputs)
 
-Ruling 10 applies first: while any `B_v` of the four vitals is still forming, nothing below is computed (section
-4.9). On a computed bin the z-missing flags are therefore 0.
+Ruling 10 applies first: while `B_v` of any vital in `HISTORY_VITALS` is still forming, nothing below is computed
+(section 4.9). This variant is wired only when temperature history is kept (ruling 1), and then `HISTORY_VITALS`
+must include temperature; on a computed bin the z-missing flags are therefore 0.
 
 | i | Name | Formula at scored bin t | Units | Missing rule | Bins read |
 |---|---|---|---|---|---|
@@ -257,10 +278,11 @@ Ruling 10 applies first: while any `B_v` of the four vitals is still forming, no
 | 33 | `temperature_d4h` | `x_temp[t] - x_temp[t-16]` | °C | as i 21 | t, t-16 |
 | 34 | `temperature_d4h_missing` | as i 22 | flag | | t-16 |
 
-### 4.4 The input vector, variant `no_temp` (27 inputs, not wired)
+### 4.4 The input vector, variant `no_temp` (27 inputs)
 
-Kept for reference (ruling 1). The same definitions without any temperature input, and with one changed NEWS2
-input:
+The wired variant only if the backend keeps no temperature history (ruling 1). The same definitions without any
+temperature input, and with one changed NEWS2 input. Ruling 10 gates it on the vitals in `HISTORY_VITALS` (today
+heart rate, respiratory rate and SpO2, exactly this variant's three):
 
 | i | Name | i | Name | i | Name |
 |---|---|---|---|---|---|
@@ -277,6 +299,8 @@ input:
 - `news2_total_minus_its_temperature_points` = `S.total - sum(p.score for p in S.parameters if p.parameter ==
   "temperature")`. The temperature points are 0 to 3 from `tables.TEMPERATURE` (≤35.0: 3; 35.1-36.0: 1;
   36.1-38.0: 0; 38.1-39.0: 1; ≥39.1: 2).
+- A bin is still scored only when NEWS2 has a temperature for that bin. "No temperature" means temperature does not
+  feed the model; the current bin's stored temperature still decides whether NEWS2 scores the bin.
 
 ### 4.5 Exact definitions of each family (from `research/student.py`)
 
@@ -315,7 +339,7 @@ float32 range makes `struct.pack` raise `OverflowError`: that bin is not compute
 
 From `research/plain_student.py` (`load`, `parse`, `forward`), format `"biosentry-plain-mlp-1"`:
 
-1. Check the row has exactly 35 values, each an `int` or `float` and finite. A bool is refused
+1. Check the row has exactly n values (35 for `all`, 27 for `no_temp`), each an `int` or `float` and finite. A bool is refused
    (`type(v) not in (int, float)`), so pass flags as 0.0 and 1.0, never True and False.
 2. `h0[i] = (x[i] - mean[i]) / std[i]`, then clamp to [-1e6, 1e6] (`CLAMP`).
 3. Layer 0, for each hidden unit u: `acc = 0.0; for i: acc += h0[i] * W0[u][i]`; then `a[u] = max(acc + b0[u], 0.0)`
@@ -340,7 +364,8 @@ Infinity; file at most 1 MiB; threshold null or in [0, 1].
 - Label (`patient_labels`): 1 from `episode_start` to fully in (`episode_start + ramp_minutes`), both ends
   included, on the bin's minute; bins after fully in are excluded from training (-1); patients present at the
   trial start (admit minute 0) are excluded (-2); 0 otherwise. `outcome` is never a label.
-- Threshold t = 0.006 (`model.json` `threshold`, `metadata.json` `variants.all.thresholds.student.threshold`). It
+- Threshold t = 0.006 for both variants (the student file's `threshold`, `metadata.json`
+  `variants.<all|no_temp>.thresholds.student.threshold`). It
   is the smallest t in the grid 0.001 to 0.009 (step 0.001), then 0.01 to 0.99 (step 0.01) whose alerts AND time in
   alert on validation seeds 261-300, under the evaluation alert rule of section 8.3 with "alerting when p >= t",
   are both at most the NEWS2 chart trigger's. It was computed from the ONNX output.
@@ -352,13 +377,14 @@ Infinity; file at most 1 MiB; threshold null or in [0, 1].
   plain forward pass is within 1e-6 of onnxruntime and within 1e-5 of MindSpore and MindIR. That test runs in the
   research ML gate, not in the backend.
 - Parity test for the backend port, with no numpy:
-  1. Once, in the research environment (standard library only), build a fixed batch from `model.json`:
+  1. Once, in the research environment (standard library only), build a fixed batch from each student file
+     (`model.json` and `model_no_temp.json`, so the test holds whichever variant ruling 1 wires):
      `rng = random.Random(7)`; rows 0-799: `x[i] = mean[i] + rng.uniform(-4, 4) * std[i]`; rows 800-999: the same,
      then each value replaced, with probability 0.5, by 0.0 or 1.0 at random (this mirrors the research batch,
      which also mixes flags). Round every value with `struct.unpack("f", struct.pack("f", x))[0]` (ruling 9).
   2. Expected output: `research.plain_student.forward(research.plain_student.load(path), row)` per row.
-  3. Commit `{"model_sha256": <sha256 of model.json>, "rows": [...], "p": [...]}` as a backend test fixture.
-  4. The backend test loads the committed `model.json` through the port, asserts its sha256 equals the fixture's,
+  3. Commit `{"model_sha256": <sha256 of the file>, "rows": [...], "p": [...]}` per file as a backend test fixture.
+  4. The backend test loads each committed student file through the port, asserts its sha256 equals the fixture's,
      and asserts `abs(p_port - p_expected) <= 1e-12` for every row. A verbatim copy of `forward` gives exact
      equality; keep the tolerance only for a port that reorders nothing but differs in the last bit.
   5. A second case feeds the same rows UNROUNDED (doubles near, but not on, float32 values) through the backend's
@@ -383,7 +409,7 @@ class TierCSignal:
 | Case | `probability` | `check` | Flag on the row |
 |---|---|---|---|
 | NOT RANKED bin (ruling 2) | `NotComputed("not ranked")` | `NotComputed("not ranked")` | none |
-| Scored bin, any of the four baselines forming (ruling 10) | `NotComputed("baseline forming")` | `NotComputed("baseline forming")` | none |
+| Scored bin, the baseline of any vital in `HISTORY_VITALS` forming (ruling 10) | `NotComputed("baseline forming")` | `NotComputed("baseline forming")` | none |
 | Stay past 672 bins, or a vital not `counted()` (ruling 7) | `NotComputed(<reason>)` | `NotComputed(<same reason>)` | none |
 | Student file failed its checks (ruling 13) | `NotComputed("student not loaded")` | `NotComputed("student not loaded")` | none |
 | Calibration failed or missing, student fine (ruling 14) | `Computed(p)` | `NotComputed("calibration not loaded")` | none |
@@ -404,10 +430,10 @@ the Analytics page.
 
 ### 5.1 The six numbers
 
-From `policy.json` `params` and `config` (content sha256 checked, see below). The no-temperature column is not
-wired (ruling 1).
+From each policy file's `params` and `config` (content sha256 checked, see below). Ruling 1 decides which column
+is the wired variant.
 
-| | `policy.json` (with temperature, wired, ledger incumbent) | `no_temperature/policy.json` (not wired) |
+| | `policy.json` (with temperature, ledger incumbent) | `no_temperature/policy.json` |
 |---|---|---|
 | weight heart rate | 0.614 | 0.3372 |
 | weight respiratory rate | 0.5247 | 0.5534 |
@@ -421,9 +447,10 @@ wired (ruling 1).
 
 Load rule (`reward_loop.load_policy`): parse the JSON; `body` = the object without `"sha256"`;
 `sha256(json.dumps(body, sort_keys=True, separators=(",", ":")))` must equal the file's `"sha256"`; `temperature`
-must be true for `policy.json`; `Params.from_dict` checks four finite non-negative weights, theta finite and at
-least 0.1, p an integer from 1 to 8 (no bools, no string numbers); `digest(config) == config_sha256`. Refuse
-otherwise. The shipped file passes this check (recomputed for this hand-off).
+must be true for `policy.json` and false for `no_temperature/policy.json`; `Params.from_dict` checks four finite
+non-negative weights, theta finite and at least 0.1, p an integer from 1 to 8 (no bools, no string numbers);
+`digest(config) == config_sha256`; a no-temperature policy must have temperature weight 0.0. Refuse otherwise.
+Both shipped files pass this check (recomputed for this hand-off).
 
 ### 5.2 z, score and state
 
@@ -432,10 +459,11 @@ otherwise. The shipped file passes this check (recomputed for this hand-off).
   direction. Research gives 0.0 while a baseline forms; the product does not compute the policy then (ruling 10).
 - Bad direction (`baseline.VITALS[v].bad`): heart rate +1 (rising is bad), respiratory rate +1, SpO2 -1 (falling is
   bad), temperature +1.
-- Score (form `"sum"`): `s = 0.614 * z_hr + 0.5247 * z_rr + 1.0638 * z_spo2 + 0.3149 * z_temp`.
-- Persistence: the run counts consecutive scored bins with `s >= theta` (2.9776). A NOT RANKED bin ends the run
-  and is not alerting. A missing bin (no row in that 15-minute slot) also ends the run. Alerting when `run >= p`
-  (5).
+- Score (form `"sum"`): with temperature `s = 0.614 * z_hr + 0.5247 * z_rr + 1.0638 * z_spo2 + 0.3149 * z_temp`;
+  without, `s = 0.3372 * z_hr + 0.5534 * z_rr + 1.2459 * z_spo2` (weight 0.0 on temperature).
+- Persistence: the run counts consecutive scored bins with `s >= theta` (2.9776 with temperature, 3.3703 without).
+  A NOT RANKED bin ends the run and is not alerting. A missing bin (no row in that 15-minute slot) also ends the
+  run. Alerting when `run >= p` (5 with temperature, 3 without).
 
 State machine (`reward_policy.states`), per stay, bins in time order:
 
@@ -453,10 +481,13 @@ for each bin with a stored row (minute m, z or NOT RANKED):
 ```
 
 A gap resets the run but the bin after it is still scored: with `s >= theta` its run is 1. Because the state is
-`run >= p`, the state at the current bin t depends only on bins t - p + 1 to t (t - 4 to t): each must be a stored,
-scored bin with a formed baseline and `s >= theta`. The product computes it from those bins on every read and
-stores nothing (ruling 5). Where the scored status of any of those earlier bins is not stored, the policy is not
-computed (ruling 6).
+`run >= p`, the state at the current bin t depends only on bins t - p + 1 to t (t - 4 to t with temperature,
+t - 2 to t without): each must be a stored, scored bin with a formed baseline and `s >= theta`. The product
+computes it from those bins on every read and stores nothing (ruling 5). An earlier bin's scored status is rebuilt
+on read by running `score_news2` on that bin's stored inputs; scores stay unstored. Where it cannot be rebuilt, the
+policy is not computed for that bin (ruling 6). The dashboard session checks first whether earlier bins' NEWS2
+inputs can be rebuilt at all; if they cannot, the policy is NOT shipped as "always not computed": the question goes
+back to the orchestrator first.
 
 ### 5.3 What `PolicySignal` receives
 
@@ -464,7 +495,7 @@ computed (ruling 6).
 |---|---|---|
 | NOT RANKED bin (ruling 2) | `NotComputed("not ranked")` | none |
 | Baseline forming (ruling 10) | `NotComputed("baseline forming")` | none |
-| An earlier bin's scored status not stored (ruling 6) | `NotComputed("earlier bin not stored")` | none |
+| An earlier bin's scored status cannot be rebuilt from stored inputs (ruling 6) | `NotComputed("earlier bin not stored")` | none |
 | Stay past 672 bins, or a vital not `counted()` (ruling 7) | `NotComputed(<reason>)` | none |
 | Policy file missing or refused (ruling 13) | `NotComputed("policy not loaded")` | none |
 | Computed, not alerting | `Computed(False)` | none |
@@ -472,10 +503,11 @@ computed (ruling 6).
 
 ### 5.4 The variant, and what the card shows
 
-Ruled: `policy.json`, with temperature (ruling 1), never picked by its held-out row. What the card
+Ruled (ruling 1): the wired variant is set by what the backend stores (temperature history or not), never by its
+held-out row. The table below is for reading the card, not for choosing. What the card
 (`models/tier_b/reward_policy/card.md`, from `held_out.txt`, ward-v2 seeds 11-30, scored once) shows:
 
-| Held-out | NEWS2 chart trigger | Final, with temperature (wired) | Final, no temperature (not wired) |
+| Held-out | NEWS2 chart trigger | Final, with temperature | Final, no temperature |
 |---|---|---|---|
 | Alone: alerts per patient per 12 h (95% CI) | 0.414 (0.395-0.434) | 0.153 (0.140-0.165) | 0.131 (0.119-0.143) |
 | Alone: time in alert | 0.158 | 0.035 | 0.021 |
@@ -484,7 +516,8 @@ Ruled: `policy.json`, with temperature (ruling 1), never picked by its held-out 
 | NEWS2 OR policy: alerts per patient per 12 h | 0.414 | 0.463 | 0.451 |
 
 - Added to NEWS2, neither policy gives a gain beyond noise: the intervals overlap. Both raise more alerts.
-- With temperature, the policy alone alerts late (median lead -3.8 min). That is not early warning.
+- With temperature, the policy alone alerts late (median lead -3.8 min). That is not early warning. Without
+  temperature its median lead alone is 20.2 min. Neither fact chooses the variant (ruling 1).
 
 ## 6. The confidence check (`TierCSignal.check` and `Guarantees`)
 
@@ -505,8 +538,8 @@ applied as the stricter bar (ruling 4).
 
 | Variant | File | q | t | alpha | n, j, k | Binds ONNX sha256 | Status |
 |---|---|---|---|---|---|---|---|
-| `all` | `models/tier_c/confidence_check/calibration.json` | 0.019854247570037842 | 0.006 | `"0.01"` | 3238, 32, 3207 | `d1ae4e881732922024b08c6cf9c37adbd8b01c48bc8390ee22b28ab802ddfdbc` | wired |
-| `no_temp` | `models/tier_c/confidence_check/calibration_no_temp.json` | 0.018539994955062866 | 0.006 | `"0.01"` | 3238, 32, 3207 | `e6b6ae44c11aa38fc38a961eebaf3e3bd51b1b5812b9e200d31d8c04101869ee` | not wired |
+| `all` | `models/tier_c/confidence_check/calibration.json` | 0.019854247570037842 | 0.006 | `"0.01"` | 3238, 32, 3207 | `d1ae4e881732922024b08c6cf9c37adbd8b01c48bc8390ee22b28ab802ddfdbc` | wired with the `all` student (ruling 1) |
+| `no_temp` | `models/tier_c/confidence_check/calibration_no_temp.json` | 0.018539994955062866 | 0.006 | `"0.01"` | 3238, 32, 3207 | `e6b6ae44c11aa38fc38a961eebaf3e3bd51b1b5812b9e200d31d8c04101869ee` | wired with the `no_temp` student (ruling 1) |
 
 Both are binding (q >= t; code: `Calibration.binding` is `q is None or q >= t`). Calibration data: ward-v2-ext
 seeds 301-340, one negative bin per non-starting stay, draw seed 20261113.
@@ -522,7 +555,8 @@ Port `confidence.load` and `confidence.verify`. Refuse the file when any of thes
 - `alpha == "0.01"` (a string) and `draw_seed == 20261113`.
 - `(j, k)` equals `indices(n)` (`j = floor(alpha * (n + 1))` in exact fractions, `k = n + 1 - j`), and q is null
   exactly when j is 0.
-- `variant` is `all`; `onnx_sha256` equals `model.json` `source.onnx_sha256`; `t` equals the student's threshold.
+- `variant` is the wired student's variant; `onnx_sha256` equals that student file's `source.onnx_sha256`; `t`
+  equals the student's threshold.
 
 The file also records the simulator setting it was calibrated on (days 30, speed 60, scenario sha256
 `95052d021b73da3fa71cc62601a795264b8ffd1cf5c4bf2e6e3ba407f74698a8`). Research refuses to claim the target in any
@@ -586,10 +620,11 @@ What the wiring adds (rulings 3, 11, 12), and nothing more:
   "Prediction model flag (synthetic, not validated)"; `PolicySignal.alert == Computed(True)` appends one with the
   text "Alert policy flag (learned by reward; synthetic, not validated)".
 - Neither sets `escalated` or `flagged`, and neither enters `sort_key`. The order is unchanged.
-- The `rule` value of those reasons: `EscalationRule` today has `tier_a_threshold`, `tier_c_raise`,
-  `tier_b_finding` and `missing_input`. The student's reason can use `tier_c_raise`; the policy has no member, so
-  the wiring slice adds one to `schemas/tiers.py` (name its own). `flagged` must keep reading only
-  `tier_b_finding` reasons, so the new reasons never move a row.
+- The `rule` value of those reasons: `EscalationRule` (`schemas/tiers.py`) today has `tier_a_threshold`,
+  `tier_c_raise`, `tier_b_finding` and `missing_input`. The wiring slice adds two new members, one for each flag
+  (names its own); `tier_c_raise` is not reused. It corrects the arbiter's module docstring, which still says
+  "Tier C may raise", to say a flag adds a reason and changes no order. The new reasons never set `flagged`:
+  `flagged` keeps reading only `tier_b_finding` reasons, so they never move a row.
 - A `NotRanked` decision carries no reasons, so it never shows a model flag.
 
 ### 7.2 Decision table (ruled behaviour)
@@ -608,7 +643,7 @@ Every row: order unchanged, and NEWS2's `escalated` and reasons exactly as NEWS2
 | scored | formed | p > q, `alert` | not alerting | `Computed(p)`, `Computed("alert")` | `Computed(False)` | False | "Prediction model flag (synthetic, not validated)" | unchanged |
 | scored | formed | p < t or `not_sure` | alerting | `Computed(p)`, `Computed("quiet")` or `Computed("not_sure")` | `Computed(True)` | False | "Alert policy flag (learned by reward; synthetic, not validated)" | unchanged |
 | scored | formed | p > q, `alert` | alerting | `Computed(p)`, `Computed("alert")` | `Computed(True)` | False | both flags | unchanged |
-| scored | formed | any | earlier bin's scored status not stored | as computed | `NotComputed("earlier bin not stored")` | False | prediction flag only, if `alert` | unchanged |
+| scored | formed | any | earlier bin's scored status cannot be rebuilt | as computed | `NotComputed("earlier bin not stored")` | False | prediction flag only, if `alert` | unchanged |
 | scored | stay past 672 bins | none | none | `NotComputed("stay past 672 bins")`, same | `NotComputed("stay past 672 bins")` | False | none | unchanged |
 
 The own-baseline finding (`TierBSignal`) keeps its own reason and its tie-break exactly as today. The invariant the
@@ -629,9 +664,9 @@ order, for both models.
 ### 8.2 Abstention, and what must never happen
 
 - Not computed, with no flag: NOT RANKED bin; baseline forming; a stay past 672 bins; a vital not `counted()`; an
-  earlier bin's scored status not stored (policy); a model, calibration or policy file missing or refused.
+  earlier bin's scored status that cannot be rebuilt from stored inputs (policy); a model, calibration or policy file missing or refused.
 - What must never happen: imputing or carrying forward a value; computing on a NOT RANKED bin; reading a later bin;
-  loading a no-temperature file or switching files per row; using q with any other ONNX; letting `not_sure` flag;
+  loading files of two variants, choosing a variant by a held-out row, or switching files per row; using q with any other ONNX; letting `not_sure` flag;
   letting a flag change NEWS2's score, risk, reasons, `escalated` or the order; a default p, t or q.
 
 ### 8.3 The evaluation alert rule (not used by the product)
@@ -667,9 +702,9 @@ device). Past 672 bins nothing is computed.
 
 (a) REQUIRED parity test for the wiring slice (closes gap G3). Replay one simulator trial through the backend path
 (ingest its bins as the simulator does, then build the features from `grid()` as the product will) and show that,
-for a stay inside the cap with device values, the backend's 35 inputs equal the research inputs from
-`research.student.stay_features(rows)` then `research.student.view(x.astype(numpy.float32), True, "trend")` on the
-same stay, for every bin the product computes. Proposed tolerance, which the wiring slice confirms: exact equality
+for a stay inside the cap with device values, the backend's inputs for the wired variant equal the research
+inputs from `research.student.stay_features(rows)` then `research.student.view(x.astype(numpy.float32), temp,
+"trend")` on the same stay (temp True for `all`, False for `no_temp`), for every bin the product computes. Proposed tolerance, which the wiring slice confirms: exact equality
 after float32 rounding for values, flags, d1h and d4h; an absolute tolerance of 1e-6 for each z. Use a
 ward-v2-ext training seed (61-160); never a held-out seed (ward-v2 11-30) or a calibration seed (301-340).
 
@@ -680,17 +715,18 @@ ward-v2-ext training seed (61-160); never a held-out seed (ward-v2 11-30) or a c
 | A stay past 672 bins | `grid()` keeps the newest 672 slots, so the baseline anchor would move; research uses the whole stay | not computed |
 | A physically impossible value | `possible()` makes it a gap in `grid()`; research keeps the stored value | not computed for that bin if the value is in the bins the features read |
 | A stale patch or a nurse-typed live value | `counted()` is False; research has no such rule | not computed |
-| An earlier bin whose scored status is not stored | research has every row's `ranked`; the product may not | the policy is not computed |
-| The baseline still forming | research scored these bins with their z-missing flags set | not computed (ruling 10) |
+| An earlier bin whose scored status cannot be rebuilt from stored inputs | research has every row's `ranked`; the product rebuilds it on read (ruling 6) | the policy is not computed |
+| The baseline still forming, for any vital in `HISTORY_VITALS` | research scored these bins with their z-missing flags set | not computed (ruling 10) |
 
 Provenance (ruling 8). Each `Computed` carries, in a structured form: the model id (`tier_c/student_vitals`,
-`tier_c/confidence_check`, `tier_b/reward_policy`), the variant (`all`), the file sha256 from the manifest
-(section 2.2), the run id from the manifest (`m1-20261113-3d634f3`, `m3-20261113-fbd39f2`, `m2-20261113`), and the
+`tier_c/confidence_check`, `tier_b/reward_policy`), the wired variant (ruling 1), the file sha256 from the
+manifest (section 2.2), the run id from the manifest (`m1-20261113-3d634f3`, `m3-20261113-fbd39f2`, `m2-20261113`,
+the same for both variants), and the
 current bin's start and end (end = start + 15 minutes). Today's `Provenance` has `source`, `tier`, `observed_at`,
 `computed_at`, `model_id`, `synthetic` and `quality`, and `Window` has `start_s`, `end_s` and `coverage`: the bin's
 start and end fit `observed_at` and the `Window`, and the model id fits `model_id`, but the variant, file sha256 and
-run id have no field. The wiring slice adds that structured form (its own name and place); it never packs them into
-the `model_id` string.
+run id have no field. The wiring slice adds structured fields to `Provenance` for them (names its own); it never
+packs them into the `model_id` string.
 
 ### 8.5 Logging (ruling 15)
 
@@ -703,23 +739,23 @@ the `model_id` string.
 ## 9. Files
 
 Bytes from `stat`, sha256 from `shasum -a 256`, re-read on 2026-11-13; every model file matches `models/manifest.json`
-as it is in this worktree. The API image holds only the rows marked "wired" plus the manifest (section 2.1); the
-manifest stays the source if a file changes.
+as it is in this worktree. The API image holds the wired variant's three rows (ruling 1) plus the manifest
+(section 2.1); the manifest stays the source if a file changes.
 
 | Path | Bytes | sha256 | Role |
 |---|---|---|---|
-| `models/tier_c/student_vitals/model.json` | 34,949 | `d05d75ee0ad8da0db138a74f3a9796c98de6b8af5dfea513789d5521f1768af6` | wired: student `all`, plain form |
-| `models/tier_c/confidence_check/calibration.json` | 660 | `7815bd3885c794fafa38e8384d6837300c163738dbb6a0a7a126c4dca2484f11` | wired: q for `all` |
-| `models/tier_c/confidence_check/calibration.json.sha256` | 65 | `e4017fd23c40974d97d7807a377c37672735c9334c7d94dbece771ecccdef0cf` | wired: holds the calibration's sha256 |
-| `models/tier_b/reward_policy/policy.json` | 5,064 | `21cf038e4ab699906eeab87d56ddbd39965915a8ec085e75f56ca99501114775` | wired: policy with temperature (content sha256 `b364a680...f804f`) |
-| `models/manifest.json` | 6,706 | `20b3b81aeb9d327f49bb6f5edfbc1749757ecd01524f4aca5d26ee1aec1dfe76` (snapshot; it changes when regenerated) | wired: the checksums |
-| `models/tier_c/student_vitals/model.onnx` | 5,334 | `d1ae4e881732922024b08c6cf9c37adbd8b01c48bc8390ee22b28ab802ddfdbc` | not loaded: its sha256 is read from `model.json` |
+| `models/tier_c/student_vitals/model.json` | 34,949 | `d05d75ee0ad8da0db138a74f3a9796c98de6b8af5dfea513789d5521f1768af6` | student `all`, plain form; wired with temperature (ruling 1) |
+| `models/tier_c/confidence_check/calibration.json` | 660 | `7815bd3885c794fafa38e8384d6837300c163738dbb6a0a7a126c4dca2484f11` | q for `all`; wired with `model.json` |
+| `models/tier_c/confidence_check/calibration.json.sha256` | 65 | `e4017fd23c40974d97d7807a377c37672735c9334c7d94dbece771ecccdef0cf` | holds `calibration.json`'s sha256; wired with it |
+| `models/tier_b/reward_policy/policy.json` | 5,064 | `21cf038e4ab699906eeab87d56ddbd39965915a8ec085e75f56ca99501114775` | policy with temperature (content sha256 `b364a680...f804f`); wired with temperature (ruling 1) |
+| `models/manifest.json` | 6,706 | `20b3b81aeb9d327f49bb6f5edfbc1749757ecd01524f4aca5d26ee1aec1dfe76` (snapshot; it changes when regenerated) | the checksums; always in the image |
+| `models/tier_c/student_vitals/model.onnx` | 5,334 | `d1ae4e881732922024b08c6cf9c37adbd8b01c48bc8390ee22b28ab802ddfdbc` | never loaded: its sha256 is read from `model.json` |
 | `models/tier_c/student_vitals/metadata.json` | 28,290 | `4ef6898ca6e9e2ca81b90377586642a3556ff7343bdd1c8f66dbad324ad25094` | record only, not loaded |
-| `models/tier_c/student_vitals/model_no_temp.json` | 14,903 | `d041b6584edc7d67c54dcdb03e81f0c1a58f51282a3cf02fbc3e869ff53cb2fc` | not wired (ruling 1) |
-| `models/tier_c/student_vitals/model_no_temp.onnx` | 2,382 | `e6b6ae44c11aa38fc38a961eebaf3e3bd51b1b5812b9e200d31d8c04101869ee` | not wired, not loaded |
-| `models/tier_c/confidence_check/calibration_no_temp.json` | 664 | `4a3de9544cce7e6cc838837bb2c1646261d85d1f41bef35f84135509fa0729bb` | not wired (ruling 1) |
-| `models/tier_c/confidence_check/calibration_no_temp.json.sha256` | 65 | `484f8b1440da0715646ce7473e1f5ee3df010634ea2f0f15b2b9f436df053c55` | not wired |
-| `models/tier_b/reward_policy/no_temperature/policy.json` | 4,916 | `522195aa8104271d3bfec0e87ab1f37e07b074dccbd5a347d05191905a12a3b3` | not wired (ruling 1; content sha256 `ef60e564...e020`) |
+| `models/tier_c/student_vitals/model_no_temp.json` | 14,903 | `d041b6584edc7d67c54dcdb03e81f0c1a58f51282a3cf02fbc3e869ff53cb2fc` | student `no_temp`, plain form; wired without temperature (ruling 1) |
+| `models/tier_c/student_vitals/model_no_temp.onnx` | 2,382 | `e6b6ae44c11aa38fc38a961eebaf3e3bd51b1b5812b9e200d31d8c04101869ee` | never loaded: its sha256 is read from `model_no_temp.json` |
+| `models/tier_c/confidence_check/calibration_no_temp.json` | 664 | `4a3de9544cce7e6cc838837bb2c1646261d85d1f41bef35f84135509fa0729bb` | q for `no_temp`; wired with `model_no_temp.json` |
+| `models/tier_c/confidence_check/calibration_no_temp.json.sha256` | 65 | `484f8b1440da0715646ce7473e1f5ee3df010634ea2f0f15b2b9f436df053c55` | holds `calibration_no_temp.json`'s sha256; wired with it |
+| `models/tier_b/reward_policy/no_temperature/policy.json` | 4,916 | `522195aa8104271d3bfec0e87ab1f37e07b074dccbd5a347d05191905a12a3b3` | policy without temperature (content sha256 `ef60e564...e020`); wired without temperature (ruling 1) |
 
 Reference implementations to port or copy:
 
@@ -737,19 +773,20 @@ library (`struct` for the float32 step included), and the baseline is already th
 
 ## 10. Test plan for the wiring slice
 
-1. Forward parity: the backend port against `research/plain_student.py` on the fixed batch of section 4.8,
-   including the float32 step (ruling 9): the rounded batch gives the expected p within 1e-12, and the unrounded
+1. Forward parity: the backend port against `research/plain_student.py` on the fixed batch of section 4.8, for
+   both student files, including the float32 step (ruling 9): the rounded batch gives the expected p within 1e-12, and the unrounded
    batch through the backend's own rounding gives the same p.
 2. Trial replay parity (ruling 7, REQUIRED): section 8.4 (a), with its stated tolerance.
 3. Feature fixture on short stays: `research.trials.load_trial("research/tests/data/toy")`, rows grouped by
-   patient, `research.student.stay_features(rows)` and `view(x.astype(numpy.float32), True, "trend")`, plus one
+   patient, `research.student.stay_features(rows)` and `view(x.astype(numpy.float32), temp, "trend")` for both
+   values of temp, plus one
    long stay built like `research/tests/test_reward.py` `stay()` (94 bins) with one gap and one NOT RANKED bin after
    bin 24. The toy stays are at most 14 bins, so every toy bin must be `NotComputed("baseline forming")` in the
    backend (ruling 10); on the long stay every bin from the formed baseline on must match the research row.
 4. Policy parity: on the same stays, the backend's states against
    `research.reward_policy.states(Params.from_dict(policy["params"]), research.reward_policy.z_series(rows), "sum")`
-   on every bin the backend computes; and `NotComputed("earlier bin not stored")` when one of bins t - 4 to t - 1
-   has no stored scored status (ruling 6).
+   on every bin the backend computes, for both policy files; and `NotComputed("earlier bin not stored")` when the
+   scored status of one of bins t - p + 1 to t - 1 cannot be rebuilt from its stored inputs (ruling 6).
 5. Check truth table: p below t; p equal to t; p between t and q; p equal to q (`not_sure`); p above q; q None
    (never `alert`).
 6. `not_sure` shows no flag and is recorded: for every bin with `t <= p <= q`, the row has no prediction-model
@@ -759,8 +796,8 @@ library (`struct` for the float32 step included), and the baseline is already th
 8. File refusals at start (ruling 13): each wired file missing, unreadable, over its cap, with a changed byte
    (manifest sha256 differs), with no manifest record; a wrong `format`; a calibration `.sha256` that differs; a
    calibration with another `onnx_sha256`; a policy with a changed weight but the old `sha256`. Each gives
-   `NotComputed` for its signal, exactly one warning line at start, no fall-back to a no-temperature file, and NEWS2
-   output unchanged.
+   `NotComputed` for its signal, exactly one warning line at start, no fall-back to the other variant, and NEWS2
+   output unchanged. A build that puts files of both variants in the image is refused.
 9. Order unchanged with flags on: for a ward fixture where both flags fire on some rows, the decisions with the
    hooks on and off have identical `news2`, `escalated`, `flagged`, NEWS2 and Tier B reasons and rank; the only
    differences are the appended flag reasons (with the exact ruling 11 texts) and `inert`.
@@ -769,6 +806,8 @@ library (`struct` for the float32 step included), and the baseline is already th
 11. NOT RANKED, forming and the cap: a NOT RANKED bin gives `NotComputed("not ranked")` on both hooks (ruling 2);
     a stay of 673 bins gives not computed (ruling 7); the current bin is the last completed stored bin (ruling 6).
 12. Logging: one score-time failure reason repeated many times gives one log line and a count (ruling 15).
+13. Baseline gate: with `HISTORY_VITALS` as it is, a stay where heart rate and respiratory rate have 24 valid bins but
+    SpO2 has 23 gives `NotComputed("baseline forming")` on both hooks (ruling 10).
 
 ## 11. Limits and what was not checked
 
@@ -802,8 +841,14 @@ recorded; a missing or bad model file means not computed, never a default.
    Ruling: (a) The with-temperature files: student `model.json`, `calibration.json`, policy `policy.json`. Never
    pick a variant by its held-out row. When temperature is missing for a bin, the result is what the trained model
    does with its missing flag; do not switch files per row.
-   For the code: the image holds those three files and the manifest (section 2.1); the no-temperature files are not
-   loaded. A temperature gap in the current bin makes it NOT RANKED; a gap in a lag bin sets that lag's flag.
+   Condition (follow-up answer 3): the with-temperature files are wired UNLESS the backend keeps no temperature
+   history. The dashboard session checks whether temperature history exists in the backend at all; if it does not,
+   the no-temperature files (`model_no_temp.json`, `calibration_no_temp.json`, `no_temperature/policy.json`) are
+   wired, for that stated reason only (what the backend stores), never because of a held-out row.
+   For the code: the image holds one variant's three files and the manifest (section 2.1). Today
+   `HISTORY_VITALS = ("heart_rate", "respiratory_rate", "spo2")` carries no temperature, and temperature bins are
+   read only for the 12-bin sparkline. A temperature gap in the current bin makes it NOT RANKED; a gap in a lag bin
+   sets that lag's flag.
 2. Open: what a NOT RANKED bin gives each hook.
    Ruling: (a) `NotComputed("not ranked")` on both hooks.
    For the code: `TierCSignal(probability=NotComputed("not ranked"), check=NotComputed("not ranked"))` and
@@ -826,8 +871,11 @@ recorded; a missing or bad model file means not computed, never a default.
    Ruling: (a) The last completed stored 15-minute bin with that bin's stored inputs. A flag can lag NEWS2 by up to
    15 minutes; say so in the document. Where an earlier bin's scored status is not stored, the policy is not
    computed.
+   Follow-up answer 4: the dashboard session checks whether earlier bins' NEWS2 inputs can be rebuilt on read from
+   stored inputs. Scores stay unstored. If they cannot be rebuilt, the policy is not shipped as "always not
+   computed"; it comes back to the orchestrator first.
    For the code: `score_news2` on the current bin's stored inputs decides "scored" for the features; the policy
-   reads bins t - 4 to t and gives `NotComputed(...)` when any of their scored status is unknown.
+   rebuilds bins t - p + 1 to t - 1 the same way on read and gives `NotComputed(...)` when one cannot be rebuilt.
 7. Open: how the series is built.
    Ruling: (a) The backend's `grid()` and `counted()`, and not computed past 672 bins. Because of gap G3, one added
    requirement for the wiring slice: a parity test that replays one simulator trial through the backend path and
@@ -838,30 +886,37 @@ recorded; a missing or bad model file means not computed, never a default.
    by-design list are in section 8.4.
 8. Open: the `Provenance` and `Window` values.
    Ruling: The structured form: model id, variant, file sha256 from the manifest, run id, the bin's start and end.
-   For the code: the bin's start and end in `observed_at` and the `Window`, the model id in `model_id`; variant,
-   file sha256 and run id need a new structured field, because `Provenance` has none (section 8.4).
+   Follow-up answer 1: the wiring slice adds structured fields to `Provenance`.
+   For the code: the bin's start and end in `observed_at` and the `Window`, the model id in `model_id`; new
+   structured `Provenance` fields for the variant, the file sha256 and the run id (section 8.4).
 9. Open: float32 rounding before the forward pass.
    Ruling: (a) float32 before the forward pass.
    For the code: `struct.unpack("f", struct.pack("f", x))[0]` on each feature, then `forward`; in the parity test.
 10. Open: whether p and the policy state are computed in the first hours of a stay.
     Ruling: (b) Not computed until the patient's own baseline has formed (24 valid bins, 6 hours).
-    For the code: while any `baseline_finding` call for the four vitals returns its "baseline forming"
-    `NotComputed`, both hooks get `NotComputed("baseline forming")`. Research scored these bins; the product only
-    removes them.
+    Follow-up answer 3: "the baseline has formed" means formed for every vital the backend keeps history for
+    (`HISTORY_VITALS`), gating both the student and the policy.
+    For the code: while `baseline_finding` returns its "baseline forming" `NotComputed` for any vital in
+    `HISTORY_VITALS` (today heart rate, respiratory rate, SpO2), `TierCSignal` and `PolicySignal` both get
+    `NotComputed("baseline forming")`. Research scored these bins; the product only removes them.
 11. Open: the row text.
     Ruling: Short row text, in the style of the baseline reason already on main: "Prediction model flag (synthetic,
     not validated)" and "Alert policy flag (learned by reward; synthetic, not validated)". `not_sure` shows no flag.
     The word "guarantee" never appears on a row or a page.
-    For the code: those two strings exactly, as `ArbiterReason.text`; no text for `not_sure`.
+    Follow-up answer 2: two new `EscalationRule` members carry these reasons; `tier_c_raise` is not reused.
+    For the code: those two strings exactly, as `ArbiterReason.text`, each with its own new `EscalationRule` member;
+    no text for `not_sure`.
 12. Open: whether a signal may change order or escalation.
     Ruling: (a) A flag adds a reason and changes no order, for both models. The script's own line is that no single
     model can push a patient up the list.
+    Follow-up answer 2: the arbiter docstring is corrected; the new reasons never set `flagged`.
     For the code: append an `ArbiterReason`; never set `escalated` or `flagged`, never touch `Ranked.sort_key`;
-    the policy's reason needs a new `EscalationRule` member.
+    correct the "Tier C may raise" line of the `arbiter.py` module docstring.
 13. Open: where the files live and how a changed file is handled.
     Ruling: (a) Copied into the API image at build, verified against `models/manifest.json` at start; a mismatch
     means not computed and one warning line.
-    For the code: the build copies the wired files and the manifest; start-up runs the checks of section 2.2 once.
+    For the code: the build copies the wired variant's files (ruling 1) and the manifest; start-up runs the checks
+    of section 2.2 once.
 14. Open: how a failed calibration is shown.
     Ruling: (a) With a failed or missing calibration the student gives no flag, and the reason is carried in the
     field of ruling 3.
