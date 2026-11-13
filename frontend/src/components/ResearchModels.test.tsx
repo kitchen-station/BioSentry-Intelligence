@@ -24,7 +24,7 @@ describe("ResearchModels", () => {
     show({ prediction: sig("no_flag"), alert_policy: sig("flag") });
     const region = screen.getByRole("region", { name: "Research models" });
     expect(within(region).getByRole("heading", { level: 2 }).textContent).toBe("Research models");
-    expect(within(region).getByText("Synthetic, not validated. A flag adds a reason line. It never changes the NEWS2 score or the order.")).toBeTruthy();
+    expect(within(region).getByText("Synthetic, not validated. A flag adds a reason line. It never changes the NEWS2 score or the order. No flag is not an all-clear: NEWS2 alone sets the next step.")).toBeTruthy();
     expect(items()).toHaveLength(2);
     expect(items()[0].textContent).toContain("Prediction model · No flag");
     expect(items()[1].textContent).toContain("Alert policy (learned by reward) · Flagged");
@@ -33,7 +33,7 @@ describe("ResearchModels", () => {
   it("words flag, no flag and not sure, and never calls not sure safe", () => {
     show({ prediction: sig("not_sure"), alert_policy: sig("no_flag") });
     expect(items()[0].textContent).toContain("Not sure");
-    expect(screen.getByText("The score passed the threshold but is too low to support a flag.")).toBeTruthy();
+    expect(screen.getByText("The model's first check was met, but its confidence check could not confirm a flag. This is not an all-clear.")).toBeTruthy();
     expect(items()[0].textContent).not.toMatch(/safe|normal|low risk|no flag/i);
   });
 
@@ -108,9 +108,29 @@ describe("ResearchModels", () => {
     ["null entries", { prediction: null, alert_policy: 3 }],
     ["an unknown state", { prediction: sig("maybe"), alert_policy: sig("flag", { state: 7 }) }],
     ["a not computed entry with no reason", { prediction: { state: "not_computed" }, alert_policy: { state: "not_computed", reason: 4 } }],
+    ["a not computed entry with an empty reason", { prediction: { state: "not_computed", reason: "" }, alert_policy: null }],
   ])("says not available for %s", (_, models) => {
     show(models);
     expect(screen.getAllByText(/Not available\./)).toHaveLength(2);
+    // A state this build does not know gets no time line and no record, whatever else the entry holds.
+    expect(screen.queryByText(/From the 15 minutes|Model record|Not computed: $/)).toBeNull();
+  });
+
+  it("gives the confidence sentence only to the model that has the check", () => {
+    show({ prediction: sig("not_sure"), alert_policy: sig("not_sure") });
+    expect(screen.getAllByText("Not sure", { exact: false })).not.toHaveLength(0);
+    expect(screen.getAllByText(/its confidence check could not confirm a flag/)).toHaveLength(1);
+  });
+
+  it("shows a record's ids as text and leaves out an item with nothing to name", async () => {
+    const { container } = show({
+      prediction: sig("flag", { provenance: [{ ...prov, model_id: "<b>x</b>" }, { tier: "C" }] }),
+      alert_policy: sig("no_flag", { provenance: [] }),
+    });
+    await userEvent.click(screen.getByText("Model record"));
+    expect(container.querySelector("details b")).toBeNull();
+    expect(container.querySelectorAll("details p")).toHaveLength(1);
+    expect(container.querySelector("details p")!.textContent).toContain("Model: <b>x</b>");
   });
 
   it("ignores a provenance that is not a list", () => {

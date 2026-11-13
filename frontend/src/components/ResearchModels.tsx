@@ -2,8 +2,8 @@ import { useId } from "react";
 import { formatClock } from "./format";
 import styles from "./ResearchModels.module.css";
 
-const NOTE = "Synthetic, not validated. A flag adds a reason line. It never changes the NEWS2 score or the order.";
-const NOT_SURE = "The score passed the threshold but is too low to support a flag.";
+const NOTE = "Synthetic, not validated. A flag adds a reason line. It never changes the NEWS2 score or the order. No flag is not an all-clear: NEWS2 alone sets the next step.";
+const NOT_SURE = "The model's first check was met, but its confidence check could not confirm a flag. This is not an all-clear.";
 const WORDS: Record<string, string> = { flag: "Flagged", no_flag: "No flag", not_sure: "Not sure" };
 const REASONS: Record<string, string> = {
   "baseline forming": "the patient's own baseline is still forming",
@@ -44,6 +44,7 @@ function ModelRecord({ provenance }: { provenance: unknown }) {
           ["File", sha && sha.slice(0, 12)],
           ["Run", text(p.run_id)],
         ].filter(([, v]) => v !== null);
+        if (lines.length === 0) return null; // an item with nothing to name
         return (
           <p key={i} className={styles.sub}>
             {lines.map(([k, v]) => `${k}: ${v}`).join(" · ")}
@@ -54,12 +55,13 @@ function ModelRecord({ provenance }: { provenance: unknown }) {
   );
 }
 
-function Entry({ name, s }: { name: string; s: unknown }) {
+function Entry({ name, s, checked }: { name: string; s: unknown; checked: boolean }) {
   const state = isObj(s) ? s.state : null;
   let body: string | null = null;
   if (typeof state === "string" && Object.hasOwn(WORDS, state)) body = WORDS[state];
-  else if (state === "not_computed" && isObj(s) && typeof s.reason === "string") {
-    body = `Not computed: ${Object.hasOwn(REASONS, s.reason) ? REASONS[s.reason] : s.reason}`;
+  else if (state === "not_computed" && isObj(s)) {
+    const reason = text(s.reason);
+    if (reason !== null) body = `Not computed: ${Object.hasOwn(REASONS, reason) ? REASONS[reason] : reason}`;
   }
   const computed = isObj(s) && typeof state === "string" && Object.hasOwn(WORDS, state);
   const from = computed ? ms(s.bin_start) : null;
@@ -67,7 +69,7 @@ function Entry({ name, s }: { name: string; s: unknown }) {
   return (
     <li className={styles.item}>
       <span className={styles.name}>{name}</span> · {body ?? "Not available."}
-      {state === "not_sure" && <span className={styles.sub}>{NOT_SURE}</span>}
+      {state === "not_sure" && checked && <span className={styles.sub}>{NOT_SURE}</span>}
       {from !== null && to !== null && (
         <span className={styles.sub}>From the 15 minutes {formatClock(from)} to {formatClock(to)}.</span>
       )}
@@ -86,7 +88,7 @@ export function ResearchModels({ models }: { models: unknown }) {
       <p className={styles.label}>{NOTE}</p>
       <ul role="list" className={styles.list}>
         {ENTRIES.map(([key, name]) => (
-          <Entry key={key} name={name} s={m[key]} />
+          <Entry key={key} name={name} s={m[key]} checked={key === "prediction"} /* only this model has the confidence check */ />
         ))}
       </ul>
     </section>
