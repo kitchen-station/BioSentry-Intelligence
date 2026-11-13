@@ -1,15 +1,16 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useParams, Link } from "react-router-dom";
 import type { ClinicalNote, PatientDetail as PatientDetailType, Session, SessionRole, TierBFinding, VitalsRecorded } from "../types";
-import { getPatient, getNotes, addNote, canRecordVitals } from "../api";
+import { getPatient, getNotes, addNote, canRecordVitals, usesServer } from "../api";
 import { SessionMenu } from "../components/SessionMenu";
 import { SimulatedNote } from "../components/LabFrame";
 import { BaselinePanel } from "../components/BaselinePanel";
 import { useBaseline } from "../components/useBaseline";
 import { CurrentVitals, VitalRow } from "../components/CurrentVitals";
 import { TrendChart } from "../components/TrendChart";
-import { patchInUse } from "../components/format";
+import { formatClock, formatSimClock, patchInUse } from "../components/format";
+import { useLivePoll } from "../components/useLivePoll";
 import { band, driftResponse, response } from "../components/risk";
 import { VitalsEntry } from "../components/VitalsEntry";
 import { standing } from "../components/vitalsDraft";
@@ -93,15 +94,36 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
   const [unranked, setUnranked] = useState<string | null>(null);
   const [refreshFailed, setRefreshFailed] = useState(false);
 
-  useEffect(() => {
-    if (!id) return;
-    getPatient(id)
+  // The first read decides "not found" or "could not be loaded". A timed read only replaces the
+  // patient: it never touches the drawer, the note box or the vitals form, and says what went wrong
+  // in one line.
+  const shown = useRef<string | null>(null);
+  const [staleSince, setStaleSince] = useState<number | null>(null);
+  const [lastGood, setLastGood] = useState<number | null>(null);
+  const [failedSince, setFailedSince] = useState<number | null>(null);
+  const loadPatient = useCallback(() => {
+    if (!id) return Promise.resolve();
+    return getPatient(id)
       .then((p) => {
-        if (p) setPatient(p);
-        else setNotFound(true);
+        const first = shown.current !== id;
+        if (p) {
+          shown.current = id;
+          setPatient(p);
+          setLastGood(Date.now());
+          setFailedSince(null);
+          setStaleSince(null);
+        } else if (first) setNotFound(true);
+        else setStaleSince(Date.now());
       })
-      .catch(() => setLoadError(true));
-    if (!readOnly) getNotes(id).then(setNotes).catch(() => setNoteError("Notes could not be loaded."));
+      .catch(() => {
+        if (shown.current !== id) setLoadError(true);
+        else setFailedSince((t) => t ?? Date.now());
+      });
+  }, [id]);
+  const { sim } = useLivePoll(loadPatient, usesServer && !readOnly, staleSince !== null || unranked !== null);
+
+  useEffect(() => {
+    if (id && !readOnly) getNotes(id).then(setNotes).catch(() => setNoteError("Notes could not be loaded."));
   }, [id, readOnly]);
 
   // An admin's page reads the notes only when the drawer opens: one audited read per real look.
@@ -174,6 +196,11 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
         <div className={styles.stripInner}>
           <Link to="/ward" className={styles.back}>&larr; Ward view</Link>
           <div className={styles.stripRight}>
+            {sim !== null && (
+              <span className={styles.stripSignal} role="group" aria-label="Ward clock">
+                Ward clock {formatSimClock(sim)}
+              </span>
+            )}
             <span className={styles.stripSignal}>
               {signal === null ? "No patch signal" : `Signal ${signal}%`}
             </span>
@@ -425,6 +452,15 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
             )}
             {refreshFailed && (
               <p role="alert">Recorded. The page could not refresh; reload to see the new score.</p>
+            )}
+            {failedSince !== null && (
+              <p role="status">Cannot reach the ward server since {formatClock(failedSince)}.</p>
+            )}
+            {staleSince !== null && unranked === null && (
+              <p role="status">
+                No longer ranked. Figures from {formatClock(lastGood ?? staleSince)}.{" "}
+                <Link to="/ward">Back to ward</Link>
+              </p>
             )}
             {unranked !== null && (
               <p role="status">

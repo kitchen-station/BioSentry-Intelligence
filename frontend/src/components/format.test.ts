@@ -3,6 +3,9 @@ import { enteredByNurse, patchInUse, formatAge, formatBloodPressure, formatClock
 import type { SimStatus } from "./format";
 import type { Vitals } from "../types";
 
+// "Sep" or "Sept", whichever the runtime's en-GB gives: the clock uses the same call as the simulator.
+const SEP = new Date(Date.UTC(2026, 8, 3)).toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" });
+
 describe("formatAge", () => {
   it("uses seconds, then minutes, then hours", () => {
     expect(formatAge(8)).toBe("8s ago");
@@ -67,15 +70,17 @@ describe("formatSimClock", () => {
   const at = (clockS: number, over: Partial<SimStatus> = {}) =>
     formatSimClock({ ...(simStatus(SHARED) as SimStatus), clockS, ...over });
 
-  it("says the day from 1, the time and the speed", () => {
-    expect(at(0)).toBe("day 1 00:00, 10x");
-    expect(at(109_200)).toBe("day 2 06:20, 10x");
-    expect(at(86_400 * 3 - 1, { speed: 60 })).toBe("day 3 23:59, 60x");
+  it("says the date and time in the simulator's format, and the pace", () => {
+    expect(at(0)).toBe(`3 ${SEP}, 15:00 \u00b7 10x`);
+    expect(at(109_200)).toBe(`4 ${SEP}, 21:20 \u00b7 10x`);
+    expect(at(540 * 60 - 1, { speed: 60 })).toBe(`3 ${SEP}, 23:59 \u00b7 60x`);
+    expect(at(540 * 60, { speed: 1 })).toBe(`4 ${SEP}, 00:00 \u00b7 1x`);
   });
 
-  it("says paused at speed 0, and ended whatever the speed", () => {
-    expect(at(109_200, { speed: 0 })).toBe("day 2 06:20, paused");
-    expect(at(109_200, { ended: true })).toBe("day 2 06:20, ended");
+  it("says Paused at speed 0, and Run ended whatever the speed", () => {
+    expect(at(109_200, { speed: 0 })).toBe(`4 ${SEP}, 21:20 \u00b7 Paused`);
+    expect(at(109_200, { ended: true })).toBe(`4 ${SEP}, 21:20 \u00b7 Run ended`);
+    expect(at(109_200, { speed: 0, ended: true })).toBe(`4 ${SEP}, 21:20 \u00b7 Run ended`);
   });
 });
 

@@ -86,11 +86,15 @@ export function simStatus(shared: unknown): SimStatus | null {
   return { clockS, speed, ended, counts: { received, rejected, abstained } };
 }
 
-/** "day 3 06:20, 10x": the simulated time and speed, or "paused" or "ended" in place of the speed. */
+/**
+ * "4 Sep, 21:20 · 10x": the simulated time in the simulator's own format, then the pace.
+ * shortcut: the simulator's start (15:00, 3 Sep 2026, Manila: its panels.tsx clockText/dateText) is copied here; upgrade when the simulator publishes its start in shared.
+ */
 export function formatSimClock(sim: SimStatus): string {
-  const day = Math.floor(sim.clockS / 86_400) + 1;
-  const hh = String(Math.floor((sim.clockS % 86_400) / 3600)).padStart(2, "0");
-  const mm = String(Math.floor((sim.clockS % 3600) / 60)).padStart(2, "0");
-  const pace = sim.ended ? "ended" : sim.speed === 0 ? "paused" : `${sim.speed}x`;
-  return `day ${day} ${hh}:${mm}, ${pace}`;
+  const at = new Date(Date.UTC(2026, 8, 3, 15, Math.floor(sim.clockS / 60)));
+  const date = at.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+  const hh = String(at.getUTCHours()).padStart(2, "0");
+  const mm = String(at.getUTCMinutes()).padStart(2, "0");
+  const pace = sim.ended ? "Run ended" : sim.speed === 0 ? "Paused" : `${sim.speed}x`;
+  return `${date}, ${hh}:${mm} \u00b7 ${pace}`;
 }

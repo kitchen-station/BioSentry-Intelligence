@@ -11,6 +11,9 @@ import synthetic from "../data/synthetic.json";
 import type { Session, WardResponse } from "../types";
 import { Ward } from "./Ward";
 
+// "Sep" or "Sept", whichever the runtime's en-GB gives: the clock uses the same call as the simulator.
+const SEP = new Date(Date.UTC(2026, 8, 3)).toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" });
+
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const api = vi.hoisted(() => ({
@@ -63,6 +66,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+  delete (document as { visibilityState?: string }).visibilityState; // back to the real getter
 });
 
 const expectLabEntry = () => {
@@ -138,59 +142,61 @@ const live = (shared: unknown) => ({ shared, patients: [], can_control: false })
 const published = (over: object = {}) =>
   live({ clockS: 109_200, speed: 10, ended: false, counts: { received: 120, rejected: 3, abstained: 5 }, ...over });
 
-describe("the simulator status line", () => {
+describe("the ward's clock and speed in the bar", () => {
   beforeEach(() => {
     api.build.usesServer = true; // only the API has a simulator
   });
+  const clock = () => screen.findByRole("group", { name: "Ward clock" });
 
-  it("says the simulated time, the speed and the counts", async () => {
+  it("says the simulated time and the speed, under a name", async () => {
     api.getLiveWard.mockResolvedValue(published());
     page();
-    expect(
-      await screen.findByText("Simulator: day 2 06:20, 10x · 120 received · 3 rejected · 5 abstained"),
-    ).toBeTruthy();
+    const el = await clock();
+    expect(el.textContent).toBe(`Ward clock4 ${SEP}, 21:20 \u00b7 10x`);
+    expect(screen.queryByText(/Simulator:/)).toBeNull(); // the old counts line is gone
   });
 
-  it("says paused at speed 0 and ended when the run is over", async () => {
-    api.getLiveWard.mockResolvedValue(published({ speed: 0 }));
+  it.each([
+    [{ speed: 60 }, `4 ${SEP}, 21:20 \u00b7 60x`],
+    [{ speed: 1 }, `4 ${SEP}, 21:20 \u00b7 1x`],
+    [{ speed: 0 }, `4 ${SEP}, 21:20 \u00b7 Paused`],
+    [{ ended: true }, `4 ${SEP}, 21:20 \u00b7 Run ended`],
+  ])("says the pace for %j", async (over, text) => {
+    api.getLiveWard.mockResolvedValue(published(over));
     page();
-    expect(await screen.findByText(/^Simulator: day 2 06:20, paused/)).toBeTruthy();
-    cleanup();
-    api.getLiveWard.mockResolvedValue(published({ ended: true }));
-    page();
-    expect(await screen.findByText(/^Simulator: day 2 06:20, ended/)).toBeTruthy();
+    expect((await clock()).textContent).toContain(text);
   });
 
   it.each([
     ["there is no simulator", null],
     ["nothing is published yet", live(null)],
     ["what is published is not the simulator's status", live({ clockS: "soon" })],
-  ])("shows no line when %s", async (_, view) => {
+  ])("shows no clock when %s", async (_, view) => {
     api.getLiveWard.mockResolvedValue(view);
     page();
     await screen.findByText(/Priority queue/);
     await waitFor(() => expect(api.getLiveWard).toHaveBeenCalled());
-    expect(screen.queryByText(/Simulator:/)).toBeNull();
+    expect(screen.queryByRole("group", { name: "Ward clock" })).toBeNull();
   });
 
-  it("follows the simulator with the ward, in the same round, and drops the line when it cannot be read", async () => {
+  it("follows the simulator with the ward, in the same round, and drops the clock when it cannot be read", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     api.getLiveWard
       .mockResolvedValueOnce(published())
       .mockResolvedValueOnce(published({ clockS: 109_260 }))
       .mockRejectedValue(new Error("down"));
     page();
-    await screen.findByText(/^Simulator: day 2 06:20/);
+    await screen.findByText(`4 ${SEP}, 21:20 \u00b7 10x`);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5_000);
     });
-    await screen.findByText(/^Simulator: day 2 06:21/);
+    await screen.findByText(`4 ${SEP}, 21:21 \u00b7 10x`);
     expect(api.getLiveWard).toHaveBeenCalledTimes(2);
     expect(api.getWard).toHaveBeenCalledTimes(2); // one round: the rows and the status together
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5_000);
     });
-    await waitFor(() => expect(screen.queryByText(/Simulator:/)).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("group", { name: "Ward clock" })).toBeNull());
   });
 
   it("is not asked for on the fixture: no call, now or later", async () => {
@@ -202,7 +208,107 @@ describe("the simulator status line", () => {
       await vi.advanceTimersByTimeAsync(30_000);
     });
     expect(api.getLiveWard).not.toHaveBeenCalled();
-    expect(screen.queryByText(/Simulator:/)).toBeNull();
+    expect(screen.queryByRole("group", { name: "Ward clock" })).toBeNull();
+  });
+});
+
+describe("how often the ward follows the run's speed", () => {
+  beforeEach(() => {
+    api.build.usesServer = true;
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+  const advance = (ms: number) =>
+    act(async () => {
+      await vi.advanceTimersByTimeAsync(ms);
+    });
+  const setVisibility = (state: "hidden" | "visible") => {
+    Object.defineProperty(document, "visibilityState", { value: state, configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+  };
+  const start = async (over: object) => {
+    api.getLiveWard.mockResolvedValue(published(over));
+    page();
+    await screen.findByRole("group", { name: "Ward clock" });
+    api.getWard.mockClear();
+  };
+
+  it("reads at 2, 4 and 6 seconds at 60x", async () => {
+    await start({ speed: 60 });
+    await advance(1_500);
+    expect(api.getWard).not.toHaveBeenCalled();
+    await advance(1_000);
+    expect(api.getWard).toHaveBeenCalledTimes(1);
+    await advance(2_000);
+    await advance(2_000);
+    expect(api.getWard).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([
+    ["10x", { speed: 10 }],
+    ["1x", { speed: 1 }],
+    ["paused", { speed: 0 }],
+    ["ended at 60x", { speed: 60, ended: true }],
+  ])("reads at 5 seconds, not 2, at %s", async (_, over) => {
+    await start(over);
+    await advance(2_500);
+    expect(api.getWard).not.toHaveBeenCalled();
+    await advance(2_700);
+    expect(api.getWard).toHaveBeenCalledTimes(1);
+  });
+
+  it("switches when the speed changes between rounds, and back", async () => {
+    await start({ speed: 60 });
+    api.getLiveWard.mockResolvedValue(published({ speed: 1 }));
+    await advance(2_100); // this round reads the new speed
+    api.getWard.mockClear();
+    await advance(2_500);
+    expect(api.getWard).not.toHaveBeenCalled();
+    await advance(2_600);
+    expect(api.getWard).toHaveBeenCalledTimes(1);
+    api.getLiveWard.mockResolvedValue(published({ speed: 60 }));
+    await advance(5_000);
+    api.getWard.mockClear();
+    await advance(2_100);
+    expect(api.getWard).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads every 5 seconds in a hidden tab, even at 60x, and every 2 again when it is shown", async () => {
+    await start({ speed: 60 });
+    await act(async () => setVisibility("hidden"));
+    await advance(2_500);
+    expect(api.getWard).not.toHaveBeenCalled();
+    await advance(2_700);
+    expect(api.getWard).toHaveBeenCalledTimes(1);
+    await act(async () => setVisibility("visible"));
+    api.getWard.mockClear();
+    await advance(2_100);
+    expect(api.getWard).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts in a hidden tab at 5 seconds", async () => {
+    setVisibility("hidden");
+    await start({ speed: 60 });
+    await advance(2_500);
+    expect(api.getWard).not.toHaveBeenCalled();
+  });
+
+  it("is 5 seconds when the live view cannot be read", async () => {
+    api.getLiveWard.mockRejectedValue(new Error("down"));
+    page();
+    await screen.findByText(/Priority queue/);
+    api.getWard.mockClear();
+    await advance(2_500);
+    expect(api.getWard).not.toHaveBeenCalled();
+  });
+
+  it("keeps one round in flight: a slow answer makes the next ticks do nothing", async () => {
+    await start({ speed: 60 });
+    api.getWard.mockReturnValue(new Promise(() => undefined));
+    await advance(2_100);
+    expect(api.getWard).toHaveBeenCalledTimes(1);
+    await advance(20_000);
+    expect(api.getWard).toHaveBeenCalledTimes(1);
+    expect(api.getLiveWard).toHaveBeenCalledTimes(2);
   });
 });
 

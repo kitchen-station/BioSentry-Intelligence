@@ -13,6 +13,9 @@ import { ApiError } from "../api/client";
 import type { Session, WardOverview } from "../types";
 import { Overview } from "./Overview";
 
+// "Sep" or "Sept", whichever the runtime's en-GB gives: the clock uses the same call as the simulator.
+const SEP = new Date(Date.UTC(2026, 8, 3)).toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" });
+
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const api = vi.hoisted(() => ({ hasOverview: true, getOverview: vi.fn() }));
@@ -73,7 +76,7 @@ describe("Overview", () => {
     expect(screen.getByText("Read-only. Every view is recorded in the audit log.")).toBeTruthy();
     expect(screen.getByText("Simulated patients until a hospital is connected.")).toBeTruthy();
     expect(await screen.findByText(AS_OF)).toBeTruthy();
-    expect(screen.getByText("Simulator: day 2 00:10, 10x")).toBeTruthy();
+    expect(screen.getByText(`Simulator: 4 ${SEP}, 15:10 \u00b7 10x`)).toBeTruthy();
     expect(screen.queryByText("Not receiving data")).toBeNull();
   });
 

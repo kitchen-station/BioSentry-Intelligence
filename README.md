@@ -136,9 +136,9 @@ schemas. Every target is in the [Makefile](Makefile).
   is connected. An administrator types their id under "Administration" (API builds only) and lands on the
   Overview.
 - **Ward:** patients in priority order, each with its score and why. A patient the system
-  cannot score is listed as NOT RANKED, with the reason and what to record to fix it.
+  cannot score is listed as NOT RANKED, with the reason and what to record to fix it. Reads again every 5 seconds, every 2 seconds while the ward runs at 60x and the tab is in front; the top bar shows the ward's clock and speed.
 - **Patient detail:** the score and what drives it, vitals and labs with where each value
-  came from, notes, and trend charts (patch data only).
+  came from, notes, and trend charts (patch data only). Reads again every 5 seconds, every 2 seconds while the ward runs at 60x and the tab is in front; the top bar shows the ward's clock and speed.
 - **Overview:** for an admin only, read only, from the "Administration" entry at sign-in (shown when the
   dashboard talks to the API). Every bed and its state, who is assigned, each clinician's patient
   count, counts of their actions in the last 24 hours, and the simulator status. It reads again on Refresh, never on a timer, because every
