@@ -492,3 +492,41 @@ chance control and the last line; null when refused). `rounds`: `id`, `started_a
 `ok`, `conclusion`. `proposals`: `id`, `action`, `step`, `proposed_at`, `state` (`proposed`,
 `approved`, `applied`), `files`, `conclusion` (of the step that led to it), `approved_by`,
 `approved_at`, `applied_at`. The question text is what a person typed: a page must show it as text.
+
+### The question worker (`python -m research.agent worker`)
+
+It answers the questions that clinicians type on the dashboard's Ask page. It claims one question from the
+API, runs the same `ask` code as `python -m research.agent ask`, and posts the answer and the record of the
+experiment back. The question is data: it is never read as a command. The contracts are `contract-ask` v1
+and `contract-d7` v3.1.
+
+    python -m research.agent worker [--once]
+
+`--once` makes one claim, handles at most one job and exits 0. There is no other option.
+
+Three environment variables, read once at start:
+
+- `BIOSENTRY_API_URL`: an `http://` or `https://` address with a host, no user-info, query or fragment.
+- `BIOSENTRY_INGEST_KEY`: the ingest key. The worker never logs it and never puts it in a URL.
+- `BIOSENTRY_AGENT_COMMIT`: optional, 7 to 40 lower-case hex characters. Without it the record says `null`.
+
+The worker refuses to start (exit 2) without the first two, or when any `BIOSENTRY_AGENT_MODEL_*` variable
+is set. The agent's own settings (`BIOSENTRY_AGENT_TRIALS`, `BIOSENTRY_AGENT_HOME`) work as for the other
+commands.
+
+It needs Python 3.11, the backend package, the trial root read-only (`ward-v2`, seeds 1 to 10) and a
+writable agent home outside the repository. Nothing in this repository starts it, and where it runs is not
+decided.
+
+It runs in-process, on the main thread, one job at a time. There is no child-process mode, so the reason
+`the agent did not finish within 15 minutes` is never sent. Every report uses one fixed reason:
+
+- `Refused: no template fits this question.`
+- `Refused: a number in the answer is not in the tool result.`
+- `the worker does not accept this job: kind` or `: question`
+- `the agent's tool failed`
+- `the agent's ledger could not be written`
+- `the agent's answer is over the size cap`
+- `the agent stopped with an error`
+
+No exception text, question or answer goes into a log line. A log line is `job <id>: <state>`.
