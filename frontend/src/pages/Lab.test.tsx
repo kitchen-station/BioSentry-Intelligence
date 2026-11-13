@@ -96,3 +96,20 @@ describe("the lab writes nothing to the ward", () => {
     for (const w of WRITES) expect(w).toHaveBeenCalledTimes(0);
   });
 });
+
+describe("the lab with the lab-run capability on", () => {
+  it.each(["md", "charge_rn"] as const)("makes no request and no ward write on mount for %s", async (role) => {
+    api.hasLabRuns = true;
+    api.getLabRuns.mockResolvedValue([]);
+    render(
+      <MemoryRouter initialEntries={["/lab"]}>
+        <Routes>
+          <Route path="/lab" element={<Lab session={{ ...session, role }} onSignOut={none} />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("No simulated runs yet.")).toBeTruthy();
+    for (const w of WRITES) expect(w).toHaveBeenCalledTimes(0);
+    api.hasLabRuns = false;
+  });
+});

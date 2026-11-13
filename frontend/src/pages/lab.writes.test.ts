@@ -1,4 +1,5 @@
-// The lab may read the ward and may not write it. This reads the source and follows imports from
+// The lab may read the ward and may not write to the live ward. Its only write is a simulated-run request to /wards/W4/lab/runs.
+// This reads the source and follows imports from
 // every lab page, so it covers every code path, not only the ones a render reaches.
 import { describe, expect, it } from "vitest";
 
@@ -71,6 +72,8 @@ describe("lab modules", () => {
       expect(paths.length, name).toBeGreaterThan(0);
       for (const path of paths) expect(path, name).toMatch(/^\/wards\/W4\/lab\/runs(\/\$\{id\})?$/);
       expect(body, name).not.toMatch(/\/sim\/|\/patients|\/rows|\/live|\/acknowledg/);
+      expect(body, name).not.toMatch(/this\.|httpProvider\./);
+      expect(body.match(/\b(fetchJson|postJson|deleteRequest|uploadFile)(?:<[^>(]*>)?\(/g) ?? [], name).toHaveLength(1);
       expect(index, name).toContain(`export const ${name} = provider.${name};`);
     }
   });

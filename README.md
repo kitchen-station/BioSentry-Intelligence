@@ -140,10 +140,9 @@ schemas. Every target is in the [Makefile](Makefile).
 - **Simulation lab:** one link in the top bar of every signed-in page. Research numbers, the pipeline and the research
   agent's findings, under a label that it is not the ward. The one-address deployment also links the ward
   simulator from there.
-  A physician or the charge nurse can ask for a simulated run: the simulator's compare runs the same patients twice
-  with one change, on a lab copy, never on the ward that is running. A lab worker beside the ward runner runs it; the
+  A physician or the charge nurse can ask for a simulated run: the simulator's compare runs one seeded simulated ward twice with one change (partly paired in hospital mode), apart from the ward that is running. A lab worker beside the ward runner runs it; the
   API only stores the request and the result. Results are synthetic and not validated, and nothing in them changes a
-  rank. Each clinician has one at a time and 10 a day; the ward has 5 waiting at most. No lab worker is deployed yet,
+  rank. Each clinician has one at a time and 10 in 24 hours; the ward has 5 waiting at most. No lab worker is deployed yet,
   so a request fails after an hour until one is.
 
 ## What the database stores
