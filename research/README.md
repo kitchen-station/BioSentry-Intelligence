@@ -723,8 +723,10 @@ Shape, format `biosentry-wiring-golden/1`:
 - a scored bin: per variant `student` (float32 `features`, `p`, `check`) and `policy` (clipped `z`, `score`, `alerting`);
 - a NOT RANKED bin has `student` and `policy` null and `policy_run_reset` true.
 
-Stays: the toy trial and one synthetic 94-bin stay (a gap, a NOT RANKED bin, new blood pressure readings and oxygen
-switched on). The file holds what the research code computes on every scored bin. It does not apply the product's
+Stays: the toy trial and one synthetic 94-bin stay `synthetic-long`: gaps at bins 30 and 84, NOT RANKED bins (consciousness
+missing) at bins 45 and 78, new blood pressure readings at bins 54 and 74 and oxygen switched on at bin 72. Bins 30 and 45
+come while the policy runs are 0. Bins 78 and 84 come inside the alerting stretch, so both policies go alerting, reset, not
+alerting for p - 1 scored bins, alerting again; `summary.totals.resets_after_run` counts these per variant. The file holds what the research code computes on every scored bin. It does not apply the product's
 gates (nothing computed while the baseline forms; the 672-bin cap): `baseline_formed` lets the backend test its own.
 
 ## Real data (eICU-CRD Demo 2.0.1)

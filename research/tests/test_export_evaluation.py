@@ -302,3 +302,16 @@ def test_json_never_touches_an_existing_tmp_file_and_a_write_error_is_one_refusa
     cap = capsys.readouterr()
     assert cap.out == "" and cap.err == "refused: --json: cannot write that file\n"
     assert sorted(p.name for p in tmp_path.iterdir()) == [".h.json.tmp", "h.json", "h.json.part", "h.json.tmp", "is-a-folder"]
+
+
+def test_write_never_touches_an_existing_tmp_file_and_a_folder_out_is_one_refusal(tmp_path, capsys):
+    keep = tmp_path / "out.json.tmp"
+    keep.write_bytes(b"keep me")
+    make(tmp_path, "registry")
+    assert keep.read_bytes() == b"keep me" and (tmp_path / "out.json").exists()
+    folder = tmp_path / "dir"
+    folder.mkdir()
+    capsys.readouterr()
+    assert ex.main(["registry", *ARGS, "--out", str(folder)]) == 2
+    assert capsys.readouterr().err.count("\n") == 1
+    assert list(folder.iterdir()) == [] and sorted(p.name for p in tmp_path.iterdir()) == ["dir", "out.json", "out.json.tmp"]

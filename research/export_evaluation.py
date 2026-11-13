@@ -19,6 +19,7 @@ import math
 import os
 import re
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
@@ -278,11 +279,17 @@ def envelope(section: str, body: dict, notes: list[str], a, seeds: list[dict], d
 
 
 def write(path: str, data: bytes) -> None:
+    """Whole or not at all, through a scratch file nothing else has (an existing file is never touched)."""
+    tmp = None
     try:
-        with open(path + ".tmp", "wb") as f:
+        fd, tmp = tempfile.mkstemp(prefix=f".{Path(path).name}.", suffix=".part", dir=Path(path).parent)
+        with os.fdopen(fd, "wb") as f:
             f.write(data)
-        os.replace(path + ".tmp", path)
+        os.chmod(tmp, 0o644)  # mkstemp makes it private; the file is an ordinary result file
+        os.replace(tmp, path)
     except OSError:
+        if tmp is not None and os.path.exists(tmp):
+            os.remove(tmp)
         raise Refused("--out: cannot write that file") from None
 
 

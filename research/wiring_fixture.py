@@ -56,6 +56,9 @@ ABOUT = (
     "p is research.plain_student.forward on those float32 values. check is research.confidence.check(p, t, q) "
     "with 'not sure' written as not_sure. z is the policy's clipped z per vital in the order of constants.policy_vitals. "
     "A NOT RANKED bin has student and policy null (no p, the policy is not alerting and its run is reset). "
+    "The long stay has two gaps and two NOT RANKED bins: bins 30 and 45 come while the runs are 0; bins 84 (gap) and "
+    "78 (NOT RANKED) come inside the alerting stretch, so the policy goes alerting, reset, not alerting, alerting again. "
+    "summary.totals.resets_after_run counts them per variant. "
     "The file holds what the research code computes on every scored bin. It does NOT apply the product's "
     "extra gates (ruling 10: nothing is computed while the baseline forms; ruling 7: the 672-bin cap). "
     "baseline_formed says, per vital, whether baseline_finding returns a finding on the series up to that "
@@ -74,27 +77,29 @@ def _row(patient: str, b: int, hr, rr, spo2, temp, sbp, bp_minute, consciousness
 
 
 def synthetic_stay() -> dict[int, Row]:
-    """94 bins; bins 1..24 are a quiet baseline, a slow drift from bin 52, a gap, a NOT RANKED bin, new nurse inputs.
+    """94 bins; bins 1..24 are a quiet baseline, a slow drift from bin 52, two gaps, two NOT RANKED bins, new nurse inputs.
 
-    GAP: no row. NOT_RANKED: consciousness missing, so NEWS2 abstains. CUFF1, CUFF2: a new blood pressure
-    with its own bp_minute. OXYGEN: oxygen switched on. All values are physically possible.
+    GAPS: no row. NOT_RANKED: consciousness missing, so NEWS2 abstains. The first of each is early (the runs
+    are 0); the second of each is inside the alerting stretch, so the policy's run reset is tested: alerting,
+    reset, not alerting for p - 1 scored bins, alerting again. CUFF1, CUFF2: a new blood pressure with its own
+    bp_minute. OXYGEN: oxygen switched on. All values are physically possible.
     """
-    gap, not_ranked, cuff1, cuff2, oxygen, drift = 30, 45, 54, 78, 72, 52
+    gaps, not_ranked, cuff1, cuff2, oxygen, drift = (30, 84), (45, 78), 54, 74, 72, 52
     rows: dict[int, Row] = {}
     for b in range(1, 95):
-        if b == gap:
+        if b in gaps:
             continue
         wob = ((b * 7) % 5) - 2
-        d = min(1.0, max(0.0, (b - drift) / 32)) ** 1.5  # a slow start, full at bin 84
-        if b > 88:
-            d = max(0.0, 1.0 - (b - 88) / 3)  # recovers in the last bins
+        d = min(1.0, max(0.0, (b - drift) / 32)) ** 1.5  # a slow start, full at bin 84, held to bin 92, then recovers
+        if b > 92:
+            d = max(0.0, 1.0 - (b - 92) / 2)  # recovers in the last bins
         hr = round(72 + wob + 52 * d, 1)
         rr = round(16 + (b % 2) + 9 * d, 1)
         spo2 = round(97 - (b % 2) * 0.5 - 6 * d, 1)
         temp = round(36.8 + wob * 0.05 + 1.5 * d, 2)
         sbp, bpm = (120.0, 5.0) if b < cuff1 else (108.0, 15.0 * cuff1 - 5.0) if b < cuff2 else (98.0, 15.0 * cuff2 - 5.0)
         rows[15 * b] = _row("synthetic", b, hr, rr, spo2, temp, sbp, bpm,
-                            None if b == not_ranked else "A", b >= oxygen)
+                            None if b in not_ranked else "A", b >= oxygen)
     return rows
 
 
@@ -146,9 +151,12 @@ def stay_json(sid: str, source: str, admit: int, rows: dict[int, Row], models: d
     return {"id": sid, "source": source, "admit_minute": admit, "bins": out_bins}
 
 
-def summary(stays: list[dict]) -> dict:
+def summary(stays: list[dict], models: dict) -> dict:
+    """Counts. resets_after_run: gaps and NOT RANKED bins that come right after a bin whose run is above 0, and
+    suppressed_alerts: scored bins where a counter that is never reset by them would alert and the policy does not."""
     per, totals = [], {"check": {v: {"alert": 0, "not_sure": 0, "quiet": 0} for v in VARIANTS},
-                       "policy_alerting": {v: 0 for v in VARIANTS}}
+                       "policy_alerting": {v: 0 for v in VARIANTS},
+                       "resets_after_run": {v: {"gap": 0, "not_ranked": 0, "suppressed_alerts": 0} for v in VARIANTS}}
     for st in stays:
         bins = st["bins"]
         scored = [b for b in bins if b["student"] is not None]
@@ -160,6 +168,19 @@ def summary(stays: list[dict]) -> dict:
             for v in VARIANTS:
                 totals["check"][v][b["student"][v]["check"]] += 1
                 totals["policy_alerting"][v] += b["policy"][v]["alerting"]
+    for v in VARIANTS:
+        m, c = models[v], totals["resets_after_run"][v]
+        for st in stays:
+            run = free = 0  # run: reset by a gap or NOT RANKED bin; free: never reset by them
+            for b in st["bins"]:
+                if b["policy"] is None:
+                    c["gap" if b["row"] is None else "not_ranked"] += run > 0
+                    run = 0
+                    continue
+                e = b["policy"][v]
+                hit = e["score"] >= m["params"].theta
+                run, free = (run + 1, free + 1) if hit else (0, 0)
+                c["suppressed_alerts"] += free >= m["params"].p and not e["alerting"]
     scored_n = sum(p["scored"] for p in per)
     totals["scored_bins"] = scored_n
     totals["policy_not_alerting"] = {v: scored_n - totals["policy_alerting"][v] for v in VARIANTS}
@@ -201,7 +222,7 @@ def build() -> dict:
             "lag_bins": {"1h": student.LAG_1H, "4h": student.LAG_4H},
         },
         "feature_names": {v: student.feature_names(VARIANTS[v][0], "trend") for v in VARIANTS},
-        "stays": stays, "summary": summary(stays),
+        "stays": stays, "summary": summary(stays, models),
     }
 
 

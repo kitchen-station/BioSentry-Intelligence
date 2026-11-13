@@ -104,6 +104,28 @@ def test_the_fixture_exercises_every_case():
     for v in VARIANTS:
         assert {b["student"][v]["check"] for b in after if b["student"]} == {"alert", "not_sure", "quiet"}
         assert {b["policy"][v]["alerting"] for b in after if b["policy"]} == {True, False}
+    gaps = [b["minute"] // 15 for b in long["bins"] if b["row"] is None]
+    nr = [b["minute"] // 15 for b in long["bins"] if b["row"] is not None and not b["news2"]["ranked"]]
+    assert len(gaps) == 2 and len(nr) == 2, (gaps, nr)
+    for v in VARIANTS:  # the test's own counters, on the stored z values
+        c = G["constants"]["variants"][v]
+        w = [c["policy_params"]["weights"][n] for n in G["constants"]["policy_vitals"]]
+        theta, p = c["policy_params"]["theta"], c["policy_params"]["p"]
+        run = free = 0  # free: a counter that a gap or a NOT RANKED bin never resets
+        after = {"gap": 0, "nr": 0}
+        suppressed = 0
+        for b in long["bins"]:
+            if b["policy"] is None:
+                after["gap" if b["row"] is None else "nr"] += run > 0
+                run = 0
+                continue
+            e = b["policy"][v]
+            hit = sum(wi * zi for wi, zi in zip(w, e["z"])) >= theta
+            run, free = (run + 1, free + 1) if hit else (0, 0)
+            suppressed += free >= p and not e["alerting"]
+        assert after["gap"] >= 1 and after["nr"] >= 1 and suppressed >= 1, (v, after, suppressed)
+        got = G["summary"]["totals"]["resets_after_run"][v]
+        assert got == {"gap": after["gap"], "not_ranked": after["nr"], "suppressed_alerts": suppressed}
     totals = G["summary"]["totals"]
     for v in VARIANTS:
         assert sum(totals["check"][v].values()) == totals["scored_bins"] == len(SCORED)

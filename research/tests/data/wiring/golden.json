@@ -1,5 +1,5 @@
 {
- "about": "Synthetic data only: the committed toy trial and one stay built in research/wiring_fixture.py. It is a golden file for the wiring slice: the backend tests its own feature builder, forward pass, confidence check and policy state machine against the research code, bin by bin. Each bin's minute is the END of the 15-minute bin, as in the trial format, so the backend's bin_at start is minute - 15. A bin entry exists for every 15-minute boundary from the first row to the last; a gap has row null and every other field null. Row values are the stored values of the research Row (diastolic is not read by NEWS2 and the Row does not hold it). Features are float32 values written as the Python repr of the float32 converted to float. p is research.plain_student.forward on those float32 values. check is research.confidence.check(p, t, q) with 'not sure' written as not_sure. z is the policy's clipped z per vital in the order of constants.policy_vitals. A NOT RANKED bin has student and policy null (no p, the policy is not alerting and its run is reset). The file holds what the research code computes on every scored bin. It does NOT apply the product's extra gates (ruling 10: nothing is computed while the baseline forms; ruling 7: the 672-bin cap). baseline_formed says, per vital, whether baseline_finding returns a finding on the series up to that bin, so the backend can test its own gate. All toy stays are kept.",
+ "about": "Synthetic data only: the committed toy trial and one stay built in research/wiring_fixture.py. It is a golden file for the wiring slice: the backend tests its own feature builder, forward pass, confidence check and policy state machine against the research code, bin by bin. Each bin's minute is the END of the 15-minute bin, as in the trial format, so the backend's bin_at start is minute - 15. A bin entry exists for every 15-minute boundary from the first row to the last; a gap has row null and every other field null. Row values are the stored values of the research Row (diastolic is not read by NEWS2 and the Row does not hold it). Features are float32 values written as the Python repr of the float32 converted to float. p is research.plain_student.forward on those float32 values. check is research.confidence.check(p, t, q) with 'not sure' written as not_sure. z is the policy's clipped z per vital in the order of constants.policy_vitals. A NOT RANKED bin has student and policy null (no p, the policy is not alerting and its run is reset). The long stay has two gaps and two NOT RANKED bins: bins 30 and 45 come while the runs are 0; bins 84 (gap) and 78 (NOT RANKED) come inside the alerting stretch, so the policy goes alerting, reset, not alerting, alerting again. summary.totals.resets_after_run counts them per variant. The file holds what the research code computes on every scored bin. It does NOT apply the product's extra gates (ruling 10: nothing is computed while the baseline forms; ruling 7: the 672-bin cap). baseline_formed says, per vital, whether baseline_finding returns a finding on the series up to that bin, so the backend can test its own gate. All toy stays are kept.",
  "bin_minutes": 15,
  "constants": {
   "alpha": "0.01",
@@ -15212,7 +15212,7 @@
      "news2": {
       "ranked": true,
       "temperature_points": 0,
-      "total": 7
+      "total": 8
      },
      "policy": {
       "all": {
@@ -15238,7 +15238,7 @@
      },
      "policy_run_reset": false,
      "row": {
-      "bp_minute": 805.0,
+      "bp_minute": 1105.0,
       "consciousness": "A",
       "diastolic": null,
       "heart_rate": 102.6,
@@ -15246,7 +15246,7 @@
       "respiratory_rate": 21.1,
       "spo2": 93.6,
       "spo2_scale": 1,
-      "systolic": 108.0,
+      "systolic": 98.0,
       "temperature": 37.71
      },
      "student": {
@@ -15269,7 +15269,7 @@
         0.0,
         9.100000381469727,
         0.0,
-        7.0,
+        8.0,
         1.0,
         0.0,
         10.699999809265137,
@@ -15289,7 +15289,7 @@
         0.8399999737739563,
         0.0
        ],
-       "p": 0.16645848850638675
+       "p": 0.159056998780288
       },
       "no_temp": {
        "check": "alert",
@@ -15306,7 +15306,7 @@
         0.0,
         -3.1500000953674316,
         0.0,
-        7.0,
+        8.0,
         1.0,
         0.0,
         10.699999809265137,
@@ -15322,7 +15322,7 @@
         -2.9000000953674316,
         0.0
        ],
-       "p": 0.8451475279444353
+       "p": 0.8372554664254235
       }
      }
     },
@@ -15337,7 +15337,7 @@
      "news2": {
       "ranked": true,
       "temperature_points": 0,
-      "total": 8
+      "total": 9
      },
      "policy": {
       "all": {
@@ -15363,7 +15363,7 @@
      },
      "policy_run_reset": false,
      "row": {
-      "bp_minute": 805.0,
+      "bp_minute": 1105.0,
       "consciousness": "A",
       "diastolic": null,
       "heart_rate": 101.7,
@@ -15371,7 +15371,7 @@
       "respiratory_rate": 22.5,
       "spo2": 92.8,
       "spo2_scale": 1,
-      "systolic": 108.0,
+      "systolic": 98.0,
       "temperature": 37.61
      },
      "student": {
@@ -15394,7 +15394,7 @@
         0.0,
         8.100000381469727,
         0.0,
-        8.0,
+        9.0,
         1.0,
         0.0,
         5.900000095367432,
@@ -15414,7 +15414,7 @@
         0.6100000143051147,
         0.0
        ],
-       "p": 0.7237024009667007
+       "p": 0.7083799011403861
       },
       "no_temp": {
        "check": "alert",
@@ -15431,7 +15431,7 @@
         0.0,
         -3.950000047683716,
         0.0,
-        8.0,
+        9.0,
         1.0,
         0.0,
         5.900000095367432,
@@ -15447,7 +15447,7 @@
         -3.0999999046325684,
         0.0
        ],
-       "p": 0.9741918044896904
+       "p": 0.9726637645548863
       }
      }
     },
@@ -15462,7 +15462,7 @@
      "news2": {
       "ranked": true,
       "temperature_points": 0,
-      "total": 8
+      "total": 9
      },
      "policy": {
       "all": {
@@ -15488,7 +15488,7 @@
      },
      "policy_run_reset": false,
      "row": {
-      "bp_minute": 805.0,
+      "bp_minute": 1105.0,
       "consciousness": "A",
       "diastolic": null,
       "heart_rate": 105.8,
@@ -15496,7 +15496,7 @@
       "respiratory_rate": 21.8,
       "spo2": 93.1,
       "spo2_scale": 1,
-      "systolic": 108.0,
+      "systolic": 98.0,
       "temperature": 37.77
      },
      "student": {
@@ -15519,7 +15519,7 @@
         0.0,
         9.699999809265137,
         0.0,
-        8.0,
+        9.0,
         1.0,
         0.0,
         6.099999904632568,
@@ -15539,7 +15539,7 @@
         0.8799999952316284,
         0.0
        ],
-       "p": 0.4410907277357315
+       "p": 0.4277443110217511
       },
       "no_temp": {
        "check": "alert",
@@ -15556,7 +15556,7 @@
         0.0,
         -3.6500000953674316,
         0.0,
-        8.0,
+        9.0,
         1.0,
         0.0,
         6.099999904632568,
@@ -15572,7 +15572,7 @@
         -3.0999999046325684,
         0.0
        ],
-       "p": 0.9567904123742154
+       "p": 0.9542804311825408
       }
      }
     },
@@ -15587,7 +15587,7 @@
      "news2": {
       "ranked": true,
       "temperature_points": 0,
-      "total": 8
+      "total": 9
      },
      "policy": {
       "all": {
@@ -15613,7 +15613,7 @@
      },
      "policy_run_reset": false,
      "row": {
-      "bp_minute": 805.0,
+      "bp_minute": 1105.0,
       "consciousness": "A",
       "diastolic": null,
       "heart_rate": 109.9,
@@ -15621,7 +15621,7 @@
       "respiratory_rate": 23.2,
       "spo2": 92.4,
       "spo2_scale": 1,
-      "systolic": 108.0,
+      "systolic": 98.0,
       "temperature": 37.94
      },
      "student": {
@@ -15644,7 +15644,7 @@
         0.0,
         11.399999618530273,
         0.0,
-        8.0,
+        9.0,
         1.0,
         0.0,
         11.300000190734863,
@@ -15664,7 +15664,7 @@
         0.9200000166893005,
         0.0
        ],
-       "p": 0.8659105030164252
+       "p": 0.8580062479950388
       },
       "no_temp": {
        "check": "alert",
@@ -15681,7 +15681,7 @@
         0.0,
         -4.349999904632568,
         0.0,
-        8.0,
+        9.0,
         1.0,
         0.0,
         11.300000190734863,
@@ -15697,7 +15697,7 @@
         -3.200000047683716,
         0.0
        ],
-       "p": 0.9969673609758085
+       "p": 0.9967833533494421
       }
      }
     },
@@ -15710,36 +15710,15 @@
      },
      "minute": 1170,
      "news2": {
-      "ranked": true,
-      "temperature_points": 0,
-      "total": 9
+      "ranked": false,
+      "temperature_points": null,
+      "total": null
      },
-     "policy": {
-      "all": {
-       "alerting": true,
-       "score": 22.311590000000017,
-       "z": [
-        18.549999999999997,
-        6.100000000000001,
-        4.150000000000006,
-        10.500000000000043
-       ]
-      },
-      "no_temp": {
-       "alerting": true,
-       "score": 14.801285000000007,
-       "z": [
-        18.549999999999997,
-        6.100000000000001,
-        4.150000000000006,
-        10.500000000000043
-       ]
-      }
-     },
-     "policy_run_reset": false,
+     "policy": null,
+     "policy_run_reset": true,
      "row": {
-      "bp_minute": 1165.0,
-      "consciousness": "A",
+      "bp_minute": 1105.0,
+      "consciousness": null,
       "diastolic": null,
       "heart_rate": 109.1,
       "on_oxygen": true,
@@ -15749,82 +15728,7 @@
       "systolic": 98.0,
       "temperature": 37.85
      },
-     "student": {
-      "all": {
-       "check": "alert",
-       "features": [
-        109.0999984741211,
-        0.0,
-        18.549999237060547,
-        0.0,
-        22.600000381469727,
-        0.0,
-        6.099999904632568,
-        0.0,
-        92.5999984741211,
-        0.0,
-        -4.150000095367432,
-        0.0,
-        37.849998474121094,
-        0.0,
-        10.5,
-        0.0,
-        9.0,
-        1.0,
-        0.0,
-        6.5,
-        0.0,
-        26.0,
-        0.0,
-        1.5,
-        0.0,
-        5.0,
-        0.0,
-        -1.0,
-        0.0,
-        -3.4000000953674316,
-        0.0,
-        0.14000000059604645,
-        0.0,
-        0.6899999976158142,
-        0.0
-       ],
-       "p": 0.7472626543164108
-      },
-      "no_temp": {
-       "check": "alert",
-       "features": [
-        109.0999984741211,
-        0.0,
-        18.549999237060547,
-        0.0,
-        22.600000381469727,
-        0.0,
-        6.099999904632568,
-        0.0,
-        92.5999984741211,
-        0.0,
-        -4.150000095367432,
-        0.0,
-        9.0,
-        1.0,
-        0.0,
-        6.5,
-        0.0,
-        26.0,
-        0.0,
-        1.5,
-        0.0,
-        5.0,
-        0.0,
-        -1.0,
-        0.0,
-        -3.4000000953674316,
-        0.0
-       ],
-       "p": 0.9899632412121333
-      }
-     }
+     "student": null
     },
     {
      "baseline_formed": {
@@ -15841,7 +15745,7 @@
      },
      "policy": {
       "all": {
-       "alerting": true,
+       "alerting": false,
        "score": 25.690450000000006,
        "z": [
         20.65,
@@ -15851,7 +15755,7 @@
        ]
       },
       "no_temp": {
-       "alerting": true,
+       "alerting": false,
        "score": 17.280885,
        "z": [
         20.65,
@@ -15863,7 +15767,7 @@
      },
      "policy_run_reset": false,
      "row": {
-      "bp_minute": 1165.0,
+      "bp_minute": 1105.0,
       "consciousness": "A",
       "diastolic": null,
       "heart_rate": 113.3,
@@ -15966,7 +15870,7 @@
      },
      "policy": {
       "all": {
-       "alerting": true,
+       "alerting": false,
        "score": 24.58967000000001,
        "z": [
         20.299999999999997,
@@ -15976,7 +15880,7 @@
        ]
       },
       "no_temp": {
-       "alerting": true,
+       "alerting": false,
        "score": 16.457055000000004,
        "z": [
         20.299999999999997,
@@ -15988,7 +15892,7 @@
      },
      "policy_run_reset": false,
      "row": {
-      "bp_minute": 1165.0,
+      "bp_minute": 1105.0,
       "consciousness": "A",
       "diastolic": null,
       "heart_rate": 112.6,
@@ -16091,7 +15995,7 @@
      },
      "policy": {
       "all": {
-       "alerting": true,
+       "alerting": false,
        "score": 27.999230000000026,
        "z": [
         22.450000000000003,
@@ -16113,7 +16017,7 @@
      },
      "policy_run_reset": false,
      "row": {
-      "bp_minute": 1165.0,
+      "bp_minute": 1105.0,
       "consciousness": "A",
       "diastolic": null,
       "heart_rate": 116.9,
@@ -16216,7 +16120,7 @@
      },
      "policy": {
       "all": {
-       "alerting": true,
+       "alerting": false,
        "score": 29.220700000000008,
        "z": [
         24.6,
@@ -16238,7 +16142,7 @@
      },
      "policy_run_reset": false,
      "row": {
-      "bp_minute": 1165.0,
+      "bp_minute": 1105.0,
       "consciousness": "A",
       "diastolic": null,
       "heart_rate": 121.2,
@@ -16363,7 +16267,7 @@
      },
      "policy_run_reset": false,
      "row": {
-      "bp_minute": 1165.0,
+      "bp_minute": 1105.0,
       "consciousness": "A",
       "diastolic": null,
       "heart_rate": 120.6,
@@ -16452,129 +16356,13 @@
      }
     },
     {
-     "baseline_formed": {
-      "heart_rate": true,
-      "respiratory_rate": true,
-      "spo2": true,
-      "temperature": true
-     },
+     "baseline_formed": null,
      "minute": 1260,
-     "news2": {
-      "ranked": true,
-      "temperature_points": 1,
-      "total": 13
-     },
-     "policy": {
-      "all": {
-       "alerting": true,
-       "score": 31.728750000000012,
-       "z": [
-        26.5,
-        8.5,
-        5.75,
-        15.500000000000043
-       ]
-      },
-      "no_temp": {
-       "alerting": true,
-       "score": 20.803625,
-       "z": [
-        26.5,
-        8.5,
-        5.75,
-        15.500000000000043
-       ]
-      }
-     },
-     "policy_run_reset": false,
-     "row": {
-      "bp_minute": 1165.0,
-      "consciousness": "A",
-      "diastolic": null,
-      "heart_rate": 125.0,
-      "on_oxygen": true,
-      "respiratory_rate": 25.0,
-      "spo2": 91.0,
-      "spo2_scale": 1,
-      "systolic": 98.0,
-      "temperature": 38.35
-     },
-     "student": {
-      "all": {
-       "check": "alert",
-       "features": [
-        125.0,
-        0.0,
-        26.5,
-        0.0,
-        25.0,
-        0.0,
-        8.5,
-        0.0,
-        91.0,
-        0.0,
-        -5.75,
-        0.0,
-        38.349998474121094,
-        0.0,
-        15.5,
-        0.0,
-        13.0,
-        1.0,
-        0.0,
-        12.399999618530273,
-        0.0,
-        35.599998474121094,
-        0.0,
-        1.600000023841858,
-        0.0,
-        5.800000190734863,
-        0.0,
-        -1.100000023841858,
-        0.0,
-        -3.9000000953674316,
-        0.0,
-        0.41999998688697815,
-        0.0,
-        1.0700000524520874,
-        0.0
-       ],
-       "p": 0.9944840971324618
-      },
-      "no_temp": {
-       "check": "alert",
-       "features": [
-        125.0,
-        0.0,
-        26.5,
-        0.0,
-        25.0,
-        0.0,
-        8.5,
-        0.0,
-        91.0,
-        0.0,
-        -5.75,
-        0.0,
-        12.0,
-        1.0,
-        0.0,
-        12.399999618530273,
-        0.0,
-        35.599998474121094,
-        0.0,
-        1.600000023841858,
-        0.0,
-        5.800000190734863,
-        0.0,
-        -1.100000023841858,
-        0.0,
-        -3.9000000953674316,
-        0.0
-       ],
-       "p": 0.9999659834657322
-      }
-     }
+     "news2": null,
+     "policy": null,
+     "policy_run_reset": null,
+     "row": null,
+     "student": null
     },
     {
      "baseline_formed": {
@@ -16591,7 +16379,7 @@
      },
      "policy": {
       "all": {
-       "alerting": true,
+       "alerting": false,
        "score": 31.392000000000017,
        "z": [
         25.0,
@@ -16601,7 +16389,7 @@
        ]
       },
       "no_temp": {
-       "alerting": true,
+       "alerting": false,
        "score": 21.474175000000002,
        "z": [
         25.0,
@@ -16613,7 +16401,7 @@
      },
      "policy_run_reset": false,
      "row": {
-      "bp_minute": 1165.0,
+      "bp_minute": 1105.0,
       "consciousness": "A",
       "diastolic": null,
       "heart_rate": 122.0,
@@ -16716,7 +16504,7 @@
      },
      "policy": {
       "all": {
-       "alerting": true,
+       "alerting": false,
        "score": 31.264300000000002,
        "z": [
         26.0,
@@ -16726,7 +16514,7 @@
        ]
       },
       "no_temp": {
-       "alerting": true,
+       "alerting": false,
        "score": 20.635025,
        "z": [
         26.0,
@@ -16738,7 +16526,7 @@
      },
      "policy_run_reset": false,
      "row": {
-      "bp_minute": 1165.0,
+      "bp_minute": 1105.0,
       "consciousness": "A",
       "diastolic": null,
       "heart_rate": 124.0,
@@ -16841,7 +16629,7 @@
      },
      "policy": {
       "all": {
-       "alerting": true,
+       "alerting": false,
        "score": 33.2498,
        "z": [
         27.0,
@@ -16863,7 +16651,7 @@
      },
      "policy_run_reset": false,
      "row": {
-      "bp_minute": 1165.0,
+      "bp_minute": 1105.0,
       "consciousness": "A",
       "diastolic": null,
       "heart_rate": 126.0,
@@ -16966,7 +16754,7 @@
      },
      "policy": {
       "all": {
-       "alerting": true,
+       "alerting": false,
        "score": 30.799850000000006,
        "z": [
         25.5,
@@ -16988,7 +16776,7 @@
      },
      "policy_run_reset": false,
      "row": {
-      "bp_minute": 1165.0,
+      "bp_minute": 1105.0,
       "consciousness": "A",
       "diastolic": null,
       "heart_rate": 123.0,
@@ -17022,24 +16810,24 @@
         13.0,
         1.0,
         0.0,
-        -2.0,
         0.0,
+        1.0,
         23.299999237060547,
         0.0,
         0.0,
-        0.0,
+        1.0,
         4.599999904632568,
         0.0,
         0.0,
-        0.0,
+        1.0,
         -3.0,
         0.0,
-        -0.10000000149011612,
         0.0,
+        1.0,
         0.6100000143051147,
         0.0
        ],
-       "p": 0.9970586916059209
+       "p": 0.9821819669981677
       },
       "no_temp": {
        "check": "alert",
@@ -17059,20 +16847,20 @@
         12.0,
         1.0,
         0.0,
-        -2.0,
         0.0,
+        1.0,
         23.299999237060547,
         0.0,
         0.0,
-        0.0,
+        1.0,
         4.599999904632568,
         0.0,
         0.0,
-        0.0,
+        1.0,
         -3.0,
         0.0
        ],
-       "p": 0.9999681121674068
+       "p": 0.999918043678752
       }
      }
     },
@@ -17086,118 +16874,118 @@
      "minute": 1335,
      "news2": {
       "ranked": true,
-      "temperature_points": 0,
-      "total": 9
+      "temperature_points": 1,
+      "total": 13
      },
      "policy": {
       "all": {
        "alerting": true,
-       "score": 22.198050000000016,
+       "score": 32.785350000000015,
        "z": [
-        17.85,
-        6.5,
-        4.25,
-        10.500000000000043
+        26.5,
+        9.5,
+        6.25,
+        15.500000000000043
        ]
       },
       "no_temp": {
        "alerting": true,
-       "score": 14.911195,
+       "score": 21.979975000000003,
        "z": [
-        17.85,
-        6.5,
-        4.25,
-        10.500000000000043
+        26.5,
+        9.5,
+        6.25,
+        15.500000000000043
        ]
       }
      },
      "policy_run_reset": false,
      "row": {
-      "bp_minute": 1165.0,
+      "bp_minute": 1105.0,
       "consciousness": "A",
       "diastolic": null,
-      "heart_rate": 107.7,
+      "heart_rate": 125.0,
       "on_oxygen": true,
-      "respiratory_rate": 23.0,
-      "spo2": 92.5,
+      "respiratory_rate": 26.0,
+      "spo2": 90.5,
       "spo2_scale": 1,
       "systolic": 98.0,
-      "temperature": 37.85
+      "temperature": 38.35
      },
      "student": {
       "all": {
        "check": "alert",
        "features": [
-        107.69999694824219,
+        125.0,
         0.0,
-        17.850000381469727,
+        26.5,
         0.0,
-        23.0,
+        26.0,
         0.0,
-        6.5,
+        9.5,
         0.0,
-        92.5,
+        90.5,
         0.0,
-        -4.25,
+        -6.25,
         0.0,
-        37.849998474121094,
+        38.349998474121094,
         0.0,
-        10.5,
+        15.5,
         0.0,
-        9.0,
+        13.0,
         1.0,
         0.0,
-        -14.300000190734863,
+        3.0,
         0.0,
-        9.100000381469727,
+        26.399999618530273,
         0.0,
-        -3.0,
         0.0,
-        1.2000000476837158,
         0.0,
-        2.0,
+        4.199999809265137,
         0.0,
-        -0.800000011920929,
         0.0,
-        -0.3499999940395355,
         0.0,
-        0.30000001192092896,
+        -2.799999952316284,
+        0.0,
+        0.15000000596046448,
+        0.0,
+        0.800000011920929,
         0.0
        ],
-       "p": 0.9572608414809263
+       "p": 0.999400711225598
       },
       "no_temp": {
        "check": "alert",
        "features": [
-        107.69999694824219,
+        125.0,
         0.0,
-        17.850000381469727,
+        26.5,
         0.0,
-        23.0,
+        26.0,
         0.0,
-        6.5,
+        9.5,
         0.0,
-        92.5,
+        90.5,
         0.0,
-        -4.25,
+        -6.25,
         0.0,
-        9.0,
+        12.0,
         1.0,
         0.0,
-        -14.300000190734863,
+        3.0,
         0.0,
-        9.100000381469727,
+        26.399999618530273,
         0.0,
-        -3.0,
         0.0,
-        1.2000000476837158,
         0.0,
-        2.0,
+        4.199999809265137,
         0.0,
-        -0.800000011920929,
+        0.0,
+        0.0,
+        -2.799999952316284,
         0.0
        ],
-       "p": 0.9982394760074809
+       "p": 0.9999953818740048
       }
      }
     },
@@ -17211,118 +16999,118 @@
      "minute": 1350,
      "news2": {
       "ranked": true,
-      "temperature_points": 0,
-      "total": 5
+      "temperature_points": 1,
+      "total": 13
      },
      "policy": {
       "all": {
        "alerting": true,
-       "score": 9.130100000000017,
+       "score": 30.335400000000018,
        "z": [
-        7.649999999999999,
-        2.5,
-        1.75,
-        4.000000000000057
+        25.0,
+        8.5,
+        5.75,
+        14.000000000000057
        ]
       },
       "no_temp": {
        "alerting": true,
-       "score": 6.143405,
+       "score": 20.297825,
        "z": [
-        7.649999999999999,
-        2.5,
-        1.75,
-        4.000000000000057
+        25.0,
+        8.5,
+        5.75,
+        14.000000000000057
        ]
       }
      },
      "policy_run_reset": false,
      "row": {
-      "bp_minute": 1165.0,
+      "bp_minute": 1105.0,
       "consciousness": "A",
       "diastolic": null,
-      "heart_rate": 87.3,
+      "heart_rate": 122.0,
       "on_oxygen": true,
-      "respiratory_rate": 19.0,
-      "spo2": 95.0,
+      "respiratory_rate": 25.0,
+      "spo2": 91.0,
       "spo2_scale": 1,
       "systolic": 98.0,
-      "temperature": 37.2
+      "temperature": 38.2
      },
      "student": {
       "all": {
        "check": "alert",
        "features": [
-        87.30000305175781,
+        122.0,
         0.0,
-        7.650000095367432,
+        25.0,
         0.0,
-        19.0,
+        25.0,
         0.0,
-        2.5,
+        8.5,
         0.0,
-        95.0,
+        91.0,
         0.0,
-        -1.75,
+        -5.75,
         0.0,
-        37.20000076293945,
+        38.20000076293945,
         0.0,
-        4.0,
+        14.0,
         0.0,
-        5.0,
+        13.0,
         1.0,
         0.0,
-        -36.70000076293945,
+        -2.0,
         0.0,
-        -15.300000190734863,
+        19.399999618530273,
         0.0,
-        -6.0,
         0.0,
-        -2.0999999046325684,
         0.0,
-        4.0,
+        3.9000000953674316,
         0.0,
-        1.399999976158142,
         0.0,
-        -1.100000023841858,
         0.0,
-        -0.5099999904632568,
+        -2.5999999046325684,
+        0.0,
+        -0.10000000149011612,
+        0.0,
+        0.49000000953674316,
         0.0
        ],
-       "p": 0.053347666995350755
+       "p": 0.9973010695369487
       },
       "no_temp": {
        "check": "alert",
        "features": [
-        87.30000305175781,
+        122.0,
         0.0,
-        7.650000095367432,
+        25.0,
         0.0,
-        19.0,
+        25.0,
         0.0,
-        2.5,
+        8.5,
         0.0,
-        95.0,
+        91.0,
         0.0,
-        -1.75,
+        -5.75,
         0.0,
-        5.0,
+        12.0,
         1.0,
         0.0,
-        -36.70000076293945,
+        -2.0,
         0.0,
-        -15.300000190734863,
+        19.399999618530273,
         0.0,
-        -6.0,
         0.0,
-        -2.0999999046325684,
         0.0,
-        4.0,
+        3.9000000953674316,
         0.0,
-        1.399999976158142,
+        0.0,
+        0.0,
+        -2.5999999046325684,
         0.0
        ],
-       "p": 0.1295771886429451
+       "p": 0.9999663866820051
       }
      }
     },
@@ -17336,118 +17124,118 @@
      "minute": 1365,
      "news2": {
       "ranked": true,
-      "temperature_points": 0,
-      "total": 4
+      "temperature_points": 1,
+      "total": 13
      },
      "policy": {
       "all": {
-       "alerting": false,
-       "score": 0.5283,
+       "alerting": true,
+       "score": 32.3209,
        "z": [
-        0.0,
-        0.5,
-        0.25,
-        0.0
+        26.0,
+        9.5,
+        6.25,
+        15.0
        ]
       },
       "no_temp": {
-       "alerting": false,
-       "score": 0.588175,
+       "alerting": true,
+       "score": 21.811374999999998,
        "z": [
-        0.0,
-        0.5,
-        0.25,
-        0.0
+        26.0,
+        9.5,
+        6.25,
+        15.0
        ]
       }
      },
      "policy_run_reset": false,
      "row": {
-      "bp_minute": 1165.0,
+      "bp_minute": 1105.0,
       "consciousness": "A",
       "diastolic": null,
-      "heart_rate": 72.0,
+      "heart_rate": 124.0,
       "on_oxygen": true,
-      "respiratory_rate": 17.0,
-      "spo2": 96.5,
+      "respiratory_rate": 26.0,
+      "spo2": 90.5,
       "spo2_scale": 1,
       "systolic": 98.0,
-      "temperature": 36.8
+      "temperature": 38.3
      },
      "student": {
       "all": {
-       "check": "quiet",
+       "check": "alert",
        "features": [
-        72.0,
+        124.0,
         0.0,
+        26.0,
         0.0,
+        26.0,
         0.0,
-        17.0,
+        9.5,
         0.0,
-        0.5,
+        90.5,
         0.0,
-        96.5,
+        -6.25,
         0.0,
-        -0.25,
+        38.29999923706055,
         0.0,
-        36.79999923706055,
+        15.0,
         0.0,
-        0.0,
-        0.0,
-        4.0,
+        13.0,
         1.0,
         0.0,
-        -54.0,
+        -2.0,
         0.0,
-        -29.700000762939453,
+        22.299999237060547,
         0.0,
-        -9.0,
         0.0,
-        -5.5,
         0.0,
-        6.0,
+        3.5,
         0.0,
-        3.700000047683716,
         0.0,
-        -1.600000023841858,
         0.0,
-        -0.8100000023841858,
+        -2.299999952316284,
+        0.0,
+        -0.10000000149011612,
+        0.0,
+        0.6899999976158142,
         0.0
        ],
-       "p": 0.005000727492954362
+       "p": 0.9994184061703635
       },
       "no_temp": {
-       "check": "quiet",
+       "check": "alert",
        "features": [
-        72.0,
+        124.0,
         0.0,
+        26.0,
         0.0,
+        26.0,
         0.0,
-        17.0,
+        9.5,
         0.0,
-        0.5,
+        90.5,
         0.0,
-        96.5,
+        -6.25,
         0.0,
-        -0.25,
-        0.0,
-        4.0,
+        12.0,
         1.0,
         0.0,
-        -54.0,
+        -2.0,
         0.0,
-        -29.700000762939453,
+        22.299999237060547,
         0.0,
-        -9.0,
         0.0,
-        -5.5,
         0.0,
-        6.0,
+        3.5,
         0.0,
-        3.700000047683716,
+        0.0,
+        0.0,
+        -2.299999952316284,
         0.0
        ],
-       "p": 0.0047649736618867984
+       "p": 0.9999946114648829
       }
      }
     },
@@ -17461,118 +17249,118 @@
      "minute": 1380,
      "news2": {
       "ranked": true,
-      "temperature_points": 0,
-      "total": 4
+      "temperature_points": 1,
+      "total": 13
      },
      "policy": {
       "all": {
-       "alerting": false,
-       "score": 0.9289000000000045,
+       "alerting": true,
+       "score": 32.193200000000004,
        "z": [
-        1.0,
-        0.0,
-        0.0,
-        1.0000000000000142
+        27.0,
+        8.5,
+        5.75,
+        16.000000000000014
        ]
       },
       "no_temp": {
-       "alerting": false,
-       "score": 0.3372,
+       "alerting": true,
+       "score": 20.972224999999998,
        "z": [
-        1.0,
-        0.0,
-        0.0,
-        1.0000000000000142
+        27.0,
+        8.5,
+        5.75,
+        16.000000000000014
        ]
       }
      },
      "policy_run_reset": false,
      "row": {
-      "bp_minute": 1165.0,
+      "bp_minute": 1105.0,
       "consciousness": "A",
       "diastolic": null,
-      "heart_rate": 74.0,
+      "heart_rate": 126.0,
       "on_oxygen": true,
-      "respiratory_rate": 16.0,
-      "spo2": 97.0,
+      "respiratory_rate": 25.0,
+      "spo2": 91.0,
       "spo2_scale": 1,
       "systolic": 98.0,
-      "temperature": 36.9
+      "temperature": 38.4
      },
      "student": {
       "all": {
-       "check": "quiet",
+       "check": "alert",
        "features": [
-        74.0,
+        126.0,
         0.0,
-        1.0,
+        27.0,
+        0.0,
+        25.0,
+        0.0,
+        8.5,
+        0.0,
+        91.0,
+        0.0,
+        -5.75,
+        0.0,
+        38.400001525878906,
         0.0,
         16.0,
         0.0,
-        -0.5,
-        0.0,
-        97.0,
-        0.0,
-        0.25,
-        0.0,
-        36.900001525878906,
-        0.0,
+        13.0,
         1.0,
         0.0,
-        4.0,
-        1.0,
+        3.0,
         0.0,
-        -49.0,
+        20.200000762939453,
         0.0,
-        -31.799999237060547,
         0.0,
-        -9.0,
         0.0,
-        -5.800000190734863,
+        3.200000047683716,
         0.0,
-        6.0,
         0.0,
-        3.9000000953674316,
         0.0,
-        -1.350000023841858,
+        -2.0999999046325684,
         0.0,
-        -0.8700000047683716,
+        0.15000000596046448,
+        0.0,
+        0.6299999952316284,
         0.0
        ],
-       "p": 0.001923689176710696
+       "p": 0.9962281184516296
       },
       "no_temp": {
-       "check": "quiet",
+       "check": "alert",
        "features": [
-        74.0,
+        126.0,
         0.0,
+        27.0,
+        0.0,
+        25.0,
+        0.0,
+        8.5,
+        0.0,
+        91.0,
+        0.0,
+        -5.75,
+        0.0,
+        12.0,
         1.0,
         0.0,
-        16.0,
+        3.0,
         0.0,
-        -0.5,
+        20.200000762939453,
         0.0,
-        97.0,
         0.0,
-        0.25,
         0.0,
-        4.0,
-        1.0,
+        3.200000047683716,
         0.0,
-        -49.0,
         0.0,
-        -31.799999237060547,
         0.0,
-        -9.0,
-        0.0,
-        -5.800000190734863,
-        0.0,
-        6.0,
-        0.0,
-        3.9000000953674316,
+        -2.0999999046325684,
         0.0
        ],
-       "p": 0.0019830208955069917
+       "p": 0.9999816613719756
       }
      }
     },
@@ -17587,117 +17375,117 @@
      "news2": {
       "ranked": true,
       "temperature_points": 0,
-      "total": 4
+      "total": 8
      },
      "policy": {
       "all": {
-       "alerting": false,
-       "score": 0.5283,
+       "alerting": true,
+       "score": 15.96015000000001,
        "z": [
-        0.0,
-        0.5,
-        0.25,
-        0.0
+        12.5,
+        5.0,
+        3.25,
+        7.000000000000028
        ]
       },
       "no_temp": {
-       "alerting": false,
-       "score": 0.588175,
+       "alerting": true,
+       "score": 11.031175,
        "z": [
-        0.0,
-        0.5,
-        0.25,
-        0.0
+        12.5,
+        5.0,
+        3.25,
+        7.000000000000028
        ]
       }
      },
      "policy_run_reset": false,
      "row": {
-      "bp_minute": 1165.0,
+      "bp_minute": 1105.0,
       "consciousness": "A",
       "diastolic": null,
-      "heart_rate": 71.0,
+      "heart_rate": 97.0,
       "on_oxygen": true,
-      "respiratory_rate": 17.0,
-      "spo2": 96.5,
+      "respiratory_rate": 21.5,
+      "spo2": 93.5,
       "spo2_scale": 1,
       "systolic": 98.0,
-      "temperature": 36.75
+      "temperature": 37.5
      },
      "student": {
       "all": {
-       "check": "quiet",
+       "check": "alert",
        "features": [
-        71.0,
+        97.0,
         0.0,
-        -0.5,
+        12.5,
         0.0,
-        17.0,
+        21.5,
         0.0,
-        0.5,
+        5.0,
         0.0,
-        96.5,
+        93.5,
         0.0,
-        -0.25,
+        -3.25,
         0.0,
-        36.75,
+        37.5,
         0.0,
-        -0.5,
+        7.0,
         0.0,
-        4.0,
+        8.0,
         1.0,
         0.0,
-        -36.70000076293945,
+        -28.0,
         0.0,
-        -38.900001525878906,
+        -12.899999618530273,
         0.0,
-        -6.0,
+        -4.5,
         0.0,
-        -6.199999809265137,
+        -1.7000000476837158,
         0.0,
-        4.0,
+        3.0,
         0.0,
-        4.099999904632568,
+        1.100000023841858,
         0.0,
-        -1.100000023841858,
+        -0.8500000238418579,
         0.0,
-        -1.190000057220459,
+        -0.4399999976158142,
         0.0
        ],
-       "p": 0.002371833480593114
+       "p": 0.6822809693203238
       },
       "no_temp": {
-       "check": "quiet",
+       "check": "alert",
        "features": [
-        71.0,
+        97.0,
         0.0,
-        -0.5,
+        12.5,
         0.0,
-        17.0,
+        21.5,
         0.0,
-        0.5,
+        5.0,
         0.0,
-        96.5,
+        93.5,
         0.0,
-        -0.25,
+        -3.25,
         0.0,
-        4.0,
+        8.0,
         1.0,
         0.0,
-        -36.70000076293945,
+        -28.0,
         0.0,
-        -38.900001525878906,
+        -12.899999618530273,
         0.0,
-        -6.0,
+        -4.5,
         0.0,
-        -6.199999809265137,
+        -1.7000000476837158,
         0.0,
-        4.0,
+        3.0,
         0.0,
-        4.099999904632568,
+        1.100000023841858,
         0.0
        ],
-       "p": 0.0020576835252815884
+       "p": 0.9481106387488992
       }
      }
     },
@@ -17738,7 +17526,7 @@
      },
      "policy_run_reset": false,
      "row": {
-      "bp_minute": 1165.0,
+      "bp_minute": 1105.0,
       "consciousness": "A",
       "diastolic": null,
       "heart_rate": 73.0,
@@ -17772,24 +17560,24 @@
         4.0,
         1.0,
         0.0,
-        -14.300000190734863,
+        -49.0,
         0.0,
         -36.099998474121094,
         0.0,
-        -3.0,
+        -9.0,
         0.0,
         -6.599999904632568,
         0.0,
-        2.0,
+        6.0,
         0.0,
         4.400000095367432,
         0.0,
-        -0.3499999940395355,
+        -1.350000023841858,
         0.0,
         -1.0,
         0.0
        ],
-       "p": 0.00097617292630845
+       "p": 0.0020431256089403107
       },
       "no_temp": {
        "check": "quiet",
@@ -17809,20 +17597,20 @@
         4.0,
         1.0,
         0.0,
-        -14.300000190734863,
+        -49.0,
         0.0,
         -36.099998474121094,
         0.0,
-        -3.0,
+        -9.0,
         0.0,
         -6.599999904632568,
         0.0,
-        2.0,
+        6.0,
         0.0,
         4.400000095367432,
         0.0
        ],
-       "p": 0.0010892252620150066
+       "p": 0.0019242754068331724
       }
      }
     }
@@ -17867,35 +17655,47 @@
    },
    {
     "bins": 94,
-    "gaps": 1,
+    "gaps": 2,
     "id": "synthetic-long",
-    "not_ranked": 1,
-    "rows": 93,
-    "scored": 92
+    "not_ranked": 2,
+    "rows": 92,
+    "scored": 90
    }
   ],
   "totals": {
    "check": {
     "all": {
-     "alert": 23,
+     "alert": 24,
      "not_sure": 3,
-     "quiet": 104
+     "quiet": 101
     },
     "no_temp": {
-     "alert": 26,
+     "alert": 27,
      "not_sure": 2,
-     "quiet": 102
+     "quiet": 99
     }
    },
    "policy_alerting": {
-    "all": 26,
-    "no_temp": 28
+    "all": 19,
+    "no_temp": 25
    },
    "policy_not_alerting": {
-    "all": 104,
-    "no_temp": 102
+    "all": 109,
+    "no_temp": 103
    },
-   "scored_bins": 130
+   "resets_after_run": {
+    "all": {
+     "gap": 1,
+     "not_ranked": 1,
+     "suppressed_alerts": 8
+    },
+    "no_temp": {
+     "gap": 1,
+     "not_ranked": 1,
+     "suppressed_alerts": 4
+    }
+   },
+   "scored_bins": 128
   }
  }
 }
