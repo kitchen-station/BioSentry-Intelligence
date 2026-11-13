@@ -280,6 +280,25 @@ def test_an_older_runs_episode_for_the_same_patient_id_never_shows(api: Api) -> 
     assert history(api)["simulated_episode"] is None
 
 
+def test_a_caller_who_may_not_see_the_patient_gets_the_same_404_and_no_truth(api: Api) -> None:
+    run_id = live(api)
+    assert put(api, run_id, ep()).status_code == 204
+    response = get(api, "s-1", "rn-reyes")
+    assert (response.status_code, response.json()) == (404, {"detail": "Not found"})
+    assert "respiratory" not in response.text and "episode" not in response.text
+
+
+def test_the_read_shows_no_episode_of_a_run_that_is_not_marked_synthetic(api: Api) -> None:
+    """The post refuses such a run. The read does not trust that: it is a second gate."""
+    run_id = live(api)
+    assert put(api, run_id, ep()).status_code == 204
+    assert history(api)["simulated_episode"] is not None
+    with connect(api.url) as conn:
+        conn.execute("UPDATE run SET source = 'fixture' WHERE id = %s", (run_id,))
+    assert history(api)["simulated_episode"] is None
+    assert [r["in_episode"] for r in history(api)["runs"]] == [None] * len(history(api)["runs"])
+
+
 def test_an_admin_reads_the_episode_as_the_patient_page_does(api: Api) -> None:
     run_id = live(api)
     add_admin(api)

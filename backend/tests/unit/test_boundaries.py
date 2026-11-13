@@ -112,3 +112,10 @@ def test_the_simulators_episode_truth_is_reachable_only_through_the_history_rout
     importing = re.compile(r"services\.episodes|from \.episodes|from \. import[^\n]*\bepisodes\b|from biosentry\.services import[^\n]*\bepisodes\b")
     users = {f.relative_to(SRC).as_posix() for f in files if f.suffix == ".py" and importing.search(f.read_text("utf-8"))}
     assert users == {"services/history.py", "api/app.py"}
+    # An import can be written in other ways (over several lines, by a relative name), and the history
+    # service hands the truth to its caller. So the two words themselves are pinned to their files.
+    def naming(word: str) -> set[str]:
+        return {f.relative_to(SRC).as_posix() for f in files if f.suffix == ".py" and re.search(rf"\b{word}\b", f.read_text("utf-8"))}
+
+    assert naming("episodes") == {"schemas/episodes.py", "services/episodes.py", "services/history.py", "api/app.py"}
+    assert naming("HistoryService") == {"services/history.py", "api/app.py"}

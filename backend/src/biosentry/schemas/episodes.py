@@ -20,7 +20,7 @@ class Episode(Contract):
     @model_validator(mode="after")
     def _ordered(self) -> Self:
         if self.full_minute < self.start_minute:
-            raise ValueError("full_minute is not before start_minute")
+            raise ValueError("full_minute is before start_minute")
         return self
 
 

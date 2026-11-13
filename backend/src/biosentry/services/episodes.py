@@ -69,7 +69,8 @@ def started(store: PostgresStore, patient_id: str) -> Started | None:
     row = store.conn.execute(
         "SELECT e.kind, e.start_minute, e.full_minute, r.origin FROM sim_episode e"
         " JOIN run r ON r.id = e.run_id WHERE e.run_id = %s AND e.patient_id = %s"
-        " AND r.origin + e.start_minute * interval '1 minute' <= r.as_of",
+        " AND r.origin + e.start_minute * interval '1 minute' <= r.as_of"
+        " AND r.source = 'synthetic'",  # a second gate: the post already refuses any other run
         (store.run_id, patient_id),
     ).fetchone()
     if row is None:
