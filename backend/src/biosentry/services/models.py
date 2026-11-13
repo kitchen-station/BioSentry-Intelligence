@@ -144,7 +144,7 @@ def _student(data: bytes) -> tuple[Plain, str]:
         raise _Refused("wrong format")
     try:
         model = parse(d)
-    except PlainModelError:
+    except (PlainModelError, OverflowError, RecursionError):  # a 400-digit integer overflows isfinite
         raise _Refused("student checks failed") from None
     if model.name != STUDENT_NAME or model.variant != WIRED_VARIANT or model.threshold is None:
         raise _Refused("not the wired student")
@@ -160,7 +160,7 @@ def _calibration(root: Path, data: bytes, sha: str, model: Plain, onnx_sha256: s
         raise _Refused("checksum sibling differs")
     try:
         cal = parse_calibration(_json(data))
-    except CalibrationError:
+    except (CalibrationError, OverflowError, RecursionError):
         raise _Refused("calibration checks failed") from None
     if not binds(cal, variant=model.variant, onnx_sha256=onnx_sha256, t=model.threshold):
         raise _Refused("calibration does not bind this student")
@@ -170,7 +170,7 @@ def _calibration(root: Path, data: bytes, sha: str, model: Plain, onnx_sha256: s
 def _policy(data: bytes) -> Policy:
     try:
         return parse_policy(_json(data), temperature=True)
-    except PolicyError:
+    except (PolicyError, OverflowError, RecursionError):
         raise _Refused("policy checks failed") from None
 
 

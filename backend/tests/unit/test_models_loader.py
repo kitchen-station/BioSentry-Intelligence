@@ -205,6 +205,13 @@ CASES = {
                                       "policy checks failed"),
     "policy other file": (OTHER_POLICY, P, "policy checks failed"),
     "policy NaN": (text_swap(POLICY, '"theta": 2.9776', '"theta": NaN'), P, "not valid JSON"),
+    # A 400-digit integer is valid JSON, and math.isfinite raises OverflowError on it: refused, never raised.
+    "student huge integer": (text_swap(STUDENT, '"threshold": 0.006', '"threshold": 1' + "0" * 400), S,
+                             "student checks failed"),
+    "calibration huge integer": (change(CALIBRATION, lambda o: o.update(t=10**400), True), C,
+                                 "calibration checks failed"),
+    "policy huge integer": (resealed_policy(lambda o: o["params"].update(theta=10**400)), P,
+                            "policy checks failed"),
 }
 
 DISABLED = {

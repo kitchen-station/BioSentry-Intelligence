@@ -100,6 +100,10 @@ def test_float32_rounding_and_its_overflow() -> None:
         with pytest.raises(OverflowError):
             to_float32(beyond)
     assert to_float32(3.4028235e38) == 3.4028234663852886e38
+    for not_a_number in (True, False, "1", None, [1.0]):
+        with pytest.raises(TypeError):
+            to_float32(not_a_number)  # type: ignore[arg-type]
+    assert to_float32(2) == 2.0
 
 
 def test_the_wired_student_has_the_documented_threshold_and_shape() -> None:

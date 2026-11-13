@@ -11,7 +11,10 @@ import struct
 def to_float32(x: float) -> float:
     """x rounded to the nearest float32, as a float. A finite value beyond the float32 range raises
     OverflowError (CPython 3.11 packs it as infinity without raising, so this checks it): the caller treats
-    that bin as not computed. NaN and infinity pass through; the forward pass refuses them."""
+    that bin as not computed. NaN and infinity pass through; the forward pass refuses them. A bool or
+    anything that is not a number is a TypeError: struct would take True as 1.0."""
+    if isinstance(x, bool) or not isinstance(x, (int, float)):
+        raise TypeError("a feature must be a number")
     y = struct.unpack("f", struct.pack("f", x))[0]
     if math.isfinite(x) and not math.isfinite(y):
         raise OverflowError("value is beyond the float32 range")
