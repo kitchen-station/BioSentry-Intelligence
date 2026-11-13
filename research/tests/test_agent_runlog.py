@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from research.agent import export as exporting
 from research.agent_tuning import generate, runlog, tasks
 from research.agent_tuning.common import group, read
 
@@ -306,3 +307,82 @@ def test_no_run_log_holds_a_path_or_a_user_name():
     for f in (AGENT / "runs").glob("*"):
         text = f.read_text()
         assert "/Users/" not in text and "/home/" not in text and str(Path.home()) not in text, f.name
+
+
+def scored_doc(made, tmp_path, untuned, tuned):
+    """A run log whose two question runs hold these outputs (each a function of the example), and the question examples."""
+    ev = tmp_path / "ev"
+    ev.mkdir()
+    held = hashlib.sha256((made.data / "heldout.jsonl").read_bytes()).hexdigest()
+    for name, fn in (("untuned", untuned), ("tuned", tuned)):
+        rows = [{"id": e["id"], "output": fn(e)} for e in made.q if fn(e) is not None]
+        write_lines(ev / f"{name}-question.jsonl", rows)
+        write_meta(ev / f"{name}-question.jsonl", None if name == "untuned" else hashlib.sha256(ADAPTER).hexdigest(),
+                   held, "question", len(made.q))
+    return runlog.build(**{**made.args, "evals": {"untuned": str(ev), "tuned": str(ev)}})
+
+
+def letting_through(made):
+    """Questions whose expected answer the guard lets through (the keyword matcher may veto some)."""
+    return [e for e in made.q if tasks.guard_question(e["expected"], e["question"])[0]]
+
+
+def test_scores_file_counts_are_hand_checked_and_the_export_accepts_it(made, tmp_path):
+    good = {e["id"] for e in letting_through(made)}
+    assert good
+    doc = scored_doc(made, tmp_path, lambda e: tasks.REFUSE, lambda e: e["expected"] if e["id"] in good else tasks.REFUSE)
+    calls = []
+    out = runlog.scores_file(doc, made.q, lambda template, args: calls.append(template) or template == "news2_threshold")
+    s = out["scores"]
+    before, after = s["runs"]
+    assert s["n"] == len(made.q) and (before["label"], after["label"]) == ("before", "after")
+    assert (before["answered"], before["grounding_passed"], before["correct_template"]) == (0, 0, 0)
+    assert after["answered"] == len(good) and after["correct_template"] == len(good)
+    assert after["grounding_passed"] == sum(e["label"]["template"] == "news2_threshold" for e in letting_through(made))
+    for r in s["runs"]:
+        assert r["answered"] + r["refused"] == s["n"]
+    assert before["model"] == "m/m" and after["model"] == "m/m + LoRA adapter " + hashlib.sha256(ADAPTER).hexdigest()[:12]
+    assert s["question_set"].startswith("blind held-out questions, first 1 of each group (%d questions; heldout.jsonl sha256 " % len(made.q))
+    assert out["notes"] == runlog.SCORE_NOTES and len(calls) <= len(good)
+    exporting.check_scores(out)
+
+
+def test_each_distinct_experiment_runs_once_across_both_runs(made, tmp_path):
+    good = {e["id"] for e in letting_through(made)}
+    keep = lambda e: e["expected"] if e["id"] in good else tasks.REFUSE  # noqa: E731
+    doc = scored_doc(made, tmp_path, keep, keep)
+    calls = []
+    out = runlog.scores_file(doc, made.q, lambda template, args: calls.append(json.dumps(args, sort_keys=True)) or True)
+    before, after = out["scores"]["runs"]
+    assert len(calls) == len(set(calls)) and 0 < len(calls) <= len(good)
+    assert before["answered"] == after["answered"] == len(good) and before["grounding_passed"] == after["grounding_passed"]
+
+
+def test_an_incomplete_run_writes_no_scores(made, tmp_path, capsys):
+    doc = scored_doc(made, tmp_path, lambda e: tasks.REFUSE, lambda e: None)
+    with pytest.raises(SystemExit) as stop:
+        runlog.scores_file(doc, made.q, lambda template, args: pytest.fail("no experiment may run"))
+    assert stop.value.code == 2 and "incomplete" in capsys.readouterr().err
+
+
+def test_the_real_experiment_runner_asks_the_tool_what_ask_would_and_passes_a_grounded_answer(tmp_path, monkeypatch):
+    from test_agent_ask import cfg as _unused  # noqa: F401
+    from biosentry.domain.scoring.tier_b.baseline import DEFAULTS
+    from research.agent import ask, ledger, tools
+    from test_agent_tools import cfg_for, toy_trials
+
+    monkeypatch.setattr(tools.evaluate, "_baseline_params", lambda: (DEFAULTS, "test"))
+    cfg = cfg_for(tmp_path)
+    toy_trials(cfg, range(1, 11))
+    cfg.models.mkdir()
+    question = "What if we alerted at a NEWS2 total of 5 or more?"
+    ask.ask(cfg, question)  # what ask builds is in its ledger step
+    asked = ledger.read(cfg)[1]["calls"][0]["args"]
+    seen, real = [], tools.call
+    monkeypatch.setattr(tools, "call", lambda c, name, args, *a, **k: seen.append((name, args)) or real(c, name, args, *a, **k))
+    monkeypatch.setattr(runlog.Config, "from_env", classmethod(lambda cls, env=None: cfg))
+    args = {"dataset": "ward-v2", "seeds": list(range(1, 11)), "window": "early",
+            "rules": ask._rules("news2_threshold", 5, question)}
+    assert runlog.run_experiment("news2_threshold", args) is True
+    assert seen == [("evaluate_rules", asked)] and asked == args
+    assert runlog.run_experiment("alerts_per_nurse", {**args, "rules": [{"rule": "bogus"}]}) is False  # a tool error

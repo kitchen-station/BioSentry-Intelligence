@@ -928,18 +928,19 @@ Limits:
   refuses a manifest that names one.
 - Circular, as everything above: rules are judged on the simulator that made the data.
 
-Export for a page that shows the record (read only; it writes one JSON file and nothing else):
+Export for the evaluation site (read only; it writes one JSON file and nothing else):
 
-    python -m research.agent export <file.json>
+    python -m research.agent export --date YYYY-MM-DD --out <file.json> [--ledger <ledger.jsonl>] \
+        [--commit <40 hex>] [--source "<command line>"]... [--scores <scores.json>]
 
-`format_version` 1. `questions`: `id`, `started_at`, `finished_at`, `question`, `experiment`
-(`news2_threshold`, `baseline_vs_news2`, `alerts_per_nurse`, or null when refused), `threshold`,
-`answered`, `tool_failed`, `grounding`, `answer` (the plain-words answer, with its numbers, the
-chance control and the last line; null when refused). `rounds`: `id`, `started_at`,
-`finished_at` (null for a round that did not finish), `experiment`, `planner`, `rule`, `tool`,
-`ok`, `conclusion`. `proposals`: `id`, `action`, `step`, `proposed_at`, `state` (`proposed`,
-`approved`, `applied`), `files`, `conclusion` (of the step that led to it), `approved_by`,
-`approved_at`, `applied_at`. The question text is what a person typed: a page must show it as text.
+The shape is `biosentry-evaluation/1`, section `research-agent`: `provenance`, `body`, `notes`. The date
+comes from `--date`, never the clock. Without `--commit` it asks git. `--ledger` reads another ledger
+file with the same checks. `body.questions` (last 200): `id`, `asked_at`, `question`, `template`,
+`status`, `answer` (lines), `numbers`. Each answer is rebuilt from the stored tool result and must
+match the ledger, or the export is refused. `body.proposals` (last 50): `id`, `action`, `step`,
+`conclusion`, `state`, `approved_by`, `approved_at`. `body.scores` is null, or the file made by
+`runlog.py --scores-out`. A banned phrase or a float refuses the export. Same ledger, same bytes.
+The question text is what a person typed: a page must show it as text.
 
 ### The question worker (`python -m research.agent worker`)
 

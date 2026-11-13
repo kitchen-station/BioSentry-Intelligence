@@ -5,7 +5,7 @@
     ask "<question>"              a doctor's question, answered on simulated trials
     approve <id> [--by NAME]      a person signs off a proposal (writes only the ledger)
     apply <id>                    copy an approved proposal into the models folder
-    export <file.json>            the questions, rounds and proposals as one JSON file (read only)
+    export --date D --out F       the questions and proposals as one evaluation JSON file (read only)
     worker [--once]               answer the questions clinicians ask on the dashboard (needs the API's address and key)
 
 Exit 0 on success, 2 with one `refused: ...` line on any refusal.
@@ -17,6 +17,7 @@ import sys
 from research.trials import TrialError, show
 
 from . import ask as asking
+from . import export as exporting
 from . import ledger, loop
 from . import worker as questions
 from .config import AgentError, Config
@@ -79,9 +80,7 @@ def ask(cfg: Config, args: list[str]) -> str:
 
 
 def export(cfg: Config, args: list[str]) -> str:
-    data = ledger.write_export(cfg, _one_id(args, "export <file.json>"))
-    return (f"exported {len(data['questions'])} questions, {len(data['rounds'])} rounds, "
-            f"{len(data['proposals'])} proposals")
+    return exporting.run(cfg, args)
 
 
 def worker(cfg: Config, args: list[str], env=None) -> str:

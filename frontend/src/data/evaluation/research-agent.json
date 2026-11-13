@@ -1,0 +1,163 @@
+{
+ "body": {
+  "ledger": {
+   "records": 21,
+   "sha256": "340e0bcc2306e37d4044896fb54b321e61c6b627f8b1bd42917c4b97c4c454e9"
+  },
+  "proposals": [
+   {
+    "action": "set_baseline_params",
+    "approved_at": "2026-11-13T05:05:34Z",
+    "approved_by": "Unattended demo run - not a person",
+    "conclusion": "Proposal rule held: the sweep chose k 4.0, p 8 and no params.json is installed. Point estimates on 51 episodes, no interval, simulated patients, a person decides.",
+    "id": "P-0001",
+    "state": "applied",
+    "step": "S-0009"
+   }
+  ],
+  "questions": [
+   {
+    "answer": [
+     "On the simulated ward (10 trials, tuning seeds 1 to 10, 52 deterioration episodes with a complete window), a rule that alerts at a NEWS2 total of 7 or more had an alert on for 13 of 52 episodes by the time the deterioration was fully in. The current NEWS2 chart trigger had one on for 30 of 52. An alert that was already on when the episode began counts.",
+     "Chance control: the same time windows on patients with no episode held an alert in 329 of 3115 windows at the new threshold and 1086 of 3115 windows for the chart trigger. Read the catches next to these.",
+     "Alarms: 35.3 alerts per 100 patient-days at the new threshold, 80.9 for the chart trigger (a change of -45.6).",
+     "Simulated patients. Not validated. A person decides."
+    ],
+    "asked_at": "2026-11-13T05:05:46Z",
+    "id": "S-0014",
+    "numbers": [
+     "10",
+     "52",
+     "7",
+     "13",
+     "52",
+     "30",
+     "52",
+     "329",
+     "3115",
+     "1086",
+     "3115",
+     "35.3",
+     "80.9",
+     "-45.6"
+    ],
+    "question": "What if we alerted at a NEWS2 total of 7 or more?",
+    "status": "answered",
+    "template": "news2_threshold"
+   },
+   {
+    "answer": [
+     "On the simulated ward (10 trials, tuning seeds 1 to 10, 52 deterioration episodes with a complete window), the NEWS2 chart trigger had an alert on for 30 of 52 episodes by the time the deterioration was fully in. The patient's own baseline alone had one on for 3 of 52, and NEWS2 or the baseline together for 30 of 52. An alert that was already on when the episode began counts.",
+     "Chance control: the same time windows on patients with no episode held an alert in 1086 of 3115 windows for the chart trigger, 55 of 3115 for the baseline alone and 1121 of 3115 for NEWS2 or the baseline. Read the catches next to these.",
+     "Alarms: 80.9 alerts per 100 patient-days for the chart trigger, 8.0 for the baseline alone (a change of -72.9), 83.5 for NEWS2 or the baseline (a change of 2.6).",
+     "Simulated patients. Not validated. A person decides."
+    ],
+    "asked_at": "2026-11-13T05:06:17Z",
+    "id": "S-0016",
+    "numbers": [
+     "10",
+     "52",
+     "30",
+     "52",
+     "3",
+     "52",
+     "30",
+     "52",
+     "1086",
+     "3115",
+     "55",
+     "3115",
+     "1121",
+     "3115",
+     "80.9",
+     "8.0",
+     "-72.9",
+     "83.5",
+     "2.6"
+    ],
+    "question": "Is a patient's own baseline better than NEWS2 at catching deterioration early?",
+    "status": "answered",
+    "template": "baseline_vs_news2"
+   },
+   {
+    "answer": [
+     "On the simulated ward (10 trials, tuning seeds 1 to 10, 52 deterioration episodes with a complete window), the current NEWS2 chart trigger had an alert on for 30 of 52 episodes by the time the deterioration was fully in. An alert that was already on when the episode began counts.",
+     "Chance control: the same time windows on patients with no episode held an alert in 1086 of 3115 windows. Read the catches next to this.",
+     "Alarms: 2.54 alerts per nurse per 12-hour shift. The nurse number is staff nurses per shift from the trial's scenario (2), 12-hour shifts, alerts spread evenly across the nurses.",
+     "Simulated patients. Not validated. A person decides."
+    ],
+    "asked_at": "2026-11-13T05:07:33Z",
+    "id": "S-0018",
+    "numbers": [
+     "10",
+     "52",
+     "30",
+     "52",
+     "1086",
+     "3115",
+     "2.54",
+     "2"
+    ],
+    "question": "How many alerts would each nurse get per shift?",
+    "status": "answered",
+    "template": "alerts_per_nurse"
+   },
+   {
+    "answer": [
+     "I can run three things on the simulated ward, on tuning seeds 1 to 10 only: (1) alerting at a NEWS2 total you name, from 1 to 20, against the current NEWS2 chart trigger; (2) a patient's own baseline against the chart trigger; (3) how many alerts a nurse gets per 12-hour shift. I did not run anything for this question.",
+     "Simulated patients. Not validated. A person decides."
+    ],
+    "asked_at": "2026-11-13T05:08:08Z",
+    "id": "S-0020",
+    "numbers": [],
+    "question": "Should we give this patient oxygen when the alert fires?",
+    "status": "refused",
+    "template": "none"
+   }
+  ],
+  "scores": null
+ },
+ "format": "biosentry-evaluation/1",
+ "notes": [],
+ "provenance": {
+  "commit": "c8f0ce82f1a48155cd3eba717c7af3ed9244dcab",
+  "data": "ward-v2 simulator trials",
+  "date": "2026-11-13",
+  "exporter": {
+   "name": "research.agent export",
+   "version": "1"
+  },
+  "repo": "kitchen-station/BioSentry-Intelligence",
+  "seeds": [
+   {
+    "role": "tuning",
+    "seeds": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10
+    ]
+   }
+  ],
+  "source": [
+   "python -m research.agent run",
+   "python -m research.agent run",
+   "python -m research.agent run --rounds 4",
+   "python -m research.agent approve P-0001 --by \"Unattended demo run - not a person\"",
+   "python -m research.agent apply P-0001",
+   "python -m research.agent ask \"What if we alerted at a NEWS2 total of 7 or more?\"",
+   "python -m research.agent ask \"Is a patient's own baseline better than NEWS2 at catching deterioration early?\"",
+   "python -m research.agent ask \"How many alerts would each nurse get per shift?\"",
+   "python -m research.agent ask \"Should we give this patient oxygen when the alert fires?\""
+  ],
+  "synthetic": true,
+  "validated": false
+ },
+ "section": "research-agent"
+}
