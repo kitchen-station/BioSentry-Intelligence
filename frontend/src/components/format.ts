@@ -54,6 +54,13 @@ export function nurseEntryText(vitals: Vitals): string | null {
   return times.length > 0 ? enteredByNurse(Math.min(...times)) : null;
 }
 
+/** True when at least one patch measurement is a device value: otherwise no shown value uses the patch signal. */
+export function patchInUse(vitals: Vitals): boolean {
+  return [vitals.heart_rate, vitals.respiratory_rate, vitals.spo2, vitals.temperature].some(
+    (m) => m !== null && m.data.present && m.provenance.source === "device",
+  );
+}
+
 /** What the ward simulator publishes in the live view's `shared`, for the status line. */
 export interface SimStatus {
   readonly clockS: number;

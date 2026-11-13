@@ -485,7 +485,7 @@
             "type": "boolean"
           },
           "label": {
-            "const": "Research finding. Synthetic, not validated. Does not change the rank.",
+            "const": "Research finding. Synthetic, not validated. Breaks ties between equal NEWS2 totals below a trigger.",
             "type": "string"
           },
           "params": {
@@ -533,7 +533,8 @@
           "reason": {
             "enum": [
               "no_history",
-              "latest_bin_missing"
+              "latest_bin_missing",
+              "patch_not_live"
             ],
             "type": "string"
           },
@@ -2711,6 +2712,17 @@
         "additionalProperties": false,
         "description": "Everything known about a patient before any score exists.\n\nThis is the state behind both a ranked row and a NOT RANKED row: scores, ranks and\nreasons are computed from it on read (never stored), so a recorded value re-ranks the\npatient. `signal_quality` and `last_update_s` are null for a patient with no patch.",
         "properties": {
+          "admitted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "admitting_context": {
             "type": "string"
           },
@@ -2831,7 +2843,8 @@
           "tier_c",
           "signal_quality",
           "last_update_s",
-          "synthetic"
+          "synthetic",
+          "admitted_at"
         ],
         "title": "UnscoredPatient",
         "type": "object"

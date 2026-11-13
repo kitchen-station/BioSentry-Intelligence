@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import synthetic from "../data/synthetic.json";
 import type { ScoreRow } from "../types";
 import { enteredByNurse, formatClock } from "./format";
-import { obsDue } from "./risk";
+import { obsDue, response } from "./risk";
 import { WardRow } from "./WardRow";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -97,5 +97,97 @@ describe("a row ranked from nurse entries", () => {
     });
     expect(screen.getByText(enteredByNurse(Date.parse("2026-09-03T06:30:00Z")))).toBeTruthy();
     expect(screen.getByText("30s ago")).toBeTruthy();
+  });
+});
+
+describe("an own-baseline drift reason on the row", () => {
+  const drift = { rule: "tier_b_finding" as const, text: "Drifting from own baseline: heart rate, 3 h (synthetic, not validated)", pathway: "circulatory" };
+  const showFlag = (score: number, role: "rn" | "md" | "charge_rn", reasons: ScoreRow["escalation_reasons"] = [drift]) =>
+    render(
+      <MemoryRouter>
+        <WardRow row={{ ...row, score, escalation_reasons: reasons }} role={role} now={0} ageOffsetS={0} />
+      </MemoryRouter>,
+    );
+
+  it("shows the reason and the role line on a low row", () => {
+    showFlag(2, "rn");
+    expect(screen.getByText(drift.text)).toBeTruthy();
+    expect(screen.getByText("Not a NEWS2 trigger. NEWS2 response: nurse assessment")).toBeTruthy();
+  });
+
+  it("words the line for a physician and a charge nurse", () => {
+    showFlag(2, "md");
+    expect(screen.getByText("Not a NEWS2 trigger. NEWS2 response: no medical review triggered")).toBeTruthy();
+    cleanup();
+    showFlag(2, "charge_rn");
+    expect(screen.getByText("Not a NEWS2 trigger. NEWS2 response: nurse assessment")).toBeTruthy();
+  });
+
+  it("words the line for score 0 as routine monitoring, and for a physician as no review", () => {
+    showFlag(0, "rn");
+    expect(screen.getByText("Not a NEWS2 trigger. NEWS2 response: routine monitoring")).toBeTruthy();
+    cleanup();
+    showFlag(0, "charge_rn");
+    expect(screen.getByText("Not a NEWS2 trigger. NEWS2 response: routine monitoring")).toBeTruthy();
+    cleanup();
+    showFlag(0, "md");
+    expect(screen.getByText("Not a NEWS2 trigger. NEWS2 response: no medical review triggered")).toBeTruthy();
+  });
+
+  it("keeps the band response and no role line on a flagged low-medium row", () => {
+    const single = { rule: "tier_a_threshold" as const, text: "Single parameter at 3: heart rate", pathway: null };
+    showFlag(3, "rn", [single, drift]);
+    expect(screen.getByText(response("low-medium", "rn"))).toBeTruthy();
+    expect(screen.queryByText(/^Not a NEWS2 trigger/)).toBeNull();
+  });
+
+  it("shows both texts when there are two drift reasons", () => {
+    const second = { ...drift, text: "Drifting from own baseline: SpO2, 2 h (synthetic, not validated)" };
+    showFlag(2, "rn", [drift, second]);
+    expect(screen.getByText(`${drift.text} · ${second.text}`)).toBeTruthy();
+  });
+
+  it("keeps the NEWS2 response and no role line on a medium row", () => {
+    showFlag(6, "rn");
+    expect(screen.getByText("Inform the medical team now")).toBeTruthy();
+    expect(screen.getByText(drift.text)).toBeTruthy();
+    expect(screen.queryByText(/^Not a NEWS2 trigger/)).toBeNull();
+  });
+
+  it("shows no role line on a low row with a NEWS2 trigger reason only", () => {
+    showFlag(3, "rn", [{ rule: "tier_a_threshold", text: "Single parameter at 3: heart rate", pathway: null }]);
+    expect(screen.queryByText(/^Not a NEWS2 trigger/)).toBeNull();
+  });
+});
+
+describe("a stored signal with no patch value in use", () => {
+  const nurseAt = (m: typeof row.vitals.temperature) => ({ ...m, provenance: { ...m.provenance, source: "nurse" as const } });
+  const v = row.vitals;
+  const allNurse = { ...v, heart_rate: nurseAt(v.heart_rate), respiratory_rate: nurseAt(v.respiratory_rate), spo2: nurseAt(v.spo2), temperature: nurseAt(v.temperature) };
+  const showSignal = (r: ScoreRow) =>
+    render(
+      <MemoryRouter>
+        <WardRow row={r} role="rn" now={0} ageOffsetS={0} />
+      </MemoryRouter>,
+    );
+
+  it("shows no signal figure and no age when all four values are nurse-typed", () => {
+    showSignal({ ...row, signal_quality: 40, last_update_s: 30, vitals: allNurse });
+    expect(screen.getByText("No patch signal")).toBeTruthy();
+    expect(screen.queryByText(/Signal \d+%/)).toBeNull();
+    expect(screen.queryByText(/ago$/)).toBeNull();
+    expect(screen.getByText(/^Entered by a nurse at /)).toBeTruthy();
+  });
+
+  it("asks for continuous monitoring with no patch on a high row", () => {
+    showSignal({ ...row, score: 9, signal_quality: 40, last_update_s: 30, vitals: allNurse });
+    expect(screen.getByText("Continuous monitoring needed: no patch")).toBeTruthy();
+  });
+
+  it("shows the figure and age when one device value is present", () => {
+    showSignal({ ...row, signal_quality: 40, last_update_s: 30, vitals: { ...allNurse, spo2: v.spo2 } });
+    expect(screen.getByText("Signal 40%")).toBeTruthy();
+    expect(screen.getByText("30s ago")).toBeTruthy();
+    expect(screen.queryByText("No patch signal")).toBeNull();
   });
 });

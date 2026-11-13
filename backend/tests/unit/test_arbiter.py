@@ -1,4 +1,4 @@
-"""Arbiter v1: rule 1 and rule 5 live, rules 2-4 inert, ordering deterministic."""
+"""Arbiter v1: rules 1, 3 and 5 live, the other hooks inert, ordering deterministic."""
 
 import itertools
 from dataclasses import replace
@@ -7,9 +7,11 @@ from typing import Any
 import pytest
 
 from biosentry.domain.arbiter import (
+    _LEVEL,
     Guarantees,
     NotesSignal,
     NotRanked,
+    PolicySignal,
     Ranked,
     TierBSignal,
     TierCSignal,
@@ -19,6 +21,7 @@ from biosentry.domain.arbiter import (
 )
 from biosentry.domain.computed import Computed, NotComputed, Window
 from biosentry.domain.scoring.tier_a import News2Inputs, News2Score, Risk, score_news2
+from biosentry.domain.scoring.tier_b.baseline import Deviation
 from biosentry.domain.scoring.tier_b.interface import Finding
 from biosentry.schemas import (
     Acvpu,
@@ -155,18 +158,32 @@ def test_not_ranked_carries_no_score() -> None:
 # --- Rules 2-4 and guarantees: inert, typed ---------------------------------------------
 
 
+def drifting(vital: str = "heart_rate", bins: int = 3, significant: bool = True) -> Any:
+    finding = Finding(
+        f"baseline/{vital}", "x", "+1", FindingDirection.rising, ProvenanceSource.derived,
+        significant, "circulatory",
+    )  # fmt: skip
+    return finding, Deviation(vital, 90.0, 70.0, 20.0, 3.0, bins, 0)
+
+
 def inert_inputs() -> dict[str, Any]:
     prov = Provenance.model_validate(provenance(source="model", tier="C"))
-    finding = Finding(
-        "af", "Arrhythmia burden", "40%", FindingDirection.rising, ProvenanceSource.device, True
-    )
     return {
         "tier_c": TierCSignal(Computed(0.99, prov, Window(0.0, 60.0, 1.0))),
-        "tier_b": TierBSignal((finding,)),
+        "policy": PolicySignal(Computed(True, prov, Window(0.0, 60.0, 1.0))),
         "notes": NotesSignal(True, "renal", "feels worse"),
         "worried": WorriedPin("rn-delacruz", "gut feeling"),
         "guarantees": Guarantees(False, True),
     }
+
+
+NAMES = {
+    "tier_c": "rule_2_tier_c",
+    "policy": "learned_policy",
+    "notes": "rule_4_notes",
+    "worried": "rule_4_worried",
+    "guarantees": "guarantees",
+}
 
 
 def test_inert_hooks_never_change_the_decision() -> None:
@@ -179,7 +196,28 @@ def test_inert_hooks_never_change_the_decision() -> None:
             decision = arbitrate("p-1", news2(heart_rate=60), **{n: supplied[n] for n in names})
             assert isinstance(decision, Ranked)
             assert replace(decision, inert=()) == baseline
-            assert len(decision.inert) == len(names)
+            assert decision.inert == tuple(NAMES[n] for n in supplied if n in names)
+
+
+def test_all_inert_hooks_leave_a_flagged_level_0_decision_identical() -> None:
+    signal = TierBSignal((drifting(),))
+    plain = arbitrate("p-1", news2(), tier_b=signal)
+    with_all = arbitrate("p-1", news2(), tier_b=signal, **inert_inputs())
+    assert isinstance(plain, Ranked) and isinstance(with_all, Ranked)
+    assert plain.flagged and not plain.escalated
+    assert replace(with_all, inert=()) == plain
+    assert with_all.inert == tuple(NAMES.values())
+
+
+@pytest.mark.parametrize("hook", list(NAMES))
+def test_each_inert_hook_leaves_a_triggered_decision_identical(hook: str) -> None:
+    plain = arbitrate("p-1", news2(heart_rate=35), tier_b=TierBSignal((drifting(),)))
+    with_hook = arbitrate(
+        "p-1", news2(heart_rate=35), tier_b=TierBSignal((drifting(),)), **{hook: inert_inputs()[hook]}
+    )
+    assert isinstance(with_hook, Ranked)
+    assert replace(with_hook, inert=()) == plain
+    assert with_hook.inert == (NAMES[hook],)
 
 
 def test_a_not_computed_tier_contributes_nothing() -> None:
@@ -187,11 +225,12 @@ def test_a_not_computed_tier_contributes_nothing() -> None:
         "p-1",
         news2(),
         tier_c=TierCSignal(NotComputed("no_model_registered")),
-        tier_b=TierBSignal(NotComputed("not_implemented")),
+        policy=PolicySignal(NotComputed("no_policy")),
+        tier_b=TierBSignal(NotComputed("baseline forming, 3 of 24 bins")),
     )
     assert isinstance(decision, Ranked)
-    assert (decision.escalated, decision.reasons) == (False, ())
-    assert decision.inert == ("rule_2_tier_c", "rule_3_tier_b")
+    assert (decision.escalated, decision.reasons, decision.flagged) == (False, (), False)
+    assert decision.inert == ("rule_2_tier_c", "learned_policy")
 
 
 def test_a_high_tier_c_probability_cannot_raise_a_patient_in_v1() -> None:
@@ -263,3 +302,100 @@ def test_rank_ward_accepts_a_generator() -> None:
     result = rank_ward(d for d in ward())
     assert len(result.ranked) == 5
     assert len(result.not_ranked) == 1
+
+
+# --- Rule 3: the own-baseline finding ------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("bins", "text"),
+    [(3, "45 min"), (4, "1 h"), (13, "3 h 15 min"), (12, "3 h"), (672, "168 h")],
+)
+def test_a_significant_finding_is_a_reason_with_its_pathway(bins: int, text: str) -> None:
+    decision = arbitrate(
+        "p-1", news2(), tier_b=TierBSignal((drifting("spo2", bins), drifting("temperature", bins)))
+    )
+    assert isinstance(decision, Ranked)
+    assert decision.reasons[0].text == (
+        f"Drifting from own baseline: SpO2, {text} (synthetic, not validated)"
+    )
+    assert decision.reasons[1].text.startswith("Drifting from own baseline: temperature, ")
+    assert [r.rule for r in decision.reasons] == [EscalationRule.tier_b_finding] * 2
+    assert decision.reasons[0].pathway == "circulatory"
+    assert decision.flagged and not decision.escalated
+
+
+def test_the_finding_comes_after_the_tier_a_reasons() -> None:
+    decision = arbitrate("p-1", news2(heart_rate=35), tier_b=TierBSignal((drifting(),)))
+    assert isinstance(decision, Ranked)
+    assert [r.rule for r in decision.reasons] == [
+        EscalationRule.tier_a_threshold,
+        EscalationRule.tier_b_finding,
+    ]
+    assert decision.escalated
+
+
+@pytest.mark.parametrize(
+    "signal",
+    [
+        TierBSignal(NotComputed("baseline forming, 3 of 24 bins")),
+        TierBSignal(()),
+        TierBSignal((drifting(significant=False),)),
+    ],
+)
+def test_no_significant_finding_gives_no_reason_and_no_flag(signal: TierBSignal) -> None:
+    decision = arbitrate("p-1", news2(), tier_b=signal)
+    assert isinstance(decision, Ranked)
+    assert (decision.reasons, decision.flagged, decision.inert) == ((), False, ())
+
+
+def test_a_not_ranked_decision_ignores_a_significant_finding() -> None:
+    plain = not_ranked(systolic_bp=None)
+    result = arbitrate(
+        "p-9", score_news2(replace(BASE, systolic_bp=None)), tier_b=TierBSignal((drifting(),))
+    )
+    assert result == plain
+
+
+def test_the_flag_never_changes_news2_or_escalation() -> None:
+    for changes in ({}, {"heart_rate": 35}, {"respiratory_rate": 26, "systolic_bp": 85}):
+        plain = ranked(**changes)
+        flagged = arbitrate("p-1", news2(**changes), tier_b=TierBSignal((drifting(),)))
+        assert isinstance(flagged, Ranked)
+        assert (flagged.news2, flagged.escalated) == (plain.news2, plain.escalated)
+
+
+def test_the_flag_only_breaks_ties_between_equal_totals_below_a_trigger() -> None:
+    # Every (level, total) pair that news2() can reach, three ids each, flagged or not.
+    kinds = {}
+    for rr, hr, sbp, temp, o2 in itertools.product(
+        (16, 10, 22, 26), (70, 45, 35, 120, 135), (120, 105, 95, 85), (37.0, 38.5, 39.5), (False, True)
+    ):
+        score = news2(respiratory_rate=rr, heart_rate=hr, systolic_bp=sbp, temperature=temp,
+                      supplemental_o2=o2)  # fmt: skip
+        kinds[(_LEVEL[score.risk], score.total)] = score
+    assert len(kinds) > 8
+    items = [
+        (kind, flag, name)
+        for kind in kinds
+        for flag in (False, True)
+        for name in ("p-a", "p-b", "p-c")
+    ]
+
+    def build(kind: tuple[int, int], flag: bool, name: str) -> Ranked:
+        signal = TierBSignal((drifting(),)) if flag else None
+        decision = arbitrate(name, kinds[kind], tier_b=signal)
+        assert isinstance(decision, Ranked)
+        return decision
+
+    for (k1, f1, n1), (k2, f2, n2) in itertools.product(items, items):
+        a, b = build(k1, f1, n1), build(k2, f2, n2)
+        if k1 != k2:
+            plain_a, plain_b = build(k1, False, n1), build(k2, False, n2)
+            assert (a.sort_key < b.sort_key) == (plain_a.sort_key < plain_b.sort_key)
+            if f1 and a.sort_key < b.sort_key:
+                assert k1 > k2  # a flagged patient is never above a higher level or total
+        elif f1 != f2:
+            first = (a if f1 else b).sort_key[:3]
+            second = (b if f1 else a).sort_key[:3]
+            assert (first < second) if k1[0] == 0 else (first == second)

@@ -59,7 +59,7 @@ const baseline: BaselineResponse = {
   patient_id: "p-001",
   synthetic: true,
   admission_known: true,
-  label: "Research finding. Synthetic, not validated. Does not change the rank.",
+  label: "Research finding. Synthetic, not validated. Breaks ties between equal NEWS2 totals below a trigger.",
   params: { window_bins: 24, k: 2, p: 3 },
   vitals: [
     {
@@ -413,5 +413,73 @@ describe("PatientDetail", () => {
       await user.click(screen.getByRole("button", { name: "Close" }));
       expect(screen.queryByLabelText("Heart rate (bpm)")).toBeNull();
     });
+  });
+});
+
+describe("PatientDetail own-baseline reason and patch display", () => {
+  const drift = { rule: "tier_b_finding", text: "Drifting from own baseline: heart rate, 3 h (synthetic, not validated)", pathway: "circulatory" };
+  const lowWithDrift = (role: SessionRole, score: number) => {
+    api.getPatient.mockResolvedValue({ ...base, score, escalation_reasons: [drift] } as Detail);
+    page(role);
+    return loaded();
+  };
+
+  it("says the NEWS2 response for a low patient with a drift reason, by role and score", async () => {
+    await lowWithDrift("rn", 2);
+    expect(screen.getByText("Not a NEWS2 trigger. NEWS2 response: nurse assessment")).toBeTruthy();
+    cleanup();
+    await lowWithDrift("charge_rn", 0);
+    expect(screen.getByText("Not a NEWS2 trigger. NEWS2 response: routine monitoring")).toBeTruthy();
+    cleanup();
+    await lowWithDrift("md", 0);
+    expect(screen.getByText("Not a NEWS2 trigger. NEWS2 response: no medical review triggered")).toBeTruthy();
+  });
+
+  it("says nothing of the kind for a low patient with no drift reason", async () => {
+    api.getPatient.mockResolvedValue({ ...base, score: 2, escalation_reasons: [] } as Detail);
+    page();
+    await loaded();
+    expect(screen.queryByText(/^Not a NEWS2 trigger/)).toBeNull();
+  });
+
+  it("shows the signal figure when two values are from the device and two from a nurse", async () => {
+    const v = base.vitals;
+    const nurse = (m: Detail["vitals"]["heart_rate"]) => ({ ...m, provenance: { ...m.provenance, source: "nurse" as const } });
+    const device = (m: Detail["vitals"]["heart_rate"]) => ({ ...m, provenance: { ...m.provenance, source: "device" as const } });
+    api.getPatient.mockResolvedValue({
+      ...base,
+      signal_quality: 40,
+      vitals: { ...v, heart_rate: device(v.heart_rate), respiratory_rate: device(v.respiratory_rate), spo2: nurse(v.spo2), temperature: nurse(v.temperature) },
+    } as Detail);
+    page();
+    await loaded();
+    expect(screen.getByText("Signal 40%")).toBeTruthy();
+    expect(screen.getByText("40%").closest("[data-signal]")?.getAttribute("data-signal")).toBe("degraded");
+  });
+
+  it("lists the drift reason with its pathway under why the patient is up", async () => {
+    api.getPatient.mockResolvedValue({
+      ...base,
+      escalation_reasons: [{ rule: "tier_b_finding", text: "Drifting from own baseline: heart rate, 3 h (synthetic, not validated)", pathway: "circulatory" }],
+    } as Detail);
+    page();
+    await loaded();
+    expect(screen.getByText("Drifting from own baseline: heart rate, 3 h (synthetic, not validated)")).toBeTruthy();
+    expect(screen.getByText("(circulatory)")).toBeTruthy();
+  });
+
+  it("shows no signal figure when all four values are nurse-typed", async () => {
+    const nurse = (m: Detail["vitals"]["heart_rate"]) => ({ ...m, provenance: { ...m.provenance, source: "nurse" as const } });
+    const v = base.vitals;
+    api.getPatient.mockResolvedValue({
+      ...base,
+      signal_quality: 40,
+      vitals: { ...v, heart_rate: nurse(v.heart_rate), respiratory_rate: nurse(v.respiratory_rate), spo2: nurse(v.spo2), temperature: nurse(v.temperature) },
+    } as Detail);
+    page();
+    await loaded();
+    expect(screen.getByText("No patch signal")).toBeTruthy();
+    expect(screen.getByText("No patch").closest("[data-signal]")?.getAttribute("data-signal")).toBe("none");
+    expect(screen.queryByText(/Signal \d+%/)).toBeNull();
   });
 });

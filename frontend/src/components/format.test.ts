@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { enteredByNurse, formatAge, formatBloodPressure, formatClock, formatOxygen, formatSimClock, formatSpo2Scale, simStatus } from "./format";
+import { enteredByNurse, patchInUse, formatAge, formatBloodPressure, formatClock, formatOxygen, formatSimClock, formatSpo2Scale, simStatus } from "./format";
 import type { SimStatus } from "./format";
+import type { Vitals } from "../types";
 
 describe("formatAge", () => {
   it("uses seconds, then minutes, then hours", () => {
@@ -89,5 +90,30 @@ describe("enteredByNurse", () => {
     const text = enteredByNurse(at, new Date(2026, 8, 5, 7, 40).getTime());
     expect(text.startsWith(`Entered by a nurse at ${formatClock(at)}, `)).toBe(true);
     expect(text).toMatch(/3/);
+  });
+});
+
+describe("patchInUse", () => {
+  const m = (source: "device" | "nurse", present = true) =>
+    ({ data: { present }, provenance: { source } }) as unknown as NonNullable<Vitals["heart_rate"]>;
+  const v = (hr: Vitals["heart_rate"], temperature: Vitals["temperature"] = m("nurse")) =>
+    ({ heart_rate: hr, respiratory_rate: m("nurse"), spo2: m("nurse"), temperature }) as unknown as Vitals;
+
+  it("is true with one device value among the four", () => {
+    expect(patchInUse(v(m("nurse"), m("device")))).toBe(true);
+  });
+
+  it("is false when all four are nurse-typed, absent or null", () => {
+    expect(patchInUse(v(m("nurse")))).toBe(false);
+    expect(patchInUse(v(m("device", false)))).toBe(false);
+  });
+
+  it("is false when one value is absent and the others are nurse-typed", () => {
+    expect(patchInUse(v(m("nurse", false)))).toBe(false);
+  });
+
+  it("is true on a mix of one device value and nurse values", () => {
+    expect(patchInUse(v(m("nurse"), m("device")))).toBe(true);
+    expect(patchInUse(v(m("device")))).toBe(true);
   });
 });

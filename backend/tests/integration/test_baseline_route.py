@@ -5,15 +5,18 @@ import re
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import psycopg
 import pytest
 from fastapi.testclient import TestClient
-from test_store import KEY, NOW, ORIGIN, Api, admission, api, batch, sim_patient, start  # noqa: F401 (api: fixture)
+from test_store import FOUR, KEY, NOW, ORIGIN, Api, admission, api, batch, obs, sim_patient, start  # noqa: F401 (api: fixture)
 
 from biosentry.api.app import create_app
 from biosentry.core.config import Settings
+from biosentry.repositories.postgres import PostgresStore, connect
 from biosentry.schemas import BaselineResponse, PatientDetail, VitalHistory
 from biosentry.schemas.baseline import BASELINE_LABEL
 from biosentry.services.baseline import BIN, MAX_BINS, grid
+from biosentry.services.scoring import counted, drift
 
 SKIP: Any = object()  # a slot with no stored row at all, as opposed to a row whose value is null
 BASE = [66.0, 70.0, 74.0] * 8  # 24 bins: median 70, MAD 4, so spread 1.4826 * 4
@@ -54,6 +57,11 @@ def served(api: Api, minute: int) -> str:
     (row,) = api.sql("SELECT last_batch_at - as_of AS shift FROM run ORDER BY id DESC LIMIT 1")
     moment = datetime.fromisoformat(ORIGIN) + timedelta(minutes=minute) + row["shift"]
     return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def sampling(pid: str, minute: int) -> list[dict[str, Any]]:
+    """A batch's patient entry: the patch last sampled at this minute."""
+    return [{"id": pid, "trend": "stable", "signal_quality": 90, "last_sample_minute": minute}]
 
 
 def at(minute: int, value: float | None, vital: str = "heart_rate") -> dict[str, Any]:
@@ -193,7 +201,7 @@ def test_bins_before_admission_are_not_the_baseline(api: Api) -> None:
         "bins": rows("s-2", "heart_rate", [100.0] * 24)  # before admission: 100 bpm
         + rows("s-2", "heart_rate", BASE, first_minute=minute),
     }
-    body = batch(minute, admissions=[arrival])
+    body = batch(minute, admissions=[arrival], patients=sampling("s-2", minute))
     assert api.post(f"/sim/runs/{run_id}/batch", body).status_code == 204
     hr = vitals(api, "s-2")["heart_rate"]
     assert (hr["baseline_median"], hr["latest"]) == (70.0, 74.0)
@@ -241,7 +249,9 @@ def test_latest_is_served_as_stored_and_derived_numbers_are_rounded(api: Api) ->
 def test_a_stale_latest_says_when_it_was_taken(api: Api) -> None:
     run_id = start(api, patients=[patient(bins=rows("s-1", "heart_rate", BASE + [90.0] * 4))])
     two_days = 2 * 24 * 60  # the run moves on and no heart-rate bin follows
-    quiet = batch(minute=two_days, bins=[], observations=[], events=[], patients=[])
+    # the patch keeps sampling (its value is unchanged, so no new bin row), or the panel would
+    # rightly say it is not live
+    quiet = batch(minute=two_days, bins=[], observations=[], events=[])
     assert api.post(f"/sim/runs/{run_id}/batch", quiet).status_code == 204
     hr = vitals(api)["heart_rate"]
     assert (hr["latest"], hr["significant"]) == (90.0, True)  # still served, and now dated
@@ -253,12 +263,15 @@ def test_a_stale_latest_says_when_it_was_taken(api: Api) -> None:
 def test_the_age_is_the_servers_and_counts_from_the_end_of_the_latest_bin(api: Api) -> None:
     last = 24 * 15  # the minute of the latest bin
     run_id = start(api, patients=[patient(bins=rows("s-1", "heart_rate", [*BASE, 90.0]))])
-    batch_at = batch(minute=last, bins=[], observations=[], events=[], patients=[])
+    batch_at = batch(minute=last, bins=[], observations=[], events=[])
     assert api.post(f"/sim/runs/{run_id}/batch", batch_at).status_code == 204
     assert vitals(api)["heart_rate"]["latest_age_s"] == 0  # the bin has only just begun
     api.wall.now += timedelta(minutes=20)  # a known shift: 5 minutes past the bin's end
     assert vitals(api)["heart_rate"]["latest_age_s"] == 5 * 60
     api.wall.now += timedelta(hours=6)  # inside the token's 12 hours
+    # the patch kept sampling: the same shift, a newer sample (and still no new bin)
+    later = batch(minute=last + 380, bins=[], observations=[], events=[])
+    assert api.post(f"/sim/runs/{run_id}/batch", later).status_code == 204
     stale = vitals(api)["heart_rate"]
     assert stale["latest_age_s"] == 5 * 60 + 6 * 3600
     assert stale["latest_at"] == served(api, last)  # still the bin's start, not its end
@@ -277,7 +290,8 @@ def test_a_window_that_starts_at_admission_says_so_within_thirty_minutes(api: Ap
     for pid, lead in [("s-2", 2), ("s-3", 3)]:  # two leading gap bins = 30 min; three = 45
         values = [None] * lead + BASE
         arrival = {**admission(pid), "minute": minute, "bins": rows(pid, "heart_rate", values, minute)}
-        assert api.post(f"/sim/runs/{run_id}/batch", batch(minute, admissions=[arrival])).status_code == 204
+        body = batch(minute, admissions=[arrival], patients=sampling(pid, minute))
+        assert api.post(f"/sim/runs/{run_id}/batch", body).status_code == 204
     assert vitals(api, "s-2")["heart_rate"]["anchored_at"] == "admission"
     assert vitals(api, "s-3")["heart_rate"]["anchored_at"] == "first_kept_bin"
 
@@ -287,7 +301,8 @@ def test_a_window_cut_by_the_cap_after_admission_is_anchored_mid_stay(api: Api) 
     minute = 600
     values = [100.0] * 28 + BASE + [70.0] * (MAX_BINS - 24)  # 28 oldest bins fall off the cap
     arrival = {**admission("s-2"), "minute": minute, "bins": rows("s-2", "heart_rate", values, minute)}
-    assert api.post(f"/sim/runs/{run_id}/batch", batch(minute, admissions=[arrival])).status_code == 204
+    body = batch(minute, admissions=[arrival], patients=sampling("s-2", minute))
+    assert api.post(f"/sim/runs/{run_id}/batch", body).status_code == 204
     response = get(api, "s-2").json()
     hr = response["vitals"][0]
     assert response["admission_known"] is True  # the admission is known, yet the window is not at it
@@ -454,3 +469,204 @@ def test_the_baseline_does_not_change_what_the_patient_route_serves(api: Api) ->
     assert get(api).status_code == 200
     assert api.client.get("/patients/s-1", headers=h).json() == before
     PatientDetail.model_validate(before)
+
+
+# --- The finding in the ward's order ----------------------------------------------------------
+
+FLAGGED = BASE + [90.0] * 5  # a rise of 20 bpm for 75 minutes: significant
+NAME = {"heart_rate": "heart rate", "respiratory_rate": "respiratory rate", "spo2": "SpO2"}
+
+
+def calm(pid: str, bins: list[dict[str, Any]] | None = None, **device: float) -> dict[str, Any]:
+    """A patient at NEWS2 0 unless a device value says otherwise."""
+    values = {"heart_rate": 70, "respiratory_rate": 16, "spo2": 98, "temperature": 37.0, **device}
+    made = patient(pid, bins)
+    made["observations"] = [
+        o for o in made["observations"] if o["source"] == "nurse"
+    ] + [obs(pid, code, -2, num=num) for code, num in values.items()]
+    made["observations"][0:4] = [
+        obs(pid, "blood_pressure", -10, "nurse", num=120, num2=80),
+        obs(pid, "consciousness", -10, "nurse", txt="A"),
+        obs(pid, "supplemental_o2", -10, "nurse", num=0),
+        obs(pid, "spo2_scale", -10, "nurse", num=1),
+    ]
+    return made
+
+
+def order(api: Api) -> list[str]:
+    return [r["id"] for r in api.ward("rn-delacruz")["ranked"]]
+
+
+def reasons(api: Api, pid: str) -> list[dict[str, Any]]:
+    row = next(r for r in api.ward("rn-delacruz")["ranked"] if r["id"] == pid)
+    return [r for r in row["escalation_reasons"] if r["rule"] == "tier_b_finding"]
+
+
+def test_a_flagged_patient_ranks_first_among_equal_totals_and_says_why(api: Api) -> None:
+    start(api, patients=[calm("s-1", rows("s-1", "heart_rate", BASE)),
+                         calm("s-2", rows("s-2", "heart_rate", FLAGGED))])  # fmt: skip
+    assert order(api) == ["s-2", "s-1"]
+    assert reasons(api, "s-2") == [{
+        "rule": "tier_b_finding", "pathway": "circulatory",
+        "text": "Drifting from own baseline: heart rate, 1 h 15 min (synthetic, not validated)",
+    }]  # fmt: skip
+    assert reasons(api, "s-1") == []
+
+
+def test_a_flagged_patient_with_a_lower_total_stays_below(api: Api) -> None:
+    start(api, patients=[calm("s-1", rows("s-1", "heart_rate", BASE), heart_rate=100),
+                         calm("s-2", rows("s-2", "heart_rate", FLAGGED))])  # fmt: skip
+    assert order(api) == ["s-1", "s-2"]
+    assert reasons(api, "s-2")
+
+
+def test_a_triggered_patient_stays_above_a_flagged_one(api: Api) -> None:
+    start(api, patients=[calm("s-1", rows("s-1", "heart_rate", BASE), respiratory_rate=25),
+                         calm("s-2", rows("s-2", "heart_rate", FLAGGED))])  # fmt: skip
+    assert order(api) == ["s-1", "s-2"]
+
+
+def test_a_flag_leaves_news2_and_escalation_alone(api: Api) -> None:
+    start(api, patients=[calm("s-1", rows("s-1", "heart_rate", BASE)),
+                         calm("s-2", rows("s-2", "heart_rate", FLAGGED))])  # fmt: skip
+    rows_ = {r["id"]: r for r in api.ward("rn-delacruz")["ranked"]}
+    assert (rows_["s-2"]["score"], rows_["s-2"]["supporting"]) == (0, rows_["s-1"]["supporting"])
+    assert not [r for r in rows_["s-2"]["escalation_reasons"] if r["rule"] == "tier_a_threshold"]
+
+
+def test_a_patch_that_is_off_gets_no_flag_from_its_old_bins(api: Api) -> None:
+    made = calm("s-1", rows("s-1", "heart_rate", FLAGGED))
+    made["observations"] = [o for o in made["observations"] if o["code"] != "heart_rate"] + [
+        obs("s-1", "heart_rate", -1, "nurse", num=70)
+    ]
+    start(api, patients=[made])
+    assert order(api) == ["s-1"]
+    assert reasons(api, "s-1") == []
+    panel = vitals(api)
+    assert panel["heart_rate"] == {
+        "vital": "heart_rate", "status": "unavailable", "reason": "patch_not_live",
+    }  # fmt: skip
+    assert (panel["respiratory_rate"]["status"], panel["spo2"]["status"]) == ("forming", "forming")
+    assert panel["temperature"]["reason"] == "no_history"
+
+
+def test_a_nurse_typed_heart_rate_after_a_significant_run_leaves_no_flag_and_no_panel_finding(
+    api: Api,
+) -> None:
+    start(api, patients=[calm("s-1", rows("s-1", "heart_rate", FLAGGED))])
+    assert reasons(api, "s-1") and vitals(api)["heart_rate"]["significant"] is True
+    post = api.client.post(
+        "/patients/s-1/vitals", headers=api.as_("rn-delacruz"), json={"heart_rate": 70}
+    )
+    assert post.status_code == 200
+    assert reasons(api, "s-1") == []
+    assert vitals(api)["heart_rate"]["reason"] == "patch_not_live"
+
+
+def silent_for(api: Api, minutes: int) -> None:
+    """The ward clock is at minute 480 and the patch last sampled `minutes` ago."""
+    quiet = batch(
+        minute=480, bins=[], observations=[], events=[],
+        patients=[{"id": "s-1", "trend": "stable", "signal_quality": 90,
+                   "last_sample_minute": None if minutes < 0 else 480 - minutes}],
+    )  # fmt: skip
+    (run,) = api.sql("SELECT max(id) AS i FROM run")
+    assert api.post(f"/sim/runs/{run['i']}/batch", quiet).status_code == 204
+
+
+def test_a_patch_silent_for_31_minutes_gets_no_flag_and_one_silent_for_30_does(api: Api) -> None:
+    start(api, patients=[calm("s-1", rows("s-1", "heart_rate", FLAGGED))])
+    silent_for(api, 30)
+    assert reasons(api, "s-1")
+    hr = vitals(api)["heart_rate"]
+    assert (hr["status"], hr["significant"]) == ("computed", True)
+    silent_for(api, 31)
+    assert reasons(api, "s-1") == []
+    assert vitals(api)["heart_rate"]["reason"] == "patch_not_live"
+
+
+def test_a_patch_that_never_sampled_gets_no_flag_even_with_device_values(api: Api) -> None:
+    start(api, patients=[calm("s-1", rows("s-1", "heart_rate", FLAGGED))])
+    silent_for(api, -1)
+    assert api.ward("rn-delacruz")["ranked"][0]["last_update_s"] is None
+    assert reasons(api, "s-1") == []
+    assert vitals(api)["heart_rate"]["reason"] == "patch_not_live"
+
+
+def test_a_device_absent_heart_rate_after_a_significant_run_counts_for_nothing(api: Api) -> None:
+    run_id = start(api, patients=[calm("s-1", rows("s-1", "heart_rate", FLAGGED))])
+    gone = obs("s-1", "heart_rate", 500, absent_reason="No usable reading yet")
+    body = batch(minute=500, bins=[], observations=[gone], events=[], patients=[])
+    assert api.post(f"/sim/runs/{run_id}/batch", body).status_code == 204
+    assert [a["id"] for a in api.ward("rn-delacruz")["abstained"]] == ["s-1"]  # no heart rate to score
+    with connect(api.url) as conn:
+        state = PostgresStore(conn, api.wall).read("s-1")
+    assert state is not None
+    assert not counted(state, "heart_rate")
+    assert drift(state) == ()
+    assert get(api).status_code == 404  # the panel itself is closed to a NOT RANKED patient
+
+
+def test_a_not_ranked_patient_never_has_a_finding_computed(
+    api: Api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    nurse_only = [o for o in sim_patient()["observations"] if o["source"] == "nurse"]
+    start(api, patients=[{**patient(bins=rows("s-1", "heart_rate", FLAGGED)), "observations": nurse_only}])
+
+    def boom(state: Any) -> Any:
+        raise AssertionError("drift ran for a NOT RANKED patient")
+
+    monkeypatch.setattr("biosentry.services.scoring.drift", boom)
+    assert [a["id"] for a in api.ward("rn-delacruz")["abstained"]] == ["s-1"]
+    assert get(api).status_code == 404
+
+
+def test_a_nurse_only_patient_gets_no_flag_and_a_forming_baseline(api: Api) -> None:
+    nurse_only = [o for o in sim_patient()["observations"] if o["source"] == "nurse"]
+    start(api, patients=[{**patient(), "observations": nurse_only}])
+    post = api.client.post("/patients/s-1/vitals", headers=api.as_("rn-delacruz"), json=FOUR)
+    assert post.status_code == 200
+    assert order(api) == ["s-1"]
+    assert reasons(api, "s-1") == []
+    assert {v["status"] for v in vitals(api).values()} == {"forming", "unavailable"}
+
+
+def test_the_baseline_route_and_the_row_name_the_same_vitals(api: Api) -> None:
+    rr = [14.0, 15.0, 16.0] * 8
+    start(api, patients=[calm("s-1", rows("s-1", "heart_rate", FLAGGED) + rows("s-1", "respiratory_rate", rr + [20.0] * 4))])
+    significant = {k for k, v in vitals(api).items() if v.get("significant")}
+    named = {
+        next(k for k, n in NAME.items() if f"baseline: {n}," in r["text"]) for r in reasons(api, "s-1")
+    }
+    assert significant == named == {"heart_rate", "respiratory_rate"}
+    assert [r["pathway"] for r in reasons(api, "s-1")] == ["circulatory", "respiratory"]
+
+
+# --- The cost of the finding on a ward read ---------------------------------------------------
+
+
+def test_a_ward_read_runs_the_same_statements_with_or_without_the_finding(
+    api: Api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen = [0]
+    real = psycopg.Connection.execute
+
+    def counting(self: Any, *args: Any, **kw: Any) -> Any:
+        seen[0] += 1
+        return real(self, *args, **kw)
+
+    def statements() -> int:
+        seen[0] = 0
+        api.ward("rn-delacruz")
+        return seen[0]
+
+    start(api, patients=[calm(f"s-{i}", rows(f"s-{i}", "heart_rate", FLAGGED)) for i in (1, 2, 3)])
+    api.as_("rn-delacruz")  # sign in first: its statements are not the read's
+    monkeypatch.setattr(psycopg.Connection, "execute", counting)
+    with_finding = statements()
+    assert reasons(api, "s-1")
+    monkeypatch.setattr("biosentry.services.scoring.drift", lambda state: ())
+    without = statements()
+    assert reasons(api, "s-1") == []
+    assert with_finding > 0
+    assert with_finding == without
