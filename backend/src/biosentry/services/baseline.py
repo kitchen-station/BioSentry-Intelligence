@@ -95,8 +95,9 @@ class BaselineService:
             finding, dev = found
             assert start is not None  # a computed baseline has at least one bin
             window_start = next(i for i, x in enumerate(bins) if x is not None)
-            baseline_from = start + window_start * BIN
-            latest_at = start + (len(bins) - 1) * BIN
+            first = start - BIN  # a stored bin_at is the window's END (model_signals, THE BIN); we serve the START
+            baseline_from = first + window_start * BIN
+            latest_at = first + (len(bins) - 1) * BIN
             vitals.append(
                 BaselineComputed(
                     vital=vital,
@@ -116,7 +117,7 @@ class BaselineService:
                     band_low=round(dev.baseline_median - DEFAULTS.k * dev.spread, 1),
                     band_high=round(dev.baseline_median + DEFAULTS.k * dev.spread, 1),
                     run_bins=dev.run_bins,
-                    since=None if dev.since_bin is None else start + dev.since_bin * BIN,
+                    since=None if dev.since_bin is None else first + dev.since_bin * BIN,
                     significant=finding.significant,
                     direction=finding.direction,
                     pathway=finding.pathway,
