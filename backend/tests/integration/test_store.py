@@ -489,6 +489,15 @@ def test_a_batch_moves_the_run_forward_in_one_transaction(api: Api) -> None:
     assert (run["received"], run["rejected"], run["abstained"], run["ended"]) == (5, 1, 2, False)
 
 
+def test_an_older_batch_arriving_late_does_not_move_the_ward_time_back(api: Api) -> None:
+    run_id = start(api)
+    assert api.post(f"/sim/runs/{run_id}/batch", batch(minute=10)).status_code == 204
+    assert api.post(f"/sim/runs/{run_id}/batch", batch(minute=5)).status_code == 204  # late
+    assert api.ward("rn-delacruz")["now"] == iso(datetime.fromisoformat(ORIGIN) + timedelta(minutes=10))
+    (run,) = api.sql("SELECT as_of FROM run WHERE id = %s", run_id)
+    assert run["as_of"] == datetime(2026, 1, 1, 0, 10, tzinfo=UTC)
+
+
 def test_a_repeated_batch_adds_no_rows(api: Api) -> None:
     run_id = start(api)
     counts = (
