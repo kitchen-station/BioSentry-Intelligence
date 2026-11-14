@@ -13,7 +13,7 @@ import re
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal, Self
 
-from pydantic import AfterValidator, AwareDatetime, Field, JsonValue, model_validator
+from pydantic import AfterValidator, AwareDatetime, Field, JsonValue, field_validator, model_validator
 
 from .base import Age, Contract, Flag, Num, Percent
 from .clinical import LabPanel
@@ -215,6 +215,66 @@ class LiveWard(Contract):
     shared: View | None
     patients: list[PatientView]
     can_control: Flag  # whether this clinician's role may send the sim commands
+
+
+BED_LABEL = r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,19}$"
+Bed = Annotated[str, Field(pattern=BED_LABEL)]
+OPEN_LIST_MAX = 20  # staff and moves
+OPEN_BEDS_MAX = 100
+
+
+class OpenStaff(Contract):
+    """A figure on the ward, with no name, id, task or path. `key` is its place in the runner's list."""
+
+    key: Annotated[int, Field(strict=True, ge=0, lt=OPEN_LIST_MAX)]
+    role: Literal["rn", "charge_rn", "md"]
+    x: Annotated[float, Field(strict=True, allow_inf_nan=False, ge=0, le=100)]
+    y: Annotated[float, Field(strict=True, allow_inf_nan=False, ge=0, le=100)]
+    facing: Literal["front", "back"]
+    walking: Flag
+    moved: Annotated[float, Field(strict=True, allow_inf_nan=False, ge=0, le=1e9)]
+    stage: Literal["home", "message", "walk", "work", "wait_md", "done", "walk_home"]
+    timer: Annotated[float, Field(strict=True, allow_inf_nan=False, ge=-1e6, le=1e6)]
+
+
+class OpenMove(Contract):
+    seq: Annotated[int, Field(strict=True, ge=1, le=2**53 - 1)]
+    bed: Bed
+    kind: Literal["in", "out"]
+
+
+class OpenSim(Contract):
+    clockS: Annotated[float, Field(strict=True, allow_inf_nan=False, ge=0)]
+    speed: Literal[0, 1, 10, 60]
+    ended: Flag
+    staff: Annotated[list[OpenStaff], Field(max_length=OPEN_LIST_MAX)]
+    moves: Annotated[list[OpenMove], Field(max_length=OPEN_LIST_MAX)]
+
+    @field_validator("speed", mode="before")
+    @classmethod
+    def _speed_is_a_number(cls, value: Any) -> Any:
+        if isinstance(value, bool):  # True would pass as 1
+            raise ValueError("speed is a number")
+        return value
+
+
+class OpenBed(Contract):
+    """One occupied bed: its place in the ward's order and its NEWS2 band, when ranked."""
+
+    bed: Bed
+    state: Literal["ranked", "not_ranked"]
+    rank: Annotated[int, Field(strict=True, ge=1)] | None
+    risk: Literal["low", "low_medium", "medium", "high"] | None
+
+
+class OpenWard(Contract):
+    """What anyone may watch with no sign-in (GET /wards/{ward}/open-view)."""
+
+    ward: str
+    synthetic: Literal[True]
+    can_control: Literal[False]
+    sim: OpenSim | None
+    beds: Annotated[list[OpenBed], Field(max_length=OPEN_BEDS_MAX)]
 
 
 class Action(Contract):

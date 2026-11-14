@@ -202,7 +202,7 @@ export interface components {
          * EscalationRule
          * @enum {string}
          */
-        readonly EscalationRule: "tier_a_threshold" | "tier_c_raise" | "tier_b_finding" | "missing_input";
+        readonly EscalationRule: "tier_a_threshold" | "tier_c_raise" | "tier_b_finding" | "missing_input" | "prediction_model_flag" | "alert_policy_flag";
         /**
          * FindingDirection
          * @enum {string}
@@ -218,6 +218,48 @@ export interface components {
             /** @constant */
             readonly present: true;
             readonly value: boolean;
+        };
+        /** HistoryEvent */
+        readonly HistoryEvent: {
+            /** Format: date-time */
+            readonly at: string;
+            readonly by: string | null;
+            /** @enum {string} */
+            readonly kind: "admitted" | "acknowledged" | "vitals_recorded" | "note_added" | "bp_charted";
+            readonly note_id: string | null;
+            readonly role: ("rn" | "md" | "charge_rn") | null;
+            readonly score: number | null;
+            /** @enum {string} */
+            readonly source: "clinician_action" | "clinical_note" | "observation" | "patient";
+        };
+        /** HistoryProvenance */
+        readonly HistoryProvenance: {
+            /** Format: date-time */
+            readonly computed_at: string;
+            /** @constant */
+            readonly rule: "news2_as_of_bins";
+            /** @constant */
+            readonly source: "derived";
+            readonly synthetic: boolean;
+            /** @constant */
+            readonly tier: "A";
+        };
+        /** HistoryRun */
+        readonly HistoryRun: {
+            readonly bins: number;
+            /** Format: date-time */
+            readonly end: string;
+            readonly in_episode: ("inside" | "outside") | null;
+            readonly ongoing: boolean;
+            readonly peak_at: string | null;
+            readonly peak_level: ("single_3" | "medium" | "high") | null;
+            readonly peak_score: number | null;
+            readonly provenance: components["schemas"]["HistoryProvenance"];
+            readonly reasons: readonly string[];
+            /** Format: date-time */
+            readonly start: string;
+            /** @enum {string} */
+            readonly state: "alert" | "not_ranked" | "not_rebuilt" | "no_reading";
         };
         readonly JsonValue: unknown;
         /** LabExtractionResult */
@@ -340,6 +382,19 @@ export interface components {
             readonly present: false;
             readonly reason: string;
         };
+        /**
+         * ModelSignal
+         * @description One research model's result at the last stored 15-minute bin. Synthetic, not validated.
+         *     A flag adds a reason line and changes nothing else. No probability is served.
+         */
+        readonly ModelSignal: {
+            readonly bin_end: string | null;
+            readonly bin_start: string | null;
+            readonly provenance: readonly components["schemas"]["Provenance"][];
+            readonly reason: string | null;
+            /** @enum {string} */
+            readonly state: "flag" | "no_flag" | "not_sure" | "not_computed";
+        };
         /** NewLabRun */
         readonly NewLabRun: {
             readonly baseline: string;
@@ -363,6 +418,13 @@ export interface components {
         };
         /** NewPatientQuestion */
         readonly NewPatientQuestion: {
+            readonly question: string;
+        };
+        /**
+         * NewQuestion
+         * @description A general question about the simulated trials (contract-ask 4): one line, stored as typed.
+         */
+        readonly NewQuestion: {
             readonly question: string;
         };
         /** NumberMeasurement */
@@ -405,6 +467,64 @@ export interface components {
             readonly systolic?: number | null;
             /** @default null */
             readonly temperature?: number | null;
+        };
+        /**
+         * OpenBed
+         * @description One occupied bed: its place in the ward's order and its NEWS2 band, when ranked.
+         */
+        readonly OpenBed: {
+            readonly bed: string;
+            readonly rank: number | null;
+            readonly risk: ("low" | "low_medium" | "medium" | "high") | null;
+            /** @enum {string} */
+            readonly state: "ranked" | "not_ranked";
+        };
+        /** OpenMove */
+        readonly OpenMove: {
+            readonly bed: string;
+            /** @enum {string} */
+            readonly kind: "in" | "out";
+            readonly seq: number;
+        };
+        /** OpenSim */
+        readonly OpenSim: {
+            readonly clockS: number;
+            readonly ended: boolean;
+            readonly moves: readonly components["schemas"]["OpenMove"][];
+            /** @enum {integer} */
+            readonly speed: 0 | 1 | 10 | 60;
+            readonly staff: readonly components["schemas"]["OpenStaff"][];
+        };
+        /**
+         * OpenStaff
+         * @description A figure on the ward, with no name, id, task or path. `key` is its place in the runner's list.
+         */
+        readonly OpenStaff: {
+            /** @enum {string} */
+            readonly facing: "front" | "back";
+            readonly key: number;
+            readonly moved: number;
+            /** @enum {string} */
+            readonly role: "rn" | "charge_rn" | "md";
+            /** @enum {string} */
+            readonly stage: "home" | "message" | "walk" | "work" | "wait_md" | "done" | "walk_home";
+            readonly timer: number;
+            readonly walking: boolean;
+            readonly x: number;
+            readonly y: number;
+        };
+        /**
+         * OpenWard
+         * @description What anyone may watch with no sign-in (GET /wards/{ward}/open-view).
+         */
+        readonly OpenWard: {
+            readonly beds: readonly components["schemas"]["OpenBed"][];
+            /** @constant */
+            readonly can_control: false;
+            readonly sim: components["schemas"]["OpenSim"] | null;
+            /** @constant */
+            readonly synthetic: true;
+            readonly ward: string;
         };
         /**
          * OverviewActivity
@@ -557,6 +677,7 @@ export interface components {
             readonly labs: components["schemas"]["LabPanel"];
             readonly last_update_s: number | null;
             readonly mechanism: string;
+            readonly models: components["schemas"]["RowModels"];
             readonly name: string;
             readonly rank: number;
             readonly score: number;
@@ -580,6 +701,22 @@ export interface components {
             readonly model_id: string;
             readonly synthetic: boolean;
             readonly values: components["schemas"]["PartialAdmitPatientInput"];
+        };
+        /** PatientHistory */
+        readonly PatientHistory: {
+            readonly bins: number;
+            readonly events: readonly components["schemas"]["HistoryEvent"][];
+            readonly events_cut: boolean;
+            readonly grid_from: string | null;
+            readonly grid_to: string | null;
+            /** @constant */
+            readonly label: "Rebuilt from stored 15-minute bins. It can differ from the score shown at the time.";
+            readonly patient_id: string;
+            readonly runs: readonly components["schemas"]["HistoryRun"][];
+            readonly runs_cut: boolean;
+            readonly simulated_episode: components["schemas"]["SimulatedEpisode"] | null;
+            readonly synthetic: boolean;
+            readonly unavailable: ("no_bins" | "past_cap" | "not_aligned") | null;
         };
         /** PatientQuestionDetail */
         readonly PatientQuestionDetail: {
@@ -642,17 +779,24 @@ export interface components {
         };
         /**
          * Provenance
-         * @description Where a value came from. Every key is required; null is allowed only where stated.
+         * @description Where a value came from. Every key is required and null is allowed only where stated, except the
+         *     three file fields of a model value: they are served only for a model value.
          */
         readonly Provenance: {
             readonly computed_at: string | null;
+            /** @default null */
+            readonly file_sha256?: string | null;
             readonly model_id: string | null;
             /** Format: date-time */
             readonly observed_at: string;
             readonly quality: components["schemas"]["QualityLevel"];
+            /** @default null */
+            readonly run_id?: string | null;
             readonly source: components["schemas"]["ProvenanceSource"];
             readonly synthetic: boolean;
             readonly tier: components["schemas"]["Tier"] | null;
+            /** @default null */
+            readonly variant?: string | null;
         };
         /**
          * ProvenanceSource
@@ -669,6 +813,42 @@ export interface components {
          * @enum {string}
          */
         readonly QualityLevel: "ok" | "degraded" | "missing";
+        /** QuestionDetail */
+        readonly QuestionDetail: {
+            readonly answer: string | null;
+            readonly claimed_at: string | null;
+            readonly finished_at: string | null;
+            readonly id: number;
+            readonly question: string;
+            readonly reason: string | null;
+            readonly report: {
+                readonly [key: string]: unknown;
+            } | null;
+            readonly requested_at: string;
+            readonly requested_by: string;
+            /** @enum {string} */
+            readonly state: "queued" | "running" | "done" | "failed" | "refused";
+        };
+        /**
+         * QuestionItem
+         * @description A general question as the ward's physicians and charge nurses read it.
+         */
+        readonly QuestionItem: {
+            readonly claimed_at: string | null;
+            readonly finished_at: string | null;
+            readonly id: number;
+            readonly question: string;
+            readonly reason: string | null;
+            readonly requested_at: string;
+            readonly requested_by: string;
+            /** @enum {string} */
+            readonly state: "queued" | "running" | "done" | "failed" | "refused";
+        };
+        /** RowModels */
+        readonly RowModels: {
+            readonly alert_policy: components["schemas"]["ModelSignal"];
+            readonly prediction: components["schemas"]["ModelSignal"];
+        };
         /**
          * ScoreRow
          * @description A ranked patient: carries a NEWS2 score and rank. That every required input was
@@ -683,6 +863,7 @@ export interface components {
             readonly labs: components["schemas"]["LabPanel"];
             readonly last_update_s: number | null;
             readonly mechanism: string;
+            readonly models: components["schemas"]["RowModels"];
             readonly name: string;
             readonly rank: number;
             readonly score: number;
@@ -712,6 +893,21 @@ export interface components {
          * @enum {string}
          */
         readonly Sex: "M" | "F";
+        /**
+         * SimulatedEpisode
+         * @description What the simulator says about this stay. It exists only for a simulated run: on a real ward
+         *     this truth does not exist. Served times, as the runs' start and end.
+         */
+        readonly SimulatedEpisode: {
+            /** Format: date-time */
+            readonly full: string;
+            /** @enum {string} */
+            readonly kind: "respiratory" | "tachycardic" | "hypotensive";
+            /** @constant */
+            readonly source: "simulation";
+            /** Format: date-time */
+            readonly start: string;
+        };
         /**
          * Spo2Scale
          * @description RCP NEWS2 SpO2 scoring scale. Scale 2 is clinician-assigned (hypercapnic failure).
@@ -905,6 +1101,9 @@ export type EscalationRule = components['schemas']['EscalationRule'];
 export type FindingDirection = components['schemas']['FindingDirection'];
 export type FlagMeasurement = components['schemas']['FlagMeasurement'];
 export type FlagPresent = components['schemas']['FlagPresent'];
+export type HistoryEvent = components['schemas']['HistoryEvent'];
+export type HistoryProvenance = components['schemas']['HistoryProvenance'];
+export type HistoryRun = components['schemas']['HistoryRun'];
 export type JsonValue = components['schemas']['JsonValue'];
 export type LabExtractionResult = components['schemas']['LabExtractionResult'];
 export type LabPanel = components['schemas']['LabPanel'];
@@ -912,12 +1111,19 @@ export type LabRunDetail = components['schemas']['LabRunDetail'];
 export type LabRunItem = components['schemas']['LabRunItem'];
 export type LiveWard = components['schemas']['LiveWard'];
 export type MeasurementAbsent = components['schemas']['MeasurementAbsent'];
+export type ModelSignal = components['schemas']['ModelSignal'];
 export type NewLabRun = components['schemas']['NewLabRun'];
 export type NewNote = components['schemas']['NewNote'];
 export type NewPatientQuestion = components['schemas']['NewPatientQuestion'];
+export type NewQuestion = components['schemas']['NewQuestion'];
 export type NumberMeasurement = components['schemas']['NumberMeasurement'];
 export type NumberPresent = components['schemas']['NumberPresent'];
 export type NurseVitalsInput = components['schemas']['NurseVitalsInput'];
+export type OpenBed = components['schemas']['OpenBed'];
+export type OpenMove = components['schemas']['OpenMove'];
+export type OpenSim = components['schemas']['OpenSim'];
+export type OpenStaff = components['schemas']['OpenStaff'];
+export type OpenWard = components['schemas']['OpenWard'];
 export type OverviewActivity = components['schemas']['OverviewActivity'];
 export type OverviewClinician = components['schemas']['OverviewClinician'];
 export type OverviewPatient = components['schemas']['OverviewPatient'];
@@ -927,6 +1133,7 @@ export type PartialAdmitPatientInput = components['schemas']['PartialAdmitPatien
 export type PartialLabInput = components['schemas']['PartialLabInput'];
 export type PatientDetail = components['schemas']['PatientDetail'];
 export type PatientExtractionResult = components['schemas']['PatientExtractionResult'];
+export type PatientHistory = components['schemas']['PatientHistory'];
 export type PatientQuestionDetail = components['schemas']['PatientQuestionDetail'];
 export type PatientQuestionItem = components['schemas']['PatientQuestionItem'];
 export type PatientStay = components['schemas']['PatientStay'];
@@ -935,10 +1142,14 @@ export type PatientView = components['schemas']['PatientView'];
 export type Provenance = components['schemas']['Provenance'];
 export type ProvenanceSource = components['schemas']['ProvenanceSource'];
 export type QualityLevel = components['schemas']['QualityLevel'];
+export type QuestionDetail = components['schemas']['QuestionDetail'];
+export type QuestionItem = components['schemas']['QuestionItem'];
+export type RowModels = components['schemas']['RowModels'];
 export type ScoreRow = components['schemas']['ScoreRow'];
 export type Session = components['schemas']['Session'];
 export type SessionRole = components['schemas']['SessionRole'];
 export type Sex = components['schemas']['Sex'];
+export type SimulatedEpisode = components['schemas']['SimulatedEpisode'];
 export type Spo2Scale = components['schemas']['Spo2Scale'];
 export type Spo2ScaleMeasurement = components['schemas']['Spo2ScaleMeasurement'];
 export type Spo2ScalePresent = components['schemas']['Spo2ScalePresent'];

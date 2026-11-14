@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { enteredByNurse, patchInUse, formatAge, formatBloodPressure, formatClock, formatOxygen, formatSimClock, formatSpo2Scale, simStatus } from "./format";
+import { enteredByNurse, patchInUse, formatAge, formatBloodPressure, formatClock, formatClockDay, formatOxygen, formatSimClock, formatSpo2Scale, simStatus } from "./format";
 import type { SimStatus } from "./format";
 import type { Vitals } from "../types";
 
@@ -120,5 +120,15 @@ describe("patchInUse", () => {
   it("is true on a mix of one device value and nurse values", () => {
     expect(patchInUse(v(m("nurse"), m("device")))).toBe(true);
     expect(patchInUse(v(m("device")))).toBe(true);
+  });
+});
+
+describe("formatClockDay", () => {
+  const now = new Date(2026, 10, 14, 12, 0).getTime();
+  it("gives the clock for today and the date with the clock for another day", () => {
+    const today = new Date(2026, 10, 14, 9, 5).getTime();
+    const before = new Date(2026, 10, 13, 22, 15).getTime();
+    expect(formatClockDay(today, now)).toBe(formatClock(today));
+    expect(formatClockDay(before, now)).toBe(`${new Date(before).toLocaleDateString([], { day: "numeric", month: "short" })}, ${formatClock(before)}`);
   });
 });

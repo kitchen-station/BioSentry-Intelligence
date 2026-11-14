@@ -113,13 +113,16 @@ def seed(conn: Conn, fixture: Path = DEFAULT_DATASET, dev_passphrase: bool = Fal
                 if isinstance(m, dict) and "data" in m
             ]
             history = (raw["details"].get(pid) or p)["vital_history"]
+            # The fixture file gives each bin's start; the table holds its end, like a posted run.
             bins += [
-                (pid, v, parse(h["time"]), h["value"]) for v in HISTORY_VITALS for h in history[v]
+                (pid, v, parse(h["time"]) + timedelta(minutes=15), h["value"])
+                for v in HISTORY_VITALS
+                for h in history[v]
             ]
             # Temperature has a sparkline but no detail chart: only its last 12 bins exist.
             temp = p["vital_trends"]["temperature"]
             bins += [
-                (pid, "temperature", as_of - timedelta(minutes=15 * (len(temp) - i)), value)
+                (pid, "temperature", as_of - timedelta(minutes=15 * (len(temp) - 1 - i)), value)
                 for i, value in enumerate(temp)
             ]
         for pid in patients:

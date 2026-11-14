@@ -2,11 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useParams, Link } from "react-router-dom";
 import type { ClinicalNote, PatientDetail as PatientDetailType, Session, SessionRole, VitalsRecorded } from "../types";
-import { getPatient, getNotes, addNote, canRecordVitals, usesServer } from "../api";
+import { getPatient, getNotes, addNote, canRecordVitals, hasHistory, hasPatientQuestions, usesServer } from "../api";
 import { Flip } from "../components/Flip";
 import { SessionMenu } from "../components/SessionMenu";
 import { SimulatedNote } from "../components/LabFrame";
+import { StayPanel } from "../components/StayPanel";
+import { AskPatient } from "../components/AskPatient";
 import { BaselinePanel, isComputed, isObj, num } from "../components/BaselinePanel";
+import { ResearchModels } from "../components/ResearchModels";
 import { useBaseline, type BaselineState } from "../components/useBaseline";
 import { CurrentVitals, VitalRow } from "../components/CurrentVitals";
 import { TrendChart } from "../components/TrendChart";
@@ -39,6 +42,8 @@ function trendTitle(history: PatientDetailType["vital_history"]) {
 }
 
 type Drawer = "notes" | "charts" | null;
+
+const MODEL_RULES = new Set<string>(["prediction_model_flag", "alert_policy_flag"]);
 
 const ROLE_LABEL: Record<SessionRole, string> = { rn: "RN", charge_rn: "Charge RN", md: "MD", admin: "Admin" };
 
@@ -190,7 +195,10 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
   const hrBand = bandOf(baseline, "heart_rate");
   const rrBand = bandOf(baseline, "respiratory_rate");
   const spo2Band = bandOf(baseline, "spo2");
-  const reasons = patient.escalation_reasons;
+  // A model flag is a reason line on the row, but it does not put the patient where they are: the page
+  // lists it apart, and "Sorted on NEWS2 only" stays true when no other reason exists.
+  const reasons = patient.escalation_reasons.filter((r) => !MODEL_RULES.has(r.rule));
+  const modelReasons = patient.escalation_reasons.filter((r) => MODEL_RULES.has(r.rule));
   const signal = patchInUse(patient.vitals) ? patient.signal_quality : null;
 
   return (
@@ -268,6 +276,16 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
                 </div>
               ) : (
                 <span className={styles.reasonNone}>Sorted on NEWS2 only</span>
+              )}
+              {modelReasons.length > 0 && (
+                <>
+                  <span className={styles.summaryLabel}>Research models · rank unchanged</span>
+                  <div className={styles.reasonList}>
+                    {modelReasons.map((r) => (
+                      <span key={r.rule} className={styles.reasonTag}>{r.text}</span>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -413,6 +431,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
             <p className={styles.panelEyebrow}>Tier B &mdash; Mechanism findings</p>
             <p className={styles.pending}>Other mechanism findings: not yet implemented</p>
             <BaselinePanel baseline={baseline} />
+            <ResearchModels models={patient.models} />
           </div>
 
         </div>
@@ -447,6 +466,18 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
               </p>
             )}
           </div>
+
+          {hasHistory && (
+            <div className={styles.panel}>
+              <StayPanel key={patient.id} patientId={patient.id} onSignOut={onSignOut} />
+            </div>
+          )}
+
+          {hasPatientQuestions && !readOnly && (
+            <div className={styles.panel}>
+              <AskPatient key={patient.id} patientId={patient.id} clinicianId={session.clinician_id} onSignOut={onSignOut} />
+            </div>
+          )}
 
           <div className={styles.panel}>
             <p className={styles.panelEyebrow}>

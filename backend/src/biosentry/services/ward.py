@@ -4,19 +4,30 @@ Scope is resolved first and fails closed: an unknown clinician sees nobody. A cl
 assigned patients; an admin sees every patient on the ward, read-only. Decisions are the
 real news2() and arbiter, computed here on every request. The rank is relative to the caller's
 set and is never stored. A patient is ranked only while every NEWS2 input is present; otherwise
-the row is NOT RANKED with the arbiter's reason and instruction. Every read appends an audit
+the row is NOT RANKED with the arbiter's reason and instruction. The two research models are computed
+for the whole set at once and handed to the arbiter as results: a flag adds a reason line and changes
+nothing else (synthetic, not validated). Every read appends an audit
 record, including reads that find nothing.
 """
 
+import logging
+from typing import Any
+
+from pydantic import ValidationError
+
 from biosentry.core.audit import AuditLog
-from biosentry.domain.arbiter import NotRanked, Ranked, rank_ward
+from biosentry.domain.arbiter import NotRanked, PolicySignal, Ranked, TierCSignal, rank_ward
+from biosentry.domain.computed import Computed, NotComputed
 from biosentry.domain.scoring.tier_a import News2Score
+from biosentry.domain.scoring.tier_c.confidence import Check
 from biosentry.repositories.postgres import OUT_OF_DATE, PostgresStore
 from biosentry.schemas import (
     AbstainedRow,
     PatientDetail,
     PatientStay,
+    ModelSignal,
     PatientSummary,
+    RowModels,
     ScoreRow,
     Tier,
     TierAScore,
@@ -25,9 +36,14 @@ from biosentry.schemas import (
     UnscoredPatient,
     WardResponse,
 )
-from biosentry.schemas.ingest import LiveWard
+from biosentry.schemas.ingest import OPEN_BEDS_MAX, LiveWard, OpenBed, OpenSim, OpenWard
 
+from .model_signals import POLICY_ID, STUDENT_ID, ModelSignals, ward_model_signals
+from .models import LoadedModels
 from .scoring import decide
+
+log = logging.getLogger(__name__)
+_LOGGED: set[str] = set()  # each fixed not-computed reason is logged once per process; no patient, no value
 
 SHIFT = "07:00"
 _SHORT = {
@@ -52,8 +68,48 @@ def supporting(news2: News2Score) -> str:
     )
 
 
+MODEL_ERROR = "model error"
+
+
+def _log_once(reason: str) -> None:
+    if reason not in _LOGGED:
+        _LOGGED.add(reason)
+        log.warning("model result not computed: %s", reason)
+
+
+def _flag_state(value: object) -> str:
+    if isinstance(value, Check):
+        return {Check.ALERT: "flag", Check.NOT_SURE: "not_sure", Check.QUIET: "no_flag"}[value]
+    return "flag" if value else "no_flag"
+
+
+def _signal(
+    result: Computed[Check] | Computed[bool] | NotComputed,
+    sig: ModelSignals,
+    model_id: str,
+    before: tuple[Computed[float] | NotComputed, ...] = (),
+) -> ModelSignal:
+    """Served as the models computed it. A not-computed result keeps its fixed reason; no probability."""
+    if isinstance(result, NotComputed):
+        _log_once(result.reason)
+        return ModelSignal(state="not_computed", reason=result.reason, bin_start=None, bin_end=None, provenance=[])
+    when = sig.provenance[model_id]
+    return ModelSignal(
+        state=_flag_state(result.value), reason=None, bin_start=when.bin_start, bin_end=when.bin_end,
+        provenance=[c.provenance for c in (*before, result) if isinstance(c, Computed)],
+    )  # fmt: skip
+
+
+def row_models(sig: ModelSignals) -> RowModels:
+    """The two states for a row: prediction needs the student and the check, the policy needs itself."""
+    return RowModels(
+        prediction=_signal(sig.check, sig, STUDENT_ID, (sig.probability,)),
+        alert_policy=_signal(sig.policy, sig, POLICY_ID),
+    )
+
+
 def score_row(
-    state: UnscoredPatient, rank: int, decision: Ranked, tiers: list[TierStatus]
+    state: UnscoredPatient, rank: int, decision: Ranked, tiers: list[TierStatus], models: RowModels
 ) -> ScoreRow:
     return ScoreRow(
         id=state.id,
@@ -73,6 +129,7 @@ def score_row(
         sort_tier=Tier.A,
         tier_status=tiers,
         escalation_reasons=decision.escalation_reasons(),
+        models=models,
         synthetic=state.synthetic,
         signal_quality=state.signal_quality,
         last_update_s=state.last_update_s,
@@ -115,10 +172,40 @@ def abstained_row(state: UnscoredPatient, decision: NotRanked) -> AbstainedRow:
     )
 
 
+_OPEN_KIND = {"in": "in", "discharged": "out", "higher_care": "out"}  # where a patient went is not shown
+
+
+def open_sim(view: dict[str, Any] | None) -> OpenSim | None:
+    """The runner's view as the open answer draws it: each field picked by name, nothing copied
+    whole. Any field that fails its check, or too many entries, gives None (never a partial sim)."""
+    shared = view.get("shared") if view else None
+    try:
+        return OpenSim.model_validate(
+            {
+                **{k: shared[k] for k in ("clockS", "speed", "ended")},
+                "staff": [
+                    {
+                        "key": i,
+                        **{k: s[k] for k in ("role", "x", "y", "facing", "moved", "stage", "timer")},
+                        "walking": len(s["path"]) > 0 if isinstance(s["path"], list) else None,
+                    }
+                    for i, s in enumerate(shared["staff"])
+                ],
+                "moves": [
+                    {"seq": m["seq"], "bed": m["bed"], "kind": _OPEN_KIND.get(m["kind"])}
+                    for m in shared["moves"]
+                ],
+            }
+        )
+    except (KeyError, TypeError, ValidationError):  # shared is missing, not an object, or not as read
+        return None
+
+
 class WardService:
-    def __init__(self, store: PostgresStore, audit: AuditLog) -> None:
+    def __init__(self, store: PostgresStore, audit: AuditLog, models: LoadedModels) -> None:
         self._store = store
         self._audit = audit
+        self._models = models  # loaded once at start
 
     def visible(self, clinician_id: str) -> frozenset[str]:
         # An admin reads every patient on the ward; every write is refused earlier by `Writer`.
@@ -132,9 +219,23 @@ class WardService:
         """Rows ranked relative to this set, and the state each row was built from."""
         read = (self._store.read(pid) for pid in sorted(ids))
         states = {s.id: s for s in read if s is not None}
-        ranking = rank_ward(decide(s) for s in states.values())
+        try:
+            signals = ward_model_signals(self._store, states, self._models)  # two statements for the set
+        except Exception as e:  # research code must never take the NEWS2 list down
+            _log_once(f"{MODEL_ERROR} ({type(e).__name__})")
+            _LOGGED.add(MODEL_ERROR)  # the line above already says it, with the kind of error
+            failed = NotComputed(MODEL_ERROR)
+            signals = {pid: ModelSignals(failed, failed, failed, {}) for pid in states}
+        decisions = [
+            decide(s, TierCSignal(g.probability, g.check), PolicySignal(g.policy))
+            for s, g in ((s, signals[s.id]) for s in states.values())
+        ]
+        ranking = rank_ward(decisions)
         tiers = self._store.tier_status
-        ranked = [score_row(states[d.patient_id], rank, d, tiers) for rank, d in ranking.ranked]
+        ranked = [
+            score_row(states[d.patient_id], rank, d, tiers, row_models(signals[d.patient_id]))
+            for rank, d in ranking.ranked
+        ]
         abstained = [abstained_row(states[d.patient_id], d) for d in ranking.not_ranked]
         return ranked, abstained, states
 
@@ -204,6 +305,35 @@ class WardService:
                 "patients": [p for p in view["patients"] if p["id"] in visible],
                 "can_control": self._store.can_control(clinician_id),
             }
+        )
+
+    def open_ward(self) -> OpenWard | None:
+        """The ward for a caller nobody identified: bed, rank and NEWS2 band only, from the ward's
+        own scoring, and the simulator's figures. None when the ward holds too many patients.
+        No model runs, so no model state can reach it; the ranking does not depend on one. Writes
+        no audit row: the route does."""
+        ids = self._store.on_ward()
+        if len(ids) > OPEN_BEDS_MAX:
+            return None
+        states = [s for s in (self._store.read(pid) for pid in sorted(ids)) if s is not None]
+        ranking = rank_ward(decide(s) for s in states)
+        bed = {s.id: s.bed for s in states}
+        beds = [
+            *(("ranked", rank, d.patient_id, d.news2.risk.value) for rank, d in ranking.ranked),
+            *(("not_ranked", None, d.patient_id, None) for d in ranking.not_ranked),
+        ]
+        shown = []
+        for state, rank, pid, risk in beds:
+            try:
+                shown.append(OpenBed(bed=bed[pid], state=state, rank=rank, risk=risk))
+            except ValidationError:  # a label that breaks the rule is left out
+                continue
+        return OpenWard(
+            ward=self._store.ward,
+            synthetic=True,
+            can_control=False,
+            sim=open_sim(self._store.live_view()),
+            beds=sorted(shown, key=lambda b: (b.bed, b.rank or 0)),
         )
 
     def summaries(self, clinician_id: str) -> list[PatientSummary]:

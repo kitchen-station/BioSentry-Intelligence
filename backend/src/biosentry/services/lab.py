@@ -1,6 +1,7 @@
 """The Simulation lab's store (contract-d7): a clinician's request for one simulated compare run,
 the lab worker's claim of it, and the worker's report. A patient question (contract-patient-ask)
-is a second kind of row in the same queue; `patient_ask.py` creates and reads it. The API never runs anything and nothing
+is a second kind of row in the same queue; `patient_ask.py` creates and reads it. A general question
+about the trials (contract-ask) is a third kind, created and read here. The API never runs anything and nothing
 that ranks or scores a patient reads these rows. Timeouts are applied here when a row is touched,
 with the injected wall clock; nothing runs in the background."""
 
@@ -20,7 +21,11 @@ from biosentry.schemas.lab import (
     LabRunDetail,
     LabRunItem,
     NewLabRun,
+    NewQuestion,
     PatientQuestionJob,
+    QuestionDetail,
+    QuestionItem,
+    QuestionJob,
 )
 
 # judgement (contract-d7 sections 4 and 8): one worker, one job at a time, run time not measured
@@ -31,7 +36,7 @@ PER_DAY = 10
 QUEUED_PER_WARD = 5
 LIST_LIMIT = 20
 
-Kind = Literal["compare", "patient_question"]
+Kind = Literal["compare", "patient_question", "question"]
 Result = Literal["ok", "not_found", "not_running", "mismatch"]
 _LOCK = "SELECT pg_advisory_xact_lock(hashtextextended('lab_run', 0))"
 
@@ -61,25 +66,30 @@ def _item(row: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _full(store: PostgresStore, who: str, now: datetime, kind: Kind) -> bool:
+    """The three limits, counted for this kind only. Call under the lock, with `_expire` done."""
+    counts = store.conn.execute(
+        "SELECT count(*) FILTER (WHERE requested_by = %(who)s AND state IN ('queued', 'running'))"
+        " AS open, count(*) FILTER (WHERE requested_by = %(who)s AND requested_at > %(day)s)"
+        " AS day, count(*) FILTER (WHERE state = 'queued' AND ward = %(ward)s) AS queued"
+        " FROM lab_run WHERE kind = %(kind)s",
+        {"who": who, "day": now - timedelta(hours=24), "ward": store.ward, "kind": kind},
+    ).fetchone()
+    assert counts is not None
+    return (
+        counts["open"] >= OPEN_PER_CLINICIAN
+        or counts["day"] >= PER_DAY
+        or counts["queued"] >= QUEUED_PER_WARD
+    )
+
+
 def create(store: PostgresStore, audit: AuditLog, who: str, body: NewLabRun) -> LabRunItem | None:
     """None when a limit is reached (audited `limited`)."""
     now = whole(store.clock())
     with store.tx():
         store.conn.execute(_LOCK)  # one request at a time, so a burst cannot pass the counts
         _expire(store.conn, now)
-        counts = store.conn.execute(
-            "SELECT count(*) FILTER (WHERE requested_by = %(who)s AND state IN ('queued', 'running'))"
-            " AS open, count(*) FILTER (WHERE requested_by = %(who)s AND requested_at > %(day)s)"
-            " AS day, count(*) FILTER (WHERE state = 'queued' AND ward = %(ward)s) AS queued"
-            " FROM lab_run WHERE kind = 'compare'",
-            {"who": who, "day": now - timedelta(hours=24), "ward": store.ward},
-        ).fetchone()
-        assert counts is not None
-        if (
-            counts["open"] >= OPEN_PER_CLINICIAN
-            or counts["day"] >= PER_DAY
-            or counts["queued"] >= QUEUED_PER_WARD
-        ):
+        if _full(store, who, now, "compare"):
             row = None
         else:
             row = store.conn.execute(
@@ -95,6 +105,57 @@ def create(store: PostgresStore, audit: AuditLog, who: str, body: NewLabRun) -> 
         return None
     audit.append(who, "lab_request", f"lab_run:{row['id']}", "ok")
     return LabRunItem.model_validate(_item(row))
+
+
+def ask(store: PostgresStore, audit: AuditLog, who: str, body: NewQuestion) -> QuestionItem | None:
+    """Queues a general question, as typed. None when a limit is reached (audited `limited`)."""
+    now = whole(store.clock())
+    with store.tx():
+        store.conn.execute(_LOCK)
+        _expire(store.conn, now)
+        if _full(store, who, now, "question"):
+            row = None
+        else:
+            row = store.conn.execute(
+                "INSERT INTO lab_run (ward, requested_by, requested_at, kind, question, state)"
+                " VALUES (%s, %s, %s, 'question', %s, 'queued') RETURNING *",
+                (store.ward, who, now, body.question),
+            ).fetchone()
+            assert row is not None
+    if row is None:
+        audit.append(who, "lab_question", store.ward, "limited")
+        return None
+    audit.append(who, "lab_question", f"lab_run:{row['id']}", "ok")
+    return QuestionItem.model_validate(_question_item(row))
+
+
+def _question_item(row: dict[str, Any]) -> dict[str, Any]:
+    out = {k: row[k] for k in ("id", "requested_by", "question", "state", "reason")}
+    for k in ("requested_at", "claimed_at", "finished_at"):
+        out[k] = None if row[k] is None else iso(row[k])
+    return out
+
+
+def list_questions(store: PostgresStore) -> list[QuestionItem]:
+    _expire(store.conn, store.clock())
+    rows = store.conn.execute(
+        "SELECT * FROM lab_run WHERE ward = %s AND kind = 'question' ORDER BY id DESC LIMIT %s",
+        (store.ward, LIST_LIMIT),
+    )
+    return [QuestionItem.model_validate(_question_item(r)) for r in rows]
+
+
+def get_question(store: PostgresStore, lab_run_id: int) -> QuestionDetail | None:
+    _expire(store.conn, store.clock())
+    row = store.conn.execute(
+        "SELECT * FROM lab_run WHERE id = %s AND ward = %s AND kind = 'question'",
+        (lab_run_id, store.ward),
+    ).fetchone()
+    if row is None:
+        return None
+    return QuestionDetail.model_validate(
+        {**_question_item(row), "answer": row["report_text"], "report": row["report"]}
+    )
 
 
 def list_runs(store: PostgresStore) -> list[LabRunItem]:
@@ -125,7 +186,9 @@ CLAIM = (
 )
 
 
-def claim(conn: Conn, now: datetime, kind: Kind = "compare") -> LabJob | PatientQuestionJob | None:
+def claim(
+    conn: Conn, now: datetime, kind: Kind = "compare"
+) -> LabJob | PatientQuestionJob | QuestionJob | None:
     """The oldest queued run of this kind, now running. None while nothing of this kind is queued
     or one is running."""
     with transaction(conn):
@@ -138,6 +201,8 @@ def claim(conn: Conn, now: datetime, kind: Kind = "compare") -> LabJob | Patient
         return None
     if kind == "compare":
         return LabJob.model_validate({k: row[k] for k in LabJob.model_fields})
+    if kind == "question":
+        return QuestionJob.model_validate({"id": row["id"], "kind": kind, "question": row["question"]})
     # the stored text, parsed again: the worker hashes what it receives
     return PatientQuestionJob.model_validate(
         {
@@ -174,6 +239,17 @@ def _answered(row: dict[str, Any], doc: Any) -> bool:
         and doc.get("synthetic") is True
         and _is(doc.get("grounding"), "ok")
         and _is(doc.get("data_sha256"), row["context_sha256"])
+    )
+
+
+def _asked(doc: Any) -> bool:
+    """contract-ask 6.1: these and nothing else. The grounding check is the worker's; the API reads
+    its verdict. There is no data hash: a general question freezes no data."""
+    return (
+        isinstance(doc, dict)
+        and _is(doc.get("question_format"), 1)
+        and doc.get("synthetic") is True
+        and _is(doc.get("grounding"), "ok")
     )
 
 
@@ -226,7 +302,9 @@ def report(conn: Conn, lab_run_id: int, body: LabReport, now: datetime) -> Resul
                 ok = row["kind"] == "compare" and _matches(row, doc)
             else:
                 doc, text = _parse(body.record_json), body.answer
-                ok = row["kind"] == "patient_question" and _answered(row, doc)
+                ok = (row["kind"] == "patient_question" and _answered(row, doc)) or (
+                    row["kind"] == "question" and _asked(doc)
+                )
             if text and ok:
                 conn.execute(
                     "UPDATE lab_run SET state = 'done', finished_at = %s, report = %s,"

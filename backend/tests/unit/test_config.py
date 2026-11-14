@@ -156,3 +156,24 @@ def test_production_refuses_a_wildcard_cors_origin() -> None:
         with pytest.raises(ConfigError, match="exact origins"):
             Settings.from_env({**PRODUCTION, "BIOSENTRY_CORS_ORIGINS": origins})
     assert Settings.from_env({"BIOSENTRY_CORS_ORIGINS": "*"}).cors_origins == ("*",)  # local only
+
+
+@pytest.mark.parametrize(
+    ("given", "expected"),
+    [(None, False), ("", False), ("  ", False), ("false", False), (" FALSE ", False), ("true", True), (" True ", True), ("TRUE", True)],
+)
+def test_the_open_ward_view_is_off_unless_it_is_set_to_true(given: str | None, expected: bool) -> None:
+    env = {} if given is None else {"BIOSENTRY_OPEN_WARD_VIEW": given}
+    assert Settings.from_env(env).open_ward_view is expected
+
+
+@pytest.mark.parametrize("given", ["1", "yes", "on", "ture", "truee", "0", "no", "off", "tru e"])
+def test_any_other_word_for_the_open_ward_view_stops_the_start(given: str) -> None:
+    with pytest.raises(ConfigError) as refused:
+        Settings.from_env({"BIOSENTRY_OPEN_WARD_VIEW": given})
+    assert str(refused.value) == "BIOSENTRY_OPEN_WARD_VIEW must be true or false"
+
+
+def test_production_starts_with_the_open_ward_view_on() -> None:
+    settings = Settings.from_env({**PRODUCTION, "BIOSENTRY_OPEN_WARD_VIEW": "true"})
+    assert (settings.env, settings.open_ward_view) == ("production", True)

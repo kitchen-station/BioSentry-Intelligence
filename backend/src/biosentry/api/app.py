@@ -20,10 +20,15 @@ The Simulation lab stores a clinician's request for a simulated compare run and 
 worker claims and reports through /sim/lab/* (ingest key). A clinician who may see a patient can
 also ask one question about that patient: the API freezes an allow-listed copy of the patient's
 data with the question, a worker answers from that copy only, and the clinician reads the answer.
+A patient's stay can be read as a short history, rebuilt on read from stored bins: nothing is stored.
+With BIOSENTRY_OPEN_WARD_VIEW on (owner decision S-3), and only then, GET /wards/{ward}/open-view shows a
+watcher nobody identified a drawing of the ward: bed, rank and NEWS2 band, and the simulator's figures,
+with no name or id. It reads no credential and its views leave at most one audit row a minute.
 The API never runs anything.
 """
 
 import hashlib
+import logging
 import re
 import secrets
 from collections.abc import Iterator
@@ -56,13 +61,18 @@ from biosentry.schemas import (
     NewLabRun,
     NewNote,
     NewPatientQuestion,
+    NewQuestion,
     NurseVitalsInput,
+    OpenWard,
     PartialLabInput,
     PatientDetail,
+    PatientHistory,
     PatientQuestionDetail,
     PatientQuestionItem,
     PatientStay,
     PatientSummary,
+    QuestionDetail,
+    QuestionItem,
     SessionRequest,
     SessionRole,
     SessionToken,
@@ -70,6 +80,7 @@ from biosentry.schemas import (
     WardOverview,
     WardResponse,
 )
+from biosentry.schemas.episodes import Episodes
 from biosentry.schemas.ingest import (
     BIGINT_MAX,
     Actions,
@@ -80,12 +91,14 @@ from biosentry.schemas.ingest import (
     NewCommand,
     NewRun,
 )
-from biosentry.schemas.lab import LabJob, LabReport, PatientQuestionJob
-from biosentry.services import ingest, lab
+from biosentry.schemas.lab import LabJob, LabReport, PatientQuestionJob, QuestionJob
+from biosentry.services import episodes, ingest, lab
 from biosentry.services.baseline import BaselineService
+from biosentry.services.history import HistoryService
 from biosentry.services.overview import OverviewService
 from biosentry.services.patient_ask import PatientAskService
 from biosentry.services.patients import PatientService, RejectedError
+from biosentry.services.models import load_models
 from biosentry.services.ward import WardService
 
 NOT_FOUND = "Not found"
@@ -95,6 +108,11 @@ SIGN_IN_WINDOW = timedelta(minutes=15)
 # of each per minute (per id for a locked sign-in), so a flood cannot fill the disk. Every request
 # is still refused; only the row is limited.
 ANONYMOUS_ROW_EVERY = timedelta(minutes=1)
+OPEN_VIEW_ACTION = "view_open_ward"
+OPEN_VIEW_WARNING = (
+    "BIOSENTRY_OPEN_WARD_VIEW is on: GET /wards/{ward}/open-view shows the ward to anyone who can"
+    " reach this API, without sign-in. Never use it on a public address."
+)
 
 # The body-bearing write routes and the action their audit rows carry. A body that fails
 # validation never reaches the handler, so its audit row is written by the validation handler.
@@ -106,6 +124,7 @@ WRITE_ACTIONS = {
     ("POST", "/patients/{patient_id}/acknowledgement"): "acknowledge",
     ("POST", "/wards/{ward}/sim/commands"): "sim_command",
     ("POST", "/wards/{ward}/lab/runs"): "lab_request",
+    ("POST", "/wards/{ward}/lab/questions"): "lab_question",
     ("POST", "/patients/{patient_id}/questions"): "ask_patient",
 }
 # Every write route that has no body or is not in WRITE_ACTIONS, so an admin is refused on it too.
@@ -122,6 +141,7 @@ UNAUTHENTICATED_WRITES = {
     ("POST", "/sim/runs"),
     ("POST", "/sim/runs/{run_id}/batch"),
     ("POST", "/sim/runs/{run_id}/view"),
+    ("POST", "/sim/runs/{run_id}/episodes"),
     ("GET", "/sim/runs/{run_id}/actions"),
     ("GET", "/sim/runs/{run_id}/commands"),
     ("POST", "/sim/lab/claim"),
@@ -145,6 +165,7 @@ class Context:
     wards: WardService
     patients: PatientService
     baselines: BaselineService
+    history: HistoryService
     overview: OverviewService
     questions: PatientAskService
 
@@ -241,13 +262,14 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
     settings = settings or Settings.from_env()
     production = settings.env == "production" or restricted()
     ensure(settings.database_url, settings.dataset, production)
+    models = load_models(settings.models_dir)  # once; a refused file is "not computed" and one warning
 
     def open_ctx() -> Context:
         conn = connect(settings.database_url, production)
         try:  # a connection that cannot become a Context (no run, say) is not left open
             store = PostgresStore(conn, clock)
             audit = AuditLog(conn, clock, store.role_of)
-            wards = WardService(store, audit)
+            wards = WardService(store, audit, models)
             baselines = BaselineService(store, audit, wards)
             return Context(
                 conn,
@@ -256,6 +278,7 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
                 wards,
                 PatientService(store, audit, wards),
                 baselines,
+                HistoryService(store, audit, wards),
                 OverviewService(store, audit, wards),
                 PatientAskService(store, audit, wards, baselines),
             )
@@ -290,6 +313,8 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
         openapi_url=None,
     )
     app.state.open_ctx = open_ctx
+    if settings.open_ward_view:
+        logging.getLogger(__name__).warning(OPEN_VIEW_WARNING)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_origins),
@@ -391,6 +416,23 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
         assert role is not None  # a token exists only for a known clinician
         return SessionToken(token=token, role=SessionRole(role))
 
+    if settings.open_ward_view:  # off: the route does not exist, so the framework's own 404 answers
+
+        @app.get("/wards/{ward}/open-view", response_model=OpenWard)
+        def open_view(ward: str, ctx: Ctx) -> OpenWard:
+            """No credential is read here: the answer is the same for every caller."""
+            found = ctx.wards.open_ward() if ward == ctx.store.ward and ctx.store.synthetic else None
+            outcome: Outcome = "ok" if found else "not_found"
+            resource = ward if found else "-"  # the caller's path text is never stored
+            since = ctx.store.clock() - ANONYMOUS_ROW_EVERY
+            # shortcut: two calls in one instant can both write a row, bounded by the callers at
+            # that instant; upgrade: an advisory lock as in sign_in, if that ever matters.
+            if not ctx.audit.count(OPEN_VIEW_ACTION, resource, outcome, since):
+                ctx.audit.append(None, OPEN_VIEW_ACTION, resource, outcome)
+            if found is None:
+                raise HTTPException(status_code=404)  # no detail: the same bytes as an unknown path
+            return found
+
     @app.get("/wards/{ward}/rows", response_model=WardResponse)
     def ward_rows(ward: str, ctx: Ctx, who: Who) -> WardResponse:
         if ward != ctx.store.ward:
@@ -440,15 +482,27 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return Response(status_code=204)
 
-    @app.post("/wards/{ward}/lab/runs", response_model=LabRunItem, status_code=201)
-    def request_lab_run(ward: str, body: NewLabRun, ctx: Ctx, who: Writer) -> LabRunItem:
+    def lab_asker(ctx: Context, who: str, action: str, ward: str) -> None:
+        """Who may ask the lab: an md or a charge nurse, on their own ward."""
         if ward != ctx.store.ward:
-            ctx.audit.append(who, "lab_request", ward, "not_found")
+            ctx.audit.append(who, action, ward, "not_found")
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         if not ctx.store.can_control(who):
-            ctx.audit.append(who, "lab_request", ward, "denied")
+            ctx.audit.append(who, action, ward, "denied")
             raise HTTPException(status_code=403, detail="Forbidden")
+
+    @app.post("/wards/{ward}/lab/runs", response_model=LabRunItem, status_code=201)
+    def request_lab_run(ward: str, body: NewLabRun, ctx: Ctx, who: Writer) -> LabRunItem:
+        lab_asker(ctx, who, "lab_request", ward)
         made = lab.create(ctx.store, ctx.audit, who, body)
+        if made is None:
+            raise HTTPException(status_code=429, detail="Lab run limit reached")
+        return made
+
+    @app.post("/wards/{ward}/lab/questions", response_model=QuestionItem, status_code=201)
+    def ask_lab_question(ward: str, body: NewQuestion, ctx: Ctx, who: Writer) -> QuestionItem:
+        lab_asker(ctx, who, "lab_question", ward)
+        made = lab.ask(ctx.store, ctx.audit, who, body)
         if made is None:
             raise HTTPException(status_code=429, detail="Lab run limit reached")
         return made
@@ -480,6 +534,24 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
         ctx.audit.append(who, "view_lab_run", f"lab_run:{lab_run_id}", "ok")
         return found
 
+    @app.get("/wards/{ward}/lab/questions", response_model=list[QuestionItem])
+    def lab_questions(ward: str, ctx: Ctx, who: Who) -> list[QuestionItem]:
+        lab_reader(ctx, who, "view_lab_questions", ward)
+        ctx.audit.append_view(who, "view_lab_questions", ward)  # the page reads it on a timer
+        return lab.list_questions(ctx.store)
+
+    @app.get("/wards/{ward}/lab/questions/{lab_run_id}", response_model=QuestionDetail)
+    def lab_question(ward: str, lab_run_id: str, ctx: Ctx, who: Who) -> QuestionDetail:
+        lab_reader(ctx, who, "view_lab_question", ward)
+        found = None
+        if (run_id := row_id(lab_run_id)) is not None:
+            found = lab.get_question(ctx.store, run_id)
+        if found is None:  # malformed and unknown are one answer, and audited
+            ctx.audit.append(who, "view_lab_question", ward, "not_found")
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        ctx.audit.append(who, "view_lab_question", f"lab_run:{lab_run_id}", "ok")
+        return found
+
     @app.get("/patients", response_model=list[PatientSummary])
     def list_patients(ctx: Ctx, who: Who) -> list[PatientSummary]:
         return ctx.wards.summaries(who)
@@ -494,6 +566,13 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
     @app.get("/patients/{patient_id}/baseline", response_model=BaselineResponse)
     def get_baseline(patient_id: str, ctx: Ctx, who: Who) -> BaselineResponse:
         found = ctx.baselines.baseline(who, patient_id)
+        if found is None:
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return found
+
+    @app.get("/patients/{patient_id}/history", response_model=PatientHistory)
+    def get_history(patient_id: str, ctx: Ctx, who: Who) -> PatientHistory:
+        found = ctx.history.history(who, patient_id)
         if found is None:
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return found
@@ -635,6 +714,17 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return Response(status_code=204)
 
+    @app.post("/sim/runs/{run_id}/episodes", status_code=204)
+    def add_episodes(
+        run_id: int, body: Episodes, ctx: Ctx, _: Annotated[None, Depends(ingest_gate)]
+    ) -> Response:
+        if not episodes.store_episodes(ctx.conn, run_id, body, clock):
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        # Truth entered the database: one row for each accepted post, the run's id only (contract-truth 7).
+        # The batch post writes none; this one is rare (the runner posts an episode once).
+        ctx.audit.append(None, "ingest_episodes", f"run:{run_id}", "ok")
+        return Response(status_code=204)
+
     @app.get("/sim/runs/{run_id}/actions", response_model=Actions)
     def sim_actions(
         run_id: int,
@@ -659,12 +749,12 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return Commands.model_validate({"commands": found})
 
-    @app.post("/sim/lab/claim", response_model=LabJob | PatientQuestionJob)
+    @app.post("/sim/lab/claim", response_model=LabJob | PatientQuestionJob | QuestionJob)
     def claim_lab_run(
         ctx: Ctx,
         _: Annotated[None, Depends(ingest_gate)],
         kind: Annotated[lab.Kind, Depends(lab_kind)],
-    ) -> LabJob | PatientQuestionJob | Response:
+    ) -> LabJob | PatientQuestionJob | QuestionJob | Response:
         job = lab.claim(ctx.conn, clock(), kind)
         if job is None:  # an empty poll writes no audit row: it records nothing
             return Response(status_code=204)

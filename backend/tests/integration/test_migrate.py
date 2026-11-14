@@ -23,7 +23,7 @@ def _names(url: str) -> list[str]:
 
 
 def test_every_migration_is_recorded_once(database_url: str) -> None:
-    assert {"0010_lab_run", "0011_patient_question"} <= set(_names(database_url))
+    assert {"0010_lab_run", "0011_patient_question", "0012_sim_episode", "0013_lab_question"} <= set(_names(database_url))
     assert _names(database_url) == [p.stem for p in migrations()]
     ensure(database_url)  # a restart
     with connect(database_url) as conn:
@@ -179,7 +179,7 @@ def test_a_compare_run_from_before_the_patient_question_survives_with_the_new_co
             )
         )
         before = conn.execute("SELECT id, state, mode, report, report_text FROM lab_run ORDER BY id").fetchall()
-        assert migrate(conn) == ["0011_patient_question"]
+        assert migrate(conn) == ["0011_patient_question", "0012_sim_episode", "0013_lab_question"]
         after = conn.execute("SELECT * FROM lab_run ORDER BY id").fetchall()
         names = {
             r["conname"]
@@ -192,3 +192,40 @@ def test_a_compare_run_from_before_the_patient_question_survives_with_the_new_co
         for column in ("question", "run_id", "patient_id", "context", "context_sha256"):
             assert r[column] is None
     assert {"lab_run_kind_check", "lab_run_fields_of_kind", "lab_run_patient"} <= names
+
+
+def test_a_compare_run_and_a_patient_question_survive_the_general_question_migration(
+    blank_database_url: str, tmp_path: Path
+) -> None:
+    for path in migrations():
+        if path.stem < "0013":
+            shutil.copy(path, tmp_path)
+    with connect(blank_database_url) as conn:
+        migrate(conn, tmp_path)
+        conn.execute("INSERT INTO clinician (id, role) VALUES ('md-old', 'md')")
+        conn.execute(
+            "INSERT INTO run (source, synthetic, ward, origin, as_of, tier_status)"
+            " VALUES ('fixture', true, 'W4', now(), now(), '[]')"
+        )
+        conn.execute(
+            "INSERT INTO patient (run_id, id, name, bed, admitting_context, mechanism, supporting,"
+            " trend) VALUES (1, 'p-1', 'n', 'b', 'a', 'm', '', 'stable')"
+        )
+        conn.execute(
+            "INSERT INTO lab_run (ward, requested_by, requested_at, kind, mode, seed, days,"
+            " baseline, change, state) VALUES ('W4', 'md-old', now(), 'compare', 'w4', 1, 1,"
+            " 'news2_total_ge_5', 'news2_chart_trigger', 'queued')"
+        )
+        conn.execute(
+            "INSERT INTO lab_run (ward, requested_by, requested_at, kind, question, run_id,"
+            " patient_id, context, context_sha256, state) VALUES ('W4', 'md-old', now(),"
+            " 'patient_question', 'q', 1, 'p-1', '{}', repeat('a', 64), 'queued')"
+        )
+        before = conn.execute("SELECT * FROM lab_run ORDER BY id").fetchall()
+        assert migrate(conn) == ["0013_lab_question"]
+        assert conn.execute("SELECT * FROM lab_run ORDER BY id").fetchall() == before
+        conn.execute(
+            "INSERT INTO lab_run (ward, requested_by, requested_at, kind, question, state)"
+            " VALUES ('W4', 'md-old', now(), 'question', 'q', 'queued')"
+        )
+    assert [r["kind"] for r in before] == ["compare", "patient_question"]

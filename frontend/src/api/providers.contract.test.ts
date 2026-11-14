@@ -387,6 +387,22 @@ describe("the fixture provider", () => {
     }
   });
 
+  it("has no patient questions: they need the server", async () => {
+    for (const call of [() => fixtureProvider.askPatient("p-001", "q"), () => fixtureProvider.getPatientQuestions("p-001"), () => fixtureProvider.getPatientQuestion("p-001", 1)]) {
+      await expect(call()).rejects.toThrow("Patient questions need the server");
+    }
+  });
+
+  it("has no lab questions: they need the server", async () => {
+    for (const call of [() => fixtureProvider.askLab("q"), () => fixtureProvider.getLabQuestions(), () => fixtureProvider.getLabQuestion(1)]) {
+      await expect(call()).rejects.toThrow("Lab questions need the server");
+    }
+  });
+
+  it("has no stay history: it needs the server", async () => {
+    await expect(fixtureProvider.getPatientHistory("p-001")).rejects.toThrow("The stay history needs the server");
+  });
+
   it("has no overview: it needs the API", async () => {
     await expect(fixtureProvider.getOverview()).rejects.toThrow("The overview needs the API");
   });

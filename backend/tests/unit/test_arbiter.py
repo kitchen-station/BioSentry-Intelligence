@@ -23,6 +23,7 @@ from biosentry.domain.computed import Computed, NotComputed, Window
 from biosentry.domain.scoring.tier_a import News2Inputs, News2Score, Risk, score_news2
 from biosentry.domain.scoring.tier_b.baseline import Deviation
 from biosentry.domain.scoring.tier_b.interface import Finding
+from biosentry.domain.scoring.tier_c.confidence import Check
 from biosentry.schemas import (
     Acvpu,
     EscalationReason,
@@ -33,7 +34,7 @@ from biosentry.schemas import (
     Spo2Scale,
 )
 
-from samples import provenance  # isort: skip
+from samples import model_provenance  # isort: skip
 
 BASE = News2Inputs(
     respiratory_rate=16,
@@ -167,10 +168,12 @@ def drifting(vital: str = "heart_rate", bins: int = 3, significant: bool = True)
 
 
 def inert_inputs() -> dict[str, Any]:
-    prov = Provenance.model_validate(provenance(source="model", tier="C"))
+    prov = Provenance.model_validate(model_provenance("C", "tier_c/student_vitals"))
     return {
-        "tier_c": TierCSignal(Computed(0.99, prov, Window(0.0, 60.0, 1.0))),
-        "policy": PolicySignal(Computed(True, prov, Window(0.0, 60.0, 1.0))),
+        "tier_c": TierCSignal(
+            Computed(0.99, prov, Window(0.0, 60.0, 1.0)), Computed(Check.QUIET, prov, Window(0.0, 60.0, 1.0))
+        ),
+        "policy": PolicySignal(Computed(False, prov, Window(0.0, 60.0, 1.0))),
         "notes": NotesSignal(True, "renal", "feels worse"),
         "worried": WorriedPin("rn-delacruz", "gut feeling"),
         "guarantees": Guarantees(False, True),
@@ -186,6 +189,11 @@ NAMES = {
 }
 
 
+# The two model hooks are live for a ranked patient (they add a reason, below); the rest stay inert.
+STILL_INERT = {"notes", "worried", "guarantees"}
+STILL_INERT_ORDER = ("notes", "worried", "guarantees")
+
+
 def test_inert_hooks_never_change_the_decision() -> None:
     baseline = arbitrate("p-1", news2(heart_rate=60))
     assert isinstance(baseline, Ranked)
@@ -196,7 +204,7 @@ def test_inert_hooks_never_change_the_decision() -> None:
             decision = arbitrate("p-1", news2(heart_rate=60), **{n: supplied[n] for n in names})
             assert isinstance(decision, Ranked)
             assert replace(decision, inert=()) == baseline
-            assert decision.inert == tuple(NAMES[n] for n in supplied if n in names)
+            assert decision.inert == tuple(NAMES[n] for n in supplied if n in names and n in STILL_INERT)
 
 
 def test_all_inert_hooks_leave_a_flagged_level_0_decision_identical() -> None:
@@ -206,7 +214,7 @@ def test_all_inert_hooks_leave_a_flagged_level_0_decision_identical() -> None:
     assert isinstance(plain, Ranked) and isinstance(with_all, Ranked)
     assert plain.flagged and not plain.escalated
     assert replace(with_all, inert=()) == plain
-    assert with_all.inert == tuple(NAMES.values())
+    assert with_all.inert == tuple(NAMES[n] for n in STILL_INERT_ORDER)
 
 
 @pytest.mark.parametrize("hook", list(NAMES))
@@ -217,20 +225,20 @@ def test_each_inert_hook_leaves_a_triggered_decision_identical(hook: str) -> Non
     )
     assert isinstance(with_hook, Ranked)
     assert replace(with_hook, inert=()) == plain
-    assert with_hook.inert == (NAMES[hook],)
+    assert with_hook.inert == ((NAMES[hook],) if hook in STILL_INERT else ())
 
 
 def test_a_not_computed_tier_contributes_nothing() -> None:
     decision = arbitrate(
         "p-1",
         news2(),
-        tier_c=TierCSignal(NotComputed("no_model_registered")),
+        tier_c=TierCSignal(NotComputed("no_model_registered"), NotComputed("no_model_registered")),
         policy=PolicySignal(NotComputed("no_policy")),
         tier_b=TierBSignal(NotComputed("baseline forming, 3 of 24 bins")),
     )
     assert isinstance(decision, Ranked)
     assert (decision.escalated, decision.reasons, decision.flagged) == (False, (), False)
-    assert decision.inert == ("rule_2_tier_c", "learned_policy")
+    assert decision.inert == ()
 
 
 def test_a_high_tier_c_probability_cannot_raise_a_patient_in_v1() -> None:

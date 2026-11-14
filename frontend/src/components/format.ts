@@ -98,3 +98,9 @@ export function formatSimClock(sim: SimStatus): string {
   const pace = sim.ended ? "Run ended" : sim.speed === 0 ? "Paused" : `${sim.speed}x`;
   return `${date}, ${hh}:${mm} \u00b7 ${pace}`;
 }
+
+/** "22:15" for today, "13 Nov, 22:15" for another day (the same day check and locale as enteredByNurse). A `now` of 0 always gives the date. */
+export function formatClockDay(ms: number, now: number = Date.now()): string {
+  if (new Date(ms).toDateString() === new Date(now).toDateString()) return formatClock(ms);
+  return `${new Date(ms).toLocaleDateString([], { day: "numeric", month: "short" })}, ${formatClock(ms)}`;
+}

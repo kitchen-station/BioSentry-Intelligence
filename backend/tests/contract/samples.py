@@ -25,11 +25,15 @@ from biosentry.schemas import (
     ClinicalNote,
     EscalationReason,
     FlagMeasurement,
+    HistoryEvent,
+    HistoryProvenance,
+    HistoryRun,
     LabExtractionResult,
     LabPanel,
     LabRunDetail,
     LabRunItem,
     LiveWard,
+    OpenWard,
     OverviewActivity,
     OverviewClinician,
     OverviewPatient,
@@ -39,17 +43,24 @@ from biosentry.schemas import (
     NewLabRun,
     NewNote,
     NewPatientQuestion,
+    NewQuestion,
     NumberMeasurement,
     NurseVitalsInput,
     PartialAdmitPatientInput,
     PartialLabInput,
     PatientDetail,
     PatientExtractionResult,
+    PatientHistory,
+    SimulatedEpisode,
     PatientQuestionDetail,
     PatientQuestionItem,
+    QuestionDetail,
+    QuestionItem,
     PatientStay,
     PatientSummary,
     Provenance,
+    ModelSignal,
+    RowModels,
     ScoreRow,
     Session,
     Spo2ScaleMeasurement,
@@ -114,6 +125,14 @@ def provenance(**overrides: Any) -> dict[str, Any]:
     return {**base, **overrides}
 
 
+FILE_SHA = "ab" * 32
+
+
+def model_provenance(tier: str, model_id: str) -> dict[str, Any]:
+    """A model value names its file and run (variant, file_sha256, run_id)."""
+    return provenance(source="model", tier=tier, model_id=model_id, variant="all", file_sha256=FILE_SHA, run_id="m1-x")
+
+
 def present(value: Any) -> dict[str, Any]:
     return {"present": True, "value": value}
 
@@ -154,6 +173,15 @@ def tier_status() -> dict[str, Any]:
     return {"tier": "A", "live": True, "label": "NEWS2"}
 
 
+def model_signal() -> dict[str, Any]:
+    """A model result that was not computed: the only state that needs no file."""
+    return {"state": "not_computed", "reason": "baseline forming", "bin_start": None, "bin_end": None, "provenance": []}
+
+
+def row_models() -> dict[str, Any]:
+    return {"prediction": model_signal(), "alert_policy": model_signal()}
+
+
 def score_row() -> dict[str, Any]:
     return {
         "id": "p-001",
@@ -176,6 +204,7 @@ def score_row() -> dict[str, Any]:
         "synthetic": True,
         "signal_quality": 94,
         "last_update_s": 4,
+        "models": row_models(),
     }
 
 
@@ -306,6 +335,8 @@ _BUILDERS: dict[type[BaseModel], Any] = {
         "text": "KDIGO rising",
         "pathway": "renal",
     },
+    ModelSignal: model_signal,
+    RowModels: row_models,
     ScoreRow: score_row,
     AbstainedRow: abstained_row,
     WardResponse: lambda: {
@@ -389,6 +420,32 @@ _BUILDERS: dict[type[BaseModel], Any] = {
         "reason": None,
     },
     PatientQuestionDetail: lambda: {**_BUILDERS[PatientQuestionItem](), "answer": None, "report": None},
+    NewQuestion: lambda: {"question": "What if we alerted at a NEWS2 total of 7 or more?"},
+    QuestionItem: lambda: {**_BUILDERS[PatientQuestionItem](), "id": 3},
+    QuestionDetail: lambda: {**_BUILDERS[QuestionItem](), "answer": None, "report": None},
+    HistoryProvenance: lambda: {
+        "source": "derived", "tier": "A", "rule": "news2_as_of_bins", "computed_at": NOW, "synthetic": True,
+    },
+    HistoryRun: lambda: {
+        "state": "alert", "start": "2026-09-03T05:00:00Z", "end": "2026-09-03T06:00:00Z", "ongoing": False,
+        "bins": 4, "peak_score": 7, "peak_level": "high", "peak_at": "2026-09-03T05:30:00Z", "in_episode": "inside",
+        "reasons": ["Total 7 (≥7): high"], "provenance": _BUILDERS[HistoryProvenance](),
+    },
+    HistoryEvent: lambda: {
+        "kind": "acknowledged", "at": "2026-09-03T05:40:00Z", "by": "rn-delacruz", "role": None,
+        "score": 7, "note_id": None, "source": "clinician_action",
+    },
+    SimulatedEpisode: lambda: {
+        "kind": "respiratory", "start": "2026-09-03T04:30:00Z", "full": "2026-09-03T05:15:00Z", "source": "simulation",
+    },
+    PatientHistory: lambda: {
+        "patient_id": "p-001", "synthetic": True, "simulated_episode": _BUILDERS[SimulatedEpisode](),
+        "label": "Rebuilt from stored 15-minute bins. It can differ from the score shown at the time.",
+        "unavailable": None,
+        "grid_from": "2026-09-03T00:00:00Z", "grid_to": "2026-09-03T06:00:00Z", "bins": 24,
+        "runs": [_BUILDERS[HistoryRun]()], "runs_cut": False,
+        "events": [_BUILDERS[HistoryEvent]()], "events_cut": False,
+    },
     LiveWard: lambda: {"shared": {"clockS": 90}, "patients": [], "can_control": False},
     OverviewPatient: lambda: {
         "bed": "4A",
@@ -406,6 +463,21 @@ _BUILDERS: dict[type[BaseModel], Any] = {
         "count": 2,
     },
     OverviewSimCounts: lambda: {"received": 5, "rejected": 1, "abstained": 2},
+    OpenWard: lambda: {
+        "ward": "W4",
+        "synthetic": True,
+        "can_control": False,
+        "sim": {
+            "clockS": 90,
+            "speed": 10,
+            "ended": False,
+            "staff": [
+                {"key": 0, "role": "rn", "x": 4.5, "y": 7, "facing": "front", "walking": False, "moved": 0, "stage": "home", "timer": 0}
+            ],
+            "moves": [{"seq": 1, "bed": "4A", "kind": "in"}],
+        },
+        "beds": [{"bed": "4A", "state": "ranked", "rank": 1, "risk": "high"}],
+    },
     OverviewSimStatus: lambda: {
         "clockS": 90,
         "speed": 10,

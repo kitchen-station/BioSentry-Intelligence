@@ -27,6 +27,12 @@ const api = vi.hoisted(() => ({
   addNote: vi.fn(),
   canRecordVitals: false,
   recordVitals: vi.fn(),
+  hasHistory: false,
+  getPatientHistory: vi.fn(),
+  hasPatientQuestions: false,
+  askPatient: vi.fn(),
+  getPatientQuestions: vi.fn(),
+  getPatientQuestion: vi.fn(),
 }));
 vi.mock("../api", () => api);
 
@@ -491,6 +497,36 @@ describe("PatientDetail own-baseline reason and patch display", () => {
     expect(screen.getByText("(circulatory)")).toBeTruthy();
   });
 
+  it("lists the two model reasons apart, as research with the rank unchanged, and adds no response line", async () => {
+    api.getPatient.mockResolvedValue({
+      ...base,
+      score: 2,
+      escalation_reasons: [
+        { rule: "prediction_model_flag", text: "Prediction model flag (synthetic, not validated)", pathway: null },
+        { rule: "alert_policy_flag", text: "Alert policy flag (learned by reward; synthetic, not validated)", pathway: null },
+      ],
+    } as Detail);
+    page();
+    await loaded();
+    expect(screen.getByText("Prediction model flag (synthetic, not validated)")).toBeTruthy();
+    expect(screen.getByText("Alert policy flag (learned by reward; synthetic, not validated)")).toBeTruthy();
+    expect(screen.queryByText(/^Not a NEWS2 trigger/)).toBeNull();
+    // Only model lines: the patient is where NEWS2 puts them, and the page still says so.
+    expect(screen.getByText("Sorted on NEWS2 only")).toBeTruthy();
+    const label = screen.getByText("Research models \u00b7 rank unchanged");
+    const why = screen.getByText("Why this patient is up");
+    expect(why.compareDocumentPosition(label) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(label.compareDocumentPosition(screen.getByText("Prediction model flag (synthetic, not validated)")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("shows no research line for a patient with no model flag", async () => {
+    api.getPatient.mockResolvedValue({ ...base, score: 2, escalation_reasons: [] } as Detail);
+    page();
+    await loaded();
+    expect(screen.getByText("Sorted on NEWS2 only")).toBeTruthy();
+    expect(screen.queryByText(/rank unchanged/)).toBeNull();
+  });
+
   it("shows no signal figure when all four values are nurse-typed", async () => {
     const nurse = (m: Detail["vitals"]["heart_rate"]) => ({ ...m, provenance: { ...m.provenance, source: "nurse" as const } });
     const v = base.vitals;
@@ -836,6 +872,173 @@ describe("PatientDetail follows the ward's speed", () => {
     expect(api.getPatient).toHaveBeenCalledTimes(1);
     expect(api.getLiveWard).not.toHaveBeenCalled();
     expect(screen.queryByRole("group", { name: "Ward clock" })).toBeNull();
+  });
+});
+
+describe("PatientDetail research models panel", () => {
+  it("sits after the own-baseline panel and asks for nothing extra", async () => {
+    api.getBaseline.mockResolvedValue(baseline);
+    page();
+    await loaded();
+    const own = await screen.findByRole("region", { name: "Change from own baseline" });
+    const models = screen.getByRole("region", { name: "Research models" });
+    expect(own.compareDocumentPosition(models) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(own.parentElement).toBe(models.parentElement);
+    expect(api.getPatient).toHaveBeenCalledOnce();
+    expect(api.getBaseline).toHaveBeenCalledOnce();
+    expect(api.getNotes).toHaveBeenCalledOnce();
+  });
+
+  it("shows the fixture words, also for an admin, and keeps the summary line", async () => {
+    api.getPatient.mockResolvedValue({
+      ...base,
+      escalation_reasons: [{ rule: "prediction_model_flag", text: "Prediction model flag (synthetic, not validated)", pathway: null }],
+    } as Detail);
+    page("admin");
+    await loaded();
+    const region = screen.getByRole("region", { name: "Research models" });
+    expect(within(region).getAllByText(/Not computed: the patient's own baseline is still forming/)).toHaveLength(2);
+    expect(screen.getByText("Research models · rank unchanged")).toBeTruthy();
+  });
+
+  it("shows no panel when the server sends no models", async () => {
+    const old: Record<string, unknown> = { ...base };
+    delete old.models;
+    api.getPatient.mockResolvedValue(old);
+    page();
+    await loaded();
+    expect(screen.queryByRole("region", { name: "Research models" })).toBeNull();
+  });
+});
+
+describe("PatientDetail: ask about this patient", () => {
+  const asked = {
+    id: 4, requested_by: "rn-manalo", requested_at: "2026-11-13T09:30:00Z", question: "Why is the rate up?", state: "done" as const,
+    reason: null, claimed_at: null, finished_at: null,
+  };
+  beforeEach(() => {
+    api.hasPatientQuestions = true;
+    api.getPatientQuestions.mockResolvedValue([asked]);
+    api.getPatientQuestion.mockResolvedValue({ ...asked, answer: "the answer", report: null });
+  });
+  afterEach(() => {
+    api.hasPatientQuestions = false;
+  });
+
+  it("sits after Current vitals and before Labs", async () => {
+    page("rn");
+    await loaded();
+    const heading = await screen.findByRole("heading", { level: 2, name: "Ask about this patient" });
+    const vitals = screen.getByText("Current vitals");
+    const labs = screen.getByText(/^Labs/);
+    expect(vitals.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(heading.compareDocumentPosition(labs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(api.getPatientQuestions).toHaveBeenCalledWith("p-001");
+  });
+
+  it("is absent, with no call, for an admin and in the demo build", async () => {
+    page("admin");
+    await loaded();
+    expect(screen.queryByText("Ask about this patient")).toBeNull();
+    cleanup();
+    api.hasPatientQuestions = false;
+    page("rn");
+    await loaded();
+    expect(screen.queryByText("Ask about this patient")).toBeNull();
+    expect(api.getPatientQuestions).not.toHaveBeenCalled();
+    expect(api.getPatientQuestion).not.toHaveBeenCalled();
+  });
+
+  it("is not remounted by the page's own refresh: the typed text and the open answer stay", async () => {
+    api.usesServer = true;
+    api.getLiveWard.mockResolvedValue(null);
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      page("rn");
+      await loaded();
+      await user.click(await screen.findByRole("button", { name: "Show answer" }));
+      await user.type(screen.getByLabelText(/Your question/), "typed");
+      expect(api.getPatient).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_100);
+      });
+      expect(api.getPatient.mock.calls.length).toBeGreaterThan(1);
+      expect((screen.getByLabelText(/Your question/) as HTMLInputElement).value).toBe("typed");
+      expect(screen.getByText("the answer")).toBeTruthy();
+      expect(api.getPatientQuestion).toHaveBeenCalledTimes(1);
+      expect(api.getPatientQuestions).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+      api.usesServer = false;
+    }
+  });
+});
+
+describe("PatientDetail: stay panel", () => {
+  const stay = {
+    bins: 4, events: [{ at: "2026-11-13T09:00:00Z", by: null, kind: "admitted", note_id: null, role: null, score: null, source: "patient" }],
+    events_cut: false, grid_from: "2026-11-13T09:00:00Z", grid_to: "2026-11-13T10:00:00Z", label: "Rebuilt.", patient_id: "p-001",
+    runs: [], runs_cut: false, synthetic: true, unavailable: null,
+  };
+  beforeEach(() => {
+    api.hasHistory = true;
+    api.getPatientHistory.mockResolvedValue(stay);
+  });
+  afterEach(() => {
+    api.hasHistory = false;
+  });
+
+  it("sits after Current vitals and before Ask about this patient, for an admin too, and reads nothing while closed", async () => {
+    api.hasPatientQuestions = true;
+    api.getPatientQuestions.mockResolvedValue([]);
+    try {
+      page("rn");
+      await loaded();
+      const summary = await screen.findByText("Stay");
+      const vitals = screen.getByText("Current vitals");
+      const ask = await screen.findByRole("heading", { level: 2, name: "Ask about this patient" });
+      expect(vitals.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(summary.compareDocumentPosition(ask) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(api.getPatientHistory).not.toHaveBeenCalled();
+      cleanup();
+      page("admin");
+      await loaded();
+      expect(await screen.findByText("Stay")).toBeTruthy();
+    } finally {
+      api.hasPatientQuestions = false;
+    }
+  });
+
+  it("is absent, with no call, in the demo build", async () => {
+    api.hasHistory = false;
+    page("rn");
+    await loaded();
+    expect(screen.queryByText("Stay")).toBeNull();
+    expect(api.getPatientHistory).not.toHaveBeenCalled();
+  });
+
+  it("is not remounted by the page's own refresh and causes no read", async () => {
+    api.usesServer = true;
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      page("rn");
+      await loaded();
+      await user.click(await screen.findByText("Stay"));
+      await screen.findByText(/^Admitted at /);
+      expect(api.getPatientHistory).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_100);
+      });
+      expect(api.getPatient.mock.calls.length).toBeGreaterThan(1);
+      expect((screen.getByText("Stay").closest("details") as HTMLDetailsElement).open).toBe(true);
+      expect(screen.getByText(/^Admitted at /)).toBeTruthy();
+      expect(api.getPatientHistory).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+      api.usesServer = false;
+    }
   });
 });
 

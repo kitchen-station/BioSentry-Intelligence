@@ -10,11 +10,11 @@ import pytest
 from biosentry.core.audit import utc_now
 from biosentry.core.config import DEFAULT_DATABASE_URL, Settings
 from biosentry.domain.arbiter import Ranked
-from biosentry.schemas import UnscoredPatient
+from biosentry.schemas import RowModels, UnscoredPatient
 from biosentry.services.patients import RejectedError, split_blood_pressure
 from biosentry.services.scoring import decide
 from biosentry.services.ward import score_row
-from samples import measurement, present, unscored  # isort: skip
+from samples import measurement, present, row_models, unscored  # isort: skip
 
 
 def test_settings_read_the_environment_and_an_empty_value_is_unset() -> None:
@@ -49,7 +49,7 @@ def test_a_ranked_row_may_have_no_patch_signal() -> None:
     state = UnscoredPatient.model_validate({**payload, "signal_quality": None})
     decision = decide(state)
     assert isinstance(decision, Ranked)
-    assert score_row(state, 1, decision, []).signal_quality is None
+    assert score_row(state, 1, decision, [], RowModels.model_validate(row_models())).signal_quality is None
 
 
 SRC = Path(__file__).resolve().parents[2] / "src" / "biosentry"
@@ -91,3 +91,31 @@ def test_only_the_lab_files_read_a_question_and_no_audit_line_names_one() -> Non
 def test_only_the_patient_question_service_builds_the_context() -> None:
     users = [f.name for f in SRC.rglob("*.py") if re.search(r"PatientContext\b", f.read_text("utf-8"))]
     assert sorted(users) == ["lab.py", "patient_ask.py"]
+
+
+def test_nothing_that_ranks_or_scores_a_patient_reads_the_history() -> None:
+    names = ("ward.py", "scoring.py", "patients.py", "baseline.py", "as_of.py", "model_signals.py", "ingest.py", "models.py")
+    scoring = [SRC / "services" / n for n in names] + [SRC / "repositories" / "postgres.py"]
+    scoring += list((SRC / "domain").rglob("*.py"))
+    assert len(scoring) > 10
+    pattern = re.compile(r"biosentry\.(services|schemas)\.history|from \.history|import[^\n]*\bhistory\b|HistoryService|PatientHistory")
+    assert [str(f) for f in scoring if pattern.search(f.read_text("utf-8"))] == []
+    users = sorted(f.name for f in SRC.rglob("*.py") if re.search(r"biosentry\.services\.history", f.read_text("utf-8")))
+    assert users == ["app.py"]  # only the route reads it
+
+
+def test_the_simulators_episode_truth_is_reachable_only_through_the_history_route() -> None:
+    files = list(SRC.rglob("*.py")) + list(SRC.rglob("*.sql"))
+    assert len(files) > 30  # the walk is not vacuous
+    named = {f.relative_to(SRC).as_posix() for f in files if "sim_episode" in f.read_text("utf-8")}
+    assert named == {"db/migrations/0012_sim_episode.sql", "services/episodes.py"}
+    importing = re.compile(r"services\.episodes|from \.episodes|from \. import[^\n]*\bepisodes\b|from biosentry\.services import[^\n]*\bepisodes\b")
+    users = {f.relative_to(SRC).as_posix() for f in files if f.suffix == ".py" and importing.search(f.read_text("utf-8"))}
+    assert users == {"services/history.py", "api/app.py"}
+    # An import can be written in other ways (over several lines, by a relative name), and the history
+    # service hands the truth to its caller. So the two words themselves are pinned to their files.
+    def naming(word: str) -> set[str]:
+        return {f.relative_to(SRC).as_posix() for f in files if f.suffix == ".py" and re.search(rf"\b{word}\b", f.read_text("utf-8"))}
+
+    assert naming("episodes") == {"schemas/episodes.py", "services/episodes.py", "services/history.py", "api/app.py"}
+    assert naming("HistoryService") == {"services/history.py", "api/app.py"}

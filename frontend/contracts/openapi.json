@@ -745,7 +745,9 @@
           "tier_a_threshold",
           "tier_c_raise",
           "tier_b_finding",
-          "missing_input"
+          "missing_input",
+          "prediction_model_flag",
+          "alert_policy_flag"
         ],
         "title": "EscalationRule",
         "type": "string"
@@ -800,6 +802,235 @@
           "value"
         ],
         "title": "FlagPresent",
+        "type": "object"
+      },
+      "HistoryEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "by": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "enum": [
+              "admitted",
+              "acknowledged",
+              "vitals_recorded",
+              "note_added",
+              "bp_charted"
+            ],
+            "type": "string"
+          },
+          "note_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "role": {
+            "anyOf": [
+              {
+                "enum": [
+                  "rn",
+                  "md",
+                  "charge_rn"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maximum": 20,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "enum": [
+              "clinician_action",
+              "clinical_note",
+              "observation",
+              "patient"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "at",
+          "by",
+          "role",
+          "score",
+          "note_id",
+          "source"
+        ],
+        "title": "HistoryEvent",
+        "type": "object"
+      },
+      "HistoryProvenance": {
+        "additionalProperties": false,
+        "properties": {
+          "computed_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "rule": {
+            "const": "news2_as_of_bins",
+            "type": "string"
+          },
+          "source": {
+            "const": "derived",
+            "type": "string"
+          },
+          "synthetic": {
+            "type": "boolean"
+          },
+          "tier": {
+            "const": "A",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "tier",
+          "rule",
+          "computed_at",
+          "synthetic"
+        ],
+        "title": "HistoryProvenance",
+        "type": "object"
+      },
+      "HistoryRun": {
+        "additionalProperties": false,
+        "properties": {
+          "bins": {
+            "maximum": 672,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "end": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "in_episode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "inside",
+                  "outside"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ongoing": {
+            "type": "boolean"
+          },
+          "peak_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "peak_level": {
+            "anyOf": [
+              {
+                "enum": [
+                  "single_3",
+                  "medium",
+                  "high"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "peak_score": {
+            "anyOf": [
+              {
+                "maximum": 20,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/HistoryProvenance"
+          },
+          "reasons": {
+            "items": {
+              "maxLength": 300,
+              "type": "string"
+            },
+            "maxItems": 4,
+            "type": "array"
+          },
+          "start": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "alert",
+              "not_ranked",
+              "not_rebuilt",
+              "no_reading"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "start",
+          "end",
+          "ongoing",
+          "bins",
+          "peak_score",
+          "peak_level",
+          "peak_at",
+          "in_episode",
+          "reasons",
+          "provenance"
+        ],
+        "title": "HistoryRun",
         "type": "object"
       },
       "JsonValue": {},
@@ -1372,6 +1603,68 @@
         "title": "MeasurementAbsent",
         "type": "object"
       },
+      "ModelSignal": {
+        "additionalProperties": false,
+        "description": "One research model's result at the last stored 15-minute bin. Synthetic, not validated.\nA flag adds a reason line and changes nothing else. No probability is served.",
+        "properties": {
+          "bin_end": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bin_start": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "provenance": {
+            "items": {
+              "$ref": "#/components/schemas/Provenance"
+            },
+            "type": "array"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "enum": [
+              "flag",
+              "no_flag",
+              "not_sure",
+              "not_computed"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "reason",
+          "bin_start",
+          "bin_end",
+          "provenance"
+        ],
+        "title": "ModelSignal",
+        "type": "object"
+      },
       "NewLabRun": {
         "additionalProperties": false,
         "properties": {
@@ -1454,6 +1747,22 @@
           "question"
         ],
         "title": "NewPatientQuestion",
+        "type": "object"
+      },
+      "NewQuestion": {
+        "additionalProperties": false,
+        "description": "A general question about the simulated trials (contract-ask 4): one line, stored as typed.",
+        "properties": {
+          "question": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "title": "NewQuestion",
         "type": "object"
       },
       "NumberMeasurement": {
@@ -1603,6 +1912,247 @@
           }
         },
         "title": "NurseVitalsInput",
+        "type": "object"
+      },
+      "OpenBed": {
+        "additionalProperties": false,
+        "description": "One occupied bed: its place in the ward's order and its NEWS2 band, when ranked.",
+        "properties": {
+          "bed": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._-]{0,19}$",
+            "type": "string"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "risk": {
+            "anyOf": [
+              {
+                "enum": [
+                  "low",
+                  "low_medium",
+                  "medium",
+                  "high"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "enum": [
+              "ranked",
+              "not_ranked"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "bed",
+          "state",
+          "rank",
+          "risk"
+        ],
+        "title": "OpenBed",
+        "type": "object"
+      },
+      "OpenMove": {
+        "additionalProperties": false,
+        "properties": {
+          "bed": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._-]{0,19}$",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "in",
+              "out"
+            ],
+            "type": "string"
+          },
+          "seq": {
+            "maximum": 9007199254740991,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "seq",
+          "bed",
+          "kind"
+        ],
+        "title": "OpenMove",
+        "type": "object"
+      },
+      "OpenSim": {
+        "additionalProperties": false,
+        "properties": {
+          "clockS": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "ended": {
+            "type": "boolean"
+          },
+          "moves": {
+            "items": {
+              "$ref": "#/components/schemas/OpenMove"
+            },
+            "maxItems": 20,
+            "type": "array"
+          },
+          "speed": {
+            "enum": [
+              0,
+              1,
+              10,
+              60
+            ],
+            "type": "integer"
+          },
+          "staff": {
+            "items": {
+              "$ref": "#/components/schemas/OpenStaff"
+            },
+            "maxItems": 20,
+            "type": "array"
+          }
+        },
+        "required": [
+          "clockS",
+          "speed",
+          "ended",
+          "staff",
+          "moves"
+        ],
+        "title": "OpenSim",
+        "type": "object"
+      },
+      "OpenStaff": {
+        "additionalProperties": false,
+        "description": "A figure on the ward, with no name, id, task or path. `key` is its place in the runner's list.",
+        "properties": {
+          "facing": {
+            "enum": [
+              "front",
+              "back"
+            ],
+            "type": "string"
+          },
+          "key": {
+            "exclusiveMaximum": 20,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "moved": {
+            "maximum": 1000000000.0,
+            "minimum": 0,
+            "type": "number"
+          },
+          "role": {
+            "enum": [
+              "rn",
+              "charge_rn",
+              "md"
+            ],
+            "type": "string"
+          },
+          "stage": {
+            "enum": [
+              "home",
+              "message",
+              "walk",
+              "work",
+              "wait_md",
+              "done",
+              "walk_home"
+            ],
+            "type": "string"
+          },
+          "timer": {
+            "maximum": 1000000.0,
+            "minimum": -1000000.0,
+            "type": "number"
+          },
+          "walking": {
+            "type": "boolean"
+          },
+          "x": {
+            "maximum": 100,
+            "minimum": 0,
+            "type": "number"
+          },
+          "y": {
+            "maximum": 100,
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "key",
+          "role",
+          "x",
+          "y",
+          "facing",
+          "walking",
+          "moved",
+          "stage",
+          "timer"
+        ],
+        "title": "OpenStaff",
+        "type": "object"
+      },
+      "OpenWard": {
+        "additionalProperties": false,
+        "description": "What anyone may watch with no sign-in (GET /wards/{ward}/open-view).",
+        "properties": {
+          "beds": {
+            "items": {
+              "$ref": "#/components/schemas/OpenBed"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "can_control": {
+            "const": false,
+            "type": "boolean"
+          },
+          "sim": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OpenSim"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "synthetic": {
+            "const": true,
+            "type": "boolean"
+          },
+          "ward": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ward",
+          "synthetic",
+          "can_control",
+          "sim",
+          "beds"
+        ],
+        "title": "OpenWard",
         "type": "object"
       },
       "OverviewActivity": {
@@ -2306,6 +2856,9 @@
           "mechanism": {
             "type": "string"
           },
+          "models": {
+            "$ref": "#/components/schemas/RowModels"
+          },
           "name": {
             "type": "string"
           },
@@ -2392,6 +2945,7 @@
           "synthetic",
           "signal_quality",
           "last_update_s",
+          "models",
           "vital_history",
           "tier_breakdown"
         ],
@@ -2426,6 +2980,110 @@
           "model_id"
         ],
         "title": "PatientExtractionResult",
+        "type": "object"
+      },
+      "PatientHistory": {
+        "additionalProperties": false,
+        "properties": {
+          "bins": {
+            "maximum": 672,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryEvent"
+            },
+            "maxItems": 300,
+            "type": "array"
+          },
+          "events_cut": {
+            "type": "boolean"
+          },
+          "grid_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "grid_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "label": {
+            "const": "Rebuilt from stored 15-minute bins. It can differ from the score shown at the time.",
+            "type": "string"
+          },
+          "patient_id": {
+            "maxLength": 64,
+            "type": "string"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryRun"
+            },
+            "maxItems": 200,
+            "type": "array"
+          },
+          "runs_cut": {
+            "type": "boolean"
+          },
+          "simulated_episode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SimulatedEpisode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "synthetic": {
+            "type": "boolean"
+          },
+          "unavailable": {
+            "anyOf": [
+              {
+                "enum": [
+                  "no_bins",
+                  "past_cap",
+                  "not_aligned"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "patient_id",
+          "synthetic",
+          "label",
+          "unavailable",
+          "grid_from",
+          "grid_to",
+          "bins",
+          "simulated_episode",
+          "runs",
+          "runs_cut",
+          "events",
+          "events_cut"
+        ],
+        "title": "PatientHistory",
         "type": "object"
       },
       "PatientQuestionDetail": {
@@ -2704,7 +3362,7 @@
       },
       "Provenance": {
         "additionalProperties": false,
-        "description": "Where a value came from. Every key is required; null is allowed only where stated.",
+        "description": "Where a value came from. Every key is required and null is allowed only where stated, except the\nthree file fields of a model value: they are served only for a model value.",
         "properties": {
           "computed_at": {
             "anyOf": [
@@ -2716,6 +3374,18 @@
                 "type": "null"
               }
             ]
+          },
+          "file_sha256": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           },
           "model_id": {
             "anyOf": [
@@ -2734,6 +3404,17 @@
           "quality": {
             "$ref": "#/components/schemas/QualityLevel"
           },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "source": {
             "$ref": "#/components/schemas/ProvenanceSource"
           },
@@ -2749,6 +3430,17 @@
                 "type": "null"
               }
             ]
+          },
+          "variant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "required": [
@@ -2784,6 +3476,185 @@
         ],
         "title": "QualityLevel",
         "type": "string"
+      },
+      "QuestionDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "claimed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "type": "integer"
+          },
+          "question": {
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "report": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requested_at": {
+            "type": "string"
+          },
+          "requested_by": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "queued",
+              "running",
+              "done",
+              "failed",
+              "refused"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "requested_by",
+          "requested_at",
+          "question",
+          "state",
+          "claimed_at",
+          "finished_at",
+          "reason",
+          "answer",
+          "report"
+        ],
+        "title": "QuestionDetail",
+        "type": "object"
+      },
+      "QuestionItem": {
+        "additionalProperties": false,
+        "description": "A general question as the ward's physicians and charge nurses read it.",
+        "properties": {
+          "claimed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "type": "integer"
+          },
+          "question": {
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requested_at": {
+            "type": "string"
+          },
+          "requested_by": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "queued",
+              "running",
+              "done",
+              "failed",
+              "refused"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "requested_by",
+          "requested_at",
+          "question",
+          "state",
+          "claimed_at",
+          "finished_at",
+          "reason"
+        ],
+        "title": "QuestionItem",
+        "type": "object"
+      },
+      "RowModels": {
+        "additionalProperties": false,
+        "properties": {
+          "alert_policy": {
+            "$ref": "#/components/schemas/ModelSignal"
+          },
+          "prediction": {
+            "$ref": "#/components/schemas/ModelSignal"
+          }
+        },
+        "required": [
+          "prediction",
+          "alert_policy"
+        ],
+        "title": "RowModels",
+        "type": "object"
       },
       "ScoreRow": {
         "additionalProperties": false,
@@ -2832,6 +3703,9 @@
           },
           "mechanism": {
             "type": "string"
+          },
+          "models": {
+            "$ref": "#/components/schemas/RowModels"
           },
           "name": {
             "type": "string"
@@ -2912,7 +3786,8 @@
           "escalation_reasons",
           "synthetic",
           "signal_quality",
-          "last_update_s"
+          "last_update_s",
+          "models"
         ],
         "title": "ScoreRow",
         "type": "object"
@@ -2955,6 +3830,40 @@
         ],
         "title": "Sex",
         "type": "string"
+      },
+      "SimulatedEpisode": {
+        "additionalProperties": false,
+        "description": "What the simulator says about this stay. It exists only for a simulated run: on a real ward\nthis truth does not exist. Served times, as the runs' start and end.",
+        "properties": {
+          "full": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "respiratory",
+              "tachycardic",
+              "hypotensive"
+            ],
+            "type": "string"
+          },
+          "source": {
+            "const": "simulation",
+            "type": "string"
+          },
+          "start": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "start",
+          "full",
+          "source"
+        ],
+        "title": "SimulatedEpisode",
+        "type": "object"
       },
       "Spo2Scale": {
         "description": "RCP NEWS2 SpO2 scoring scale. Scale 2 is clinician-assigned (hypercapnic failure).",

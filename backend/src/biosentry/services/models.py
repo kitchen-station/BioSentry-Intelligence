@@ -184,10 +184,10 @@ def _attempt(rel: str, fail: str, make: Callable[[], T]) -> tuple[T | NotCompute
 
 
 def load_models(models_dir: Path) -> LoadedModels:
-    root = Path(models_dir).resolve()
     try:
+        root = Path(models_dir).resolve()  # a link loop raises here: the API must still start
         records = _manifest_records(root)
-    except _Refused as e:
+    except (_Refused, OSError, RuntimeError) as e:
         for rel in (STUDENT, CALIBRATION, POLICY):
             log.warning("model file refused: %s: %s", rel, e)
         return LoadedModels(NotComputed(NO_STUDENT), NotComputed(NO_STUDENT), NotComputed(NO_POLICY), None, None, None)

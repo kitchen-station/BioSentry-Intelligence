@@ -9,8 +9,14 @@ from pydantic import BaseModel, ValidationError
 from biosentry.schemas import CONTRACT_MODELS, INPUT_MODELS
 from samples import sample
 
-# Optional-by-design string fields on output models (TS `detail?:` / `pathway?:`).
-OPTIONAL_OUTPUT_FIELDS = {("EscalationReason", "pathway")}
+# Optional-by-design string fields on output models (TS `detail?:` / `pathway?:`). A Provenance names its
+# model file only for a model value, so the three fields are null (and may be left out) for every other source.
+OPTIONAL_OUTPUT_FIELDS = {
+    ("EscalationReason", "pathway"),
+    ("Provenance", "variant"),
+    ("Provenance", "file_sha256"),
+    ("Provenance", "run_id"),
+}
 
 IDS = [m.__name__ for m in CONTRACT_MODELS]
 

@@ -94,3 +94,26 @@ describe("an own-baseline drift reason", () => {
     expect(driftResponse("md", 3)).toBe(driftResponse("md", 0));
   });
 });
+
+describe("the two model reasons", () => {
+  const model = [
+    { text: "Prediction model flag (synthetic, not validated)", rule: "prediction_model_flag" as const, pathway: null },
+    { text: "Alert policy flag (learned by reward; synthetic, not validated)", rule: "alert_policy_flag" as const, pathway: null },
+  ];
+  const withModel = (score: number) => ({ id: "a", score, escalation_reasons: model });
+  const at = (iso: string) => ({ data: { present: true, value: 0 }, provenance: { observed_at: iso } });
+  const t0 = "2026-09-03T06:00:00Z";
+
+  it("leave the band, the observations due and the acknowledge strip as they are for a low row", () => {
+    for (const score of [0, 1, 2, 4]) {
+      expect(band(withModel(score))).toBe(band(r(score)));
+      expect(band(withModel(score))).toBe("low");
+      const vitals = { blood_pressure: at(t0), consciousness: at(t0) };
+      expect(obsDue({ ...withModel(score), vitals } as unknown as Parameters<typeof obsDue>[0])).toBe(
+        obsDue({ ...r(score), vitals } as unknown as Parameters<typeof obsDue>[0]),
+      );
+    }
+    expect(unacknowledged([withModel(0), withModel(4)], new Map())).toEqual([]);
+    expect(unacknowledged([withModel(8), withModel(0)], new Map()).map((x) => x.id)).toEqual(["a"]);
+  });
+});

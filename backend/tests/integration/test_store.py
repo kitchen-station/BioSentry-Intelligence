@@ -189,10 +189,22 @@ def test_a_seeded_database_reproduces_the_fixture(api: Api, who: str) -> None:
     ]
 
 
+def ended(history: dict[str, list[dict[str, Any]]]) -> dict[str, list[dict[str, Any]]]:
+    """The fixture file gives each 15-minute bin's START; the API serves its END, as for a posted run."""
+
+    def end(start: str) -> str:
+        moment = datetime.fromisoformat(start) + timedelta(minutes=15)
+        return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    return {v: [{**h, "time": end(h["time"])} for h in points] for v, points in history.items()}
+
+
 def test_the_fixture_detail_pages_are_reproduced(api: Api) -> None:
     for row in DATA["ranked"]:
         detail = api.client.get(f"/patients/{row['id']}", headers=api.as_("rn-manalo")).json()
-        assert detail["vital_history"] == DATA["details"][row["id"]]["vital_history"]
+        assert detail["vital_history"] == ended(DATA["details"][row["id"]]["vital_history"])
+        # the last bin of each vital ends at the ward's own time
+        assert {points[-1]["time"] for points in detail["vital_history"].values()} == {DATA["as_of"]}
         assert detail["tier_breakdown"] == bare(DATA["details"][row["id"]]["tier_breakdown"])
 
 

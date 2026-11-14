@@ -20,7 +20,7 @@ from test_store import DATA, NOW, Api, api, new_run, sim_patient  # noqa: F401 (
 
 from biosentry.api.app import REFUSED_ACTIONS, WRITE_ACTIONS, create_app
 from biosentry.core.audit import AuditLog
-from biosentry.core.config import Settings
+from biosentry.core.config import DEFAULT_MODELS_DIR, Settings
 from biosentry.db import admin as admin_module
 from biosentry.db import passphrase as passphrase_module
 from biosentry.db.passphrase import hash_passphrase
@@ -28,9 +28,11 @@ from biosentry.db.seed import DEV_PASSPHRASE
 from biosentry.repositories.postgres import PostgresStore, connect
 from biosentry.schemas import WardOverview
 from biosentry.schemas import NewNote, NurseVitalsInput, PartialLabInput
+from biosentry.services.models import load_models
 from biosentry.services.patients import PatientService
 from biosentry.services.ward import WardService
 
+MODELS = load_models(DEFAULT_MODELS_DIR)
 ADMIN = "admin-santos"
 IDS = [r["id"] for r in DATA["ranked"]] + [a["id"] for a in DATA["abstained"]]
 FORBIDDEN_KEYS = {"name", "age", "sex", "vitals", "notes", "admitting_context", "labs"}
@@ -107,7 +109,7 @@ def test_the_admin_sees_every_patient_on_the_ward_and_one_audit_row_is_written(a
     ]
     assert len(body.patients) == len(IDS) == 12
     store = PostgresStore(connect(api.url), api.wall)
-    ranked, abstained = WardService(store, AuditLog(store.conn, api.wall, store.role_of)).compute(
+    ranked, abstained = WardService(store, AuditLog(store.conn, api.wall, store.role_of), MODELS).compute(
         store.on_ward()
     )
     assert [(p.bed, p.state, p.score) for p in body.patients] == [
@@ -322,7 +324,7 @@ def _expected_resource(template: str) -> str:
 
 def _assert_every_write_refused(api: Api, headers: dict[str, str]) -> None:
     writes = _writes(api)
-    assert len(writes) == 11 and set(writes) == set(REFUSED_ACTIONS)
+    assert len(writes) == 12 and set(writes) == set(REFUSED_ACTIONS)
     before = snapshot(api)
     seq = _last_seq(api)
     for method, template in writes:
@@ -362,14 +364,16 @@ def test_the_write_actions_are_still_the_body_bearing_routes_only(api: Api) -> N
 
 READS = [("GET", p) for p in (
     "/wards/{ward}/rows", "/wards/{ward}/stays", "/wards/{ward}/overview", "/wards/{ward}/live",
-    "/wards/{ward}/lab/runs", "/wards/{ward}/lab/runs/{lab_run_id}", "/patients",
-    "/patients/{patient_id}", "/patients/{patient_id}/baseline", "/patients/{patient_id}/notes",
-    "/patients/{patient_id}/questions", "/patients/{patient_id}/questions/{question_id}",
+    "/wards/{ward}/lab/runs", "/wards/{ward}/lab/runs/{lab_run_id}", "/wards/{ward}/lab/questions",
+    "/wards/{ward}/lab/questions/{lab_run_id}", "/patients",
+    "/patients/{patient_id}", "/patients/{patient_id}/baseline", "/patients/{patient_id}/history",
+    "/patients/{patient_id}/notes", "/patients/{patient_id}/questions", "/patients/{patient_id}/questions/{question_id}",
     "/acknowledgements", "/audit",
 )]
 PATIENT_READS = {
     "/patients/{patient_id}": "view_patient",
     "/patients/{patient_id}/baseline": "view_baseline",
+    "/patients/{patient_id}/history": "view_history",
     "/patients/{patient_id}/notes": "view_notes",
 }
 WARD_READS = {
@@ -381,6 +385,8 @@ CLOSED_TO_ADMIN = {
     "/wards/{ward}/live": "view_live",
     "/wards/{ward}/lab/runs": "view_lab_runs",
     "/wards/{ward}/lab/runs/{lab_run_id}": "view_lab_run",
+    "/wards/{ward}/lab/questions": "view_lab_questions",
+    "/wards/{ward}/lab/questions/{lab_run_id}": "view_lab_question",
 }
 
 
@@ -542,13 +548,14 @@ def test_the_admins_view_rows_name_the_admin_and_there_is_one_row_per_call(api: 
     headers = add_admin(api)
     seq = _last_seq(api)
     for path in ("/wards/W4/rows", "/patients", "/patients/p-001", "/patients/p-001/baseline",
-                 "/patients/p-001/notes"):
+                 "/patients/p-001/history", "/patients/p-001/notes"):
         assert api.client.get(path, headers=headers).status_code == 200, path
     assert _rows_since(api, seq) == [
         (ADMIN, "admin", "view_ward", "W4", "ok"),
         (ADMIN, "admin", "list_patients", "-", "ok"),
         (ADMIN, "admin", "view_patient", "p-001", "ok"),
         (ADMIN, "admin", "view_baseline", "p-001", "ok"),
+        (ADMIN, "admin", "view_history", "p-001", "ok"),
         (ADMIN, "admin", "view_notes", "p-001", "ok"),
     ]
 
@@ -577,7 +584,7 @@ def test_every_write_gives_the_same_403_for_a_known_unknown_unranked_and_left_pa
 def test_reads_of_an_unknown_a_left_and_an_unranked_patient_are_the_same_404(api: Api) -> None:
     headers = add_admin(api)
     write(api, "UPDATE patient SET left_at = %s, outcome = 'discharged' WHERE id = 'p-002'", NOW)
-    for template in ("/patients/{patient_id}", "/patients/{patient_id}/baseline"):
+    for template in ("/patients/{patient_id}", "/patients/{patient_id}/baseline", "/patients/{patient_id}/history"):
         seen = set()
         for pid in ("p-zzz", "p-002", "p-004"):  # unknown, left, NOT RANKED (no detail page)
             seq = _last_seq(api)
@@ -785,17 +792,17 @@ def test_an_admin_never_reads_a_discharged_patient_and_stays_is_still_empty(api:
     assert api.client.get("/wards/W4/stays", headers=headers).json() == []
     rows = api.client.get("/wards/W4/rows", headers=headers).json()
     assert "p-001" not in {r["id"] for k in ("ranked", "abstained") for r in rows[k]}
-    for suffix in ("", "/notes", "/baseline"):
+    for suffix in ("", "/notes", "/baseline", "/history"):
         seq = _last_seq(api)
         assert api.client.get(f"/patients/p-001{suffix}", headers=headers).status_code == 404
-        action = {"": "view_patient", "/notes": "view_notes", "/baseline": "view_baseline"}[suffix]
+        action = {"": "view_patient", "/notes": "view_notes", "/baseline": "view_baseline", "/history": "view_history"}[suffix]
         assert [r[2:] for r in _rows_since(api, seq)] == [(action, "p-001", "not_found")]
 
 
 def _services(api: Api) -> tuple[PostgresStore, WardService, PatientService]:
     store = PostgresStore(connect(api.url), api.wall)
     audit = AuditLog(store.conn, api.wall, store.role_of)
-    wards = WardService(store, audit)
+    wards = WardService(store, audit, MODELS)
     return store, wards, PatientService(store, audit, wards)
 
 
@@ -849,7 +856,7 @@ def test_an_older_runs_patient_is_a_404_for_the_admin_and_rows_lists_only_the_ne
     assert response.status_code == 201, response.text
     rows = api.client.get("/wards/W4/rows", headers=headers).json()
     assert {r["id"] for k in ("ranked", "abstained") for r in rows[k]} == {"s-1"}
-    for suffix, action in (("", "view_patient"), ("/notes", "view_notes"), ("/baseline", "view_baseline")):
+    for suffix, action in (("", "view_patient"), ("/notes", "view_notes"), ("/baseline", "view_baseline"), ("/history", "view_history")):
         seq = _last_seq(api)
         assert api.client.get(f"/patients/p-001{suffix}", headers=headers).status_code == 404
         assert [r[2:] for r in _rows_since(api, seq)] == [(action, "p-001", "not_found")]
@@ -860,14 +867,14 @@ def test_an_older_runs_patient_is_a_404_for_the_admin_and_rows_lists_only_the_ne
     ["p-zzz", "p" * 300, "p-001%20", "P-001", "%00"],
     ids=["unknown", "300-chars", "trailing-space", "upper-case", "nul"],
 )
-@pytest.mark.parametrize("suffix", ["", "/notes", "/baseline"])
+@pytest.mark.parametrize("suffix", ["", "/notes", "/baseline", "/history"])
 def test_an_odd_patient_id_is_a_404_for_the_admin_with_one_row(api: Api, pid: str, suffix: str) -> None:
     headers = add_admin(api)
     seq = _last_seq(api)
     response = api.client.get(f"/patients/{pid}{suffix}", headers=headers)
     assert response.status_code == 404
     rows = _rows_since(api, seq)
-    action = {"": "view_patient", "/notes": "view_notes", "/baseline": "view_baseline"}[suffix]
+    action = {"": "view_patient", "/notes": "view_notes", "/baseline": "view_baseline", "/history": "view_history"}[suffix]
     if pid == "%00":  # refused as a `request` before the handler: the id is never an id
         assert [(r[0], r[2], r[4]) for r in rows] == [(ADMIN, "request", "not_found")]
     else:  # the handler writes the row, naming the id as sent (decoded)

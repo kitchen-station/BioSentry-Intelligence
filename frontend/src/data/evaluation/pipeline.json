@@ -30,24 +30,24 @@
     "in": "Simulator readings grouped in fifteen-minute bins",
     "links_to": "models",
     "name": "Prediction model",
-    "out": "A score for each bin, offline only",
-    "state": "research only, offline"
+    "out": "A reason line on the row when the confidence check says alert",
+    "state": "shown, does not change the ranking"
    },
    {
     "id": "reward",
     "in": "Simulator trials and an alert rule of six numbers",
     "links_to": "models",
     "name": "Alert policy learned by reward",
-    "out": "A changed rule and its reward on trials, offline only",
-    "state": "research only, offline"
+    "out": "A reason line on the row when the rule alerts",
+    "state": "shown, does not change the ranking"
    },
    {
     "id": "confidence",
     "in": "A model score for one simulator bin",
     "links_to": "models",
     "name": "Confidence check",
-    "out": "Alert, not sure or quiet, offline only",
-    "state": "research only, offline"
+    "out": "Alert, not sure or quiet; only alert lets the prediction model flag",
+    "state": "shown, does not change the ranking"
    },
    {
     "id": "agent",
@@ -72,9 +72,9 @@
   "The commit is the main commit this file was exported on. The stage list changed in the same pull request."
  ],
  "provenance": {
-  "commit": "d5dde654f24ed84cc904f31e5e666591303ee324",
+  "commit": "6710d564c26776c5acec62e4a8b98edc23efb1d8",
   "data": "stage names, states and what goes in and out",
-  "date": "2026-11-13",
+  "date": "2026-11-14",
   "exporter": {
    "name": "npm run export:pipeline",
    "version": "1"
@@ -82,7 +82,7 @@
   "repo": "kitchen-station/BioSentry-Intelligence",
   "seeds": [],
   "source": [
-   "npm run export:pipeline -- --date 2026-11-13 --commit d5dde654f24ed84cc904f31e5e666591303ee324 --note \"The commit is the main commit this file was exported on. The stage list changed in the same pull request.\""
+   "npm run export:pipeline -- --date 2026-11-14 --commit 6710d564c26776c5acec62e4a8b98edc23efb1d8 --note \"The commit is the main commit this file was exported on. The stage list changed in the same pull request.\""
   ],
   "synthetic": true,
   "validated": false

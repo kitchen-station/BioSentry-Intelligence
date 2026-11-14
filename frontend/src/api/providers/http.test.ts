@@ -227,3 +227,35 @@ describe("httpProvider lab runs", () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual(input);
   });
 });
+
+describe("httpProvider stay history", () => {
+  it("reads only the history path of one patient", async () => {
+    fetchMock.mockImplementation(async () => reply(200, {}));
+    await httpProvider.getPatientHistory("p-001");
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual(["/patients/p-001/history"]);
+  });
+});
+
+describe("httpProvider patient questions", () => {
+  it("asks, lists and reads only the question paths of one patient", async () => {
+    fetchMock.mockImplementation(async () => reply(200, {}));
+    await httpProvider.askPatient("p-001", "Why is the rate up?");
+    await httpProvider.getPatientQuestions("p-001");
+    await httpProvider.getPatientQuestion("p-001", 7);
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual(["/patients/p-001/questions", "/patients/p-001/questions", "/patients/p-001/questions/7"]);
+    expect(fetchMock.mock.calls[0][1].method).toBe("POST");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ question: "Why is the rate up?" });
+  });
+});
+
+describe("httpProvider lab questions", () => {
+  it("asks, lists and reads only the lab question paths of the ward", async () => {
+    fetchMock.mockImplementation(async () => reply(200, {}));
+    await httpProvider.askLab("What if we alerted at 7?");
+    await httpProvider.getLabQuestions();
+    await httpProvider.getLabQuestion(7);
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual(["/wards/W4/lab/questions", "/wards/W4/lab/questions", "/wards/W4/lab/questions/7"]);
+    expect(fetchMock.mock.calls[0][1].method).toBe("POST");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ question: "What if we alerted at 7?" });
+  });
+});

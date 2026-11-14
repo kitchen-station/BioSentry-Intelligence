@@ -1,0 +1,103 @@
+/* The stay: a strip of marks, then the list that says the same in words. */
+
+.panel {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.summary {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--label);
+  cursor: pointer;
+}
+
+.body {
+  margin-top: var(--sp-3);
+}
+
+.quiet {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--label);
+  margin: 0 0 var(--sp-2);
+}
+
+.error {
+  margin: 0 0 var(--sp-2);
+  font-size: 13px;
+  color: var(--alert);
+}
+
+.strip {
+  display: block;
+  width: 100%;
+  height: 28px;
+}
+
+.ends {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--label);
+  margin-bottom: var(--sp-2);
+}
+
+.high { fill: var(--alert); }
+.medium { fill: var(--alert-edge); }
+.single { fill: var(--alert-tint); stroke: var(--alert); stroke-width: 1; }
+.hatch { stroke: var(--label); stroke-width: 1.5; }
+.hatchBox { stroke: var(--label); stroke-width: 1; }
+.dashed { fill: none; stroke: var(--label); stroke-width: 1; stroke-dasharray: 3 2; }
+.tick { fill: var(--ink); }
+.letter { font-family: var(--font-mono); font-size: 11px; font-weight: 700; fill: var(--ink); text-anchor: middle; dominant-baseline: central; }
+.letterHigh { fill: var(--button-ink); }
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item {
+  padding: var(--sp-1) 0;
+  border-top: 1px solid var(--border);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.nested {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 var(--sp-3);
+  font-size: 13px;
+  color: var(--label);
+}
+
+.button {
+  padding: var(--sp-1) var(--sp-3);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--button-ink);
+  background: var(--button);
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.button[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.foot {
+  margin-top: var(--sp-2);
+}
+
+.episode { fill: none; stroke: var(--label); stroke-width: 1; stroke-dasharray: 1 2; }

@@ -26,10 +26,17 @@ import type {
   LabRunItem,
   LiveWard,
   NewLabRun,
+  NewPatientQuestion,
+  NewQuestion,
   NurseVitalsInput,
   PartialLabInput,
   PatientDetail,
   PatientExtractionResult,
+  PatientHistory,
+  PatientQuestionDetail,
+  PatientQuestionItem,
+  QuestionDetail,
+  QuestionItem,
   VitalsRecorded,
   WardOverview,
   PatientStay,
@@ -70,6 +77,36 @@ export const httpProvider: ApiProvider = {
 
   getLabRun(id: number): Promise<LabRunDetail> {
     return fetchJson<LabRunDetail>(`/wards/W4/lab/runs/${id}`);
+  },
+
+  askPatient(patientId: string, question: string): Promise<PatientQuestionItem> {
+    const body: NewPatientQuestion = { question };
+    return postJson<PatientQuestionItem>(`/patients/${encodeURIComponent(patientId)}/questions`, body);
+  },
+
+  getPatientQuestions(patientId: string): Promise<PatientQuestionItem[]> {
+    return fetchJson<PatientQuestionItem[]>(`/patients/${encodeURIComponent(patientId)}/questions`);
+  },
+
+  askLab(question: string): Promise<QuestionItem> {
+    const body: NewQuestion = { question };
+    return postJson<QuestionItem>("/wards/W4/lab/questions", body);
+  },
+
+  getLabQuestions(): Promise<QuestionItem[]> {
+    return fetchJson<QuestionItem[]>("/wards/W4/lab/questions");
+  },
+
+  getLabQuestion(id: number): Promise<QuestionDetail> {
+    return fetchJson<QuestionDetail>(`/wards/W4/lab/questions/${id}`);
+  },
+
+  getPatientHistory(patientId: string): Promise<PatientHistory> {
+    return fetchJson<PatientHistory>(`/patients/${encodeURIComponent(patientId)}/history`);
+  },
+
+  getPatientQuestion(patientId: string, questionId: number): Promise<PatientQuestionDetail> {
+    return fetchJson<PatientQuestionDetail>(`/patients/${encodeURIComponent(patientId)}/questions/${questionId}`);
   },
 
   async getPatient(id: string): Promise<PatientDetail | null> {

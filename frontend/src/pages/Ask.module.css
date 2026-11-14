@@ -1,0 +1,34 @@
+/* The Ask page: only what the patient panel's styles and the research page's styles do not give. */
+
+/* The warning is told by its border and its bold word, not by colour alone. */
+.warning {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--alert-tint);
+  border: 2px solid var(--alert-edge);
+  border-left-width: 6px;
+  border-radius: var(--radius);
+}
+
+.pre {
+  max-width: 100%;
+  margin: var(--sp-2) 0;
+  padding: var(--sp-2);
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--panel);
+  border-radius: var(--radius);
+}
+
+.sub {
+  margin: var(--sp-2) 0 0;
+  font-size: 13px;
+  font-weight: 500;
+}

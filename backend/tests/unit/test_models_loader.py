@@ -293,6 +293,17 @@ def test_an_unusable_manifest_disables_all_three(case: str, tmp_path: Path, capl
     assert (loaded.student_file, loaded.calibration_file, loaded.policy_file) == (None, None, None)
 
 
+def test_a_folder_that_cannot_be_resolved_does_not_raise(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    """The API calls the loader when it starts: a link loop in the path must not stop the start."""
+    a, b = tmp_path / "a", tmp_path / "b"
+    a.symlink_to(b)
+    b.symlink_to(a)
+    loaded, lines = attempt(a, caplog)
+    assert len(lines) == 3 and all(line.startswith("model file refused: ") for line in lines)
+    assert (loaded.student, loaded.calibration) == (NotComputed("student not loaded"),) * 2
+    assert loaded.policy == NotComputed("policy not loaded")
+
+
 def test_a_missing_folder_does_not_raise(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     loaded, lines = attempt(tmp_path / "nowhere", caplog)
     assert len(lines) == 3 and isinstance(loaded.policy, NotComputed)

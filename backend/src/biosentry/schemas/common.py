@@ -1,9 +1,9 @@
 """Provenance and measurement primitives (I1 missing is missing, I2 provenance on every value)."""
 
 from enum import IntEnum, StrEnum
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import AwareDatetime, Field, field_validator
+from pydantic import AwareDatetime, Field, field_validator, model_serializer, model_validator
 
 from .base import Contract, Flag, Num
 
@@ -60,8 +60,12 @@ class Spo2Scale(IntEnum):
     scale_2 = 2
 
 
+_FILE_FIELDS = ("variant", "file_sha256", "run_id")
+
+
 class Provenance(Contract):
-    """Where a value came from. Every key is required; null is allowed only where stated."""
+    """Where a value came from. Every key is required and null is allowed only where stated, except the
+    three file fields of a model value: they are served only for a model value."""
 
     source: ProvenanceSource
     tier: Tier | None
@@ -70,6 +74,23 @@ class Provenance(Contract):
     model_id: str | None
     synthetic: Flag
     quality: QualityLevel
+    # Only a model value (tier B policy, tier C student or check) carries these three; all null elsewhere.
+    variant: str | None = None
+    file_sha256: Annotated[str | None, Field(pattern=r"^[0-9a-f]{64}$")] = None
+    run_id: str | None = None  # the manifest record's run id
+
+    @model_serializer(mode="wrap")
+    def _omit_unused(self, handler: Any) -> dict[str, Any]:
+        """The three file fields are served only for a model value: every other answer is as before."""
+        out: dict[str, Any] = handler(self)
+        return {k: v for k, v in out.items() if v is not None or k not in _FILE_FIELDS}
+
+    @model_validator(mode="after")
+    def _model_value_names_its_file(self) -> "Provenance":
+        if self.source is ProvenanceSource.model and self.tier in (Tier.B, Tier.C):
+            if None in (self.variant, self.file_sha256, self.run_id):
+                raise ValueError("a model value needs variant, file_sha256 and run_id")
+        return self
 
 
 class BloodPressure(Contract):

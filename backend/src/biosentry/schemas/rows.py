@@ -6,8 +6,27 @@ from pydantic import AwareDatetime, Field
 
 from .base import Age, Contract, Flag, NonNegNum, Percent
 from .clinical import LabPanel, VitalHistoryFull, Vitals, VitalTrends
-from .common import Tier, Trend
+from .common import Provenance, Tier, Trend
 from .tiers import EscalationReason, TierStatus
+
+
+ModelState = Literal["flag", "no_flag", "not_sure", "not_computed"]
+
+
+class ModelSignal(Contract):
+    """One research model's result at the last stored 15-minute bin. Synthetic, not validated.
+    A flag adds a reason line and changes nothing else. No probability is served."""
+
+    state: ModelState
+    reason: str | None  # exactly when not_computed
+    bin_start: AwareDatetime | None  # both exactly when computed
+    bin_end: AwareDatetime | None
+    provenance: list[Provenance]  # empty when not computed
+
+
+class RowModels(Contract):
+    prediction: ModelSignal
+    alert_policy: ModelSignal
 
 
 class ScoreRow(Contract):
@@ -34,6 +53,7 @@ class ScoreRow(Contract):
     synthetic: Flag
     signal_quality: Percent | None  # null when none is stored (served as stored, never invented)
     last_update_s: NonNegNum | None
+    models: RowModels
 
 
 class AbstainedRow(Contract):

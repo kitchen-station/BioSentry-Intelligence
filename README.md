@@ -251,6 +251,11 @@ applied to made-up patients.
   under 32 characters or has fewer than 8 distinct ones.
   `BIOSENTRY_CORS_ORIGINS` (comma-separated) overrides the origins the dashboard may be served from; the
   local ones stay the default.
+  `BIOSENTRY_OPEN_WARD_VIEW=true` (owner decision S-3; off when unset or `false`, any other word stops the
+  start) adds one route, `GET /wards/{ward}/open-view`, that shows anyone who can reach the API the ward
+  simulator's drawing with no sign-in: bed, rank and NEWS2 band, and staff figures, no names or ids. It serves
+  a synthetic run only, still needs a sign-in for control, and its views leave at most one audit row a
+  minute. It is allowed in production and logs a warning at start. Never use it on a public address.
 
 ## Licence
 

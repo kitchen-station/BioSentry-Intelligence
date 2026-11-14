@@ -12,7 +12,7 @@ import {
 import { DrawOn, Tick, useDrawFrom } from "./DrawOn";
 
 interface DataPoint {
-  time: string; // ISO 8601 start of the bin
+  time: string; // ISO 8601. From the API: the END of the 15-minute bin. The fixture file gives its start.
   value: number | null; // null is a gap: the line breaks, nothing is bridged
 }
 

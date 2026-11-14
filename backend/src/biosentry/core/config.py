@@ -10,6 +10,9 @@
     BIOSENTRY_MODELS_DIR     the folder holding the model files and manifest.json; the repository's
                              `models/` when unset (a checkout, and /app/models in the image, which are
                              the same rule: the folder three levels above the package)
+    BIOSENTRY_OPEN_WARD_VIEW true: GET /wards/{ward}/open-view shows the ward to anyone, without sign-in
+                             (bed bands, no names or ids; a synthetic run only). Off when unset or
+                             `false`; any other word stops the start. Allowed in production, with a warning.
 
 In production the process refuses to start on a database URL that holds the dev password (an early
 check on the text) or an ingest key that is not 32 or more characters, at least 8 of them distinct,
@@ -78,6 +81,7 @@ class Settings:
     env: str = "local"
     retention_days: int = 7
     models_dir: Path = DEFAULT_MODELS_DIR
+    open_ward_view: bool = False
 
     def __post_init__(self) -> None:
         if not 1 <= self.retention_days <= MAX_RETENTION_DAYS:
@@ -111,6 +115,9 @@ class Settings:
             retention_days = int(source.get("BIOSENTRY_RETENTION_DAYS", "").strip() or 7)
         except ValueError:
             retention_days = 0  # refused below, by the one message
+        view = source.get("BIOSENTRY_OPEN_WARD_VIEW", "").strip().lower()
+        if view not in ("", "true", "false"):  # never read as off: a typo would hide the choice
+            raise ConfigError("BIOSENTRY_OPEN_WARD_VIEW must be true or false")
         return cls(
             database_url=source.get("BIOSENTRY_DATABASE_URL") or DEFAULT_DATABASE_URL,
             ingest_key=source.get("BIOSENTRY_INGEST_KEY", "").strip() or None,
@@ -118,4 +125,5 @@ class Settings:
             env=(source.get("BIOSENTRY_ENV") or "local").strip().lower(),
             retention_days=retention_days,
             models_dir=Path(source.get("BIOSENTRY_MODELS_DIR", "").strip() or DEFAULT_MODELS_DIR),
+            open_ward_view=view == "true",
         )
