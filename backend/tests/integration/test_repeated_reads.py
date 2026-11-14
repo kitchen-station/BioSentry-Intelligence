@@ -20,6 +20,7 @@ READS = [
     ("view_baseline", f"/patients/{PID}/baseline", PID),
     ("view_lab_runs", "/wards/W4/lab/runs", "W4"),
     ("view_lab_questions", "/wards/W4/lab/questions", "W4"),
+    ("view_patient_questions", f"/patients/{PID}/questions", PID),
 ]
 
 
@@ -38,7 +39,7 @@ def rows(api: Api, who: str, action: str | None = None) -> list[dict[str, Any]]:
     )
 
 
-def test_the_rule_names_six_reads_and_one_minute() -> None:
+def test_the_rule_names_seven_reads_and_one_minute() -> None:
     assert VIEW_ROW_EVERY == timedelta(minutes=1)
     assert REPEATED_VIEWS == {a for a, _, _ in READS}
 

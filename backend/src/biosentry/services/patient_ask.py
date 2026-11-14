@@ -175,7 +175,7 @@ class PatientAskService:
             " AND patient_id = %s ORDER BY id DESC LIMIT %s",
             (store.run_id, patient_id, LIST_LIMIT),
         ).fetchall()
-        self._audit.append(who, "view_patient_questions", patient_id, "ok")
+        self._audit.append_view(who, "view_patient_questions", patient_id)  # the panel reads it on a timer
         return [PatientQuestionItem.model_validate(_item(r)) for r in rows]
 
     def detail(

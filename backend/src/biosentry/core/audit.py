@@ -29,6 +29,7 @@ REPEATED_VIEWS = frozenset(
         "view_baseline",
         "view_lab_runs",
         "view_lab_questions",
+        "view_patient_questions",
     }
 )
 VIEW_ROW_EVERY = timedelta(minutes=1)
