@@ -12,6 +12,7 @@ import { WardRow } from "../components/WardRow";
 import { band, obsDue, unacknowledged } from "../components/risk";
 import { formatClock, formatSimClock } from "../components/format";
 import { useLivePoll } from "../components/useLivePoll";
+import { syncWardNow, useWardNow } from "../components/wardNow";
 import { SimulatedNote } from "../components/LabFrame";
 import { SessionMenu } from "../components/SessionMenu";
 import { standing } from "../components/vitalsDraft";
@@ -60,7 +61,7 @@ export function Ward({ session, onSignOut }: Props) {
   const [data, setData] = useState<WardResponse | null>(null);
   const [fetchedAt, setFetchedAt] = useState<number | null>(null);
   const [failedSince, setFailedSince] = useState<number | null>(null);
-  const [now, setNow] = useState(() => Date.now());
+  const now = useWardNow(); // ward time as served, advancing since the last good read
   const [notice, setNotice] = useState<string | null>(null);
   // null until the server's acknowledgements arrive, so an alert already acknowledged never sounds.
   const [acked, setAcked] = useState<ReadonlyMap<string, number> | null>(null);
@@ -77,6 +78,7 @@ export function Ward({ session, onSignOut }: Props) {
       const w = await getWard();
       if (n > applied.current) {
         applied.current = n;
+        syncWardNow(w.now);
         setData(w);
         setFetchedAt(Date.now());
         setFailedSince(null);
@@ -108,11 +110,6 @@ export function Ward({ session, onSignOut }: Props) {
       },
     );
   }, [readOnly]);
-
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
 
   const moveRef = useMoveOnReorder(data ? data.ranked.map((r) => r.id) : []);
 
@@ -156,7 +153,7 @@ export function Ward({ session, onSignOut }: Props) {
     );
   }
 
-  const ageOffsetS = fetchedAt ? Math.max(0, Math.floor((now - fetchedAt) / 1000)) : 0;
+  const ageOffsetS = Math.max(0, Math.floor((now - Date.parse(data.now)) / 1000)); // time since the read, on the ward's base
   const overdue = data.ranked.filter((r) => {
     const due = obsDue(r);
     return due !== "continuous" && due <= now;

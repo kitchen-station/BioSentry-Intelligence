@@ -54,7 +54,7 @@ describe("a row ranked from nurse entries", () => {
 
   it("says who entered the values, and that there is no patch signal, with no made-up number", () => {
     showRow(nurseRow);
-    expect(screen.getByText(enteredByNurse(Date.parse("2026-09-03T06:45:00Z")))).toBeTruthy();
+    expect(screen.getByText(enteredByNurse(Date.parse("2026-09-03T06:45:00Z"), 0))).toBeTruthy();
     expect(screen.getByText("No patch signal")).toBeTruthy();
     expect(screen.queryByText(/Signal \d+%/)).toBeNull();
     expect(screen.queryByText(/ago$/)).toBeNull();
@@ -95,7 +95,7 @@ describe("a row ranked from nurse entries", () => {
         spo2: by(v.spo2, "device", "2026-09-03T07:00:00Z"),
       },
     });
-    expect(screen.getByText(enteredByNurse(Date.parse("2026-09-03T06:30:00Z")))).toBeTruthy();
+    expect(screen.getByText(enteredByNurse(Date.parse("2026-09-03T06:30:00Z"), 0))).toBeTruthy();
     expect(screen.getByText("30s ago")).toBeTruthy();
   });
 });

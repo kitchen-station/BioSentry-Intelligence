@@ -331,3 +331,17 @@ describe("document extraction stubs", () => {
     }
   });
 });
+
+describe("the demo's ward time", () => {
+  it("is the browser's clock at each read, on the ward list and on a patient", async () => {
+    vi.useFakeTimers({ now: Date.parse("2026-11-14T10:00:00Z"), toFake: ["Date"] });
+    try {
+      setActiveClinician("rn-manalo");
+      expect((await getWard()).now).toBe("2026-11-14T10:00:00.000Z");
+      vi.setSystemTime(Date.parse("2026-11-14T10:00:07Z"));
+      expect((await getPatient("p-001"))?.now).toBe("2026-11-14T10:00:07.000Z");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

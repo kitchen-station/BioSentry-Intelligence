@@ -368,6 +368,8 @@ export interface components {
          */
         readonly LiveWard: {
             readonly can_control: boolean;
+            /** Format: date-time */
+            readonly now: string;
             readonly patients: readonly components["schemas"]["PatientView"][];
             readonly shared: {
                 readonly [key: string]: components["schemas"]["JsonValue"];
@@ -679,6 +681,8 @@ export interface components {
             readonly mechanism: string;
             readonly models: components["schemas"]["RowModels"];
             readonly name: string;
+            /** Format: date-time */
+            readonly now: string;
             readonly rank: number;
             readonly score: number;
             readonly sex: string | null;
@@ -1064,6 +1068,8 @@ export interface components {
         readonly WardResponse: {
             readonly abstained: readonly components["schemas"]["AbstainedRow"][];
             readonly clinician: string;
+            /** Format: date-time */
+            readonly now: string;
             readonly ranked: readonly components["schemas"]["ScoreRow"][];
             readonly receiving_data: boolean;
             readonly shift: string;

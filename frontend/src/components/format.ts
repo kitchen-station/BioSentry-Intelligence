@@ -36,7 +36,7 @@ export function formatClock(ms: number): string {
  * "Entered by a nurse at 07:40", with the day when it is not today: blood pressure and
  * consciousness do not expire, so an old entry must not read as today's.
  */
-export function enteredByNurse(ms: number, now: number = Date.now()): string {
+export function enteredByNurse(ms: number, now: number): string {
   const day = new Date(ms).toDateString() === new Date(now).toDateString()
     ? ""
     : `, ${new Date(ms).toLocaleDateString([], { day: "numeric", month: "short" })}`;
@@ -47,11 +47,11 @@ export function enteredByNurse(ms: number, now: number = Date.now()): string {
  * "Entered by a nurse at 07:40" when a patch value (heart rate, respiratory rate, SpO2 or
  * temperature) was typed by a nurse. It names the earliest time, the one that expires first.
  */
-export function nurseEntryText(vitals: Vitals): string | null {
+export function nurseEntryText(vitals: Vitals, now: number): string | null {
   const times = [vitals.heart_rate, vitals.respiratory_rate, vitals.spo2, vitals.temperature]
     .filter((m) => m !== null && m.data.present && m.provenance.source === "nurse")
     .map((m) => Date.parse(m!.provenance.observed_at));
-  return times.length > 0 ? enteredByNurse(Math.min(...times)) : null;
+  return times.length > 0 ? enteredByNurse(Math.min(...times), now) : null;
 }
 
 /** True when at least one patch measurement is a device value: otherwise no shown value uses the patch signal. */
@@ -100,7 +100,7 @@ export function formatSimClock(sim: SimStatus): string {
 }
 
 /** "22:15" for today, "13 Nov, 22:15" for another day (the same day check and locale as enteredByNurse). A `now` of 0 always gives the date. */
-export function formatClockDay(ms: number, now: number = Date.now()): string {
+export function formatClockDay(ms: number, now: number): string {
   if (new Date(ms).toDateString() === new Date(now).toDateString()) return formatClock(ms);
   return `${new Date(ms).toLocaleDateString([], { day: "numeric", month: "short" })}, ${formatClock(ms)}`;
 }

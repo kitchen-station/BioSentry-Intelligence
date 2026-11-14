@@ -8,6 +8,8 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import synthetic from "../data/synthetic.json";
+import { obsDue } from "../components/risk";
+import { formatClock } from "../components/format";
 import type { Session, WardResponse } from "../types";
 import { Ward } from "./Ward";
 
@@ -45,6 +47,7 @@ const ward = (): WardResponse => ({
   tier_status: rows[0].tier_status,
   ranked: rows.slice(0, 1),
   abstained: [],
+  now: "2026-09-03T07:00:00Z",
 });
 const session: Session = { clinician_id: "rn-manalo", ward: "W4", role: "charge_rn" };
 const admin: Session = { clinician_id: "admin-santos", ward: "W4", role: "admin" };
@@ -520,5 +523,39 @@ describe("flip on change", () => {
     await advance(2_100);
     expect(flips()).toEqual([`4 ${SEP}, 21:21 · 60x`]);
     expect(el.textContent).toBe(`Ward clock4 ${SEP}, 21:21 · 60x`);
+  });
+});
+
+describe("every age and due time follows the ward's time as served", () => {
+  // A patient below the high band, so observations have a due time. The browser says 14 Nov 2026.
+  const low = rows.find((r) => r.score < 7)!;
+  const due = obsDue(low) as number;
+  const BROWSER = Date.parse("2026-11-14T09:00:00Z");
+  const wardAt = (now: number): WardResponse => ({ ...ward(), ranked: [low], now: new Date(now).toISOString() });
+
+  it("says Obs due HH:MM, not overdue by hundreds of hours, when the ward's time is before the due time", async () => {
+    vi.useFakeTimers({ now: BROWSER, toFake: ["Date"] });
+    api.getWard.mockResolvedValue(wardAt(due - 30 * 60_000));
+    page();
+    expect(await screen.findByText(`Obs due ${formatClock(due)}`)).toBeTruthy();
+    expect(screen.queryByText(/Obs overdue \d/)).toBeNull();
+    expect(screen.getByText("Obs overdue").previousSibling?.textContent).toBe("0");
+  });
+
+  it("goes overdue when the ward's time passes the due time, and keeps going while reads fail", async () => {
+    vi.useFakeTimers({ now: BROWSER });
+    api.getWard.mockResolvedValue(wardAt(due - 30 * 60_000));
+    page();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByText(`Obs due ${formatClock(due)}`)).toBeTruthy();
+    api.getWard.mockRejectedValue(new Error("down"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(31 * 60_000); // the ward's 30 minutes pass, and one more
+    });
+    expect(screen.getByText(/^Obs overdue 1 min$/)).toBeTruthy();
+    expect(screen.getByText(/Cannot reach the ward server since/)).toBeTruthy();
+    expect(screen.getByText("Obs overdue").previousSibling?.textContent).toBe("1");
   });
 });

@@ -7,6 +7,8 @@ type Primitive = string | number | boolean;
 export interface MeasurementProps<T> {
   measurement: Measurement<T>;
   unit?: string;
+  /** Ward time (ms): decides whether a nurse's entry time prints with its day. */
+  now: number;
 }
 
 function primitiveText(value: unknown): string {
@@ -22,6 +24,7 @@ function Display<T>({
   measurement,
   unit,
   format,
+  now,
 }: MeasurementProps<T> & { format?: (value: T) => string }): ReactElement {
   const isNurse = measurement.provenance.source === "nurse";
 
@@ -38,7 +41,7 @@ function Display<T>({
       className={isNurse ? "nurse-entered" : undefined}
       title={
         isNurse
-          ? enteredByNurse(Date.parse(measurement.provenance.observed_at))
+          ? enteredByNurse(Date.parse(measurement.provenance.observed_at), now)
           : undefined
       }
     >

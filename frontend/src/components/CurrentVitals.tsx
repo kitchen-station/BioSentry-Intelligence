@@ -14,6 +14,7 @@ function Row<T>({
   measurement,
   unit,
   format,
+  now,
   points,
   flip,
 }: RowProps<T> & { format?: (value: T) => string }): ReactElement {
@@ -26,12 +27,13 @@ function Row<T>({
           <MeasurementDisplay
             measurement={measurement}
             unit={unit}
+            now={now}
             format={format as (value: T) => string}
           />
         </Flip>
         {measurement.data.present && measurement.provenance.source === "nurse" && (
           <span className={styles.vitalLabel}>
-            {" "}{enteredByNurse(Date.parse(measurement.provenance.observed_at))}
+            {" "}{enteredByNurse(Date.parse(measurement.provenance.observed_at), now)}
           </span>
         )}
       </span>
@@ -50,23 +52,24 @@ export const VitalRow = Row as {
 };
 
 /** The CURRENT VITALS block of the patient detail page. */
-export function CurrentVitals({ vitals }: { vitals: Vitals }): ReactElement {
+export function CurrentVitals({ vitals, now }: { vitals: Vitals; now: number }): ReactElement {
   const p = news2Points(vitals);
   return (
     <>
-      <VitalRow label="Heart rate" measurement={vitals.heart_rate} unit="bpm" flip points={p.heart_rate} />
-      <VitalRow label="Respiratory rate" measurement={vitals.respiratory_rate} unit="/min" flip points={p.respiratory_rate} />
-      <VitalRow label="SpO2" measurement={vitals.spo2} unit="%" flip points={p.spo2} />
-      <VitalRow label="Temperature" measurement={vitals.temperature} unit={"°C"} flip points={p.temperature} />
+      <VitalRow now={now} label="Heart rate" measurement={vitals.heart_rate} unit="bpm" flip points={p.heart_rate} />
+      <VitalRow now={now} label="Respiratory rate" measurement={vitals.respiratory_rate} unit="/min" flip points={p.respiratory_rate} />
+      <VitalRow now={now} label="SpO2" measurement={vitals.spo2} unit="%" flip points={p.spo2} />
+      <VitalRow now={now} label="Temperature" measurement={vitals.temperature} unit={"°C"} flip points={p.temperature} />
       <VitalRow
+        now={now}
         label="Blood pressure"
         measurement={vitals.blood_pressure}
         format={formatBloodPressure}
         flip points={p.blood_pressure}
       />
-      <VitalRow label="Consciousness" measurement={vitals.consciousness} flip points={p.consciousness} />
-      <VitalRow label="Oxygen" measurement={vitals.supplemental_o2} format={formatOxygen} flip points={p.supplemental_o2} />
-      <VitalRow label="SpO2 scale" measurement={vitals.spo2_scale} format={formatSpo2Scale} />
+      <VitalRow now={now} label="Consciousness" measurement={vitals.consciousness} flip points={p.consciousness} />
+      <VitalRow now={now} label="Oxygen" measurement={vitals.supplemental_o2} format={formatOxygen} flip points={p.supplemental_o2} />
+      <VitalRow now={now} label="SpO2 scale" measurement={vitals.spo2_scale} format={formatSpo2Scale} />
     </>
   );
 }

@@ -123,6 +123,7 @@ export async function getWard(): Promise<WardResponse> {
     tier_status: TIERS,
     ranked: reRanked,
     abstained: filteredAbstained,
+    now: new Date().toISOString(), // the demo's ward time is the browser's clock
   };
 }
 
@@ -374,5 +375,6 @@ export async function getPatient(id: string): Promise<PatientDetail | null> {
     last_update_s: row.last_update_s === null ? null : row.last_update_s + elapsedS(),
     vital_history: detail.vital_history,
     tier_breakdown: bare(detail.tier_breakdown),
+    now: new Date().toISOString(),
   };
 }

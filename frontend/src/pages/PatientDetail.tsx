@@ -7,6 +7,7 @@ import { Flip } from "../components/Flip";
 import { SessionMenu } from "../components/SessionMenu";
 import { SimulatedNote } from "../components/LabFrame";
 import { StayPanel } from "../components/StayPanel";
+import { syncWardNow, useWardNow } from "../components/wardNow";
 import { AskPatient } from "../components/AskPatient";
 import { BaselinePanel, isComputed, isObj, num } from "../components/BaselinePanel";
 import { ResearchModels } from "../components/ResearchModels";
@@ -96,7 +97,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
   const baseline = useBaseline(id, saves);
   const [patient, setPatient] = useState<PatientDetailType | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const [now, setNow] = useState(() => new Date());
+  const now = useWardNow(); // ward time as served, advancing since the last good read
   const [notes, setNotes] = useState<ClinicalNote[]>([]);
   const [noteText, setNoteText] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -128,6 +129,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
         const first = shown.current !== id;
         if (p) {
           shown.current = id;
+          syncWardNow(p.now);
           setPatient(p);
           setLastGood(Date.now());
           setFailedSince(null);
@@ -188,11 +190,6 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
 
   const toggleDrawer = (d: Drawer) => setDrawer((prev) => prev === d ? null : d);
 
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
-
   if (notFound) {
     return (
       <Bare session={session} onSignOut={onSignOut}>
@@ -238,7 +235,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
               {signal === null ? "No patch signal" : `Signal ${signal}%`}
             </span>
             <span className={styles.stripUpdate}>
-              {now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              {new Date(now).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
             </span>
             <span className={styles.stripId}>{patient.id}</span>
             <SessionMenu session={session} onSignOut={onSignOut} />
@@ -461,7 +458,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
           <div className={styles.panel}>
             <p className={styles.panelEyebrow}>Current vitals</p>
             <div className={styles.vitalsGrid}>
-              <CurrentVitals vitals={patient.vitals} />
+              <CurrentVitals vitals={patient.vitals} now={now} />
             </div>
             {canRecordVitals && !readOnly && (
               <button type="button" className={styles.drawerBtn} aria-expanded={entering} onClick={() => setEntering((open) => !open)}>
@@ -489,7 +486,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
 
           {hasHistory && (
             <div className={styles.panel}>
-              <StayPanel key={patient.id} patientId={patient.id} onSignOut={onSignOut} />
+              <StayPanel key={patient.id} patientId={patient.id} onSignOut={onSignOut} now={now} />
             </div>
           )}
 
@@ -508,7 +505,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
             <div className={styles.vitalsGrid}>
               {LAB_ROWS.map(([key, label, unit]) => {
                 const m = patient.labs[key];
-                return m && <VitalRow key={key} label={label} measurement={m} unit={unit} />;
+                return m && <VitalRow key={key} now={now} label={label} measurement={m} unit={unit} />;
               })}
               {LAB_ROWS.every(([key]) => !patient.labs[key]) && (
                 <p className={styles.pending}>No lab result yet.</p>
