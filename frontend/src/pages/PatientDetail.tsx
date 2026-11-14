@@ -429,7 +429,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
 
           <div className={styles.panel}>
             <p className={styles.panelEyebrow}>Tier B &mdash; Mechanism findings</p>
-            <p className={styles.pending}>Other mechanism findings: not yet implemented</p>
+            <p className={styles.pending}>Findings beyond NEWS2 show here when they are computed.</p>
             <BaselinePanel baseline={baseline} />
             <ResearchModels models={patient.models} />
           </div>

@@ -29,6 +29,15 @@ describe("TrendChart", () => {
     expect(container.textContent).toContain("90 bpm");
   });
 
+  it("shows the latest value to one decimal, with the served value as its title", () => {
+    const { container } = render(
+      <TrendChart label="HR" unit="bpm" data={[{ time: t(0), value: 70 }, { time: t(15), value: 108.51226339288638 }]} />,
+    );
+    expect(container.textContent).toContain("108.5 bpm");
+    expect(container.textContent).not.toContain("108.51");
+    expect(container.querySelector('[title="108.51226339288638"]')!.textContent).toBe("108.5 bpm");
+  });
+
   it("draws no threshold without one, and shows -- when the latest bin is a gap", () => {
     const { container } = render(
       <TrendChart label="HR" unit="bpm" data={[{ time: t(0), value: 70 }, { time: t(15), value: null }]} />,

@@ -151,7 +151,7 @@ describe("PatientDetail", () => {
     for (const text of ["+44% vs baseline", "AF episodes over 6h window", /Tier C/, /risk_probability|23%/]) {
       expect(screen.queryByText(text), String(text)).toBeNull();
     }
-    expect(screen.getByText("Other mechanism findings: not yet implemented")).toBeTruthy();
+    expect(screen.getByText("Findings beyond NEWS2 show here when they are computed.")).toBeTruthy();
   });
 
   it("lists every recorded lab", async () => {
@@ -177,7 +177,7 @@ describe("PatientDetail", () => {
     await loaded();
     expect(screen.getByText("Sorted on NEWS2 only")).toBeTruthy();
     expect(screen.queryByText("Next step")).toBeNull(); // band low: no response block
-    expect(screen.getByText("Other mechanism findings: not yet implemented")).toBeTruthy(); // never an empty box
+    expect(screen.getByText("Findings beyond NEWS2 show here when they are computed.")).toBeTruthy(); // never an empty box
     expect(screen.getByText("Own-baseline findings need the live API.")).toBeTruthy();
     expect(screen.getByText("No lab values recorded")).toBeTruthy();
     expect(screen.getByText(/^-- -- · Bed/)).toBeTruthy();
@@ -195,7 +195,7 @@ describe("PatientDetail", () => {
     expect(api.getBaseline).toHaveBeenCalledWith("p-001");
     expect(within(region).getByText(/Heart rate/).closest("li")!.textContent).toContain("from own baseline");
     const tierB = region.parentElement!;
-    expect(within(tierB).getByText("Other mechanism findings: not yet implemented")).toBeTruthy();
+    expect(within(tierB).getByText("Findings beyond NEWS2 show here when they are computed.")).toBeTruthy();
     expect(tierB.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_CONTAINED_BY).toBeTruthy();
     expect(screen.queryByText("Own-baseline findings need the live API.")).toBeNull();
   });
@@ -204,7 +204,7 @@ describe("PatientDetail", () => {
     api.getBaseline.mockResolvedValue(baseline);
     page();
     expect(await screen.findByRole("region", { name: "Change from own baseline" })).toBeTruthy();
-    expect(screen.getByText("Other mechanism findings: not yet implemented")).toBeTruthy();
+    expect(screen.getByText("Findings beyond NEWS2 show here when they are computed.")).toBeTruthy();
   });
 
   it("says it is loading the baseline, and never shows another patient's", async () => {
@@ -226,7 +226,7 @@ describe("PatientDetail", () => {
     expect(await screen.findByText("Baseline could not be loaded.")).toBeTruthy();
     expect(screen.queryByRole("region", { name: "Change from own baseline" })).toBeNull();
     expect(screen.queryByRole("alert")).toBeNull(); // quiet, not an alarm
-    expect(screen.getByText("Other mechanism findings: not yet implemented")).toBeTruthy();
+    expect(screen.getByText("Findings beyond NEWS2 show here when they are computed.")).toBeTruthy();
   });
 
   it("shows not found for a patient that is missing or not yours", async () => {

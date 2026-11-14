@@ -21,7 +21,6 @@ interface Profile {
   role: string;
   department: Department;
   sessionRole: SessionRole;
-  patients: number;
   ward: string;
 }
 
@@ -34,7 +33,6 @@ const PROFILES: Profile[] = [
     role: "Staff Nurse",
     department: "nursing",
     sessionRole: "rn",
-    patients: 6,
     ward: "W4",
   },
   {
@@ -43,7 +41,6 @@ const PROFILES: Profile[] = [
     role: "Staff Nurse",
     department: "nursing",
     sessionRole: "rn",
-    patients: 6,
     ward: "W4",
   },
   {
@@ -52,7 +49,6 @@ const PROFILES: Profile[] = [
     role: "Charge Nurse",
     department: "nursing",
     sessionRole: "charge_rn",
-    patients: 12,
     ward: "W4",
   },
   {
@@ -61,7 +57,6 @@ const PROFILES: Profile[] = [
     role: "Attending Physician",
     department: "medical",
     sessionRole: "md",
-    patients: 5,
     ward: "W4",
   },
   {
@@ -70,7 +65,6 @@ const PROFILES: Profile[] = [
     role: "Attending Physician",
     department: "medical",
     sessionRole: "md",
-    patients: 5,
     ward: "W4",
   },
 ];
@@ -267,7 +261,6 @@ export function SignIn({ onSignIn }: Props) {
                     </div>
                   </div>
                   <div className={styles.profileMeta}>
-                    <span>{p.patients} patients</span>
                     <span>Ward {p.ward}</span>
                   </div>
                 </button>
@@ -283,8 +276,7 @@ export function SignIn({ onSignIn }: Props) {
               <div className={styles.selectedInfo}>
                 <span className={styles.selectedName}>{selected.label}</span>
                 <span className={styles.selectedDetail}>
-                  {selected.role} &middot; Ward {selected.ward} &middot;{" "}
-                  {selected.patients} patients
+                  {selected.role} &middot; Ward {selected.ward}
                 </span>
               </div>
             ) : (
