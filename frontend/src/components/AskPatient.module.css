@@ -1,4 +1,4 @@
-/* Ask about this patient: one question at a time, answered by code. Words carry every state. */
+/* The patient page's Ask panel: its heading and its link; the thread has its own styles. */
 
 .heading {
   font-family: var(--font-mono);
@@ -10,99 +10,8 @@
   margin-bottom: var(--sp-3);
 }
 
-.quiet {
+.link {
   font-family: var(--font-sans);
   font-size: 13px;
-  line-height: 1.5;
-  color: var(--label);
   margin-bottom: var(--sp-2);
-}
-
-.form {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--sp-2);
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 200px;
-  min-width: 0;
-  gap: var(--sp-1);
-  font-family: var(--font-sans);
-  font-size: 13px;
-  color: var(--ink);
-}
-
-.field input {
-  min-width: 0;
-  padding: var(--sp-1) var(--sp-2);
-  font: inherit;
-  color: var(--ink);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-
-.count {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--label);
-}
-
-.button {
-  padding: var(--sp-1) var(--sp-3);
-  font-family: var(--font-sans);
-  font-size: 13px;
-  color: var(--button-ink);
-  background: var(--button);
-  border: none;
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-
-.button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.error {
-  margin: var(--sp-2) 0 0;
-  font-family: var(--font-sans);
-  font-size: 13px;
-  color: var(--alert);
-}
-
-.list {
-  list-style: none;
-  margin: var(--sp-3) 0 0;
-  padding: 0;
-}
-
-.item {
-  padding: var(--sp-2) 0;
-  border-top: 1px solid var(--border);
-  font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--ink);
-  overflow-wrap: anywhere;
-}
-
-.meta {
-  font-size: 12px;
-  color: var(--label);
-}
-
-.answer {
-  margin: var(--sp-2) 0 0;
-  padding: var(--sp-2);
-  font-family: var(--font-sans);
-  font-size: 13px;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
 }

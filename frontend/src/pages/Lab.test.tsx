@@ -70,7 +70,14 @@ describe("lab index", () => {
     lab();
     api.hasLabQuestions = false;
     const first = screen.getAllByRole("listitem")[0];
-    expect(within(first).getByRole("link", { name: "Ask the research agent" }).getAttribute("href")).toBe("/lab/ask");
+    expect(within(first).getByRole("link", { name: "Ask the research agent" }).getAttribute("href")).toBe("/ask");
+  });
+
+  it("does not link the Ask page for an admin, who cannot open it", () => {
+    api.hasLabQuestions = true;
+    lab(admin);
+    api.hasLabQuestions = false;
+    expect(screen.queryByRole("link", { name: "Ask the research agent" })).toBeNull();
   });
 
   it("links the ward simulator, with its warning, when the one-address image serves it", () => {

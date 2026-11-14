@@ -15,7 +15,7 @@ import { App } from "./App";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const api = vi.hoisted(() => ({ restoreSession: vi.fn(() => true), clearSession: vi.fn(), hasLabQuestions: true }));
+const api = vi.hoisted(() => ({ restoreSession: vi.fn(() => true), clearSession: vi.fn() }));
 vi.mock("./api", () => api);
 
 // The pages are stand-ins: these tests are about the shell, not what each page shows.
@@ -68,8 +68,8 @@ vi.mock("./pages/PatientDetail", () => ({
 vi.mock("./pages/Lab", () => ({
   Lab: ({ session }: { session: Session }) => <p>lab page for {session.clinician_id}</p>,
 }));
-vi.mock("./pages/Ask", () => ({
-  Ask: ({ session }: { session: Session }) => <p>ask page for {session.clinician_id}</p>,
+vi.mock("./pages/AskChat", () => ({
+  AskChat: ({ session }: { session: Session }) => <p>ask page for {session.clinician_id}</p>,
 }));
 vi.mock("./pages/Research", () => ({
   Research: ({ session }: { session: Session }) => <p>research page for {session.clinician_id}</p>,
@@ -194,7 +194,8 @@ describe("route guards", () => {
   });
 
   const physician: Session = { clinician_id: "md-santos", ward: "W4", role: "md" };
-  const LAB = [["/lab", "lab page"], ["/lab/ask", "ask page"]] as const;
+  const LAB = [["/lab", "lab page"]] as const;
+  const ASK = ["/ask", "/ask/patient/p-001"] as const;
   const DEVELOPER = [["/lab/research", "research page"], ["/lab/pipeline", "pipeline page"], ["/research", "research page"], ["/pipeline", "pipeline page"]] as const;
 
   // The owner's rule: a clinician has no developer view. The address alone must not open one.
@@ -209,6 +210,27 @@ describe("route guards", () => {
       const { unmount } = at(path);
       expect(screen.getByText(`ward page for ${who.clinician_id}`)).toBeTruthy();
       expect(screen.queryByText(`${words} for ${who.clinician_id}`)).toBeNull();
+      unmount();
+    }
+  });
+
+  it.each([["md", physician], ["charge_rn", charge]] as const)("shows the Ask page to %s on both addresses, and /lab/ask leads there", (_, who) => {
+    store(who);
+    for (const path of ASK) {
+      const { unmount } = at(path);
+      expect(screen.getByText(`ask page for ${who.clinician_id}`)).toBeTruthy();
+      unmount();
+    }
+    at("/lab/ask");
+    expect(screen.getByText(`ask page for ${who.clinician_id}`)).toBeTruthy();
+  });
+
+  it.each([["rn", nurse], ["admin", admin]] as const)("sends %s from the Ask page, a thread and /lab/ask to the ward", (_, who) => {
+    store(who);
+    for (const path of [...ASK, "/lab/ask"]) {
+      const { unmount } = at(path);
+      expect(screen.getByText(`ward page for ${who.clinician_id}`)).toBeTruthy();
+      expect(screen.queryByText(`ask page for ${who.clinician_id}`)).toBeNull();
       unmount();
     }
   });
@@ -232,17 +254,9 @@ describe("route guards", () => {
     }
   });
 
-  it("sends a signed-out visitor of the Ask page to sign-in", () => {
-    at("/lab/ask");
-    expect(screen.getByText("sign-in page from /lab/ask")).toBeTruthy();
-  });
-
-  it("has no Ask route in the fixture build", () => {
-    api.hasLabQuestions = false;
-    store(physician);
-    at("/lab/ask");
-    api.hasLabQuestions = true;
-    expect(screen.queryByText("ask page for md-santos")).toBeNull();
+  it.each(["/ask", "/ask/patient/p-001", "/lab/ask"])("sends a signed-out visitor of %s to sign-in", (path) => {
+    at(path);
+    expect(screen.getByText(`sign-in page from ${path}`)).toBeTruthy();
   });
 
   it("sends a signed-out visitor of the lab to sign-in, remembering where", () => {

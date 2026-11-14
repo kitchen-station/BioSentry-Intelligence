@@ -14,7 +14,7 @@ export function Lab({ session, onSignOut }: { session: Session; onSignOut: () =>
       <main className={research.main}>
         <h1 className={research.title}>Simulation lab</h1>
         <ul>
-          {hasLabQuestions && <li><Link to="/lab/ask">Ask the research agent</Link></li>}
+          {hasLabQuestions && session.role !== "admin" && <li><Link to="/ask">Ask the research agent</Link></li>}
           {session.role === "admin" && (
             <>
               <li><Link to="/lab/research">Research numbers</Link></li>

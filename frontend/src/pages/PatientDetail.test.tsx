@@ -955,6 +955,19 @@ describe("PatientDetail: ask about this patient", () => {
     expect(api.getPatientQuestions).toHaveBeenCalledWith("p-001");
   });
 
+  it("shows the shared thread, with a link to Ask for a physician and none for a staff nurse", async () => {
+    page("md");
+    await loaded();
+    expect(await screen.findByText("Research agent")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Open in Ask" }).getAttribute("href")).toBe("/ask/patient/p-001");
+    cleanup();
+    page("rn");
+    await loaded();
+    expect(await screen.findByText("Research agent")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Open in Ask" })).toBeNull();
+  });
+
   it("is absent, with no call, for an admin and in the demo build", async () => {
     page("admin");
     await loaded();
@@ -976,7 +989,7 @@ describe("PatientDetail: ask about this patient", () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       page("rn");
       await loaded();
-      await user.click(await screen.findByRole("button", { name: "Show answer" }));
+      expect(await screen.findByText("the answer")).toBeTruthy(); // the newest answer loads by itself
       await user.type(screen.getByLabelText(/Your question/), "typed");
       expect(api.getPatient).toHaveBeenCalledTimes(1);
       await act(async () => {

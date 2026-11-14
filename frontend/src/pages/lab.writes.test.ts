@@ -1,6 +1,6 @@
 // The lab may read the ward and may not write to the live ward. It has two writes, and neither reaches the live ward: a simulated-run
 // request to /wards/W4/lab/runs and a question for the research agent to /wards/W4/lab/questions. This reads the source and follows imports from
-// every lab page, so it covers every code path, not only the ones a render reaches.
+// every lab page and from the Ask page (which sits in the ward's frame, not the lab's), so it covers every code path, not only the ones a render reaches.
 import { describe, expect, it } from "vitest";
 
 const all = import.meta.glob("../**/*.{ts,tsx}", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
@@ -46,6 +46,7 @@ const apiStatements = (src: string) =>
 
 const roots = [
   ...Object.keys(sources).filter((p) => p.startsWith("./") && sources[p].includes("<LabFrame")),
+  "./AskChat.tsx", // the question calls: through Thread and useQuestions
   "../components/LabFrame.tsx",
 ];
 
@@ -55,7 +56,7 @@ describe("lab modules", () => {
     expect(roots).toContain("./Pipeline.tsx");
   });
 
-  it("reach the api only through getWard in Pipeline, the lab-run calls in LabRuns, and the lab-question calls in Ask", () => {
+  it("reach the api only through getWard in Pipeline, the lab-run calls in LabRuns, and the question calls in the Ask thread", () => {
     const users = Object.fromEntries(
       reached(roots).map((p) => [p, apiStatements(sources[p])] as const).filter(([, s]) => s.length > 0),
     );
@@ -65,8 +66,11 @@ describe("lab modules", () => {
       "./LabRuns.tsx": ['import { ApiError, getLabRun, getLabRuns, hasLabRuns, requestLabRun } from "../api"'],
       // Plain constants (blood-pressure bounds), no request. The guard reaches it now that it follows imports out of pages/.
       "../data/fixtures.ts": ['import { DIASTOLIC_BOUNDS, SYSTOLIC_BOUNDS } from "../api/bounds"'],
-      "./Ask.tsx": ['import { askLab, getLabQuestion, getLabQuestions, hasLabQuestions } from "../api"'],
       "./Lab.tsx": ['import { hasLabQuestions } from "../api"'],
+      "./AskChat.tsx": ['import { ApiError, getWard, hasLabQuestions, hasPatientQuestions } from "../api"'],
+      "../components/Thread.tsx": [
+        'import { askLab, askPatient, getLabQuestion, getLabQuestions, getPatientQuestion, getPatientQuestions } from "../api"',
+      ],
       "../components/useQuestions.ts": ['import { ApiError } from "../api"'],
     });
   });
