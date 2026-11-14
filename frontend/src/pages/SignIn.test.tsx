@@ -58,7 +58,10 @@ describe("SignIn", () => {
     await click(/Nurse/);
     expect(screen.getByText("Select nurse")).toBeTruthy();
     expect(screen.queryByText("Dr. Santos")).toBeNull(); // physicians are filtered out
+    // The page cannot know a clinician's patients before sign-in, so it states no count.
+    expect(screen.queryByText(/\d+\s+patients/)).toBeNull();
     await click(/Nurse Reyes/);
+    expect(screen.queryByText(/\d+\s+patients/)).toBeNull();
     const passphrase = screen.getByLabelText("Passphrase") as HTMLInputElement;
     await userEvent.clear(passphrase);
     await userEvent.type(passphrase, "hunter2");
