@@ -284,7 +284,7 @@ def test_a_key_the_worker_does_not_know_changes_the_hash_and_nothing_else(q):
     # The API will add keys to `patient` (a baseline band, provenance fields). The worker ignores them and hashes what it got.
     p = json.loads(json.dumps(SAMPLE["patient"]))
     for e in p["baseline"]["vitals"]:
-        e["band_low"], e["band_high"] = 99.9, 111.1
+        e["a_future_key"] = 99.9  # (band_low and band_high are read now: they are no longer unknown)
     for v in p["detail"]["vitals"].values():
         v["provenance"].update(variant=None, file_sha256=None, run_id=None)
     p["new_top"], p["detail"]["new_key"], p["baseline"]["new_key"] = "x", {"a": [1, 2]}, 5
