@@ -89,3 +89,8 @@ def binds(cal: Calibration, *, variant: str, onnx_sha256: str, t: float | None) 
     """Section 6.3: the file belongs to this student's variant, ONNX sha256 and threshold, with no tolerance.
     A student with no threshold (None) is bound to nothing."""
     return cal.variant == variant and cal.onnx_sha256 == onnx_sha256 and t is not None and cal.t == t
+
+
+def check_calibrated(cal: Calibration, p: float) -> Check:
+    """The check of section 6.1 with the t and q of a loaded calibration, never numbers from a caller."""
+    return check(p, cal.t, cal.q)
