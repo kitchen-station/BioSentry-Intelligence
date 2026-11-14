@@ -72,7 +72,7 @@
   "The commit is the main commit this file was exported on. The stage list changed in the same pull request."
  ],
  "provenance": {
-  "commit": "ffdfea1ac5da13e3b451d38020cf90b81f5fa728",
+  "commit": "6710d564c26776c5acec62e4a8b98edc23efb1d8",
   "data": "stage names, states and what goes in and out",
   "date": "2026-11-14",
   "exporter": {
@@ -82,7 +82,7 @@
   "repo": "kitchen-station/BioSentry-Intelligence",
   "seeds": [],
   "source": [
-   "npm run export:pipeline -- --date 2026-11-14 --commit ffdfea1ac5da13e3b451d38020cf90b81f5fa728 --note \"The commit is the main commit this file was exported on. The stage list changed in the same pull request.\""
+   "npm run export:pipeline -- --date 2026-11-14 --commit 6710d564c26776c5acec62e4a8b98edc23efb1d8 --note \"The commit is the main commit this file was exported on. The stage list changed in the same pull request.\""
   ],
   "synthetic": true,
   "validated": false
