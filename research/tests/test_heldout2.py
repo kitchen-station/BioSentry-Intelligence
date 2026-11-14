@@ -201,10 +201,13 @@ def make_file(per_rule: dict, n=5, seeds=None, held_out_set=2):
                        for i, s in enumerate(seeds)]}
 
 
+ALL_IDS = [i for _, i in heldout2.PRIMARY + heldout2.SECONDARY_OR + heldout2.ALONE]
+
+
 def three(x_any, n_any=500, x_alerts=150, n_alerts=100, chance=100, episodes=1000):
     base = counts(episodes, n_any, chance, 1000, n_alerts)
     x = counts(episodes, x_any, chance, 1000, x_alerts)
-    return {"news2_chart_trigger": base, "news2_or_student": x, "news2_or_student_checked": x, "news2_or_reward_final": x}
+    return {"news2_chart_trigger": base, **dict.fromkeys(ALL_IDS, x)}
 
 
 def test_hand_computed_gain_and_alert_ratio():
@@ -255,25 +258,50 @@ def test_the_bootstrap_resamples_trials_with_the_documented_generator():
     assert (heldout2.SEED, heldout2.RESAMPLES) == (20261114, 2000)
 
 
+def test_the_comparison_uses_the_rules_own_chance():
+    # powers of two keep the arithmetic exact: NEWS2 512/1024 with chance 128/1024; X 640/1024 with chance 256/1024
+    f = {**three(600), "news2_chart_trigger": counts(1024, 512, 128, 1024),
+         "news2_or_student": counts(1024, 640, 256, 1024)}
+    p = heldout2.analyse([make_file(f)])[0]["primary"][0]
+    assert p["gain"]["estimate"] == 0.0 and p["verdict"] == NONE
+
+
+def test_the_bootstrap_is_paired_across_rules():
+    per = [counts(episodes=10 * (i + 3), any_bin=i + 1, chance_any=i % 3, control=7 * (i + 2), alerts=5 + 3 * i)
+           for i in range(6)]
+    f = make_file(dict.fromkeys(["news2_chart_trigger", *ALL_IDS], per))
+    obj, _ = heldout2.analyse([f], resamples=200)
+    g = obj["primary"][0]["gain"]
+    assert tuple(g["ci_95"]) == (0.0, 0.0) and tuple(g["ci_98.33"]) == (0.0, 0.0)
+
+
+def test_the_primary_verdict_comes_from_the_98_33_interval_through_analyse():
+    # 30 trials, 9 with a loss of 1 and 21 with a gain of 1: the 95% lower end is above 0, the 98.33% one is 0
+    n = 30
+    per_x = [counts(100, 49 if i < 9 else 51, 10, 100) for i in range(n)]
+    f = make_file({**dict.fromkeys(ALL_IDS, per_x), "news2_chart_trigger": counts(100, 50, 10, 100)}, n=n)
+    p = heldout2.analyse([f])[0]["primary"][0]
+    g = p["gain"]
+    assert heldout2.verdict(g["ci_95"]) == GAIN and heldout2.verdict(g["ci_98.33"]) == NONE
+    assert p["verdict"] == NONE == heldout2.verdict(g["ci_98.33"]) != heldout2.verdict(g["ci_95"])
+
+
 def test_trials_are_the_unit_and_ratios_are_recomputed_from_sums():
     per = [counts(episodes=10 * (i + 1), any_bin=i + 1, chance_any=0, control=10) for i in range(5)]
-    f = make_file({"news2_chart_trigger": per, "news2_or_student": per, "news2_or_student_checked": per,
-                   "news2_or_reward_final": per})
+    f = make_file(dict.fromkeys(["news2_chart_trigger", *ALL_IDS], per))
     obj, _ = heldout2.analyse([f], resamples=50)
     assert obj["primary"][0]["gain"]["estimate"] == 0.0 and obj["primary"][0]["verdict"] == NONE
     # a different count in one trial changes the estimate by the pooled ratio, not by a mean of trial ratios
     x = [dict(c) for c in per]
     x[0]["any_bin_not_cut_short"] += 5
-    f = make_file({"news2_chart_trigger": per, "news2_or_student": x, "news2_or_student_checked": x,
-                   "news2_or_reward_final": x})
+    f = make_file({**dict.fromkeys(ALL_IDS, x), "news2_chart_trigger": per})
     obj, _ = heldout2.analyse([f], resamples=50)
     assert obj["primary"][0]["gain"]["estimate"] == pytest.approx(5 / 150)
 
 
 def test_deterministic_bytes_and_files(tmp_path, capsys):
     paths = []
-    for name, rules in (("a", three(600)), ("b", {"news2_chart_trigger": three(600)["news2_chart_trigger"],
-                                                  "student": counts(alerts=120, any_bin=55)})):
+    for name, rules in (("a", three(600)), ("b", {"news2_chart_trigger": three(600)["news2_chart_trigger"]})):
         p = tmp_path / f"{name}.json"
         p.write_text(json.dumps(make_file(rules)))
         paths.append(str(p))
@@ -295,8 +323,8 @@ def test_refusals(tmp_path, capsys):
     for bad, text in ((make_file(three(600), held_out_set=1), "not from held-out set 2"),
                       ({**good, "trials": []}, "no per-trial counts"),
                       (make_file(three(600), seeds=[1001, 1002, 1003, 1004, 1006]), "disagree"),
-                      (make_file({"news2_chart_trigger": counts()}), "needed for the primary comparisons are missing: "
-                       "news2_or_student, news2_or_student_checked, news2_or_reward_final")):
+                      (make_file({"news2_chart_trigger": counts()}), "comparisons are missing: news2_or_student, news2_or_student_checked, "
+                       "news2_or_reward_final, news2_or_student_no_temp")):
         with pytest.raises(TrialError, match=text):
             heldout2.analyse([good, bad] if "disagree" in text else [bad])
     other = make_file({"news2_chart_trigger": counts(any_bin=51)})
@@ -318,8 +346,7 @@ def test_the_analysis_runs_on_the_json_the_evaluation_writes(tmp_path):
     result: dict = {}
     run(folders, result=result, held_out_set=2)
     obj = json.loads(json.dumps(result))
-    alias = {"news2_or_student": "news2_total_ge_5", "news2_or_student_checked": "news2_total_ge_5",
-             "news2_or_reward_final": "news2_total_ge_5"}
+    alias = dict.fromkeys(ALL_IDS, "news2_total_ge_5")
     obj["rules"] += [{**next(r for r in obj["rules"] if r["id"] == src), "id": new} for new, src in alias.items()]
     for t in obj["trials"]:
         for new, src in alias.items():

@@ -770,7 +770,7 @@ gains we measured from zero.
   for three comparisons) is above 0; "a loss is shown" if its upper end is below 0; otherwise "no gain beyond
   chance is shown". The 95% interval and the ratio of alerts per patient per 12 h to NEWS2's, with its
   interval, are printed beside every verdict. The secondary table (the same three without temperature; each
-  X alone; median lead; per-kind any-bin counts) has intervals and no verdict word. The confidence check keeps
+  X alone; median lead; per-kind any-bin counts) has intervals and no verdict word (median lead: pooled, no interval). The confidence check keeps
   its set-1 quantity and its MET / NOT MET rule.
 - What is not done: no threshold, q, policy or model changes after the read; set 2 does not choose between the
   with- and no-temperature files. A gain shown is a statement about this simulator only: synthetic, not

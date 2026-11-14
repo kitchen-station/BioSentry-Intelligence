@@ -636,3 +636,36 @@ def test_the_command_passes_the_set_and_checks_it(tmp_path, monkeypatch, capsys)
     assert seen[-1] == {"json_path": "j.json", "held_out_set": 2} and "heldout_2.txt sha256" in capsys.readouterr().out
     assert c.main(["evaluate", "x"]) == 0 and seen[-1] == {"json_path": None} and "heldout.txt sha256" in capsys.readouterr().out
     assert c.main(["evaluate", "x", "--held-out-set", "3"]) == 2 and len(seen) == 2
+
+
+def test_the_two_set_2_commands_agree_on_every_shared_rule(tmp_path, patched, model, cohort, monkeypatch):
+    from research import evaluate_student, heldout2
+    cohort.update({s: trial(s) for s in SET2})
+    _calibrate(tmp_path, model)
+    out = tmp_path / "out" / "model"
+    root = tmp_path / "h2"
+    root.mkdir()
+    f2 = folders(root, SET2)
+    conf_json = tmp_path / "conf.json"
+    c.evaluate(f2, model, out, cal_seeds=SEEDS, json_path=str(conf_json), held_out_set=2)
+    # evaluate_student needs a trained MindSpore model to refit; here its student rows come from the same ONNX
+    sess = student.session((model / "model.onnx").read_bytes())
+    t = json.loads((model / "metadata.json").read_text())["variants"]["all"]["thresholds"]["student"]["threshold"]
+    meta = json.loads((model / "metadata.json").read_text()) | {"byte_reproducible": True, "framework_version": "x"}
+    mdir = tmp_path / "m"
+    shutil.copytree(model, mdir)
+    ms_dir = mdir
+    from research.student import Scorer, onnx_predict
+    scorer = Scorer(lambda x: onnx_predict(sess, x), True, "base")
+    monkeypatch.setattr(evaluate_student, "student_policies", lambda train, val, m, o, scorers=None: (
+        (prob_policy("student", scorer, t), prob_policy("news2_or_student", scorer, t, True)), []))
+    monkeypatch.setattr(evaluate_student, "_json", lambda o, name: meta)
+    monkeypatch.setattr(evaluate_student, "_check_files", lambda o: None)
+    stu_json = tmp_path / "stu.json"
+    evaluate_student.run(f2, out=ms_dir, result=(res := {}), held_out_set=2)
+    evaluate.write_json(str(stu_json), res)
+    files = [json.loads(p.read_text()) for p in (stu_json, conf_json)]
+    shared = {r["id"] for r in files[0]["rules"]} & {r["id"] for r in files[1]["rules"]}
+    assert {"news2_chart_trigger", "student", "news2_or_student"} <= shared
+    seeds, cols, _ = heldout2.join(files)  # refuses when a shared rule has different per-trial counts
+    assert seeds == SET2 and shared <= set(cols)

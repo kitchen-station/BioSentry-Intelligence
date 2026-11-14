@@ -228,13 +228,13 @@ def analyse(files: list[dict], resamples: int = RESAMPLES, seed: int = SEED) -> 
     """(the JSON object, the text report)."""
     seeds, cols, pooled = join(files)
     n = len(seeds)
-    need = [NEWS2] + [x for _, x in PRIMARY]
+    need = [NEWS2] + [x for _, x in PRIMARY + SECONDARY_OR + ALONE]
     missing = [r for r in need if r not in cols]
     if missing:
-        raise TrialError("rules needed for the primary comparisons are missing: " + ", ".join(missing))
+        raise TrialError("rules needed for the comparisons are missing: " + ", ".join(missing))
     comparisons = [(label, x, False) for label, x in PRIMARY]
-    comparisons += [(label, x, False) for label, x in SECONDARY_OR if x in cols]
-    comparisons += [(label, x, True) for label, x in ALONE if x in cols]
+    comparisons += [(label, x, False) for label, x in SECONDARY_OR]
+    comparisons += [(label, x, True) for label, x in ALONE]
     stats, used = {}, {NEWS2}
     for label, x, alone in comparisons:
         used.add(x)
@@ -257,8 +257,8 @@ def analyse(files: list[dict], resamples: int = RESAMPLES, seed: int = SEED) -> 
         return d
 
     primary = [{**comp(label, x, False), "verdict": verdict(res[f"{x}/gain"]["98.33"])} for label, x in PRIMARY]
-    secondary_or = [comp(label, x, False) for label, x in SECONDARY_OR if x in cols]
-    secondary_alone = [comp(label, x, True) for label, x in ALONE if x in cols]
+    secondary_or = [comp(label, x, False) for label, x in SECONDARY_OR]
+    secondary_alone = [comp(label, x, True) for label, x in ALONE]
     sums_kinds = {r: {k: {part: sum(cols[r]["kinds"][k][part]) for part in ("evaluated", "any_bin")} for k in KINDS}
                   for r in sorted(used | {x for _, x in PRIMARY})}
     leads = {r: pooled[r].get("lead") for r in sorted(used) if r in pooled}
@@ -309,7 +309,8 @@ def analyse(files: list[dict], resamples: int = RESAMPLES, seed: int = SEED) -> 
             parts.append(f"{label} {_v(r['estimate'], places, name != 'alert_ratio')}, 95% interval "
                          f"{_ci(r, 'ci_95', places, name != 'alert_ratio')}")
         lines += [f"{d['label']} alone against NEWS2: {d['id']}", *[f"   {p}" for p in parts]]
-    lines += ["", "pooled any-bin rate (episodes not cut short), chance any-bin, alerts per patient per 12 h, median lead"]
+    lines += ["", "pooled any-bin rate (episodes not cut short), chance any-bin, alerts per patient per 12 h, median lead "
+              "(median lead: pooled, no interval)"]
     for r in sorted(used):
         p, lead = obj["pooled"][r], (leads.get(r) or {})
         lines.append(f"   {r}: {_v(p['any_bin_not_cut_short'])}, {_v(p['chance_any'])}, "
