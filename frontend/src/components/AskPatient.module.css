@@ -1,4 +1,4 @@
-/* The patient page's Ask panel: its heading and its link; the thread has its own styles. */
+/* The patient page's Ask panel: its heading and the button that opens the chat. */
 
 .heading {
   font-family: var(--font-mono);
@@ -10,8 +10,14 @@
   margin-bottom: var(--sp-3);
 }
 
-.link {
+.open {
+  min-height: 44px;
+  padding: 0 var(--sp-3);
   font-family: var(--font-sans);
   font-size: 13px;
-  margin-bottom: var(--sp-2);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
 }

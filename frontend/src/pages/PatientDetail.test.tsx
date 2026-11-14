@@ -981,28 +981,21 @@ describe("PatientDetail: ask about this patient", () => {
     api.hasPatientQuestions = false;
   });
 
-  it("sits after Current vitals and before Labs", async () => {
-    page("rn");
-    await loaded();
-    const heading = await screen.findByRole("heading", { level: 2, name: "Ask about this patient" });
-    const vitals = screen.getByText("Current vitals");
-    const labs = screen.getByText(/^Labs/);
-    expect(vitals.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(heading.compareDocumentPosition(labs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(api.getPatientQuestions).toHaveBeenCalledWith("p-001");
-  });
-
-  it("shows the shared thread, with a link to Ask for a physician and none for a staff nurse", async () => {
-    page("md");
-    await loaded();
-    expect(await screen.findByText("Research agent")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Open in Ask" }).getAttribute("href")).toBe("/ask/patient/p-001");
-    cleanup();
-    page("rn");
-    await loaded();
-    expect(await screen.findByText("Research agent")).toBeTruthy();
-    expect(screen.queryByRole("link", { name: "Open in Ask" })).toBeNull();
+  it("sits after Current vitals and before Labs, as a button that opens the chat panel, and reads no thread itself", async () => {
+    for (const role of ["rn", "md"] as const) {
+      page(role);
+      await loaded();
+      const heading = await screen.findByRole("heading", { level: 2, name: "Ask about this patient" });
+      const vitals = screen.getByText("Current vitals");
+      const labs = screen.getByText(/^Labs/);
+      expect(vitals.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(heading.compareDocumentPosition(labs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Open the chat" })).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+      cleanup();
+    }
+    // One copy of the thread: the page never reads the questions, the panel does.
+    expect(api.getPatientQuestions).not.toHaveBeenCalled();
   });
 
   it("is absent, with no call, for an admin and in the demo build", async () => {
@@ -1018,30 +1011,6 @@ describe("PatientDetail: ask about this patient", () => {
     expect(api.getPatientQuestion).not.toHaveBeenCalled();
   });
 
-  it("is not remounted by the page's own refresh: the typed text and the open answer stay", async () => {
-    api.usesServer = true;
-    api.getLiveWard.mockResolvedValue(null);
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    try {
-      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      page("rn");
-      await loaded();
-      expect(await screen.findByText("the answer")).toBeTruthy(); // the newest answer loads by itself
-      await user.type(screen.getByLabelText(/Your question/), "typed");
-      expect(api.getPatient).toHaveBeenCalledTimes(1);
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(5_100);
-      });
-      expect(api.getPatient.mock.calls.length).toBeGreaterThan(1);
-      expect((screen.getByLabelText(/Your question/) as HTMLInputElement).value).toBe("typed");
-      expect(screen.getByText("the answer")).toBeTruthy();
-      expect(api.getPatientQuestion).toHaveBeenCalledTimes(1);
-      expect(api.getPatientQuestions).toHaveBeenCalledTimes(1);
-    } finally {
-      vi.useRealTimers();
-      api.usesServer = false;
-    }
-  });
 });
 
 describe("PatientDetail: stay panel", () => {
