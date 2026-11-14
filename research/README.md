@@ -1092,14 +1092,16 @@ handled-id set and key rules. It claims `POST {base}/sim/lab/claim?kind=patient_
 response of up to 524288 bytes. It reads `BIOSENTRY_API_URL`, `BIOSENTRY_INGEST_KEY` and, optionally,
 `BIOSENTRY_AGENT_COMMIT`. It needs no trials folder and no agent home.
 
-Nothing in this repository starts this worker, and the API routes it calls are not on `main` yet. Do not
-start it until the API serves `?kind=patient_question` on the claim. It stops after a job of another kind.
+Nothing in this repository starts this worker. The API routes it calls are on `main` since 2026-11-14; the worker
+has not run against them. It stops after a job of another kind.
 
 The data lives in memory for one job. The worker writes no file. A log line holds a job id and a state only. The
 `done` record holds the kind, the arguments, the numbers and `data_sha256`, the hash of the patient object as
 received (the contract's canonical JSON, NaN refused). It holds no copy of the data. A refusal and a failure carry one fixed reason, and never an exception text.
 
-One claim body from the dashboard session's API (its branch, not on `main`; the seeded patient p-001) is a test
+One claim body from the dashboard session's API (made on its branch, before the merge; the seeded patient p-001) is a test
 file: `tests/data/patient_question_job.json`. A test checks that the worker's hash of it is the hash that API
 stored when the question was asked, and that the job ends `done`. That is one sample, read from a file. The
 worker has still never talked to a running API.
+The sample was made before the API began to serve a baseline's times as the start of the 15 minutes, and before
+`band_low` and `band_high`. It stays as a check of the hash rule only; its baseline times are the old ones.

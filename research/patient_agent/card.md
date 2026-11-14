@@ -16,7 +16,9 @@ data unusable: the job ends `failed` and no answer goes out. The agent never gue
 - `own_baseline`: "What is this patient's baseline for heart rate?" A ranked patient whose data holds a null
   baseline gets one fixed sentence: the data holds no baseline at this time.
 - `recent_change`: "What changed in the last 6 hours?" or "What changed in SpO2 in the last 3 hours?" (first, latest,
-  lowest and highest value with times; no computed number). A vital in the question limits the answer to that vital.
+  lowest and highest value with times; no computed number). Each value is a 15-minute median, and its time is the
+  end of its 15 minutes. The baseline answer gives the latest value with the start of its 15 minutes, as the API
+  stores it, so the same value has a time 15 minutes earlier there. Each answer says which it is. A vital in the question limits the answer to that vital.
   Temperature gets a fixed sentence: the history holds no temperature. `own_baseline` for temperature gives the
   data's own sentence when the baseline has no history for it. A vital that is not one of the four is refused. The hours number comes from the question
   (1 to 72); with no number it is 6. It never comes from the data.

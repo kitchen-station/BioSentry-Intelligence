@@ -111,7 +111,7 @@ def test_baseline_computed_forming_unavailable_and_missing():
         "Heart rate: the baseline is 72.5, with this unit:\n"
         '  "bpm"\n'
         "It is the median of the first 24 valid 15-minute values. The window starts at admission.\n"
-        "The latest stored value is 120 at 13 Nov 2026 08:15 UTC. The difference from the baseline is 47.5. The z value is 4.2.\n"
+        "The latest stored value is 120. It is the median of the 15-minute set that starts at 13 Nov 2026 08:15 UTC. The difference from the baseline is 47.5. The z value is 4.2.\n"
         "The change is significant. The direction is rising. The run started at 13 Nov 2026 07:30 UTC.\n"
     ) + tail("this patient's own baseline")
     assert out["numbers"] == ["72.5", "24", "120", "13", "2026", "08", "15", "47.5", "4.2", "13", "2026", "07", "30"]
@@ -624,3 +624,9 @@ def test_the_number_check_refuses_a_quoted_number_that_the_stored_string_lacks(m
 ])
 def test_the_last_round_of_forbidden_wordings_is_refused(question, why):
     assert ask.match(question) == (None, why)
+
+
+def test_each_answer_says_which_end_of_the_15_minutes_its_time_is():
+    # The API serves a history point at the END of its 15 minutes and a baseline's latest value at the START.
+    assert "Each value is the median of a 15-minute set, and its time is the end of that set." in run("what changed in the last 2 hours")["text"]
+    assert "It is the median of the 15-minute set that starts at 13 Nov 2026 08:15 UTC." in run("own baseline heart rate")["text"]
