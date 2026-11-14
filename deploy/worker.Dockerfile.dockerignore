@@ -1,0 +1,20 @@
+# What the worker image's build may read (the context is the repository root): the backend's
+# package and the research code. No test, no evaluation question, no run record, no notebook, no
+# weights. Two data files stay because the code reads them: research/agent_tuning/weights.json
+# (the sha256 list) and requirements.txt (the worker-tuned build).
+*
+!backend/pyproject.toml
+!backend/uv.lock
+!backend/src
+!research/*.py
+!research/agent
+!research/patient_agent
+!research/agent_tuning
+research/patient_agent/eval_questions.json
+research/agent/eval_questions.json
+research/agent/records
+research/agent_tuning/heldout_frames.json
+**/*.md
+**/__pycache__
+**/*.pyc
+**/*.egg-info
