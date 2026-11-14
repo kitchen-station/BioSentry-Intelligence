@@ -62,6 +62,8 @@ call it anyway). "Public mode" is the one supported way to let them use this API
   around `ufw`'s rules, so the safety here is that two ports are bound to loopback and the third is not
   published at all. Do not edit `compose.yaml` to publish any of them, and open nothing but SSH in the
   provider's firewall (Tailscale needs no inbound port).
+- `BIOSENTRY_OPEN_WARD_VIEW=true` lets anyone who can open the address watch the ward simulator without signing in (bed colours, staff figures, no names); control still needs a sign-in. It is off unless set, it serves only a run marked synthetic, and the API logs a warning at start when it is on. Public mode (`compose.public.yaml`) forces it off.
+- Never turn it on where the address is public (`tailscale funnel`, a public IP or a tunnel): every person who can reach the page sees the ward.
 - A clinician still signs in with their own passphrase, on both pages. The API answers each one only for
   their own patients and writes an audit row for every view. Tailscale decides who can reach the address;
   the passphrase decides whose patients they see.

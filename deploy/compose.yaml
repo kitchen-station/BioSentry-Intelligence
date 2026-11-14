@@ -47,6 +47,10 @@ services:
       BIOSENTRY_CORS_ORIGINS: ${BIOSENTRY_CORS_ORIGINS:-}
       # Days of sim time a run keeps its bins and superseded observations; empty keeps the default, 7.
       BIOSENTRY_RETENTION_DAYS: ${BIOSENTRY_RETENTION_DAYS:-}
+      # `true` lets anyone who can open the address watch the ward simulator without signing in (bed
+      # colours, staff figures, no names). Empty or `false` is off, and the route then does not exist.
+      # Never `true` on a public address: compose.public.yaml forces it off and setup.sh refuses both.
+      BIOSENTRY_OPEN_WARD_VIEW: ${BIOSENTRY_OPEN_WARD_VIEW:-}
     ports:
       # Loopback only. API_PORT moves the host side when 8000 is taken (a second stack on one machine).
       - "127.0.0.1:${API_PORT:-8000}:8000"

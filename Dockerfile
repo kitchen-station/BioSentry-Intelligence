@@ -24,6 +24,9 @@ RUN uv sync --locked --no-dev --no-install-project
 # The package is installed in place (editable): its code finds the dataset at /app/frontend/....
 COPY backend/src ./src
 COPY frontend/src/data/synthetic.json /app/frontend/src/data/synthetic.json
+# The research models' files, read once at start (BIOSENTRY_MODELS_DIR defaults to /app/models). Without
+# them the API still starts and ranks by NEWS2; each model shows as "not computed".
+COPY models /app/models
 RUN uv sync --locked --no-dev
 
 # --- run
