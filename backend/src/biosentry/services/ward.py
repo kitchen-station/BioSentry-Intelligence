@@ -72,8 +72,6 @@ def score_row(
         labs=state.labs,
         sort_tier=Tier.A,
         tier_status=tiers,
-        tier_b=state.tier_b,
-        tier_c=state.tier_c,
         escalation_reasons=decision.escalation_reasons(),
         synthetic=state.synthetic,
         signal_quality=state.signal_quality,
@@ -176,8 +174,6 @@ class WardService:
         state = states[patient_id]
         breakdown = TierBreakdown(
             tier_a=TierAScore(score=row.score, label=f"NEWS2 = {row.score}"),
-            tier_b=state.tier_b,
-            tier_c=state.tier_c,
         )
         return PatientDetail(
             **row.model_dump(), vital_history=state.vital_history, tier_breakdown=breakdown

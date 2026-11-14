@@ -1,4 +1,4 @@
-"""Tier status, Tier B findings, Tier C output and input, and escalation reasons.
+"""Tier status, finding directions, Tier C input and escalation reasons.
 
 I3 tier separation: Tier C input (TierCInput) is built only from raw and derived features.
 It has no field that can carry a Tier A score, a Tier B finding or an arbiter reason.
@@ -8,9 +8,9 @@ from enum import StrEnum
 
 from pydantic import AwareDatetime
 
-from .base import Contract, Flag, Fraction, NonNegInt, NonNegNum, Num
+from .base import Contract, Flag, NonNegInt
 from .clinical import LabPanel, Vitals, VitalTrends
-from .common import ProvenanceSource, Tier
+from .common import Tier
 
 
 class TierStatus(Contract):
@@ -24,34 +24,6 @@ class FindingDirection(StrEnum):
     falling = "falling"
     stable = "stable"
     new = "new"
-
-
-class TierBFinding(Contract):
-    """A named observation with its own units. Not comparable on a shared scale."""
-
-    id: str
-    label: str
-    value: str  # pre-formatted with units, e.g. "12%", "KDIGO 2"
-    direction: FindingDirection | None
-    source: ProvenanceSource
-    significant: Flag  # exceeds the finding's own threshold
-    detail: str | None = None
-
-
-class TierBData(Contract):
-    findings: list[TierBFinding]
-
-
-class TierCAttribution(Contract):
-    feature: str
-    contribution: Num  # signed; positive = risk-increasing
-
-
-class TierCData(Contract):
-    risk_probability: Fraction  # isotonic-calibrated, never the raw model score
-    forecast_window: str
-    scored_seconds_ago: NonNegNum  # the model's own clock, not the vitals feed's
-    attributions: list[TierCAttribution]
 
 
 class TierCInput(Contract):

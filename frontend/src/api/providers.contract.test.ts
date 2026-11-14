@@ -187,6 +187,19 @@ describe.each(harnesses)("$name", ({ provider, signIn }) => {
     expect(Array.isArray(live.patients)).toBe(true);
   });
 
+  it("serves no seeded model number: no Tier C block and no demo Tier B findings", async () => {
+    signIn("rn-manalo");
+    const ward = await provider.getWard();
+    const detail = await provider.getPatient("p-001");
+    const text = JSON.stringify([ward, detail]);
+    for (const key of ["tier_b", "tier_c", "risk_probability", "attributions"]) {
+      expect(text, key).not.toContain(`"${key}":`);
+    }
+    for (const label of ["Arrhythmia burden", "Perfusion index", "HRV (SDNN)"]) {
+      expect(text, label).not.toContain(label);
+    }
+  });
+
   it("gaps are null in the history and never zero", async () => {
     signIn("rn-manalo");
     const detail = await provider.getPatient("p-006");
