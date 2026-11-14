@@ -146,7 +146,7 @@ def test_registry_file(tmp_path):
     assert (prov["synthetic"], prov["validated"], prov["commit"], prov["date"]) == (True, False, COMMIT, "2026-11-13")
     assert prov["exporter"] == {"name": "research.export_evaluation", "version": "1"}
     ds = {d["id"]: d for d in body["datasets"]}
-    assert set(ds) == {"eicu-crd-demo", "ward-v2", "ward-v2-ext"}
+    assert set(ds) == {"eicu-crd-demo", "ward-v2", "ward-v2-ext", "ward-v2-heldout2"}
     assert ds["eicu-crd-demo"]["licence"] == "Open Data Commons Open Database License v1.0 (ODbL)"
     assert ds["eicu-crd-demo"]["name"] == "eICU-CRD Demo 2.0.1" and ds["ward-v2"]["licence"] == "not stated"
     assert all(set(e) == {"id", "name", "path", "licence", "source"} and e["path"] is None for e in body["datasets"] + body["open_weights"])

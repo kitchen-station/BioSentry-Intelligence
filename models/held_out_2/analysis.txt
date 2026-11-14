@@ -1,0 +1,93 @@
+BioSentry: held-out set 2, the declared analysis (offline research, simulated data)
+trials: 400, seeds 1001 to 1400; unit of resampling: the trial
+bootstrap: 2000 resamples of the trials with replacement, SplitMix64 generator seed 20261114, percentile interval; every ratio is recomputed from the summed per-trial counts of each resample
+interval rule: tail t per side (95%: 1/40; 98.33%: 1/120, Bonferroni for three comparisons); sorted values, indexes floor(t m) and floor((1 - t) m) - 1
+gain in excess over chance = [any-bin rate(NEWS2 or X) - chance any-bin(NEWS2 or X)] - [any-bin rate(NEWS2) - chance any-bin(NEWS2)], episodes not cut short; NEWS2 is the chart trigger
+verdict: a gain beyond chance is shown only if the lower end of the 98.33% interval is above 0; a loss is shown only if its upper end is below 0
+alert ratio: alerts per patient per 12 hours of the rule over NEWS2's
+
+PRIMARY comparisons (NEWS2 or X against NEWS2 alone)
+1. the student (with temperature): news2_or_student
+   gain in excess over chance -0.0401
+   95% interval -0.0517 to -0.0281; 98.33% interval -0.0542 to -0.0253
+   verdict: a loss is shown
+   alert ratio 1.254: 95% interval 1.246 to 1.263; 98.33% interval 1.244 to 1.265
+2. the student with the confidence check (with temperature): news2_or_student_checked
+   gain in excess over chance +0.0181
+   95% interval +0.0094 to +0.0272; 98.33% interval +0.0080 to +0.0291
+   verdict: a gain beyond chance is shown
+   alert ratio 1.048: 95% interval 1.045 to 1.051; 98.33% interval 1.045 to 1.051
+3. the reward policy, final (with temperature): news2_or_reward_final
+   gain in excess over chance -0.0127
+   95% interval -0.0229 to -0.0024; 98.33% interval -0.0245 to -0.0001
+   verdict: a loss is shown
+   alert ratio 1.131: 95% interval 1.126 to 1.137; 98.33% interval 1.125 to 1.138
+
+SECONDARY (no verdict word)
+NEWS2 or the student, no temperature: news2_or_student_no_temp
+   gain in excess over chance -0.0365, 95% interval -0.0483 to -0.0249; alert ratio 1.220, 95% interval 1.213 to 1.229
+NEWS2 or the student with the confidence check, no temperature: news2_or_student_checked_no_temp
+   gain in excess over chance +0.0211, 95% interval +0.0124 to +0.0301; alert ratio 1.039, 95% interval 1.037 to 1.042
+NEWS2 or the reward policy, final, no temperature: news2_or_reward_final_no_temp
+   gain in excess over chance +0.0081, 95% interval -0.0006 to +0.0175; alert ratio 1.092, 95% interval 1.088 to 1.096
+the student alone against NEWS2: student
+   any-bin rate difference, all evaluated episodes -0.0350, 95% interval -0.0539 to -0.0158
+   chance difference -0.1709, 95% interval -0.1784 to -0.1636
+   alert ratio 1.023, 95% interval 1.010 to 1.036
+   time in alert difference -0.1011, 95% interval -0.1033 to -0.0988
+the student with the confidence check alone against NEWS2: student_checked
+   any-bin rate difference, all evaluated episodes -0.1038, 95% interval -0.1228 to -0.0856
+   chance difference -0.3950, 95% interval -0.4010 to -0.3887
+   alert ratio 0.317, 95% interval 0.310 to 0.325
+   time in alert difference -0.1410, 95% interval -0.1433 to -0.1386
+the reward policy, final alone against NEWS2: reward_final
+   any-bin rate difference, all evaluated episodes -0.1291, 95% interval -0.1486 to -0.1094
+   chance difference -0.3465, 95% interval -0.3527 to -0.3401
+   alert ratio 0.394, 95% interval 0.387 to 0.402
+   time in alert difference -0.1296, 95% interval -0.1322 to -0.1271
+the student, no temperature alone against NEWS2: student_no_temp
+   any-bin rate difference, all evaluated episodes -0.0321, 95% interval -0.0500 to -0.0145
+   chance difference -0.1600, 95% interval -0.1673 to -0.1526
+   alert ratio 1.002, 95% interval 0.990 to 1.016
+   time in alert difference -0.1003, 95% interval -0.1025 to -0.0981
+the student with the confidence check, no temperature alone against NEWS2: student_checked_no_temp
+   any-bin rate difference, all evaluated episodes -0.1050, 95% interval -0.1239 to -0.0859
+   chance difference -0.3899, 95% interval -0.3956 to -0.3839
+   alert ratio 0.328, 95% interval 0.321 to 0.336
+   time in alert difference -0.1416, 95% interval -0.1440 to -0.1392
+the reward policy, final, no temperature alone against NEWS2: reward_final_no_temp
+   any-bin rate difference, all evaluated episodes -0.1234, 95% interval -0.1421 to -0.1048
+   chance difference -0.3859, 95% interval -0.3917 to -0.3799
+   alert ratio 0.347, 95% interval 0.339 to 0.355
+   time in alert difference -0.1445, 95% interval -0.1469 to -0.1420
+
+pooled any-bin rate (episodes not cut short), chance any-bin, alerts per patient per 12 h, median lead (median lead: pooled, no interval)
+   news2_chart_trigger: 0.7851, 0.4787, 0.415, 46.6 min (n 854)
+   news2_or_reward_final: 0.8282, 0.5345, 0.470, 64.1 min (n 888)
+   news2_or_reward_final_no_temp: 0.8220, 0.5074, 0.453, 67.7 min (n 890)
+   news2_or_student: 0.8432, 0.5769, 0.521, 99.8 min (n 837)
+   news2_or_student_checked: 0.8201, 0.4955, 0.435, 71.5 min (n 902)
+   news2_or_student_checked_no_temp: 0.8207, 0.4932, 0.432, 67.8 min (n 909)
+   news2_or_student_no_temp: 0.8413, 0.5714, 0.507, 90.3 min (n 853)
+   reward_final: 0.6690, 0.1321, 0.164, 15.2 min (n 1053)
+   reward_final_no_temp: 0.6746, 0.0928, 0.144, 23.7 min (n 1086)
+   student: 0.7508, 0.3078, 0.425, 82.9 min (n 1048)
+   student_checked: 0.6908, 0.0836, 0.132, 38.9 min (n 1130)
+   student_checked_no_temp: 0.6908, 0.0888, 0.136, 36.8 min (n 1117)
+   student_no_temp: 0.7539, 0.3187, 0.416, 80.4 min (n 1062)
+per-kind any-bin counts (alerting in any bin / evaluated), pooled
+   news2_chart_trigger: respiratory 861/939; tachycardic 307/346; hypotensive 169/458
+   news2_or_reward_final: respiratory 890/939; tachycardic 332/346; hypotensive 189/458
+   news2_or_reward_final_no_temp: respiratory 892/939; tachycardic 329/346; hypotensive 179/458
+   news2_or_student: respiratory 899/939; tachycardic 334/346; hypotensive 210/458
+   news2_or_student_checked: respiratory 894/939; tachycardic 329/346; hypotensive 176/458
+   news2_or_student_checked_no_temp: respiratory 893/939; tachycardic 328/346; hypotensive 179/458
+   news2_or_student_no_temp: respiratory 901/939; tachycardic 332/346; hypotensive 209/458
+   reward_final: respiratory 794/939; tachycardic 282/346; hypotensive 36/458
+   reward_final_no_temp: respiratory 826/939; tachycardic 274/346; hypotensive 22/458
+   student: respiratory 866/939; tachycardic 318/346; hypotensive 92/458
+   student_checked: respiratory 833/939; tachycardic 301/346; hypotensive 22/458
+   student_checked_no_temp: respiratory 831/939; tachycardic 294/346; hypotensive 29/458
+   student_no_temp: respiratory 869/939; tachycardic 316/346; hypotensive 96/458
+
+synthetic, not validated: a gain shown is a statement about this simulator only

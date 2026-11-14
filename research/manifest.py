@@ -42,7 +42,8 @@ WRITTEN_BY = {".mindir": "MindSpore export", ".onnx": "onnx.helper, built from t
 # new model file cannot slip in without a line in MODEL_FILES.
 RECORD_SUFFIXES = {".md", ".txt", ".jsonl", ".sh", ".sha256"}
 RECORD_NAMES = {"metadata.json", "exports.json", "timing.json", "manifest.json",
-                "held_out.json", "heldout.json"}  # the one-time held-out results
+                "held_out.json", "heldout.json", "held_out_2.json", "heldout_2.json",
+                "analysis.json"}  # the one-time held-out results (set 1 and set 2) and the set-2 analysis
 RECORD_FOLDERS = {"rounds", "generations"}  # generation records and the dropped rounds' policies
 
 

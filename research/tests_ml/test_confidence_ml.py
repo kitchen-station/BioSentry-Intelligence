@@ -573,3 +573,99 @@ def test_the_block_counts_q_below_t_by_hand_the_check_is_not_binding(monkeypatch
     assert "3. alerting bins: student 101, checked 101, removed 0 (0.000); new alerts: student 6, checked 6" in text
     assert "2. not sure (p >= t and p <= q): 0.0000 (0/247) of scored bins, 0.0000 (0/101)" in text
     assert text.count("window 0; caught early (a new alert in the window before fully in) 0") == 2
+
+
+# --- held-out set 2 ---
+
+SET2 = [1001, 1002, 1003]
+
+
+def test_set_2_evaluation_has_its_own_file_guard_json_and_label(tmp_path, patched, model, cohort):
+    cohort.update({s: trial(s) for s in SET2})  # the patched loaders read this module-scoped dict
+    _calibrate(tmp_path, model)
+    out = tmp_path / "out" / "model"
+    root = tmp_path / "h2"
+    root.mkdir()
+    f2 = folders(root, SET2)
+    path = tmp_path / "h2.json"
+    text = c.evaluate(f2, model, out, cal_seeds=SEEDS, json_path=str(path), held_out_set=2)
+    assert (out / c.HELD_OUTPUT_2).read_text() == text and not (out / c.HELD_OUTPUT).exists()
+    obj = json.loads(path.read_text())
+    assert obj["context"]["held_out_set"] == 2 and obj["context"]["held_out_seeds"] == SET2
+    assert [t["seed"] for t in obj["trials"]] == SET2 and "all" in obj["confidence"]
+    assert "held-out set 2, ward-v2-heldout2 seeds 1001-1400" in text and "held-out ward-v2 seeds 11-30" not in text
+    assert "held-out set 2, seeds 1001 to 1400, the only ones scored: 3 of 400 trials given" in text
+    with pytest.raises(TrialError, match="heldout_2.txt exists"):
+        c.evaluate(f2, model, out, cal_seeds=SEEDS, held_out_set=2)  # the set-2 run is made once
+    c.evaluate(_held(tmp_path), model, out, cal_seeds=SEEDS)  # set 1's guard is its own file
+    assert (out / c.HELD_OUTPUT).exists()
+
+
+def test_set_2_refuses_set_1_seeds_and_set_1_refuses_set_2_seeds_having_opened_only_manifest_json(tmp_path, opened, model):
+    log, note = opened
+    note.root = tmp_path
+    one, two = folder(tmp_path, 11), folder(tmp_path, 1001)
+    log.clear()
+    with pytest.raises(TrialError, match="not in held-out set 2 seeds 1001 to 1400"):
+        c.evaluate([str(one)], model, tmp_path / "out", held_out_set=2)
+    with pytest.raises(TrialError, match="not in held-out set 2 seeds 1001 to 1400"):
+        c.evaluate([str(two), str(one)], model, tmp_path / "out", held_out_set=2)
+    with pytest.raises(TrialError, match="not in held-out ward-v2 seeds 11 to 30"):
+        c.evaluate([str(two)], model, tmp_path / "out")
+    assert {name for _, name in log} == {"manifest.json"} and not (tmp_path / "out").exists()
+
+
+def test_no_calibration_or_training_loader_takes_a_set_2_seed(tmp_path, opened, model):
+    log, note = opened
+    note.root = tmp_path
+    two = folder(tmp_path, 1001)
+    log.clear()
+    with pytest.raises(TrialError, match="not in calibration seeds 301 to 340"):
+        c.calibrate([str(two)], model, tmp_path / "out")
+    with pytest.raises(TrialError, match="seed 1001 is not used here"):
+        student.load_for_training([str(two)])
+    with pytest.raises(TrialError, match="seed 1001 is not used here"):
+        student.load_for_evaluation([str(two)])
+    assert {name for _, name in log} == {"manifest.json"} and not (tmp_path / "out").exists()
+
+
+def test_the_command_passes_the_set_and_checks_it(tmp_path, monkeypatch, capsys):
+    seen = []
+    monkeypatch.setattr(c, "evaluate", lambda folders, model, out, **kw: seen.append(kw) or "text")
+    assert c.main(["evaluate", "x", "--held-out-set", "2", "--json", "j.json"]) == 0
+    assert seen[-1] == {"json_path": "j.json", "held_out_set": 2} and "heldout_2.txt sha256" in capsys.readouterr().out
+    assert c.main(["evaluate", "x"]) == 0 and seen[-1] == {"json_path": None} and "heldout.txt sha256" in capsys.readouterr().out
+    assert c.main(["evaluate", "x", "--held-out-set", "3"]) == 2 and len(seen) == 2
+
+
+def test_the_two_set_2_commands_agree_on_every_shared_rule(tmp_path, patched, model, cohort, monkeypatch):
+    from research import evaluate_student, heldout2
+    cohort.update({s: trial(s) for s in SET2})
+    _calibrate(tmp_path, model)
+    out = tmp_path / "out" / "model"
+    root = tmp_path / "h2"
+    root.mkdir()
+    f2 = folders(root, SET2)
+    conf_json = tmp_path / "conf.json"
+    c.evaluate(f2, model, out, cal_seeds=SEEDS, json_path=str(conf_json), held_out_set=2)
+    # evaluate_student needs a trained MindSpore model to refit; here its student rows come from the same ONNX
+    sess = student.session((model / "model.onnx").read_bytes())
+    t = json.loads((model / "metadata.json").read_text())["variants"]["all"]["thresholds"]["student"]["threshold"]
+    meta = json.loads((model / "metadata.json").read_text()) | {"byte_reproducible": True, "framework_version": "x"}
+    mdir = tmp_path / "m"
+    shutil.copytree(model, mdir)
+    ms_dir = mdir
+    from research.student import Scorer, onnx_predict
+    scorer = Scorer(lambda x: onnx_predict(sess, x), True, "base")
+    monkeypatch.setattr(evaluate_student, "student_policies", lambda train, val, m, o, scorers=None: (
+        (prob_policy("student", scorer, t), prob_policy("news2_or_student", scorer, t, True)), []))
+    monkeypatch.setattr(evaluate_student, "_json", lambda o, name: meta)
+    monkeypatch.setattr(evaluate_student, "_check_files", lambda o: None)
+    stu_json = tmp_path / "stu.json"
+    evaluate_student.run(f2, out=ms_dir, result=(res := {}), held_out_set=2)
+    evaluate.write_json(str(stu_json), res)
+    files = [json.loads(p.read_text()) for p in (stu_json, conf_json)]
+    shared = {r["id"] for r in files[0]["rules"]} & {r["id"] for r in files[1]["rules"]}
+    assert {"news2_chart_trigger", "student", "news2_or_student"} <= shared
+    seeds, cols, _ = heldout2.join(files)  # refuses when a shared rule has different per-trial counts
+    assert seeds == SET2 and shared <= set(cols)

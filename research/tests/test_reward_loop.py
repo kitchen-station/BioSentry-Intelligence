@@ -2,6 +2,7 @@
 
 import json
 import shutil
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -427,7 +428,7 @@ def test_the_loop_never_opens_held_out_or_unowned_seeds(tmp_path, monkeypatch):
 def test_held_out_and_ext_seeds_are_refused_before_any_file_is_opened(tmp_path, monkeypatch):
     opened = []
     monkeypatch.setattr(trials, "_read", lambda *a: opened.append(a))
-    for seed in (11, 20, 30, 61, 100, 340, 5, 2801):
+    for seed in (11, 20, 30, 61, 100, 340, 5, 1001, 1002, 1400, 2801):  # 1001-1400 is held-out set 2
         with pytest.raises(TrialError, match="not allowed"):
             load_seed(tmp_path, seed, Plan().allowed)
         with pytest.raises(TrialError, match="not allowed"):
@@ -575,6 +576,49 @@ def test_the_budget_rule(tmp_path, monkeypatch, capsys):
     assert go(tmp_path / "c", ["--round", "1"], plan=plan(100)) == 2  # not even round 1 fits
 
 
+def test_the_generation_budget_is_401_to_1000_and_set_2_is_refused_in_any_plan(tmp_path, monkeypatch):
+    plan = Plan()
+    assert (plan.first_seed, plan.last_seed) == (401, 1000) and 1000 in plan.allowed[1] and 1001 not in plan.allowed[1]
+    wide = Plan(last_seed=2800)  # even a plan that names them cannot open seeds 1001-1400
+    opened = []
+    monkeypatch.setattr(trials, "_read", lambda *a: opened.append(a))
+    for seed in (1001, 1200, 1400):
+        with pytest.raises(TrialError, match="not allowed"):
+            load_seed(tmp_path, seed, wide.allowed)
+        with pytest.raises(TrialError, match="not allowed"):
+            reward_loop.FolderSource(tmp_path, wide).check([seed])
+    assert not opened
+
+
+def test_a_round_that_does_not_fit_the_new_budget_is_refused_but_a_started_one_is_not(tmp_path, capsys):
+    big = Plan(**{**PLAN.__dict__, "last_seed": 130})  # round 1 needs 4 x 5 = 20 seeds from 111: fits
+    assert go(tmp_path, ["--round", "1"], plan=big) == 0
+    tight = Plan(**{**PLAN.__dict__, "last_seed": 125})  # no longer fits, but its files exist
+    assert go(tmp_path, ["--round", "1"], plan=tight) == 0
+    assert go(tmp_path / "new", ["--round", "1"], plan=tight) == 2 and "budget" in capsys.readouterr().err
+
+
+def test_the_committed_ledger_and_generation_files_still_verify_under_the_default_plan(tmp_path):
+    committed = Path(reward_loop.__file__).parent.parent / "models" / "tier_b" / "reward_policy"
+    out = tmp_path / "o"
+    shutil.copytree(committed, out)
+    led = read_ledger(out / "experiments.jsonl")
+    assert [x.get("round") for x in led if x["decision"] in ("baseline", "dropped", "kept")] == [1, 2]
+
+    class NoTrials:
+        def check(self, seeds):
+            raise AssertionError("a finished round opens no trial")
+
+        prepared = check
+
+    before = tree(out)
+    why = next(x["why"] for x in led if x.get("round") == 2)
+    assert go(out, ["--round", "1"], src=NoTrials(), plan=Plan()) == 0
+    assert go(out, ["--round", "2", "--change", "selection_trials=16", "--why", why], src=NoTrials(), plan=Plan()) == 0
+    assert tree(out) == before
+    assert main(["--out", str(out), "--run-log", str(tmp_path / "log.json")]) == 0
+
+
 # --- held-out, once -----------------------------------------------------------------------------
 
 def test_evaluate_refuses_a_tampered_or_missing_policy(copy, tmp_path, capsys):
@@ -626,6 +670,43 @@ def test_evaluate_json_holds_the_printed_numbers_and_leaves_the_text_alone(finis
     assert go(finished, ["--evaluate", str(root), "--json", str(tmp_path / "no" / "h.json")]) == 2
     assert "--json" in capsys.readouterr().err
     assert go(finished, ["--stop", "x", "--json", str(path)]) == 2
+
+
+def test_evaluate_set_2_opens_seed_1001_to_1400_by_name(finished, tmp_path, capsys, monkeypatch):
+    root = tmp_path / "ward-v2-heldout2"
+    root.mkdir()
+    for s in (1001, 1002):
+        _write_folder(root, s)
+    monkeypatch.setattr(evaluate, "_sanity", lambda *a: None)
+    path = tmp_path / "held2.json"
+    assert go(finished, ["--evaluate", str(root), "--held-out-set", "2", "--json", str(path)]) == 0
+    text = capsys.readouterr().out
+    obj = json.loads(path.read_text())
+    assert obj["context"]["held_out_set"] == 2 and obj["context"]["held_out_seeds"] == [1001, 1002]
+    assert [t["seed"] for t in obj["trials"]] == [1001, 1002] and "reward_final" in [r["id"] for r in obj["rules"]]
+    assert "held-out set 2, seeds 1001 to 1400, the only ones scored: 2 of 400 trials given" in text
+    assert "held-out seeds (11 to 30)" not in text
+    # set 1 is the default and wants seed-11 to seed-30 folders
+    assert go(finished, ["--evaluate", str(root)]) == 2 and "seed-11 to seed-30" in capsys.readouterr().err
+    old = tmp_path / "ward-v2"
+    old.mkdir()
+    _write_folder(old, 11)
+    assert go(finished, ["--evaluate", str(old), "--held-out-set", "2"]) == 2
+    assert "seed-1001 to seed-1400" in capsys.readouterr().err
+    assert go(finished, ["--evaluate", str(root), "--held-out-set", "3"]) == 2
+    assert go(finished, ["--stop", "x", "--held-out-set", "2"]) == 2
+
+
+def test_evaluate_set_2_refuses_a_manifest_naming_another_seed_before_a_cohort_file(finished, tmp_path, monkeypatch, capsys):
+    root = tmp_path / "w"
+    root.mkdir()
+    _write_folder(root, 1001)
+    (root / "seed-1001" / "manifest.json").write_text(json.dumps({"seed": 1002}))
+    opened = []
+    real = trials._read
+    monkeypatch.setattr(trials, "_read", lambda folder, name, cap: opened.append(name) or real(folder, name, cap))
+    assert go(finished, ["--evaluate", str(root), "--held-out-set", "2"]) == 2
+    assert "names another seed" in capsys.readouterr().err and set(opened) == {"manifest.json"}
 
 
 def test_usage_errors(tmp_path, capsys):

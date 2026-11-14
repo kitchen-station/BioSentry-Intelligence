@@ -4,7 +4,7 @@
                                   [--out <dir>] [--cache <dir>] [--workers N]
                                   [--run_log <file>] [--run_id <text>] [--commit <sha>]
     python -m research.confidence evaluate <ward-v2 folders of seeds 11-30>... [--model <dir>] [--out <dir>]
-                                  [--json <held-out.json>]
+                                  [--json <held-out.json>] [--held-out-set 1|2]
 
 The student alerts when p >= t. The check lets that alert through only when p > q, where q is the
 finite-sample quantile of one randomly drawn negative bin per calibration stay; otherwise the bin is
@@ -41,7 +41,9 @@ OUT = Path(__file__).parent.parent / "models" / "tier_c" / "confidence_check"
 MODEL = Path(__file__).parent.parent / "models" / "tier_c" / "student_vitals"
 ONNX = {"all": "model.onnx", "no_temp": "model_no_temp.onnx"}
 CALIBRATION = {"all": "calibration.json", "no_temp": "calibration_no_temp.json"}
+HELD_SEEDS_2 = range(1001, 1401)  # held-out set 2 (research/evaluate.py HELD_OUT_2)
 HELD_OUTPUT = "heldout.txt"
+HELD_OUTPUT_2 = "heldout_2.txt"  # its own run-once guard; set 1's file is untouched
 CHART = POLICIES[0]
 SUMMARY_POINTS = 200
 PACKAGES = ("numpy", "onnxruntime")
@@ -327,7 +329,7 @@ def calibrate(folders: Sequence[str], model: Path = MODEL, out: Path = OUT, cach
 
 
 def _block(tag: str, cal: Calibration, files: Sequence[str], scorer, student_policy: Policy, checked: Policy,
-           data: dict | None = None) -> list[str]:
+           data: dict | None = None, label: str = "held-out ward-v2 seeds 11-30") -> list[str]:
     """The contract's held-out block for one variant, from the trials' rows and the student's p. When `data`
     is a dict it is filled with the same numbers at full precision (the --json file)."""
     import numpy as np
@@ -383,6 +385,7 @@ def _block(tag: str, cal: Calibration, files: Sequence[str], scorer, student_pol
                         lost[scope][kind] += hit(*res["student"]) and not hit(*res["checked"])
         Scorer.clear()
         scorer._memo.clear()
+        del trial, by, wins  # before the next load: never two trials at once
     stats = {name: (lambda s, c=c: s[c] / s[3] if s[3] else None) for c, name in enumerate(("error", "checked", "student"))}
     iv = bootstrap.intervals({"stays": shares}, stats)
     mean = {k: (sum(s[c] for s in shares) / len(shares) if shares else None) for c, k in enumerate(("error", "checked", "student"))}
@@ -411,7 +414,7 @@ def _block(tag: str, cal: Calibration, files: Sequence[str], scorer, student_pol
             "lost": {"all": dict(lost["all"]), "not_cut_short": dict(lost["uncut"])},
         })
     return [
-        f"[{tag}] confidence check, alpha {cal.alpha}, held-out ward-v2 seeds 11-30",
+        f"[{tag}] confidence check, alpha {cal.alpha}, {label}",
         f"calibration facts: n={cal.n} k={cal.k} (j={cal.j}) q={cal.q} t={cal.t} alpha={cal.alpha} "
         f"onnx sha256 {cal.onnx_sha256}",
         f"{'binding' if cal.binding else 'NOT binding (q < t): the check removes no alert'}",
@@ -435,11 +438,14 @@ def _block(tag: str, cal: Calibration, files: Sequence[str], scorer, student_pol
 
 
 def evaluate(folders: Sequence[str], model: Path = MODEL, out: Path = OUT, cal_seeds: range = CAL_SEEDS,
-             *, json_path: str | None = None) -> str:
-    """With `json_path`, the held-out JSON (rules and the confidence blocks) is written next to heldout.txt."""
-    jobs = _manifests(folders, HELD_SEEDS, "held-out ward-v2")
-    if (out / HELD_OUTPUT).exists():
-        raise TrialError(f"{HELD_OUTPUT} exists: the held-out run was already made (delete it only for a counting bug)")
+             *, json_path: str | None = None, held_out_set: int = 1) -> str:
+    """With `json_path`, the held-out JSON (rules and the confidence blocks) is written next to heldout.txt
+    (heldout_2.txt for set 2, which has its own run-once guard)."""
+    set2 = held_out_set == 2
+    held_output = HELD_OUTPUT_2 if set2 else HELD_OUTPUT
+    jobs = _manifests(folders, HELD_SEEDS_2 if set2 else HELD_SEEDS, "held-out set 2" if set2 else "held-out ward-v2")
+    if (out / held_output).exists():
+        raise TrialError(f"{held_output} exists: the held-out run was already made (delete it only for a counting bug)")
     from . import evaluate as ev
     ev.check_json_path(json_path)  # before any trial is read
     from .student import Scorer, onnx_predict, prob_policy, session
@@ -465,23 +471,31 @@ def evaluate(folders: Sequence[str], model: Path = MODEL, out: Path = OUT, cal_s
         cals[tag] = (cal, digest, scorer, pols)
         notes.append(f"{tag}: calibration {CALIBRATION[tag]} sha256 {digest}")
     result: dict = {}
-    text = ev.run([f for _, f, _ in jobs], POLICIES + tuple(policies), result if json_path else None)
+
+    def release() -> None:  # per-stay memos must not grow with the number of trials
+        Scorer.clear()
+        for _, _, sc, _ in cals.values():
+            sc._memo.clear()
+
+    text = ev.run([f for _, f, _ in jobs], POLICIES + tuple(policies), result if json_path else None,
+                  held_out_set, release)
     files = [f for _, f, _ in jobs]
     Scorer.clear()
     for _, _, scorer, _ in cals.values():
         scorer._memo.clear()
     block = [f"confidence check (slice M3): split-conformal, one negative bin per calibration stay, alpha {ALPHA}", *notes, ""]
     confidence = {}
+    label = "held-out set 2, ward-v2-heldout2 seeds 1001-1400" if set2 else "held-out ward-v2 seeds 11-30"
     for tag, (cal, digest, scorer, pols) in cals.items():
         data: dict = {"calibration_sha256": digest}
-        block += _block(tag, cal, files, scorer, pols[0], pols[1], data) + [f"   calibration file sha256 {digest}", ""]
+        block += _block(tag, cal, files, scorer, pols[0], pols[1], data, label) + [f"   calibration file sha256 {digest}", ""]
         confidence[tag] = data
     whole = text + "\n" + "\n".join(block)
     if json_path:
         result["confidence"] = confidence
         ev.write_json(json_path, result)  # first, so a failure writes nothing of heldout.txt
     try:
-        with open(out / HELD_OUTPUT, "x", encoding="utf-8") as f:  # "x": a second held-out run is refused, not overwritten
+        with open(out / held_output, "x", encoding="utf-8") as f:  # "x": a second held-out run is refused, not overwritten
             f.write(whole)
     except OSError:
         if json_path:
@@ -512,6 +526,7 @@ def _parser() -> argparse.ArgumentParser:
         s.add_argument("--out")
         if name == "evaluate":
             s.add_argument("--json")
+            s.add_argument("--held-out-set", default="1")
         if name == "calibrate":
             for flag in ("--cache", "--run_log", "--run_id", "--commit"):
                 s.add_argument(flag)
@@ -528,8 +543,11 @@ def main(argv: list[str]) -> int:
                               a.run_id, a.commit)
             sys.stdout.write("\n".join(lines) + "\n")
         else:
-            text = evaluate(a.folders, model, out, json_path=a.json)
-            sys.stdout.write(text + f"\n{HELD_OUTPUT} sha256 {hashlib.sha256(text.encode()).hexdigest()}\n")
+            from .evaluate import check_set
+            held_out_set = check_set(a.held_out_set)
+            text = evaluate(a.folders, model, out, json_path=a.json, **({"held_out_set": 2} if held_out_set == 2 else {}))
+            name = HELD_OUTPUT_2 if held_out_set == 2 else HELD_OUTPUT
+            sys.stdout.write(text + f"\n{name} sha256 {hashlib.sha256(text.encode()).hexdigest()}\n")
     except TrialError as e:
         print(f"refused: {e}", file=sys.stderr)
         return 2
