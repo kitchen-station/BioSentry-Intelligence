@@ -5,17 +5,18 @@ import { LabFrame } from "../components/LabFrame";
 import { LabRuns } from "./LabRuns";
 import research from "./Research.module.css";
 
-/** The lab's front page. It writes nothing to the live ward; its two writes are a request for a simulated run and a question for the research agent. */
+/** The lab's front page. A physician or charge nurse reaches it as "What-if runs" (/what-if); an administrator as the "Simulation lab" (/lab). It writes nothing to the live ward; its two writes are a request for a simulated run and a question for the research agent. */
 export function Lab({ session, onSignOut }: { session: Session; onSignOut: () => void }) {
   // shortcut: only the one-address image (VITE_API_URL=/api) serves /simulator/; upgrade to an explicit VITE_SIMULATOR_PATH when deploy/ changes.
-  const simulatorServed = import.meta.env.VITE_API_URL === "/api";
+  const admin = session.role === "admin";
+  const simulatorServed = admin && import.meta.env.VITE_API_URL === "/api"; // a developer tool: no word of it on the clinician's page
   return (
-    <LabFrame session={session} onSignOut={onSignOut}>
+    <LabFrame session={session} onSignOut={onSignOut} whatIf={!admin}>
       <main className={research.main}>
-        <h1 className={research.title}>Simulation lab</h1>
+        <h1 className={research.title}>{admin ? "Simulation lab" : "What-if runs"}</h1>
         <ul>
-          {hasLabQuestions && session.role !== "admin" && <li><Link to="/ask">Ask the research agent</Link></li>}
-          {session.role === "admin" && (
+          {hasLabQuestions && !admin && <li><Link to="/ask">Ask the research agent</Link></li>}
+          {admin && (
             <>
               <li><Link to="/lab/research">Research numbers</Link></li>
               <li><Link to="/lab/research#agent">The research agent&apos;s questions and answers</Link></li>

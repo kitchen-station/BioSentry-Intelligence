@@ -26,7 +26,7 @@ const request = (r: LabRunItem) =>
     : `Hospital, seed ${r.seed}, ${r.days} days: ${r.baseline}, change ${r.change}`;
 const state = (r: LabRunItem) =>
   ({
-    queued: "Waiting for the lab worker",
+    queued: "Waiting to run",
     running: r.claimed_at == null ? "Running" : `Running since ${String(r.claimed_at).slice(11, 16)} UTC`,
     done: "Done",
     failed: `Failed: ${r.reason ?? "no reason given"}`,
