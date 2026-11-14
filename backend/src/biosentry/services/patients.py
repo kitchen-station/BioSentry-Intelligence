@@ -72,6 +72,10 @@ def split_blood_pressure(text: str) -> BloodPressure:
     return check_blood_pressure(int(systolic_text), int(diastolic_text))
 
 
+# The role a note shows: the labels the patient page uses.
+NOTE_ROLE = {"rn": "RN", "charge_rn": "Charge RN", "md": "MD"}
+
+
 class PatientService:
     def __init__(self, store: PostgresStore, audit: AuditLog, wards: WardService) -> None:
         self._store = store
@@ -98,16 +102,22 @@ class PatientService:
             return None
         with self._store.tx():
             self._store.add_action("add_note", clinician_id, patient_id, {})  # never the text
-            note = self._store.add_note(patient_id, body.author, body.role, body.content)
+            # Author and role are the signed-in clinician's, never the body's: a note cannot be
+            # written in another person's name.
+            role = self._store.role_of(clinician_id) or ""
+            note = self._store.add_note(
+                patient_id, clinician_id, NOTE_ROLE.get(role, role), body.content
+            )
         self._audit.append(clinician_id, "add_note", patient_id, "ok")
         return note
 
     def delete_note(self, clinician_id: str, patient_id: str, note_id: str) -> bool:
         if not self._visible(clinician_id, patient_id, "delete_note"):
             return False
-        self._store.delete_note(patient_id, note_id)
-        self._audit.append(clinician_id, "delete_note", patient_id, "ok")
-        return True
+        # Only the author's own note: another clinician's note and a missing one are one answer.
+        deleted = self._store.delete_note(patient_id, note_id, clinician_id)
+        self._audit.append(clinician_id, "delete_note", patient_id, "ok" if deleted else "not_found")
+        return deleted
 
     # --- acknowledgements ------------------------------------------------------------------
 

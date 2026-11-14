@@ -11,7 +11,7 @@ from typing import Annotated
 
 from pydantic import Field
 
-from .base import Age, CamelContract, Contract, Flag, Fraction
+from .base import Age, CamelContract, Contract, Flag, Fraction, Line, Text
 from .clinical import PartialLabInput
 from .common import Acvpu
 
@@ -47,24 +47,24 @@ class CivilStatus(StrEnum):
 
 class AdmitPatientInput(CamelContract):
     # Identity (DOH face sheet)
-    last_name: str
-    first_name: str
-    middle_name: str | None = None
-    name_extension: str | None = None  # Jr, Sr, III
+    last_name: Line
+    first_name: Line
+    middle_name: Line | None = None
+    name_extension: Line | None = None  # Jr, Sr, III
     date_of_birth: date
     age: Age
     sex: Sex
     civil_status: CivilStatus | None = None
-    contact_number: str | None = None
+    contact_number: Line | None = None
     philhealth_pin: Annotated[str, Field(pattern=PHILHEALTH_PIN)] | None = None
     # Admission details
-    bed: str
+    bed: Line
     admission_route: AdmissionRoute
     condition_on_admission: AdmissionCondition | None = None
-    chief_complaint: str
-    admitting_context: str
-    attending_physician: str
-    allergies: str | None = None  # free text or "NKDA"
+    chief_complaint: Text
+    admitting_context: Text
+    attending_physician: Line
+    allergies: Text | None = None  # free text or "NKDA"
     # CV-specific
     weight_kg: Positive | None = None
     height_cm: Positive | None = None
@@ -76,23 +76,23 @@ class AdmitPatientInput(CamelContract):
 class PartialAdmitPatientInput(CamelContract):
     """AdmitPatientInput with every field optional (extraction results)."""
 
-    last_name: str | None = None
-    first_name: str | None = None
-    middle_name: str | None = None
-    name_extension: str | None = None
+    last_name: Line | None = None
+    first_name: Line | None = None
+    middle_name: Line | None = None
+    name_extension: Line | None = None
     date_of_birth: date | None = None
     age: Age | None = None
     sex: Sex | None = None
     civil_status: CivilStatus | None = None
-    contact_number: str | None = None
+    contact_number: Line | None = None
     philhealth_pin: Annotated[str, Field(pattern=PHILHEALTH_PIN)] | None = None
-    bed: str | None = None
+    bed: Line | None = None
     admission_route: AdmissionRoute | None = None
     condition_on_admission: AdmissionCondition | None = None
-    chief_complaint: str | None = None
-    admitting_context: str | None = None
-    attending_physician: str | None = None
-    allergies: str | None = None
+    chief_complaint: Text | None = None
+    admitting_context: Text | None = None
+    attending_physician: Line | None = None
+    allergies: Text | None = None
     weight_kg: Positive | None = None
     height_cm: Positive | None = None
     initial_bp: Annotated[str, Field(pattern=BLOOD_PRESSURE_TEXT)] | None = None

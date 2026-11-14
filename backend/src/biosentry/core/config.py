@@ -89,6 +89,8 @@ class Settings:
         if self.env != "production":
             return
         problems = []
+        if any("*" in origin for origin in self.cors_origins):
+            problems.append("BIOSENTRY_CORS_ORIGINS must list exact origins, no *")
         # An early check on the text; connect() checks the password the connection really used.
         if DEV_DATABASE_PASSWORD in unquote(self.database_url):  # covers the default URL itself
             problems.append("BIOSENTRY_DATABASE_URL must not be the dev default or hold the dev password")

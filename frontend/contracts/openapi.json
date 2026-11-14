@@ -162,6 +162,7 @@
             "$ref": "#/components/schemas/AdmissionRoute"
           },
           "admittingContext": {
+            "maxLength": 4000,
             "type": "string"
           },
           "age": {
@@ -172,6 +173,7 @@
           "allergies": {
             "anyOf": [
               {
+                "maxLength": 4000,
                 "type": "string"
               },
               {
@@ -181,12 +183,15 @@
             "default": null
           },
           "attendingPhysician": {
+            "maxLength": 200,
             "type": "string"
           },
           "bed": {
+            "maxLength": 200,
             "type": "string"
           },
           "chiefComplaint": {
+            "maxLength": 4000,
             "type": "string"
           },
           "civilStatus": {
@@ -214,6 +219,7 @@
           "contactNumber": {
             "anyOf": [
               {
+                "maxLength": 200,
                 "type": "string"
               },
               {
@@ -227,6 +233,7 @@
             "type": "string"
           },
           "firstName": {
+            "maxLength": 200,
             "type": "string"
           },
           "heightCm": {
@@ -265,11 +272,13 @@
             "default": null
           },
           "lastName": {
+            "maxLength": 200,
             "type": "string"
           },
           "middleName": {
             "anyOf": [
               {
+                "maxLength": 200,
                 "type": "string"
               },
               {
@@ -281,6 +290,7 @@
           "nameExtension": {
             "anyOf": [
               {
+                "maxLength": 200,
                 "type": "string"
               },
               {
@@ -1400,15 +1410,18 @@
       },
       "NewNote": {
         "additionalProperties": false,
-        "description": "The body of POST /patients/{id}/notes. The server assigns id, time and the flag.",
+        "description": "The body of POST /patients/{id}/notes. The server assigns id, time and the flag, and also\nthe author and the role: they come from the session, and what the body says is not stored.",
         "properties": {
           "author": {
+            "maxLength": 200,
             "type": "string"
           },
           "content": {
+            "maxLength": 4000,
             "type": "string"
           },
           "role": {
+            "maxLength": 200,
             "type": "string"
           }
         },
@@ -1746,6 +1759,7 @@
           "admittingContext": {
             "anyOf": [
               {
+                "maxLength": 4000,
                 "type": "string"
               },
               {
@@ -1770,6 +1784,7 @@
           "allergies": {
             "anyOf": [
               {
+                "maxLength": 4000,
                 "type": "string"
               },
               {
@@ -1781,6 +1796,7 @@
           "attendingPhysician": {
             "anyOf": [
               {
+                "maxLength": 200,
                 "type": "string"
               },
               {
@@ -1792,6 +1808,7 @@
           "bed": {
             "anyOf": [
               {
+                "maxLength": 200,
                 "type": "string"
               },
               {
@@ -1803,6 +1820,7 @@
           "chiefComplaint": {
             "anyOf": [
               {
+                "maxLength": 4000,
                 "type": "string"
               },
               {
@@ -1836,6 +1854,7 @@
           "contactNumber": {
             "anyOf": [
               {
+                "maxLength": 200,
                 "type": "string"
               },
               {
@@ -1859,6 +1878,7 @@
           "firstName": {
             "anyOf": [
               {
+                "maxLength": 200,
                 "type": "string"
               },
               {
@@ -1905,6 +1925,7 @@
           "lastName": {
             "anyOf": [
               {
+                "maxLength": 200,
                 "type": "string"
               },
               {
@@ -1916,6 +1937,7 @@
           "middleName": {
             "anyOf": [
               {
+                "maxLength": 200,
                 "type": "string"
               },
               {
@@ -1927,6 +1949,7 @@
           "nameExtension": {
             "anyOf": [
               {
+                "maxLength": 200,
                 "type": "string"
               },
               {

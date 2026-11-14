@@ -5,7 +5,7 @@ from typing import Annotated, Self
 
 from pydantic import AwareDatetime, Field, field_validator, model_validator
 
-from .base import Contract, Flag, Num
+from .base import Contract, Flag, Line, Num, Text
 from .common import (
     Acvpu,
     AcvpuMeasurement,
@@ -66,11 +66,12 @@ class NewAcknowledgement(Contract):
 
 
 class NewNote(Contract):
-    """The body of POST /patients/{id}/notes. The server assigns id, time and the flag."""
+    """The body of POST /patients/{id}/notes. The server assigns id, time and the flag, and also
+    the author and the role: they come from the session, and what the body says is not stored."""
 
-    author: str
-    role: str
-    content: str
+    author: Line
+    role: Line
+    content: Text
 
 
 class NurseVitalsInput(Contract):

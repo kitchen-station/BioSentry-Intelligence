@@ -719,12 +719,14 @@ class PostgresStore:
             )
         return next(n for n in self.notes(patient_id) if n.id == note_id)
 
-    def delete_note(self, patient_id: str, note_id: str) -> None:
-        self.conn.execute(
+    def delete_note(self, patient_id: str, note_id: str, author: str) -> bool:
+        """Whether a live note of this author was deleted."""
+        done = self.conn.execute(
             "UPDATE clinical_note SET deleted_at = %s WHERE run_id = %s AND patient_id = %s AND id = %s"
-            " AND deleted_at IS NULL",
-            (whole(self.run_now), self.run_id, patient_id, note_id),
+            " AND author = %s AND deleted_at IS NULL",
+            (whole(self.run_now), self.run_id, patient_id, note_id, author),
         )
+        return done.rowcount == 1
 
     # --- acknowledgements ----------------------------------------------------------------------
 

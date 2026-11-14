@@ -351,7 +351,8 @@ export interface components {
         };
         /**
          * NewNote
-         * @description The body of POST /patients/{id}/notes. The server assigns id, time and the flag.
+         * @description The body of POST /patients/{id}/notes. The server assigns id, time and the flag, and also
+         *     the author and the role: they come from the session, and what the body says is not stored.
          */
         readonly NewNote: {
             readonly author: string;
