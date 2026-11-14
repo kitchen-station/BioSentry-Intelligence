@@ -3,7 +3,8 @@ command (standard library only).
 
     python -m research.export_evaluation registry    --date YYYY-MM-DD --commit <40 hex> [--source <text>]... --out <path>
     python -m research.export_evaluation evaluations --date YYYY-MM-DD --commit <40 hex> --source <command line>...
-                                         --held-out <held-out.json>... [--drop-rule <id>]... [--confidence <heldout.json>] --out <path>
+                                         --held-out <held-out.json>... [--drop-rule <id>]... [--confidence <heldout.json>]
+                                         [--set-2-analysis <analysis.json>] --out <path>
 
 `--source` is required for `evaluations` (the command lines that made the held-out files, at least one).
 The held-out JSON files are what `--json` of research.evaluate, research.evaluate_student,
@@ -260,6 +261,25 @@ def build_evaluations(held: list[dict], drop: list[str], confidence: dict | None
 
 # --- the envelope and the command -----------------------------------------------------------------------
 
+SET_2 = (("news2_or_student", "student"), ("news2_or_student_checked", "checked student"),
+         ("news2_or_reward_final", "reward policy"))
+
+
+def set_2_note(path: Path) -> str:
+    """One note that says the rows are held-out set 1 and gives the three pre-registered set-2 verdicts, read from
+    the analysis file (research.heldout2), never typed."""
+    obj = load_json(path)
+    try:
+        by_id = {x["id"]: x for x in obj["primary"]}
+        parts = [f"{name} {by_id[i]['gain']['estimate']:+.3f}, {by_id[i]['alert_ratio']['estimate']:.3f}x alerts, "
+                 f"{by_id[i]['verdict']}" for i, name in SET_2]
+        trials = int(obj["trials"])
+    except (KeyError, TypeError, ValueError):
+        raise Refused(f"{path.name}: not a held-out set 2 analysis file") from None
+    return (f"These rows are held-out set 1 (91 episodes). Held-out set 2 ({trials} trials), gain over chance when added "
+            "to NEWS2: " + "; ".join(parts) + ".")
+
+
 def envelope(section: str, body: dict, notes: list[str], a, seeds: list[dict], data: str) -> bytes:
     cap(notes, 10, "notes")
     for n in notes:
@@ -312,6 +332,7 @@ def _parser() -> argparse.ArgumentParser:
             s.add_argument("--held-out", action="append", required=True)
             s.add_argument("--drop-rule", action="append", default=[])
             s.add_argument("--confidence")
+            s.add_argument("--set-2-analysis")
     return p
 
 
@@ -335,6 +356,8 @@ def run(argv: list[str]) -> None:
                 raise Refused(f"{Path(f).name}: not a held-out file")
             held.append(obj)
         body, notes, seeds = build_evaluations(held, a.drop_rule, confidence_block(a.confidence, root) if a.confidence else None)
+        if a.set_2_analysis:
+            notes.append(set_2_note(Path(a.set_2_analysis)))
         data = envelope("evaluations", body, notes, a, seeds, "ward-v2 simulator trials")
     write(a.out, data)
 
