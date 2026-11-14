@@ -84,8 +84,8 @@ describe("SessionMenu", () => {
 
   it.each([
     ["rn", ["Ward"]],
-    ["charge_rn", ["Ward", "Ask", "Station", "Ward research"]],
-    ["md", ["Ward", "Ask", "Station", "Ward research"]],
+    ["charge_rn", ["Ward", "Ask", "What-if runs", "Station", "Ward research"]],
+    ["md", ["Ward", "Ask", "What-if runs", "Station", "Ward research"]],
     ["admin", ["Overview", "Ward"]],
   ] as const)("adds Ward research to the bar of %s only with the API and only for a physician or the charge nurse", (role, names) => {
     vi.stubEnv("VITE_API_URL", "/api");
