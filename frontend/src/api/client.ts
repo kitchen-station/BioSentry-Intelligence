@@ -59,10 +59,16 @@ export class ApiError extends Error {
   }
 }
 
+// A read that has not answered in 10 s is a dead connection (the ward polls every 2 to 5 s): fail it so
+// the page says so and the next tick tries again. Only reads: a write that times out on the client
+// may still be stored by the server, so a POST or DELETE is never cut short.
+export const READ_TIMEOUT_MS = 10_000;
+
 async function request<T>(
   path: string,
   init: RequestInit = {},
   waitForSession = true,
+  timeoutMs?: number,
 ): Promise<T> {
   if (waitForSession) await _pending;
   const headers = new Headers(init.headers);
@@ -79,8 +85,18 @@ async function request<T>(
     headers.set("Content-Type", "application/json");
   }
 
-  const res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
+  // An AbortController and a timer, not AbortSignal.timeout: it follows fake timers in tests.
+  const ctl = timeoutMs ? new AbortController() : undefined;
+  const timer = ctl && setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    return await respond<T>(await fetch(`${BASE_URL}${path}`, { ...init, headers, signal: ctl?.signal }));
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
+// Reads the body inside the timeout too: a stalled body is as dead as a stalled connection.
+async function respond<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let body: unknown;
     try {
@@ -99,7 +115,7 @@ async function request<T>(
 }
 
 export function fetchJson<T>(path: string): Promise<T> {
-  return request<T>(path);
+  return request<T>(path, {}, true, READ_TIMEOUT_MS);
 }
 
 export function postJson<T>(path: string, body: unknown): Promise<T> {

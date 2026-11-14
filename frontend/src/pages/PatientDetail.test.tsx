@@ -5,7 +5,7 @@
  * charts, and the not-found / load-error states.
  */
 
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,12 +13,17 @@ import synthetic from "../data/synthetic.json";
 import type { BaselineResponse, ClinicalNote, LabPanel, PatientDetail as Detail, Session, SessionRole } from "../types";
 import { PatientDetail } from "./PatientDetail";
 
+// "Sep" or "Sept", whichever the runtime's en-GB gives: the clock uses the same call as the simulator.
+const SEP = new Date(Date.UTC(2026, 8, 3)).toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" });
+
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const api = vi.hoisted(() => ({
   getPatient: vi.fn(),
   getNotes: vi.fn(),
   getBaseline: vi.fn(),
+  getLiveWard: vi.fn(),
+  usesServer: false,
   addNote: vi.fn(),
   canRecordVitals: false,
   recordVitals: vi.fn(),
@@ -86,6 +91,8 @@ beforeEach(() => {
   api.getPatient.mockResolvedValue(base);
   api.getNotes.mockResolvedValue([]);
   api.getBaseline.mockResolvedValue(null); // fixture mode
+  api.getLiveWard.mockResolvedValue(null);
+  api.usesServer = false;
 });
 afterEach(() => {
   cleanup();
@@ -542,5 +549,200 @@ describe("PatientDetail for an administrator (read only)", () => {
     page("md");
     await loaded();
     expect(screen.queryByText(/Read-only/)).toBeNull();
+  });
+});
+
+describe("PatientDetail follows the ward's speed", () => {
+  const published = (over: object = {}) => ({
+    shared: { clockS: 109_200, speed: 60, ended: false, counts: { received: 1, rejected: 0, abstained: 0 }, ...over },
+    patients: [],
+    can_control: false,
+  });
+  const advance = (ms: number) =>
+    act(async () => {
+      await vi.advanceTimersByTimeAsync(ms);
+    });
+  beforeEach(() => {
+    api.usesServer = true;
+    api.getLiveWard.mockResolvedValue(published());
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    api.canRecordVitals = false;
+  });
+
+  it("reads the patient and the live view again every 2 seconds at 60x, and shows the clock", async () => {
+    page();
+    await loaded();
+    expect(screen.getByRole("group", { name: "Ward clock" }).textContent).toBe(`Ward clock 4 ${SEP}, 21:20 \u00b7 60x`);
+    expect(api.getPatient).toHaveBeenCalledTimes(1);
+    await advance(2_100);
+    expect(api.getPatient).toHaveBeenCalledTimes(2);
+    await advance(2_000);
+    expect(api.getPatient).toHaveBeenCalledTimes(3);
+    expect(api.getLiveWard).toHaveBeenCalledTimes(3);
+  });
+
+  it("reads every 5 seconds at 10x", async () => {
+    api.getLiveWard.mockResolvedValue(published({ speed: 10 }));
+    page();
+    await loaded();
+    await advance(2_500);
+    expect(api.getPatient).toHaveBeenCalledTimes(1);
+    await advance(2_700);
+    expect(api.getPatient).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the open drawer, the typed note, the vitals form and the focus across refreshes", async () => {
+    api.canRecordVitals = true;
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    page("charge_rn");
+    await loaded();
+    await user.click(screen.getByRole("button", { name: "Notes" }));
+    await user.type(screen.getByPlaceholderText("Add a clinical note..."), "Repeat lactate");
+    await user.click(screen.getByRole("button", { name: "Record vitals" }));
+    const hr = screen.getByLabelText("Heart rate (bpm)");
+    await user.type(hr, "118");
+    api.getPatient.mockResolvedValue({ ...base, score: 4 });
+    await advance(4_200);
+    expect(api.getPatient.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(screen.getByPlaceholderText("Add a clinical note...")).toHaveProperty("value", "Repeat lactate");
+    expect(screen.getByLabelText("Heart rate (bpm)")).toBe(hr);
+    expect(hr).toHaveProperty("value", "118");
+    expect(document.activeElement).toBe(hr);
+  });
+
+  it("keeps the page and says so when the patient is no longer ranked, and stops asking", async () => {
+    page();
+    await loaded();
+    api.getPatient.mockResolvedValue(null);
+    await advance(2_100);
+    expect((await screen.findByText(/No longer on your ranked list\. Figures from/)).textContent).toMatch(/\d{2}:\d{2}/);
+    expect(screen.getByRole("link", { name: "Back to ward" }).getAttribute("href")).toBe("/ward");
+    expect(screen.queryByText("Patient not found.")).toBeNull();
+    api.getPatient.mockClear();
+    await advance(10_000);
+    expect(api.getPatient).not.toHaveBeenCalled();
+  });
+
+  it("keeps the last good data and says so when a refresh fails, and clears it on the next good answer", async () => {
+    page();
+    await loaded();
+    api.getPatient.mockRejectedValue(new Error("down"));
+    await advance(2_100);
+    expect(await screen.findByText(/Cannot reach the ward server since/)).toBeTruthy();
+    expect(screen.queryByText(/could not be loaded/)).toBeNull();
+    expect(screen.getByRole("heading", { level: 1 })).toBeTruthy();
+    api.getPatient.mockResolvedValue(base);
+    await advance(5_100);
+    await waitFor(() => expect(screen.queryByText(/Cannot reach the ward server since/)).toBeNull());
+  });
+
+  const summaryBar = () => document.querySelector('[class*="summaryBar"]') as HTMLElement;
+
+  it("puts the stale lines in the summary bar, beside the score", async () => {
+    page();
+    await loaded();
+    api.getPatient.mockRejectedValue(new Error("down"));
+    await advance(2_100);
+    const failed = await screen.findByText(/Cannot reach the ward server since/);
+    expect(summaryBar().contains(failed)).toBe(true);
+    api.getPatient.mockResolvedValue(null);
+    await advance(5_100);
+    const gone = await screen.findByText(/No longer on your ranked list\. Figures from/);
+    expect(summaryBar().contains(gone)).toBe(true);
+    // The server answered, so the line that it cannot be reached is no longer true and must go.
+    expect(screen.queryByText(/Cannot reach the ward server since/)).toBeNull();
+  });
+
+  it("shows the Cannot reach line in an open drawer's header too", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    page();
+    await loaded();
+    await user.click(screen.getByRole("button", { name: /Charts/ }));
+    api.getPatient.mockRejectedValue(new Error("down"));
+    await advance(2_100);
+    const overlay = document.querySelector('[class*="overlayHeader"]') as HTMLElement;
+    await waitFor(() => expect(within(overlay).getByText(/Cannot reach the ward server since/)).toBeTruthy());
+  });
+
+  it("leaves the open charts drawer alone while the data does not change", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    page();
+    await loaded();
+    await user.click(screen.getByRole("button", { name: /Charts/ }));
+    await advance(900); // the first draw-on (700 ms) has finished
+    const grid = document.querySelector('[class*="chartGrid"]') as HTMLElement;
+    const before = grid.innerHTML;
+    await advance(4_200);
+    expect(api.getPatient.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(document.querySelector('[class*="chartGrid"]')).toBe(grid);
+    expect(grid.innerHTML).toBe(before);
+  });
+
+  it("drops a slow old answer that lands after a newer one", async () => {
+    api.canRecordVitals = true;
+    api.recordVitals.mockResolvedValue({
+      patient_id: "p-001", blood_pressure: null, consciousness: null, supplemental_o2: null, spo2_scale: null,
+      heart_rate: null, respiratory_rate: null, spo2: null, temperature: null,
+      ranked: true, rank: 1, score: 4, not_ranked_reason: null, not_ranked_instruction: null,
+    });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    page();
+    await loaded();
+    let late!: (p: Detail) => void;
+    api.getPatient.mockReturnValueOnce(new Promise((res) => (late = res)));
+    await advance(2_100); // a timed round starts and hangs
+    api.getPatient.mockResolvedValue({ ...base, name: "Newer, Pat" });
+    await user.click(screen.getByRole("button", { name: "Record vitals" }));
+    await user.type(screen.getByLabelText("Heart rate (bpm)"), "118");
+    await user.click(screen.getByRole("button", { name: "Record" })); // the save's read is answered first
+    expect(await screen.findByText("Newer, Pat")).toBeTruthy();
+    await act(async () => late({ ...base, name: "Older, Pat" }));
+    expect(screen.queryByText("Older, Pat")).toBeNull();
+    expect(screen.getByText("Newer, Pat")).toBeTruthy();
+  });
+
+  it("after null, recorded vitals and ranked again, the stale line is gone and the timer reads again", async () => {
+    api.canRecordVitals = true;
+    api.recordVitals.mockResolvedValue({
+      patient_id: "p-001", blood_pressure: null, consciousness: null, supplemental_o2: null, spo2_scale: null,
+      heart_rate: null, respiratory_rate: null, spo2: null, temperature: null,
+      ranked: true, rank: 1, score: 9, not_ranked_reason: null, not_ranked_instruction: null,
+    });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    page();
+    await loaded();
+    api.getPatient.mockResolvedValue(null);
+    await advance(2_100);
+    expect(await screen.findByText(/No longer on your ranked list/)).toBeTruthy();
+    api.getPatient.mockClear().mockResolvedValue(base);
+    await user.click(screen.getByRole("button", { name: "Record vitals" }));
+    await user.type(screen.getByLabelText("Heart rate (bpm)"), "118");
+    await user.click(screen.getByRole("button", { name: "Record" }));
+    await waitFor(() => expect(screen.queryByText(/No longer on your ranked list/)).toBeNull());
+    api.getPatient.mockClear();
+    await advance(2_100);
+    expect(api.getPatient).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not ask again, or for the live view, for an administrator", async () => {
+    page("admin");
+    await loaded();
+    await advance(30_000);
+    expect(api.getPatient).toHaveBeenCalledTimes(1);
+    expect(api.getLiveWard).not.toHaveBeenCalled();
+    expect(screen.queryByRole("group", { name: "Ward clock" })).toBeNull();
+  });
+
+  it("does not ask again, or for the live view, in the demo build", async () => {
+    api.usesServer = false;
+    page();
+    await loaded();
+    await advance(30_000);
+    expect(api.getPatient).toHaveBeenCalledTimes(1);
+    expect(api.getLiveWard).not.toHaveBeenCalled();
+    expect(screen.queryByRole("group", { name: "Ward clock" })).toBeNull();
   });
 });

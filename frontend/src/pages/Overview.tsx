@@ -88,7 +88,12 @@ export function Overview({ session, onSignOut }: { session: Session; onSignOut: 
             <p className={research.small}>Read-only. Every view is recorded in the audit log.</p>
             <div className={styles.status}>
               {data && <p>As of {when(data.as_of)}</p>}
-              {sim && <p>Simulator: {formatSimClock(sim)}</p>}
+              {sim && (
+                <p>
+                  Simulator: {formatSimClock(sim)} &middot; {sim.counts.received} received &middot;{" "}
+                  {sim.counts.rejected} rejected &middot; {sim.counts.abstained} abstained
+                </p>
+              )}
               {data && !data.receiving_data && <p className={styles.warn}>Not receiving data</p>}
               <Link to="/ward">Ward list</Link>
               <button type="button" className={styles.refresh} onClick={() => { setLoading(true); show(); }} disabled={loading}>

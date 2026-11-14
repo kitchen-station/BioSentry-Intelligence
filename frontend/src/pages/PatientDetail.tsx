@@ -1,15 +1,16 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useParams, Link } from "react-router-dom";
 import type { ClinicalNote, PatientDetail as PatientDetailType, Session, SessionRole, VitalsRecorded } from "../types";
-import { getPatient, getNotes, addNote, canRecordVitals } from "../api";
+import { getPatient, getNotes, addNote, canRecordVitals, usesServer } from "../api";
 import { SessionMenu } from "../components/SessionMenu";
 import { SimulatedNote } from "../components/LabFrame";
 import { BaselinePanel } from "../components/BaselinePanel";
 import { useBaseline } from "../components/useBaseline";
 import { CurrentVitals, VitalRow } from "../components/CurrentVitals";
 import { TrendChart } from "../components/TrendChart";
-import { patchInUse } from "../components/format";
+import { formatClock, formatSimClock, patchInUse } from "../components/format";
+import { useLivePoll } from "../components/useLivePoll";
 import { band, driftResponse, response } from "../components/risk";
 import { VitalsEntry } from "../components/VitalsEntry";
 import { standing } from "../components/vitalsDraft";
@@ -60,15 +61,50 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
   const [unranked, setUnranked] = useState<string | null>(null);
   const [refreshFailed, setRefreshFailed] = useState(false);
 
-  useEffect(() => {
+  // The first read decides "not found" or "could not be loaded". A timed read only replaces the
+  // patient: it never touches the drawer, the note box or the vitals form, and says what went wrong
+  // in one line.
+  const shown = useRef<string | null>(null);
+  const [staleSince, setStaleSince] = useState<number | null>(null);
+  const [lastGood, setLastGood] = useState<number | null>(null);
+  const [failedSince, setFailedSince] = useState<number | null>(null);
+  // Each request takes the next number and an answer counts only if no later request was answered
+  // first: a slow old answer never brings back an older score. The timer and a saved entry share it.
+  const issued = useRef(0);
+  const applied = useRef(0);
+  const loadPatient = useCallback(async () => {
     if (!id) return;
-    getPatient(id)
-      .then((p) => {
-        if (p) setPatient(p);
-        else setNotFound(true);
-      })
-      .catch(() => setLoadError(true));
-    if (!readOnly) getNotes(id).then(setNotes).catch(() => setNoteError("Notes could not be loaded."));
+    const n = ++issued.current;
+    try {
+      const p = await getPatient(id);
+      if (n > applied.current) {
+        applied.current = n;
+        const first = shown.current !== id;
+        if (p) {
+          shown.current = id;
+          setPatient(p);
+          setLastGood(Date.now());
+          setFailedSince(null);
+          setStaleSince(null);
+        } else if (first) setNotFound(true);
+        else {
+          setFailedSince(null); // the server answered: only the no-longer line is true now
+          setStaleSince(Date.now());
+        }
+      }
+      return true;
+    } catch {
+      if (n > applied.current) {
+        if (shown.current !== id) setLoadError(true);
+        else setFailedSince((t) => t ?? Date.now());
+      }
+      return false;
+    }
+  }, [id]);
+  const { sim } = useLivePoll(loadPatient, usesServer && !readOnly, staleSince !== null || unranked !== null);
+
+  useEffect(() => {
+    if (id && !readOnly) getNotes(id).then(setNotes).catch(() => setNoteError("Notes could not be loaded."));
   }, [id, readOnly]);
 
   // An admin's page reads the notes only when the drawer opens: one audited read per real look.
@@ -100,7 +136,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
     setSaves((n) => n + 1);
     if (recorded.ranked) {
       setUnranked(null);
-      getPatient(id).then((p) => p && setPatient(p)).catch(() => setRefreshFailed(true));
+      void loadPatient().then((ok) => ok === false && setRefreshFailed(true));
     } else setUnranked(`Recorded. ${standing(recorded)}`);
   };
 
@@ -141,6 +177,11 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
         <div className={styles.stripInner}>
           <Link to="/ward" className={styles.back}>&larr; Ward view</Link>
           <div className={styles.stripRight}>
+            {sim !== null && (
+              <span className={styles.stripSignal} role="group" aria-label="Ward clock">
+                Ward clock {formatSimClock(sim)}
+              </span>
+            )}
             <span className={styles.stripSignal}>
               {signal === null ? "No patch signal" : `Signal ${signal}%`}
             </span>
@@ -158,6 +199,16 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
       <div className={styles.summaryBar}>
         {unranked !== null && (
           <p className={styles.summaryLabel}>No longer ranked. The figures below are from before this entry.</p>
+        )}
+        {/* Here, not in a panel: the big score must not look current when it is not. */}
+        {failedSince !== null && (
+          <p className={styles.summaryLabel} role="status">Cannot reach the ward server since {formatClock(failedSince)}.</p>
+        )}
+        {staleSince !== null && unranked === null && (
+          <p className={styles.summaryLabel} role="status">
+            No longer on your ranked list. Figures from {formatClock(lastGood ?? staleSince)}.{" "}
+            <Link to="/ward">Back to ward</Link>
+          </p>
         )}
         <div className={styles.summaryRow}>
           <div className={styles.summaryInner}>
@@ -226,6 +277,9 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
               <span className={styles.overlayTitle}>
                 {drawer === "notes" ? `Clinical notes${notes.length > 0 ? ` \u00b7 ${notes.length}` : ""}` : "Vital trends -- last 6 hours"}
               </span>
+              {failedSince !== null && (
+                <span>Cannot reach the ward server since {formatClock(failedSince)}.</span>
+              )}
               <button type="button" className={styles.overlayClose} onClick={() => setDrawer(null)}>&times;</button>
             </div>
 
