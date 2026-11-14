@@ -58,8 +58,12 @@ function rebase(v: unknown): unknown {
 const elapsedS = (): number => Math.floor((Date.now() - LOADED_AT) / 1000);
 
 // This is the typed view of the JSON. Copies, so runtime admits and lab entries never mutate the module's data.
+// The file still holds demo Tier B findings and a Tier C block: no model computes them, so they are never read.
+const SEEDED = new Set(["tier_b", "tier_c"]);
+const bare = <T extends object>(o: T): T =>
+  Object.fromEntries(Object.entries(o).filter(([k]) => !SEEDED.has(k))) as T;
 const data = rebase(synthetic) as SyntheticWard;
-const ranked: ScoreRow[] = data.ranked;
+const ranked: ScoreRow[] = data.ranked.map(bare);
 const abstained: AbstainedRow[] = data.abstained;
 const TIERS = ranked[0]?.tier_status ?? [];
 
@@ -369,6 +373,6 @@ export async function getPatient(id: string): Promise<PatientDetail | null> {
     ...row,
     last_update_s: row.last_update_s === null ? null : row.last_update_s + elapsedS(),
     vital_history: detail.vital_history,
-    tier_breakdown: detail.tier_breakdown,
+    tier_breakdown: bare(detail.tier_breakdown),
   };
 }

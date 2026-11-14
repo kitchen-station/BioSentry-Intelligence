@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * The patient page: the score and why, the role's next step, Tier B findings grouped by axis,
+ * The patient page: the score and why, the role's next step,
  * labs with their freshness, notes (append-only, a failed save keeps the text), the trend
  * charts, and the not-found / load-error states.
  */
@@ -30,7 +30,7 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock("../api", () => api);
 
-// p-001 from the committed ward: NEWS2 9 (high), two reasons, eight Tier B findings.
+// p-001 from the committed ward: NEWS2 9 (high), two reasons.
 const row = synthetic.ranked[0] as unknown as Detail;
 const base: Detail = {
   ...row,
@@ -132,44 +132,36 @@ describe("PatientDetail", () => {
     expect(screen.getByText("Emergency assessment; consider critical care")).toBeTruthy();
   });
 
-  it("groups Tier B findings by axis, with direction, source, detail and pathway", async () => {
+  it("shows no seeded Tier B finding and no Tier C block, even when the data carries them", async () => {
     api.getPatient.mockResolvedValue({
       ...base,
-      escalation_reasons: [{ rule: "tier_b_finding", text: "Perfusion falling", pathway: "perfusion" }],
-      tier_b: {
-        ...base.tier_b!,
-        findings: [
-          ...base.tier_b!.findings,
-          { id: "qt", label: "QTc", value: "480 ms", direction: "new", source: "device", significant: false, detail: null },
-          { id: "st", label: "ST deviation", value: "0.1 mV", direction: null, source: "device", significant: false, detail: null },
-        ],
-      },
-    } as Detail);
+      tier_c: { risk_probability: 0.23, forecast_window: "next 1-4h", scored_seconds_ago: 420, attributions: [] },
+    } as unknown as Detail);
     page();
     await loaded();
-    for (const group of ["Device axes", "Lab substrate", "Secondary"]) expect(screen.getByText(group)).toBeTruthy();
-    expect(screen.getByText("Arrhythmia burden")).toBeTruthy();
-    expect(screen.getByText("AF episodes over 6h window")).toBeTruthy();
-    expect(screen.getByText("QTc")).toBeTruthy(); // ungrouped
-    expect(screen.getByText("ST deviation")).toBeTruthy();
-    expect(screen.getByText("(perfusion)", { exact: false })).toBeTruthy();
+    for (const label of ["Arrhythmia burden", "Perfusion index", "HRV (SDNN)", "Troponin trend", "KDIGO stage", "Device axes", "Lab substrate"]) {
+      expect(screen.queryByText(label), label).toBeNull();
+    }
+    for (const text of ["+44% vs baseline", "AF episodes over 6h window", /Tier C/, /risk_probability|23%/]) {
+      expect(screen.queryByText(text), String(text)).toBeNull();
+    }
+    expect(screen.getByText("Other mechanism findings: not yet implemented")).toBeTruthy();
   });
 
   it("lists every recorded lab", async () => {
     api.getPatient.mockResolvedValue({ ...base, labs: { ...everyLab, freshness_hours: 2 } });
     page();
     await loaded();
-    const labs = screen.getByText(/^Labs/).parentElement!; // Tier B also has a "Lactate" finding
+    const labs = screen.getByText(/^Labs/).parentElement!;
     for (const label of LAB_LABELS) expect(within(labs).getByText(label)).toBeTruthy();
     expect(screen.queryByText("No lab values recorded")).toBeNull();
   });
 
-  it("says plainly what is not there: no reasons, no Tier B, no labs, no age or sex", async () => {
+  it("says plainly what is not there: no reasons, no labs, no age or sex", async () => {
     api.getPatient.mockResolvedValue({
       ...base,
       score: 0,
       escalation_reasons: [],
-      tier_b: null,
       labs: noLabs,
       age: null,
       sex: null,
@@ -188,7 +180,7 @@ describe("PatientDetail", () => {
     expect(screen.getByText("80%")).toBeTruthy(); // the summary block
   });
 
-  it("shows the own-baseline panel below the Tier B findings, loaded once with the patient", async () => {
+  it("shows the own-baseline panel in the Tier B panel, loaded once with the patient", async () => {
     api.getBaseline.mockResolvedValue(baseline);
     page();
     await loaded();
@@ -197,13 +189,12 @@ describe("PatientDetail", () => {
     expect(api.getBaseline).toHaveBeenCalledWith("p-001");
     expect(within(region).getByText(/Heart rate/).closest("li")!.textContent).toContain("from own baseline");
     const tierB = region.parentElement!;
-    expect(within(tierB).getByText("Device axes")).toBeTruthy(); // the stored findings stay
+    expect(within(tierB).getByText("Other mechanism findings: not yet implemented")).toBeTruthy();
     expect(tierB.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_CONTAINED_BY).toBeTruthy();
     expect(screen.queryByText("Own-baseline findings need the live API.")).toBeNull();
   });
 
-  it("shows the panel after the placeholder when there are no stored Tier B findings", async () => {
-    api.getPatient.mockResolvedValue({ ...base, tier_b: null } as Detail);
+  it("shows the panel after the placeholder", async () => {
     api.getBaseline.mockResolvedValue(baseline);
     page();
     expect(await screen.findByRole("region", { name: "Change from own baseline" })).toBeTruthy();
@@ -229,7 +220,7 @@ describe("PatientDetail", () => {
     expect(await screen.findByText("Baseline could not be loaded.")).toBeTruthy();
     expect(screen.queryByRole("region", { name: "Change from own baseline" })).toBeNull();
     expect(screen.queryByRole("alert")).toBeNull(); // quiet, not an alarm
-    expect(screen.getByText("Device axes")).toBeTruthy();
+    expect(screen.getByText("Other mechanism findings: not yet implemented")).toBeTruthy();
   });
 
   it("shows not found for a patient that is missing or not yours", async () => {

@@ -7,7 +7,7 @@ from pydantic import AwareDatetime, Field
 from .base import Age, Contract, Flag, NonNegNum, Percent
 from .clinical import LabPanel, VitalHistoryFull, Vitals, VitalTrends
 from .common import Tier, Trend
-from .tiers import EscalationReason, TierBData, TierCData, TierStatus
+from .tiers import EscalationReason, TierStatus
 
 
 class ScoreRow(Contract):
@@ -30,8 +30,6 @@ class ScoreRow(Contract):
     labs: LabPanel
     sort_tier: Tier
     tier_status: list[TierStatus]
-    tier_b: TierBData | None
-    tier_c: TierCData | None
     escalation_reasons: list[EscalationReason]
     synthetic: Flag
     signal_quality: Percent | None  # null when none is stored (served as stored, never invented)
@@ -70,8 +68,6 @@ class TierAScore(Contract):
 
 class TierBreakdown(Contract):
     tier_a: TierAScore | None
-    tier_b: TierBData | None
-    tier_c: TierCData | None
 
 
 class PatientDetail(ScoreRow):
@@ -125,8 +121,6 @@ class UnscoredPatient(Contract):
     vital_trends: VitalTrends
     vital_history: VitalHistoryFull
     labs: LabPanel
-    tier_b: TierBData | None
-    tier_c: TierCData | None
     signal_quality: Percent | None
     last_update_s: NonNegNum | None
     synthetic: Flag

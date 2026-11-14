@@ -25,7 +25,7 @@ each nurse and physician who to see next.
 The list is sorted by **NEWS2**, a published bedside early-warning score (Tier A). A patient
 who meets a NEWS2 trigger sits above one who does not. The own-baseline finding (Tier B) is listed as a
 reason and breaks ties between equal NEWS2 totals below a trigger; it never moves a patient past a NEWS2
-difference. Other Tier B findings are demo content.
+difference. No other Tier B finding and no Tier C risk is shown: no model computes them yet.
 
 **What is here.** The dashboard (`frontend/`) and a slim API (`backend/`: FastAPI over PostgreSQL). The
 ML models and the training code were removed ahead of the Huawei overhaul and are in git history. The

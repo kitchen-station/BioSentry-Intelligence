@@ -2303,28 +2303,8 @@
           "synthetic": {
             "type": "boolean"
           },
-          "tier_b": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TierBData"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "tier_breakdown": {
             "$ref": "#/components/schemas/TierBreakdown"
-          },
-          "tier_c": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TierCData"
-              },
-              {
-                "type": "null"
-              }
-            ]
           },
           "tier_status": {
             "items": {
@@ -2362,8 +2342,6 @@
           "labs",
           "sort_tier",
           "tier_status",
-          "tier_b",
-          "tier_c",
           "escalation_reasons",
           "synthetic",
           "signal_quality",
@@ -2691,26 +2669,6 @@
           "synthetic": {
             "type": "boolean"
           },
-          "tier_b": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TierBData"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "tier_c": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TierCData"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "tier_status": {
             "items": {
               "$ref": "#/components/schemas/TierStatus"
@@ -2744,8 +2702,6 @@
           "labs",
           "sort_tier",
           "tier_status",
-          "tier_b",
-          "tier_c",
           "escalation_reasons",
           "synthetic",
           "signal_quality",
@@ -2872,74 +2828,6 @@
         "title": "TierAScore",
         "type": "object"
       },
-      "TierBData": {
-        "additionalProperties": false,
-        "properties": {
-          "findings": {
-            "items": {
-              "$ref": "#/components/schemas/TierBFinding"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "findings"
-        ],
-        "title": "TierBData",
-        "type": "object"
-      },
-      "TierBFinding": {
-        "additionalProperties": false,
-        "description": "A named observation with its own units. Not comparable on a shared scale.",
-        "properties": {
-          "detail": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "direction": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/FindingDirection"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "id": {
-            "type": "string"
-          },
-          "label": {
-            "type": "string"
-          },
-          "significant": {
-            "type": "boolean"
-          },
-          "source": {
-            "$ref": "#/components/schemas/ProvenanceSource"
-          },
-          "value": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "label",
-          "value",
-          "direction",
-          "source",
-          "significant"
-        ],
-        "title": "TierBFinding",
-        "type": "object"
-      },
       "TierBreakdown": {
         "additionalProperties": false,
         "properties": {
@@ -2952,82 +2840,12 @@
                 "type": "null"
               }
             ]
-          },
-          "tier_b": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TierBData"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "tier_c": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TierCData"
-              },
-              {
-                "type": "null"
-              }
-            ]
           }
         },
         "required": [
-          "tier_a",
-          "tier_b",
-          "tier_c"
+          "tier_a"
         ],
         "title": "TierBreakdown",
-        "type": "object"
-      },
-      "TierCAttribution": {
-        "additionalProperties": false,
-        "properties": {
-          "contribution": {
-            "type": "number"
-          },
-          "feature": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "feature",
-          "contribution"
-        ],
-        "title": "TierCAttribution",
-        "type": "object"
-      },
-      "TierCData": {
-        "additionalProperties": false,
-        "properties": {
-          "attributions": {
-            "items": {
-              "$ref": "#/components/schemas/TierCAttribution"
-            },
-            "type": "array"
-          },
-          "forecast_window": {
-            "type": "string"
-          },
-          "risk_probability": {
-            "maximum": 1,
-            "minimum": 0,
-            "type": "number"
-          },
-          "scored_seconds_ago": {
-            "minimum": 0,
-            "type": "number"
-          }
-        },
-        "required": [
-          "risk_probability",
-          "forecast_window",
-          "scored_seconds_ago",
-          "attributions"
-        ],
-        "title": "TierCData",
         "type": "object"
       },
       "TierCInput": {
@@ -3207,26 +3025,6 @@
           "synthetic": {
             "type": "boolean"
           },
-          "tier_b": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TierBData"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "tier_c": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TierCData"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "trend": {
             "$ref": "#/components/schemas/Trend"
           },
@@ -3254,8 +3052,6 @@
           "vital_trends",
           "vital_history",
           "labs",
-          "tier_b",
-          "tier_c",
           "signal_quality",
           "last_update_s",
           "synthetic",
