@@ -108,19 +108,19 @@ def test_baseline_computed_forming_unavailable_and_missing():
     out = run("own baseline heart rate")
     assert out["status"] == "answered" and out["kind"] == "own_baseline"
     assert out["text"] == FIRST + (
-        "Heart rate: the baseline is 72.5, with this unit:\n"
+        "Heart rate: this patient's own baseline is 72.5, with this unit:\n"
         '  "bpm"\n'
         "It is the median of the first 24 valid 15-minute values. The window starts at admission. "
         "The first value of the window is the 15-minute set that starts at 12 Nov 2026 20:00 UTC.\n"
-        "The latest stored value is 120. It is the median of the 15-minute set that starts at 13 Nov 2026 08:15 UTC. The latest value is above the baseline. The difference from the baseline is 47.5. The z value is 4.2.\n"
+        "The latest stored value is 120. It is the median of the 15-minute set that starts at 13 Nov 2026 08:15 UTC. That set ended 60 seconds ago, on the server's clock. The latest value is above the baseline. The difference from the baseline is 47.5. The z value is 4.2.\n"
         "The baseline band runs from 61.5 to 83.5. The latest value is outside the band.\n"
         "The change is significant. The direction is rising. The run started at 13 Nov 2026 07:30 UTC.\n"
     ) + tail("this patient's own baseline")
-    assert out["numbers"] == ["72.5", "24", "12", "2026", "20", "00", "120", "13", "2026", "08", "15", "47.5", "4.2", "61.5", "83.5",
+    assert out["numbers"] == ["72.5", "24", "12", "2026", "20", "00", "120", "13", "2026", "08", "15", "60", "47.5", "4.2", "61.5", "83.5",
                               "13", "2026", "07", "30"]
     t = run("show the baseline")["text"]
-    assert "Respiratory rate: the baseline is still forming: 10 of 24 values." in t
-    assert "SpO2: no baseline, because the patch is not live." in t
+    assert "Respiratory rate: this patient's own baseline is still forming: 10 of 24 values." in t
+    assert "SpO2: no own baseline, because the patch is not live." in t
     assert "Temperature: the data holds no baseline entry." in t
     out = run("baseline", patient(baseline=None))  # the API can send null for a ranked patient: a fixed sentence, no number
     assert out["status"] == "answered" and out["text"] == FIRST + ask.NO_BASELINE + "\n" + tail("this patient's own baseline") and out["numbers"] == []
@@ -608,7 +608,7 @@ def test_a_comparison_with_the_own_baseline_is_answered_for_each_vital(vital, q)
     entry = {**baseline_dict()["vitals"][0], "vital": vital, "unit": "u"}  # a computed baseline for this vital alone
     out = run(q, patient(baseline=baseline_dict([entry])))
     assert out["status"] == "answered" and out["planner"] == "keywords"
-    assert ask.NAMES[vital] + ": the baseline is 72.5" in out["text"]
+    assert ask.NAMES[vital] + ": this patient's own baseline is 72.5" in out["text"]
     assert "The latest value is above the baseline." in out["text"] and "is outside the band." in out["text"]
 
 
@@ -643,7 +643,7 @@ def test_a_band_that_is_upside_down_is_not_answered():
 
 def test_a_baseline_that_is_still_forming_is_not_compared():
     t = run("how does the respiratory rate compare with the baseline")["text"]
-    assert "the baseline is still forming: 10 of 24 values." in t and "above" not in t and "below" not in t
+    assert "own baseline is still forming: 10 of 24 values." in t and "above" not in t and "below" not in t
 
 
 @pytest.mark.parametrize("q, key", [
@@ -671,10 +671,53 @@ def test_a_baseline_that_is_still_forming_is_not_compared():
     ("is her baseline heart rate high for her age", "outside"),
     ("is her baseline pulse within limits", "outside"),
     ("is her baseline pulse dangerous", "outside"),
+    # a target that follows "baseline" or "usual" is not this patient
+    ("compare with the baseline of most women", "other_patient"),
+    ("compare with the baseline of her sister", "other_patient"),
+    ("compare the heart rate with the baseline for women her size", "other_patient"),
+    ("is the heart rate higher than the baseline from the last admission", "other_patient"),
+    ("is the heart rate higher than the usual for women", "other_patient"),
+    ("is the heart rate usual for a marathon runner", "other_patient"),
+    ("heart rate vs baseline of women", "other_patient"),
+    ("What is a normal heart rate?", "outside"),
+    ("is her pulse normal", "outside"),
 ])
+
+
 def test_a_comparison_question_still_cannot_carry_an_instruction_or_another_patient(q, key):
     assert ask.match(q) == (None, key)
     assert run(q)["status"] == "refused"
+
+
+@pytest.mark.parametrize("q", ["Is her pulse pressure above baseline?", "what is the pulse pressure baseline", "pulse-pressure change in the last 6 hours",
+                               "pulse pressure compared with her usual"])
+def test_pulse_pressure_is_not_the_pulse(q):
+    assert ask.match(q) == (None, "none")
+
+
+@pytest.mark.parametrize("q, vital", [("what is the baseline for heart rate", "heart_rate"), ("What is this patient's baseline for heart rate?", "heart_rate"),
+                                      ("baseline for the respiratory rate", "respiratory_rate"), ("what is the usual spo2 for this patient", "spo2"),
+                                      ("what is her normal heart rate", "heart_rate"), ("what is the baseline of this patient", None),
+                                      ("what is this patient's own normal temperature", "temperature")])
+def test_a_baseline_of_or_for_this_patient_or_a_vital_is_kept(q, vital):
+    assert ask.match(q) == ("own_baseline", {"vital": vital})
+
+
+def test_the_answer_says_own_baseline_in_words_and_gives_the_age_of_the_latest_value():
+    t = run("how does the heart rate compare with the baseline")["text"]
+    assert "this patient's own baseline is 72.5" in t and "That set ended 60 seconds ago, on the server's clock." in t
+    assert "stale" not in t
+    for age, stale in ((1200, False), (1201, True), (7 * 24 * 3600, True)):  # the page's limit: 15 x 60 + 300 seconds
+        v = baseline_dict()
+        v["vitals"][0]["latest_age_s"] = age
+        out = run("heart rate compare baseline", patient(baseline=v))
+        assert out["status"] == "answered" and (f"ended {age} seconds ago" in out["text"])
+        assert ("It is stale: it is older than the limit" in out["text"] and "from today" in out["text"]) is stale
+    v = baseline_dict()
+    del v["vitals"][0]["latest_age_s"]  # older data: no age line, nothing else changes
+    assert "seconds ago" not in run("heart rate compare baseline", patient(baseline=v))["text"]
+    v["vitals"][0]["latest_age_s"] = -5
+    assert run("heart rate compare baseline", patient(baseline=v))["status"] == "bad_data"
 
 
 @pytest.mark.parametrize("q", ["compare the heart rate with the baseline of 40", "compare the heart rate with baseline 40",
