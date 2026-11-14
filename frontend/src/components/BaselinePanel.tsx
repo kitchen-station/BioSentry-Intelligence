@@ -26,7 +26,7 @@ const FLAGS_RISE: Record<string, boolean> = {
 };
 const REASONS: Record<string, string> = {
   no_history: "no history yet",
-  latest_bin_missing: "latest reading missing",
+  latest_bin_missing: "latest 15-minute set missing",
   patch_not_live: "not counted: no live patch reading",
 };
 
@@ -76,17 +76,17 @@ const Num = ({ children, title }: { children: ReactNode; title?: string }) => (
 
 // What the window is anchored on, in words. An unknown anchor is not claimed to be admission.
 const anchorText = (v: BaselineComputed, windowBins: number, admissionKnown: boolean) =>
-  `Baseline: first ${windowBins} valid bins, ${
+  `Baseline: first ${windowBins} valid 15-minute sets, ${
     v.anchored_at === "admission"
       ? "since admission"
       : admissionKnown
-        ? "from the earliest readings kept (not from admission)"
-        : "from the first stored reading (admission time not known)"
+        ? "from the earliest 15-minute set kept (not from admission)"
+        : "from the first stored 15-minute set (admission time not known)"
   }, from ${when(v.baseline_from)}`;
 
 function Computed({ v, k, p, anchor }: { v: BaselineComputed; k: number; p: number; anchor: string | null }) {
   const stale = v.latest_age_s > STALE_AGE_S;
-  const bins = `${v.run_bins} ${v.run_bins === 1 ? "bin" : "bins"}`;
+  const bins = `${v.run_bins} 15-minute ${v.run_bins === 1 ? "set" : "sets"}`;
   const flagsRise = FLAGS_RISE[v.vital];
   const direction = typeof v.direction === "string" ? v.direction : null; // a wrong type is absent
   const pathway = typeof v.pathway === "string" ? v.pathway : null;
@@ -97,7 +97,7 @@ function Computed({ v, k, p, anchor }: { v: BaselineComputed; k: number; p: numb
     v.run_bins === 0 && Math.abs(v.z) < k
       ? ""
       : wentFlaggedWay
-        ? ` (only ${v.run_bins} of ${p} bins so far)`
+        ? ` (only ${v.run_bins} of ${p} 15-minute sets so far)`
         : v.delta === 0
           ? ""
           : ` (moved the other way; only a sustained ${flagsRise ? "rise" : "fall"} is flagged)`;
@@ -120,7 +120,7 @@ function Computed({ v, k, p, anchor }: { v: BaselineComputed; k: number; p: numb
       <span className={styles.secondary}>{" "}z <Num>{v.z}</Num>{pathway !== null && ` · ${pathway}`}</span>
       {/* An old reading is worded and marked, not just dated: it must not pass as current. */}
       <span className={styles.sub} data-stale={stale || undefined}>
-        {stale ? "Stale · " : ""}15-min median <Num>{when(v.latest_at)}</Num> to{" "}
+        {stale ? "Stale · " : ""}15-minute set <Num>{when(v.latest_at)}</Num> to{" "}
         <Num>{formatClock(Date.parse(v.latest_at) + BIN_MIN * 60_000)}</Num>, ended {formatAge(v.latest_age_s)}
       </span>
       {anchor !== null && <span className={styles.sub}>{anchor}</span>}
@@ -133,7 +133,7 @@ function Item({ v, k, p, anchor }: { v: unknown; k: number; p: number; anchor: (
   if (v.status === "computed" && isComputed(v)) return <Computed v={v} k={k} p={p} anchor={anchor(v)} />;
   const name = <span className={styles.name}>{NAMES[v.vital]}</span>;
   if (v.status === "forming" && num(v.bins_valid) && num(v.bins_needed)) {
-    return <>{name} · baseline forming, <Num>{v.bins_valid}</Num> of <Num>{v.bins_needed}</Num> bins</>;
+    return <>{name} · Own baseline: getting ready (<Num>{v.bins_valid}</Num> of <Num>{v.bins_needed}</Num> 15-minute sets)</>;
   }
   if (v.status === "unavailable" && typeof v.reason === "string" && Object.hasOwn(REASONS, v.reason)) {
     return <>{name} · {REASONS[v.reason]}</>;
@@ -143,18 +143,19 @@ function Item({ v, k, p, anchor }: { v: unknown; k: number; p: number; anchor: (
 
 export function BaselinePanel({ baseline }: { baseline: BaselineState }) {
   const heading = useId();
-  if (baseline === undefined) return <p className={styles.quiet}>Loading baseline…</p>;
-  if (baseline === null) return <p className={styles.quiet}>Own-baseline findings need the live API.</p>;
+  if (baseline === undefined) return <p className={styles.quiet}>Own baseline: getting ready.</p>;
+  if (baseline === null) return <p className={styles.quiet}>Own baseline: not shown in this version.</p>;
+  const failed = <p className={styles.quiet}>Baseline could not be loaded.</p>;
+  if (baseline === "failed") return failed;
   const b: unknown = baseline;
   if (
-    baseline === "failed" ||
     !isObj(b) ||
     !Array.isArray(b.vitals) ||
     b.vitals.length === 0 ||
     !isObj(b.params) ||
     ![b.params.k, b.params.p, b.params.window_bins].every(num)
   ) {
-    return <p className={styles.quiet}>Baseline could not be loaded.</p>;
+    return failed;
   }
   const { k, p, window_bins } = b.params as { k: number; p: number; window_bins: number };
   const entries: unknown[] = b.vitals;

@@ -151,7 +151,27 @@ describe("PatientDetail", () => {
     for (const text of ["+44% vs baseline", "AF episodes over 6h window", /Tier C/, /risk_probability|23%/]) {
       expect(screen.queryByText(text), String(text)).toBeNull();
     }
-    expect(screen.getByText("Findings beyond NEWS2 show here when they are computed.")).toBeTruthy();
+    expect(screen.getByText("Own baseline: not shown in this version.")).toBeTruthy();
+  });
+
+  it("says no lab result yet only when every lab is missing", async () => {
+    api.getPatient.mockResolvedValue({ ...base, labs: { ...noLabs, sodium: { ...everyLab.sodium! } } });
+    page();
+    await loaded();
+    expect(screen.getByText("Sodium")).toBeTruthy();
+    expect(screen.queryByText("No lab result yet.")).toBeNull();
+  });
+
+  it("says no lab result yet when only a lab with no row is set, and keeps it hidden for an absent measurement", async () => {
+    api.getPatient.mockResolvedValue({ ...base, labs: { ...noLabs, calcium: potassium } });
+    page();
+    await loaded();
+    expect(screen.getByText("No lab result yet.")).toBeTruthy();
+    cleanup();
+    api.getPatient.mockResolvedValue({ ...base, labs: { ...noLabs, sodium: { ...potassium, data: { present: false } } } as unknown as LabPanel });
+    page();
+    await loaded();
+    expect(screen.queryByText("No lab result yet.")).toBeNull();
   });
 
   it("lists every recorded lab", async () => {
@@ -160,7 +180,7 @@ describe("PatientDetail", () => {
     await loaded();
     const labs = screen.getByText(/^Labs/).parentElement!;
     for (const label of LAB_LABELS) expect(within(labs).getByText(label)).toBeTruthy();
-    expect(screen.queryByText("No lab values recorded")).toBeNull();
+    expect(screen.queryByText("No lab result yet.")).toBeNull();
   });
 
   it("says plainly what is not there: no reasons, no labs, no age or sex", async () => {
@@ -177,16 +197,15 @@ describe("PatientDetail", () => {
     await loaded();
     expect(screen.getByText("Sorted on NEWS2 only")).toBeTruthy();
     expect(screen.queryByText("Next step")).toBeNull(); // band low: no response block
-    expect(screen.getByText("Findings beyond NEWS2 show here when they are computed.")).toBeTruthy(); // never an empty box
-    expect(screen.getByText("Own-baseline findings need the live API.")).toBeTruthy();
-    expect(screen.getByText("No lab values recorded")).toBeTruthy();
+    expect(screen.getByText("Own baseline: not shown in this version.")).toBeTruthy(); // never an empty box
+    expect(screen.getByText("No lab result yet.")).toBeTruthy();
     expect(screen.getByText(/^-- -- · Bed/)).toBeTruthy();
     expect(screen.queryByText(/since collection/)).toBeNull();
     expect(screen.getByText("Signal 80%")).toBeTruthy(); // the strip
     expect(screen.getByText("80%")).toBeTruthy(); // the summary block
   });
 
-  it("shows the own-baseline panel in the Tier B panel, loaded once with the patient", async () => {
+  it("shows the own-baseline panel in the Own baseline panel, loaded once with the patient", async () => {
     api.getBaseline.mockResolvedValue(baseline);
     page();
     await loaded();
@@ -195,23 +214,23 @@ describe("PatientDetail", () => {
     expect(api.getBaseline).toHaveBeenCalledWith("p-001");
     expect(within(region).getByText(/Heart rate/).closest("li")!.textContent).toContain("from own baseline");
     const tierB = region.parentElement!;
-    expect(within(tierB).getByText("Findings beyond NEWS2 show here when they are computed.")).toBeTruthy();
+    expect(within(tierB).getByText("Own baseline")).toBeTruthy();
     expect(tierB.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_CONTAINED_BY).toBeTruthy();
-    expect(screen.queryByText("Own-baseline findings need the live API.")).toBeNull();
+    expect(screen.queryByText("Own baseline: getting ready.")).toBeNull();
   });
 
   it("shows the panel after the placeholder", async () => {
     api.getBaseline.mockResolvedValue(baseline);
     page();
     expect(await screen.findByRole("region", { name: "Change from own baseline" })).toBeTruthy();
-    expect(screen.getByText("Findings beyond NEWS2 show here when they are computed.")).toBeTruthy();
+    expect(screen.getByText("Own baseline")).toBeTruthy();
   });
 
   it("says it is loading the baseline, and never shows another patient's", async () => {
     api.getBaseline.mockReturnValue(new Promise(() => undefined));
     page();
     await loaded();
-    expect(screen.getByText("Loading baseline…")).toBeTruthy();
+    expect(screen.getByText("Own baseline: getting ready.")).toBeTruthy();
     cleanup();
     api.getBaseline.mockResolvedValue({ ...baseline, patient_id: "p-002" });
     page();
@@ -226,7 +245,7 @@ describe("PatientDetail", () => {
     expect(await screen.findByText("Baseline could not be loaded.")).toBeTruthy();
     expect(screen.queryByRole("region", { name: "Change from own baseline" })).toBeNull();
     expect(screen.queryByRole("alert")).toBeNull(); // quiet, not an alarm
-    expect(screen.getByText("Findings beyond NEWS2 show here when they are computed.")).toBeTruthy();
+    expect(screen.getByText("Own baseline")).toBeTruthy();
   });
 
   it("shows not found for a patient that is missing or not yours", async () => {
@@ -513,7 +532,7 @@ describe("PatientDetail own-baseline reason and patch display", () => {
     expect(screen.queryByText(/^Not a NEWS2 trigger/)).toBeNull();
     // Only model lines: the patient is where NEWS2 puts them, and the page still says so.
     expect(screen.getByText("Sorted on NEWS2 only")).toBeTruthy();
-    const label = screen.getByText("Research models \u00b7 rank unchanged");
+    const label = screen.getByText("Prediction models \u00b7 rank unchanged");
     const why = screen.getByText("Why this patient is up");
     expect(why.compareDocumentPosition(label) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(label.compareDocumentPosition(screen.getByText("Prediction model flag (synthetic, not validated)")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -875,13 +894,13 @@ describe("PatientDetail follows the ward's speed", () => {
   });
 });
 
-describe("PatientDetail research models panel", () => {
+describe("PatientDetail prediction models panel", () => {
   it("sits after the own-baseline panel and asks for nothing extra", async () => {
     api.getBaseline.mockResolvedValue(baseline);
     page();
     await loaded();
     const own = await screen.findByRole("region", { name: "Change from own baseline" });
-    const models = screen.getByRole("region", { name: "Research models" });
+    const models = screen.getByRole("region", { name: "Prediction models" });
     expect(own.compareDocumentPosition(models) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(own.parentElement).toBe(models.parentElement);
     expect(api.getPatient).toHaveBeenCalledOnce();
@@ -896,9 +915,9 @@ describe("PatientDetail research models panel", () => {
     } as Detail);
     page("admin");
     await loaded();
-    const region = screen.getByRole("region", { name: "Research models" });
-    expect(within(region).getAllByText(/Not computed: the patient's own baseline is still forming/)).toHaveLength(2);
-    expect(screen.getByText("Research models · rank unchanged")).toBeTruthy();
+    const region = screen.getByRole("region", { name: "Prediction models" });
+    expect(within(region).getAllByText(/No result: the patient's own baseline is still forming/)).toHaveLength(2);
+    expect(screen.getByText("Prediction models · rank unchanged")).toBeTruthy();
   });
 
   it("shows no panel when the server sends no models", async () => {
@@ -907,7 +926,7 @@ describe("PatientDetail research models panel", () => {
     api.getPatient.mockResolvedValue(old);
     page();
     await loaded();
-    expect(screen.queryByRole("region", { name: "Research models" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Prediction models" })).toBeNull();
   });
 });
 
