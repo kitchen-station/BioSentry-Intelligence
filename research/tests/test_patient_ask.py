@@ -119,7 +119,8 @@ def test_baseline_computed_forming_unavailable_and_missing():
     assert "Respiratory rate: the baseline is still forming: 10 of 24 values." in t
     assert "SpO2: no baseline, because the patch is not live." in t
     assert "Temperature: the data holds no baseline entry." in t
-    assert run("baseline", patient(baseline=None))["status"] == "bad_data"  # NOT RANKED is the only case with no baseline
+    out = run("baseline", patient(baseline=None))  # the API can send null for a ranked patient: a fixed sentence, no number
+    assert out["status"] == "answered" and out["text"] == FIRST + ask.NO_BASELINE + "\n" + tail("this patient's own baseline") and out["numbers"] == []
     for reason, sentence in ask.UNAVAILABLE.items():
         v = baseline_dict([{"vital": "heart_rate", "status": "unavailable", "reason": reason}])
         assert sentence in run("baseline heart rate", patient(baseline=v))["text"]
