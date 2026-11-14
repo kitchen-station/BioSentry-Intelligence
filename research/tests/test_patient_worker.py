@@ -1,5 +1,6 @@
 import json
 import re
+from pathlib import Path
 
 import pytest
 from patient_fixtures import abstained, patient
@@ -235,3 +236,61 @@ def test_the_record_names_each_kind(kind):
     fake = Fake(job(question=q))
     go(fake)
     assert json.loads(body(fake)["record_json"])["kind"] == kind
+
+
+# The body the dashboard session's API returned for one claim (seeded patient p-001), and the hash it stored at ask time.
+SAMPLE = json.loads((Path(__file__).parent / "data" / "patient_question_job.json").read_text(encoding="utf-8"))
+SAMPLE_SHA256 = "4ae3a9251c5a8adfff7fa31573af60abcabf38cee1493db92ed5b5bb0a33521b"
+
+
+def test_the_hash_of_the_api_sample_job_is_the_hash_the_api_stored():
+    assert worker.data_sha256(SAMPLE["patient"]) == SAMPLE_SHA256
+
+
+def test_the_api_sample_job_ends_done_with_the_stored_hash():
+    fake = Fake((200, SAMPLE))
+    go(fake, commit="abc1234")
+    b = body(fake)
+    record = json.loads(b["record_json"])
+    assert b["state"] == "done" and b["answer"].startswith(ask.FIRST) and "number 1 on your list" in b["answer"]
+    assert type(record["patient_question_format"]) is int and record["patient_question_format"] == 1
+    assert record["synthetic"] is True and record["grounding"] == "ok" and record["kind"] == "why_rank"
+    assert record["data_sha256"] == SAMPLE_SHA256
+
+
+@pytest.mark.parametrize("q, kind", [("what is this patient's baseline heart rate", "own_baseline"), ("which alerts are active", "active_alerts"),
+                                     ("how has spo2 changed over the last 72 hours", "recent_change"), ("show the baseline", "own_baseline")])
+def test_every_kind_answers_on_the_api_sample(q, kind):
+    out = worker.report_for({**SAMPLE, "question": q}, None)
+    assert out["state"] == "done" and json.loads(out["record_json"])["kind"] == kind
+
+
+def test_a_ranked_patient_with_a_null_baseline_gets_a_fixed_sentence_not_a_failure():
+    p = {**SAMPLE["patient"], "baseline": None}
+    out = worker.report_for({**SAMPLE, "question": "what is this patient's baseline heart rate", "patient": p}, None)
+    record = json.loads(out["record_json"])
+    assert out["state"] == "done" and record["kind"] == "own_baseline" and record["numbers"] == []
+    assert out["answer"].split("\n")[1] == ask.NO_BASELINE == "The data for this patient holds no baseline at this time."
+    for q in ("why is this patient at this rank", "what changed in the last 6 hours", "which alerts are active"):
+        assert worker.report_for({**SAMPLE, "question": q, "patient": p}, None)["state"] == "done"
+    del p["baseline"]  # a missing key is not the contract's null: it stays a failure
+    out = worker.report_for({**SAMPLE, "question": "show the baseline", "patient": p}, None)
+    assert out == {"state": "failed", "reason": "the agent stopped with an error"}
+
+
+@pytest.mark.parametrize("q", ["what is this patient's baseline heart rate", "show the baseline", "why is this patient at this rank",
+                               "what changed in the last 6 hours", "which alerts are active"])
+def test_a_key_the_worker_does_not_know_changes_the_hash_and_nothing_else(q):
+    # The API will add keys to `patient` (a baseline band, provenance fields). The worker ignores them and hashes what it got.
+    p = json.loads(json.dumps(SAMPLE["patient"]))
+    for e in p["baseline"]["vitals"]:
+        e["band_low"], e["band_high"] = 99.9, 111.1
+    for v in p["detail"]["vitals"].values():
+        v["provenance"].update(variant=None, file_sha256=None, run_id=None)
+    p["new_top"], p["detail"]["new_key"], p["baseline"]["new_key"] = "x", {"a": [1, 2]}, 5
+    old = worker.report_for({**SAMPLE, "question": q}, None)
+    new = worker.report_for({**SAMPLE, "question": q, "patient": p}, None)
+    a, b = json.loads(old["record_json"]), json.loads(new["record_json"])
+    assert new["state"] == "done" and new["answer"] == old["answer"]
+    assert b["data_sha256"] == worker.data_sha256(p) != a["data_sha256"]
+    assert {**b, "data_sha256": ""} == {**a, "data_sha256": ""}

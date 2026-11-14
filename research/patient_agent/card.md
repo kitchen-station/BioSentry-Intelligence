@@ -13,7 +13,8 @@ job id and a state only. A field that the question's kind needs and that is miss
 data unusable: the job ends `failed` and no answer goes out. The agent never guesses a missing field.
 
 ## What it answers (four kinds)
-- `own_baseline`: "What is this patient's baseline for heart rate?"
+- `own_baseline`: "What is this patient's baseline for heart rate?" A ranked patient whose data holds a null
+  baseline gets one fixed sentence: the data holds no baseline at this time.
 - `recent_change`: "What changed in the last 6 hours?" or "What changed in SpO2 in the last 3 hours?" (first, latest,
   lowest and highest value with times; no computed number). A vital in the question limits the answer to that vital.
   Temperature gets a fixed sentence: the history holds no temperature. `own_baseline` for temperature gives the

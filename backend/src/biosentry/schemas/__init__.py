@@ -43,7 +43,14 @@ from .common import (
     Trend,
 )
 from .ingest import LiveWard
-from .lab import LabRunDetail, LabRunItem, NewLabRun
+from .lab import (
+    LabRunDetail,
+    LabRunItem,
+    NewLabRun,
+    NewPatientQuestion,
+    PatientQuestionDetail,
+    PatientQuestionItem,
+)
 from .overview import (
     OverviewActivity,
     OverviewClinician,
@@ -141,6 +148,9 @@ CONTRACT_MODELS: tuple[type[BaseModel], ...] = (
     NewLabRun,
     LabRunItem,
     LabRunDetail,
+    NewPatientQuestion,
+    PatientQuestionItem,
+    PatientQuestionDetail,
 )
 
 # Inputs entered by a person: optional fields may be omitted and default to None.
@@ -180,6 +190,7 @@ __all__ = [
     "NewAcknowledgement",
     "NewLabRun",
     "NewNote",
+    "NewPatientQuestion",
     "NumberMeasurement",
     "NurseVitalsInput",
     "OverviewActivity",
@@ -191,6 +202,8 @@ __all__ = [
     "PartialLabInput",
     "PatientDetail",
     "PatientExtractionResult",
+    "PatientQuestionDetail",
+    "PatientQuestionItem",
     "PatientStay",
     "PatientSummary",
     "Provenance",

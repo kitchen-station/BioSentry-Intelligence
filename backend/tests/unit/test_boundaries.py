@@ -72,3 +72,22 @@ def test_nothing_that_ranks_a_patient_reads_a_lab_run() -> None:
     assert len(ranking) > 5
     pattern = re.compile(r"lab_run|biosentry\.(services|schemas)\.lab\b|import[^\n]*\blab\b")
     assert [str(f) for f in ranking if pattern.search(f.read_text("utf-8"))] == []
+
+
+def test_only_the_lab_files_read_a_question_and_no_audit_line_names_one() -> None:
+    reads = re.compile(r"\.question\b|\[\s*[\"']question[\"']\s*\]|context_sha256")
+    allowed = {
+        SRC / "schemas" / "lab.py",
+        SRC / "services" / "lab.py",
+        SRC / "services" / "patient_ask.py",
+    }
+    found = [str(f) for f in SRC.rglob("*.py") if f not in allowed and reads.search(f.read_text("utf-8"))]
+    assert found == []
+    for f in allowed:
+        lines = f.read_text("utf-8").splitlines()
+        assert [ln for ln in lines if "audit." in ln and re.search(r"\b(question|context|text)\b", ln)] == []
+
+
+def test_only_the_patient_question_service_builds_the_context() -> None:
+    users = [f.name for f in SRC.rglob("*.py") if re.search(r"PatientContext\b", f.read_text("utf-8"))]
+    assert sorted(users) == ["lab.py", "patient_ask.py"]

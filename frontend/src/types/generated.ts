@@ -361,6 +361,10 @@ export interface components {
             readonly content: string;
             readonly role: string;
         };
+        /** NewPatientQuestion */
+        readonly NewPatientQuestion: {
+            readonly question: string;
+        };
         /** NumberMeasurement */
         readonly NumberMeasurement: {
             readonly data: components["schemas"]["NumberPresent"] | components["schemas"]["MeasurementAbsent"];
@@ -576,6 +580,34 @@ export interface components {
             readonly model_id: string;
             readonly synthetic: boolean;
             readonly values: components["schemas"]["PartialAdmitPatientInput"];
+        };
+        /** PatientQuestionDetail */
+        readonly PatientQuestionDetail: {
+            readonly answer: string | null;
+            readonly claimed_at: string | null;
+            readonly finished_at: string | null;
+            readonly id: number;
+            readonly question: string;
+            readonly reason: string | null;
+            readonly report: {
+                readonly [key: string]: unknown;
+            } | null;
+            readonly requested_at: string;
+            readonly requested_by: string;
+            /** @enum {string} */
+            readonly state: "queued" | "running" | "done" | "failed" | "refused";
+        };
+        /** PatientQuestionItem */
+        readonly PatientQuestionItem: {
+            readonly claimed_at: string | null;
+            readonly finished_at: string | null;
+            readonly id: number;
+            readonly question: string;
+            readonly reason: string | null;
+            readonly requested_at: string;
+            readonly requested_by: string;
+            /** @enum {string} */
+            readonly state: "queued" | "running" | "done" | "failed" | "refused";
         };
         /**
          * PatientStay
@@ -882,6 +914,7 @@ export type LiveWard = components['schemas']['LiveWard'];
 export type MeasurementAbsent = components['schemas']['MeasurementAbsent'];
 export type NewLabRun = components['schemas']['NewLabRun'];
 export type NewNote = components['schemas']['NewNote'];
+export type NewPatientQuestion = components['schemas']['NewPatientQuestion'];
 export type NumberMeasurement = components['schemas']['NumberMeasurement'];
 export type NumberPresent = components['schemas']['NumberPresent'];
 export type NurseVitalsInput = components['schemas']['NurseVitalsInput'];
@@ -894,6 +927,8 @@ export type PartialAdmitPatientInput = components['schemas']['PartialAdmitPatien
 export type PartialLabInput = components['schemas']['PartialLabInput'];
 export type PatientDetail = components['schemas']['PatientDetail'];
 export type PatientExtractionResult = components['schemas']['PatientExtractionResult'];
+export type PatientQuestionDetail = components['schemas']['PatientQuestionDetail'];
+export type PatientQuestionItem = components['schemas']['PatientQuestionItem'];
 export type PatientStay = components['schemas']['PatientStay'];
 export type PatientSummary = components['schemas']['PatientSummary'];
 export type PatientView = components['schemas']['PatientView'];

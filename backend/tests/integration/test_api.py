@@ -335,6 +335,9 @@ def test_the_audit_trail_holds_no_patient_data(app_and_client: tuple[Any, TestCl
         ("GET", "/patients/{}", "view_patient", None),
         ("GET", "/patients/{}/notes", "view_notes", None),
         ("GET", "/patients/{}/baseline", "view_baseline", None),
+        ("GET", "/patients/{}/questions", "view_patient_questions", None),
+        ("GET", "/patients/{}/questions/1", "view_patient_question", None),
+        ("POST", "/patients/{}/questions", "ask_patient", {"question": "What changed?"}),
         ("POST", "/patients/{}/notes", "add_note", {"author": "a", "role": "RN", "content": "c"}),
         ("DELETE", "/patients/{}/notes/n-001", "delete_note", None),
         ("POST", "/patients/{}/labs", "enter_labs", {"potassium": 4.0}),
@@ -1067,6 +1070,7 @@ def test_a_bad_body_is_answered_the_same_for_not_yours_and_nonexistent(
         ("POST", "/patients/p-001/labs", "enter_labs", {"potassium": "high"}),
         ("POST", "/patients/p-004/vitals", "record_vitals", {}),
         ("POST", "/wards/W4/lab/runs", "lab_request", {}),
+        ("POST", "/patients/p-001/questions", "ask_patient", {}),
     ],
 )
 def test_every_write_route_audits_a_body_that_fails_validation(
@@ -1104,6 +1108,7 @@ VALID_BODIES: dict[tuple[str, str], dict[str, Any]] = {
     ("POST", "/patients/{patient_id}/notes"): {"author": "a", "role": "RN", "content": "c"},
     ("POST", "/patients/{patient_id}/labs"): {"potassium": 4.0},
     ("POST", "/patients/{patient_id}/vitals"): {"systolic": 120, "diastolic": 80},
+    ("POST", "/patients/{patient_id}/questions"): {"question": "What changed?"},
     ("POST", "/wards/{ward}/lab/runs"): {
         "kind": "compare",
         "mode": "w4",
@@ -1113,7 +1118,9 @@ VALID_BODIES: dict[tuple[str, str], dict[str, Any]] = {
         "change": "news2_chart_trigger",
     },
 }
-PATH_VALUES = {"patient_id": "p-001", "note_id": "n-001", "ward": "W4", "lab_run_id": "1"}
+PATH_VALUES = {
+    "patient_id": "p-001", "note_id": "n-001", "ward": "W4", "lab_run_id": "1", "question_id": "1",
+}  # fmt: skip
 
 
 def _route_table(app: Any) -> list[tuple[str, str]]:

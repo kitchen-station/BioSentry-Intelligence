@@ -17,7 +17,10 @@ that is no longer the newest is refused (both 409, nothing written). The sim rea
 did (acknowledgements, vitals, notes without their text, admissions) from /sim/runs/{id}/actions,
 and what a clinician who may (an md or the charge nurse) asked of it from /sim/runs/{id}/commands.
 The Simulation lab stores a clinician's request for a simulated compare run and its result; a lab
-worker claims and reports through /sim/lab/* (ingest key). The API never runs anything.
+worker claims and reports through /sim/lab/* (ingest key). A clinician who may see a patient can
+also ask one question about that patient: the API freezes an allow-listed copy of the patient's
+data with the question, a worker answers from that copy only, and the clinician reads the answer.
+The API never runs anything.
 """
 
 import hashlib
@@ -52,9 +55,12 @@ from biosentry.schemas import (
     NewAcknowledgement,
     NewLabRun,
     NewNote,
+    NewPatientQuestion,
     NurseVitalsInput,
     PartialLabInput,
     PatientDetail,
+    PatientQuestionDetail,
+    PatientQuestionItem,
     PatientStay,
     PatientSummary,
     SessionRequest,
@@ -74,10 +80,11 @@ from biosentry.schemas.ingest import (
     NewCommand,
     NewRun,
 )
-from biosentry.schemas.lab import LabJob, LabReport
+from biosentry.schemas.lab import LabJob, LabReport, PatientQuestionJob
 from biosentry.services import ingest, lab
 from biosentry.services.baseline import BaselineService
 from biosentry.services.overview import OverviewService
+from biosentry.services.patient_ask import PatientAskService
 from biosentry.services.patients import PatientService, RejectedError
 from biosentry.services.ward import WardService
 
@@ -99,6 +106,7 @@ WRITE_ACTIONS = {
     ("POST", "/patients/{patient_id}/acknowledgement"): "acknowledge",
     ("POST", "/wards/{ward}/sim/commands"): "sim_command",
     ("POST", "/wards/{ward}/lab/runs"): "lab_request",
+    ("POST", "/patients/{patient_id}/questions"): "ask_patient",
 }
 # Every write route that has no body or is not in WRITE_ACTIONS, so an admin is refused on it too.
 REFUSED_ACTIONS = {
@@ -122,6 +130,11 @@ UNAUTHENTICATED_WRITES = {
 LAB_RUN_ID = re.compile(r"[1-9][0-9]{0,18}")
 
 
+def row_id(text: str) -> int | None:
+    """The id a path names, or None when it is not one the database can hold."""
+    return int(text) if LAB_RUN_ID.fullmatch(text) and int(text) <= BIGINT_MAX else None
+
+
 @dataclass(slots=True)
 class Context:
     """One request: its connection and the services built on it."""
@@ -133,6 +146,7 @@ class Context:
     patients: PatientService
     baselines: BaselineService
     overview: OverviewService
+    questions: PatientAskService
 
     def close(self) -> None:
         self.conn.close()
@@ -234,14 +248,16 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
             store = PostgresStore(conn, clock)
             audit = AuditLog(conn, clock, store.role_of)
             wards = WardService(store, audit)
+            baselines = BaselineService(store, audit, wards)
             return Context(
                 conn,
                 store,
                 audit,
                 wards,
                 PatientService(store, audit, wards),
-                BaselineService(store, audit, wards),
+                baselines,
                 OverviewService(store, audit, wards),
+                PatientAskService(store, audit, wards, baselines),
             )
         except BaseException:
             conn.close()
@@ -257,6 +273,14 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
         if not secrets.compare_digest(given, settings.ingest_key.encode()):
             ctx.audit.append(None, "ingest", "-", "denied")
             raise HTTPException(status_code=403, detail="Forbidden")
+
+    def lab_kind(request: Request, kind: lab.Kind = "compare") -> lab.Kind:
+        """At most one `kind`: FastAPI would take the last of two without a word."""
+        if len(request.query_params.getlist("kind")) > 1:
+            raise RequestValidationError(
+                [{"type": "too_long", "loc": ("query", "kind"), "msg": "Give kind once"}]
+            )
+        return kind
 
     app = FastAPI(
         title="BioSentry Intelligence API",
@@ -448,8 +472,8 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
     def lab_run(ward: str, lab_run_id: str, ctx: Ctx, who: Who) -> LabRunDetail:
         lab_reader(ctx, who, "view_lab_run", ward)
         found = None
-        if LAB_RUN_ID.fullmatch(lab_run_id) and int(lab_run_id) <= BIGINT_MAX:
-            found = lab.get_run(ctx.store, int(lab_run_id))
+        if (run_id := row_id(lab_run_id)) is not None:
+            found = lab.get_run(ctx.store, run_id)
         if found is None:  # malformed and unknown are one answer, and audited
             ctx.audit.append(who, "view_lab_run", ward, "not_found")
             raise HTTPException(status_code=404, detail=NOT_FOUND)
@@ -470,6 +494,45 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
     @app.get("/patients/{patient_id}/baseline", response_model=BaselineResponse)
     def get_baseline(patient_id: str, ctx: Ctx, who: Who) -> BaselineResponse:
         found = ctx.baselines.baseline(who, patient_id)
+        if found is None:
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return found
+
+    @app.post(
+        "/patients/{patient_id}/questions", response_model=PatientQuestionItem, status_code=201
+    )
+    def ask_patient(
+        patient_id: str, body: NewPatientQuestion, ctx: Ctx, who: Writer
+    ) -> PatientQuestionItem:
+        made = ctx.questions.create(who, patient_id, body)
+        if made == "not_found":
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        if made == "limited":
+            raise HTTPException(status_code=429, detail="Question limit reached")
+        return made
+
+    def not_for_admin(ctx: Context, who: str, action: str, patient_id: str) -> None:
+        """An admin does not see what a clinician asked about a patient: the lab's rule."""
+        if ctx.store.is_admin(who):
+            ctx.audit.append(who, action, patient_id, "denied")
+            raise HTTPException(status_code=403, detail="Forbidden")
+
+    @app.get("/patients/{patient_id}/questions", response_model=list[PatientQuestionItem])
+    def list_patient_questions(patient_id: str, ctx: Ctx, who: Who) -> list[PatientQuestionItem]:
+        not_for_admin(ctx, who, "view_patient_questions", patient_id)
+        found = ctx.questions.recent(who, patient_id)
+        if found is None:
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return found
+
+    @app.get(
+        "/patients/{patient_id}/questions/{question_id}", response_model=PatientQuestionDetail
+    )
+    def get_patient_question(
+        patient_id: str, question_id: str, ctx: Ctx, who: Who
+    ) -> PatientQuestionDetail:
+        not_for_admin(ctx, who, "view_patient_question", patient_id)
+        found = ctx.questions.detail(who, patient_id, row_id(question_id))
         if found is None:
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return found
@@ -596,9 +659,13 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return Commands.model_validate({"commands": found})
 
-    @app.post("/sim/lab/claim", response_model=LabJob)
-    def claim_lab_run(ctx: Ctx, _: Annotated[None, Depends(ingest_gate)]) -> LabJob | Response:
-        job = lab.claim(ctx.conn, clock())
+    @app.post("/sim/lab/claim", response_model=LabJob | PatientQuestionJob)
+    def claim_lab_run(
+        ctx: Ctx,
+        _: Annotated[None, Depends(ingest_gate)],
+        kind: Annotated[lab.Kind, Depends(lab_kind)],
+    ) -> LabJob | PatientQuestionJob | Response:
+        job = lab.claim(ctx.conn, clock(), kind)
         if job is None:  # an empty poll writes no audit row: it records nothing
             return Response(status_code=204)
         ctx.audit.append(None, "lab_claim", f"lab_run:{job.id}", "ok")

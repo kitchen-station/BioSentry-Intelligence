@@ -15,6 +15,7 @@ MAX_NODES = 200_000
 MAX_LIST = 2000
 LAST = "Synthetic data. Not validated. Not advice on treatment."
 FIRST = "For this patient only:"
+NO_BASELINE = "The data for this patient holds no baseline at this time."
 FIXED = ("NEWS2", "SpO2", "15-minute")
 KINDS = ("own_baseline", "recent_change", "why_rank", "active_alerts")
 VITALS = ("heart_rate", "respiratory_rate", "spo2", "temperature")
@@ -427,7 +428,8 @@ def build(kind: str, args: dict, patient: dict) -> tuple[str, list[str]]:
     else:
         phrase = PHRASES[kind]
         if kind == "own_baseline":
-            lines = _baseline(w, args, patient.get("baseline"))
+            # contract-patient-ask: `baseline` is null for a ranked patient when the baseline read gave nothing.
+            lines = [NO_BASELINE] if "baseline" in patient and patient["baseline"] is None else _baseline(w, args, patient.get("baseline"))
         elif kind == "recent_change":
             lines = _changes(w, args, data)
         elif kind == "why_rank":
@@ -444,6 +446,8 @@ def _roots(kind: str, args: dict, patient: dict) -> list:
     d, v = patient["detail"], args.get("vital")
     if kind == "own_baseline":
         b = patient["baseline"]
+        if b is None:
+            return []
         return [b["params"]["window_bins"], *[e for e in b["vitals"] if v is None or e.get("vital") == v]]
     if kind == "recent_change":
         return [d["vital_history"][x] for x in ([v] if v else VITALS[:3]) if x != "temperature"]
