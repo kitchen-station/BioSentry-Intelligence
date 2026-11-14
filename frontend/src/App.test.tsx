@@ -193,44 +193,56 @@ describe("route guards", () => {
     expect(screen.getByText("sign-in page from /patient/p-001")).toBeTruthy();
   });
 
-  it.each([
-    ["rn", nurse],
-    ["md", { clinician_id: "md-santos", ward: "W4", role: "md" }],
-    ["charge_rn", charge],
-  ] as const)("shows every lab page to %s", (_, who) => {
+  const physician: Session = { clinician_id: "md-santos", ward: "W4", role: "md" };
+  const LAB = [["/lab", "lab page"], ["/lab/ask", "ask page"]] as const;
+  const DEVELOPER = [["/lab/research", "research page"], ["/lab/pipeline", "pipeline page"], ["/research", "research page"], ["/pipeline", "pipeline page"]] as const;
+
+  // The owner's rule: a clinician has no developer view. The address alone must not open one.
+  it.each([["md", physician], ["charge_rn", charge]] as const)("shows the lab's tools to %s and sends them from each developer page to the ward", (_, who) => {
     store(who);
-    for (const [path, words] of [["/lab", "lab page"], ["/lab/research", "research page"], ["/lab/pipeline", "pipeline page"]]) {
+    for (const [path, words] of LAB) {
       const { unmount } = at(path);
       expect(screen.getByText(`${words} for ${who.clinician_id}`)).toBeTruthy();
       unmount();
     }
+    for (const [path, words] of DEVELOPER) {
+      const { unmount } = at(path);
+      expect(screen.getByText(`ward page for ${who.clinician_id}`)).toBeTruthy();
+      expect(screen.queryByText(`${words} for ${who.clinician_id}`)).toBeNull();
+      unmount();
+    }
   });
 
-  it("shows the Ask page to a signed-in clinician and sends a signed-out visitor to sign-in", () => {
+  it("sends a staff nurse from every lab address to the ward", () => {
     store(nurse);
-    const { unmount } = at("/lab/ask");
-    expect(screen.getByText("ask page for rn-reyes")).toBeTruthy();
-    unmount();
-    sessionStorage.clear();
+    for (const [path, words] of [...LAB, ...DEVELOPER]) {
+      const { unmount } = at(path);
+      expect(screen.getByText("ward page for rn-reyes")).toBeTruthy();
+      expect(screen.queryByText(`${words} for rn-reyes`)).toBeNull();
+      unmount();
+    }
+  });
+
+  it("shows every lab page to an admin, the old addresses too", () => {
+    store(admin);
+    for (const [path, words] of [...LAB, ...DEVELOPER]) {
+      const { unmount } = at(path);
+      expect(screen.getByText(`${words} for admin-ruiz`)).toBeTruthy();
+      unmount();
+    }
+  });
+
+  it("sends a signed-out visitor of the Ask page to sign-in", () => {
     at("/lab/ask");
     expect(screen.getByText("sign-in page from /lab/ask")).toBeTruthy();
   });
 
   it("has no Ask route in the fixture build", () => {
     api.hasLabQuestions = false;
-    store(nurse);
+    store(physician);
     at("/lab/ask");
     api.hasLabQuestions = true;
-    expect(screen.queryByText("ask page for rn-reyes")).toBeNull();
-  });
-
-  it.each([
-    ["/research", "research page"],
-    ["/pipeline", "pipeline page"],
-  ])("sends the old %s address into the lab", (path, words) => {
-    store(nurse);
-    at(path);
-    expect(screen.getByText(`${words} for rn-reyes`)).toBeTruthy();
+    expect(screen.queryByText("ask page for md-santos")).toBeNull();
   });
 
   it("sends a signed-out visitor of the lab to sign-in, remembering where", () => {

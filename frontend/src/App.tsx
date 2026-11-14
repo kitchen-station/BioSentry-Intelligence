@@ -82,6 +82,12 @@ export function App() {
     setSession(null);
   };
 
+  // The owner's rule: a clinician has no developer view. The research numbers and the pipeline open for an admin only.
+  // The lab's own tools (simulated runs, a question for the research agent) open for those who can use them; a staff nurse cannot.
+  const developer = session?.role === "admin";
+  const usesLab = developer || session?.role === "md" || session?.role === "charge_rn";
+  const toWard = <Navigate to="/ward" replace />;
+
   return (
     <Routes>
       <Route
@@ -112,21 +118,21 @@ export function App() {
       />
       <Route
         path="/lab"
-        element={session ? <Lab session={session} onSignOut={signOut} /> : <ToSignIn gone={gone} />}
+        element={session ? (usesLab ? <Lab session={session} onSignOut={signOut} /> : toWard) : <ToSignIn gone={gone} />}
       />
       {hasLabQuestions && (
         <Route
           path="/lab/ask"
-          element={session ? <Ask session={session} onSignOut={signOut} /> : <ToSignIn gone={gone} />}
+          element={session ? (usesLab ? <Ask session={session} onSignOut={signOut} /> : toWard) : <ToSignIn gone={gone} />}
         />
       )}
       <Route
         path="/lab/research"
-        element={session ? <Research session={session} onSignOut={signOut} /> : <ToSignIn gone={gone} />}
+        element={session ? (developer ? <Research session={session} onSignOut={signOut} /> : toWard) : <ToSignIn gone={gone} />}
       />
       <Route
         path="/lab/pipeline"
-        element={session ? <Pipeline session={session} onSignOut={signOut} /> : <ToSignIn gone={gone} />}
+        element={session ? (developer ? <Pipeline session={session} onSignOut={signOut} /> : toWard) : <ToSignIn gone={gone} />}
       />
       <Route path="/research" element={session ? <Navigate to="/lab/research" replace /> : <ToSignIn gone={gone} />} />
       <Route path="/pipeline" element={session ? <Navigate to="/lab/pipeline" replace /> : <ToSignIn gone={gone} />} />
