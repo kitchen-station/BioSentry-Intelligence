@@ -20,7 +20,7 @@ const REASONS: Record<string, string> = {
 // Reasons that mean the model is not running at all: the panel says "getting ready", not the reason.
 // An odd or malformed entry reads the same. An unknown text reason is a model that ran and has no result.
 const NOT_RUNNING = new Set(["student not loaded", "calibration not loaded", "policy not loaded", "model error"]);
-const ENTRIES = [
+export const ENTRIES = [
   ["prediction", "Prediction model"],
   ["alert_policy", "Alert policy"],
 ] as const;
@@ -29,17 +29,21 @@ const isObj = (x: unknown): x is Record<string, unknown> => typeof x === "object
 const ms = (x: unknown) => (typeof x === "string" && Number.isFinite(Date.parse(x)) ? Date.parse(x) : null);
 const text = (x: unknown) => (typeof x === "string" && x !== "" ? x : null);
 
+// The one sentence for a model: what the patient page and the ward table both show.
 // The model runs and has no result for this patient now: the reason from the map, or a plain line
 // for a reason the page does not know. Not loaded, an error and an odd entry mean it is not running.
+export function modelWords(s: unknown): string {
+  const state = isObj(s) ? s.state : null;
+  if (typeof state === "string" && Object.hasOwn(WORDS, state)) return WORDS[state];
+  const reason = state === "not_computed" && isObj(s) ? text(s.reason) : null;
+  if (reason === null || NOT_RUNNING.has(reason)) return "getting ready";
+  return Object.hasOwn(REASONS, reason) ? `No result: ${REASONS[reason]}` : "No result for this patient now.";
+}
+
 function Entry({ name, s, checked }: { name: string; s: unknown; checked: boolean }) {
   const state = isObj(s) ? s.state : null;
-  const reason = isObj(s) && state === "not_computed" ? text(s.reason) : null;
+  const body = modelWords(s);
   const computed = isObj(s) && typeof state === "string" && Object.hasOwn(WORDS, state);
-  let body = "getting ready";
-  if (computed) body = WORDS[state];
-  else if (reason !== null && !NOT_RUNNING.has(reason)) {
-    body = Object.hasOwn(REASONS, reason) ? `No result: ${REASONS[reason]}` : "No result for this patient now.";
-  }
   const from = computed ? ms(s.bin_start) : null;
   const to = computed ? ms(s.bin_end) : null;
   return (

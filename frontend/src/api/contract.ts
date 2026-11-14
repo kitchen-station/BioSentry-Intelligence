@@ -21,6 +21,7 @@ import type {
   PatientDetail,
   PatientExtractionResult,
   PatientHistory,
+  WardResearch,
   PatientQuestionDetail,
   PatientQuestionItem,
   PatientStay,
@@ -79,6 +80,8 @@ export interface ApiProvider {
   getLabQuestion(id: number): Promise<QuestionDetail>;
   /** The stay of one patient as runs and events, rebuilt from stored 15-minute sets. Each read is one audit row. */
   getPatientHistory(patientId: string): Promise<PatientHistory>;
+  /** The whole ward as one research table, in the NEWS2 order. A physician or the charge nurse only. Each read is one audit row. */
+  getWardResearch(): Promise<WardResearch>;
   extractLabsFromFile(file: File): Promise<LabExtractionResult>;
   extractPatientFromFile(file: File): Promise<PatientExtractionResult>;
 }

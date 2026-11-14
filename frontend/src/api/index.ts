@@ -61,6 +61,7 @@ function lazyFixtureProvider(): ApiProvider {
     getLabQuestions: () => fixtures().then((m) => m.fixtureProvider.getLabQuestions()),
     getLabQuestion: (id) => fixtures().then((m) => m.fixtureProvider.getLabQuestion(id)),
     getPatientHistory: (patientId) => fixtures().then((m) => m.fixtureProvider.getPatientHistory(patientId)),
+    getWardResearch: () => fixtures().then((m) => m.fixtureProvider.getWardResearch()),
     extractLabsFromFile: (file) =>
       fixtures().then((m) => m.fixtureProvider.extractLabsFromFile(file)),
     extractPatientFromFile: (file) =>
@@ -95,6 +96,7 @@ export const askLab = provider.askLab;
 export const getLabQuestions = provider.getLabQuestions;
 export const getLabQuestion = provider.getLabQuestion;
 export const getPatientHistory = provider.getPatientHistory;
+export const getWardResearch = provider.getWardResearch;
 
 /**
  * Whether this build can record nurse-entered vitals. Only the API re-ranks (D4: the frontend
@@ -111,6 +113,8 @@ export const hasPatientQuestions = !USE_FIXTURES;
 export const hasLabQuestions = !USE_FIXTURES;
 // Only the API rebuilds a stay; each read is one audit row.
 export const hasHistory = !USE_FIXTURES;
+// Only the API holds the whole ward's numbers; each read is one audit row.
+export const hasWardResearch = !USE_FIXTURES;
 export const extractLabsFromFile = provider.extractLabsFromFile;
 export const extractPatientFromFile = provider.extractPatientFromFile;
 

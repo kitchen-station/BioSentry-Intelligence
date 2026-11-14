@@ -342,6 +342,57 @@
         "title": "AdmitPatientInput",
         "type": "object"
       },
+      "AlertCounted": {
+        "additionalProperties": false,
+        "properties": {
+          "bins": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "minutes": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "ongoing": {
+            "type": "boolean"
+          },
+          "status": {
+            "const": "counted",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "bins",
+          "minutes",
+          "ongoing"
+        ],
+        "title": "AlertCounted",
+        "type": "object"
+      },
+      "AlertUnavailable": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "enum": [
+              "no_bins",
+              "past_cap",
+              "not_aligned"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "const": "unavailable",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "reason"
+        ],
+        "title": "AlertUnavailable",
+        "type": "object"
+      },
       "BaselineComputed": {
         "additionalProperties": false,
         "properties": {
@@ -460,6 +511,46 @@
           "unit"
         ],
         "title": "BaselineComputed",
+        "type": "object"
+      },
+      "BaselineFlagged": {
+        "additionalProperties": false,
+        "description": "A finding for a patient who is not the reader's: the flag and its direction, no value of any kind.",
+        "properties": {
+          "direction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FindingDirection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "significant": {
+            "type": "boolean"
+          },
+          "status": {
+            "const": "flag_only",
+            "type": "string"
+          },
+          "vital": {
+            "enum": [
+              "heart_rate",
+              "respiratory_rate",
+              "spo2",
+              "temperature"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "vital",
+          "status",
+          "significant",
+          "direction"
+        ],
+        "title": "BaselineFlagged",
         "type": "object"
       },
       "BaselineForming": {
@@ -3649,6 +3740,152 @@
         "title": "QuestionItem",
         "type": "object"
       },
+      "ResearchAbstained": {
+        "additionalProperties": false,
+        "description": "NOT RANKED: the arbiter's reason and instruction, no score, no rank.",
+        "properties": {
+          "assigned": {
+            "type": "boolean"
+          },
+          "bed": {
+            "type": "string"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "instruction": {
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "bed",
+          "assigned",
+          "id",
+          "name",
+          "reason",
+          "instruction"
+        ],
+        "title": "ResearchAbstained",
+        "type": "object"
+      },
+      "ResearchRow": {
+        "additionalProperties": false,
+        "properties": {
+          "alert": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AlertCounted"
+              },
+              {
+                "$ref": "#/components/schemas/AlertUnavailable"
+              }
+            ]
+          },
+          "assigned": {
+            "type": "boolean"
+          },
+          "baseline": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/BaselineComputed"
+                },
+                {
+                  "$ref": "#/components/schemas/BaselineFlagged"
+                },
+                {
+                  "$ref": "#/components/schemas/BaselineForming"
+                },
+                {
+                  "$ref": "#/components/schemas/BaselineUnavailable"
+                }
+              ]
+            },
+            "maxItems": 4,
+            "type": "array"
+          },
+          "bed": {
+            "type": "string"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "level": {
+            "enum": [
+              "low",
+              "low_medium",
+              "medium",
+              "high"
+            ],
+            "type": "string"
+          },
+          "models": {
+            "$ref": "#/components/schemas/RowModels"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rank": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "score": {
+            "maximum": 20,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "bed",
+          "assigned",
+          "id",
+          "name",
+          "rank",
+          "score",
+          "level",
+          "baseline",
+          "models",
+          "alert"
+        ],
+        "title": "ResearchRow",
+        "type": "object"
+      },
       "RowModels": {
         "additionalProperties": false,
         "properties": {
@@ -4557,6 +4794,48 @@
           "activity"
         ],
         "title": "WardOverview",
+        "type": "object"
+      },
+      "WardResearch": {
+        "additionalProperties": false,
+        "properties": {
+          "abstained": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchAbstained"
+            },
+            "type": "array"
+          },
+          "label": {
+            "const": "Each patient against their own baseline. Research view: synthetic, not validated. NEWS2 alone orders the list.",
+            "type": "string"
+          },
+          "now": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "ranked": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchRow"
+            },
+            "type": "array"
+          },
+          "synthetic": {
+            "const": true,
+            "type": "boolean"
+          },
+          "ward": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ward",
+          "now",
+          "synthetic",
+          "label",
+          "ranked",
+          "abstained"
+        ],
+        "title": "WardResearch",
         "type": "object"
       },
       "WardResponse": {

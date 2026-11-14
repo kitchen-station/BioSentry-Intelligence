@@ -10,12 +10,18 @@ from typing import Any
 from pydantic import BaseModel
 
 from biosentry.schemas import (
+    AlertCounted,
+    AlertUnavailable,
+    ResearchAbstained,
+    ResearchRow,
+    WardResearch,
     CONTRACT_MODELS,
     AbstainedRow,
     Acknowledgement,
     AcvpuMeasurement,
     AdmitPatientInput,
     BaselineComputed,
+    BaselineFlagged,
     BaselineForming,
     BaselineResponse,
     BaselineUnavailable,
@@ -295,6 +301,7 @@ _BUILDERS: dict[type[BaseModel], Any] = {
         "pathway": "circulatory",
         "unit": "bpm",
     },
+    BaselineFlagged: lambda: {"vital": "heart_rate", "status": "flag_only", "significant": True, "direction": "rising"},
     BaselineForming: lambda: {
         "vital": "spo2",
         "status": "forming",
@@ -447,6 +454,21 @@ _BUILDERS: dict[type[BaseModel], Any] = {
         "grid_from": "2026-09-03T00:00:00Z", "grid_to": "2026-09-03T06:00:00Z", "bins": 24,
         "runs": [_BUILDERS[HistoryRun]()], "runs_cut": False,
         "events": [_BUILDERS[HistoryEvent]()], "events_cut": False,
+    },
+    AlertCounted: lambda: {"status": "counted", "bins": 13, "minutes": 195, "ongoing": True},
+    AlertUnavailable: lambda: {"status": "unavailable", "reason": "no_bins"},
+    ResearchRow: lambda: {
+        "bed": "4A", "assigned": False, "id": None, "name": None, "rank": 1, "score": 7, "level": "high",
+        "baseline": [_BUILDERS[BaselineForming]()], "models": row_models(), "alert": _BUILDERS[AlertCounted](),
+    },
+    ResearchAbstained: lambda: {
+        "bed": "5B", "assigned": True, "id": "p-002", "name": "Test Patient", "reason": "Heart rate missing",
+        "instruction": "Measure and record it",
+    },
+    WardResearch: lambda: {
+        "ward": "W4", "now": "2026-09-03T06:00:00Z", "synthetic": True,
+        "label": "Each patient against their own baseline. Research view: synthetic, not validated. NEWS2 alone orders the list.",
+        "ranked": [_BUILDERS[ResearchRow]()], "abstained": [_BUILDERS[ResearchAbstained]()],
     },
     LiveWard: lambda: {"shared": {"clockS": 90}, "patients": [], "can_control": False, "now": "2026-09-03T07:00:00Z"},
     OverviewPatient: lambda: {

@@ -18,6 +18,12 @@ access; [`deploy/README.md`](deploy/README.md) says how it is built and kept.
 
 To run or change the code yourself, see [Run it yourself](#run-it-yourself-developers).
 
+**Your own feed.** The API takes a ward's data through one door: the `/sim/*` routes, with an ingest key
+in the `X-Ingest-Key` header. The ward simulation is one sender; any system that posts the same shapes
+(a run, then batches of observations) reaches the same scoring, own-baseline tracking and ward list, with
+no change to the dashboard. Today the door accepts only data marked synthetic, and nothing here is
+validated for clinical use; a feed of real patients would need that rule changed, and a validation first.
+
 A ranked early-warning list for hospital wards in the Philippines.
 
 BioSentry answers one question: *of your twenty patients, see this one first.* It takes

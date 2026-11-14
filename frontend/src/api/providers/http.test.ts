@@ -236,6 +236,15 @@ describe("httpProvider stay history", () => {
   });
 });
 
+describe("httpProvider ward research", () => {
+  it("reads only the ward's research path, with GET", async () => {
+    fetchMock.mockImplementation(async () => reply(200, {}));
+    await httpProvider.getWardResearch();
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual(["/wards/W4/research"]);
+    expect(fetchMock.mock.calls[0][1]?.method ?? "GET").toBe("GET");
+  });
+});
+
 describe("httpProvider patient questions", () => {
   it("asks, lists and reads only the question paths of one patient", async () => {
     fetchMock.mockImplementation(async () => reply(200, {}));

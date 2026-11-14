@@ -15,6 +15,7 @@ from .admission import (
 )
 from .baseline import (
     BaselineComputed,
+    BaselineFlagged,
     BaselineForming,
     BaselineResponse,
     BaselineUnavailable,
@@ -75,6 +76,7 @@ from .records import (
     SessionToken,
     VitalsRecorded,
 )
+from .research_view import AlertCounted, AlertUnavailable, ResearchAbstained, ResearchRow, WardResearch
 from .rows import (
     AbstainedRow,
     ModelSignal,
@@ -144,6 +146,7 @@ CONTRACT_MODELS: tuple[type[BaseModel], ...] = (
     BaselineResponse,
     BaselineUsed,
     BaselineComputed,
+    BaselineFlagged,
     BaselineForming,
     BaselineUnavailable,
     LiveWard,
@@ -168,6 +171,11 @@ CONTRACT_MODELS: tuple[type[BaseModel], ...] = (
     HistoryEvent,
     PatientHistory,
     SimulatedEpisode,
+    WardResearch,
+    ResearchRow,
+    ResearchAbstained,
+    AlertCounted,
+    AlertUnavailable,
 )
 
 # Inputs entered by a person: optional fields may be omitted and default to None.
@@ -186,6 +194,7 @@ __all__ = [
     "AdmissionRoute",
     "AdmitPatientInput",
     "BaselineComputed",
+    "BaselineFlagged",
     "BaselineForming",
     "BaselineResponse",
     "BaselineUnavailable",

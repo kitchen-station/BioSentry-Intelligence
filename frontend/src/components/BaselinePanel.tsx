@@ -24,7 +24,7 @@ const FLAGS_RISE: Record<string, boolean> = {
   spo2: false,
   temperature: true,
 };
-const REASONS: Record<string, string> = {
+export const REASONS: Record<string, string> = {
   no_history: "no history yet",
   latest_bin_missing: "latest 15-minute set missing",
   patch_not_live: "not counted: no live patch reading",

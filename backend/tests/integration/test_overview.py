@@ -364,7 +364,7 @@ def test_the_write_actions_are_still_the_body_bearing_routes_only(api: Api) -> N
 
 READS = [("GET", p) for p in (
     "/wards/{ward}/rows", "/wards/{ward}/stays", "/wards/{ward}/overview", "/wards/{ward}/live",
-    "/wards/{ward}/lab/runs", "/wards/{ward}/lab/runs/{lab_run_id}", "/wards/{ward}/lab/questions",
+    "/wards/{ward}/research", "/wards/{ward}/lab/runs", "/wards/{ward}/lab/runs/{lab_run_id}", "/wards/{ward}/lab/questions",
     "/wards/{ward}/lab/questions/{lab_run_id}", "/patients",
     "/patients/{patient_id}", "/patients/{patient_id}/baseline", "/patients/{patient_id}/history",
     "/patients/{patient_id}/notes", "/patients/{patient_id}/questions", "/patients/{patient_id}/questions/{question_id}",
@@ -380,9 +380,11 @@ WARD_READS = {
     "/wards/{ward}/rows": "view_ward",
     "/wards/{ward}/stays": "view_stays",
     "/wards/{ward}/overview": "view_overview",
+    "/wards/{ward}/research": "view_ward_research",
 }
 CLOSED_TO_ADMIN = {
     "/wards/{ward}/live": "view_live",
+    "/wards/{ward}/research": "view_ward_research",
     "/wards/{ward}/lab/runs": "view_lab_runs",
     "/wards/{ward}/lab/runs/{lab_run_id}": "view_lab_run",
     "/wards/{ward}/lab/questions": "view_lab_questions",
@@ -463,6 +465,8 @@ def test_the_role_matrix_over_every_route(api: Api, persona: str) -> None:
             assert (status, rows) == (403, [(*mine, CLOSED_TO_ADMIN_BY_PATIENT[template], pid, "denied")])
         elif template == "/wards/{ward}/overview" and not is_admin:
             assert (status, rows) == (403, [(*mine, "view_overview", ward, "denied")])
+        elif template == "/wards/{ward}/research" and role == "rn":  # a staff nurse: the ward is not hers to compare
+            assert (status, rows) == (403, [(*mine, "view_ward_research", ward, "denied")])
         elif template in WARD_READS and ward != "W4":
             assert (status, rows) == (404, [(*mine, WARD_READS[template], ward, "not_found")])
         elif template in WARD_READS:

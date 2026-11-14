@@ -15,7 +15,7 @@ import { App } from "./App";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const api = vi.hoisted(() => ({ restoreSession: vi.fn(() => true), clearSession: vi.fn() }));
+const api = vi.hoisted(() => ({ restoreSession: vi.fn(() => true), clearSession: vi.fn(), hasWardResearch: true }));
 vi.mock("./api", () => api);
 
 // The pages are stand-ins: these tests are about the shell, not what each page shows.
@@ -91,6 +91,9 @@ vi.mock("./pages/Station", () => ({
   ),
 }));
 
+vi.mock("./pages/WardResearch", () => ({
+  WardResearch: ({ session }: { session: Session }) => <p>ward research page for {session.clinician_id}</p>,
+}));
 vi.mock("./pages/Overview", () => ({
   Overview: ({ session }: { session: Session }) => <p>overview page for {session.clinician_id}</p>,
 }));
@@ -260,6 +263,32 @@ describe("route guards", () => {
   it.each(["/ask", "/ask/patient/p-001", "/lab/ask"])("sends a signed-out visitor of %s to sign-in", (path) => {
     at(path);
     expect(screen.getByText(`sign-in page from ${path}`)).toBeTruthy();
+  });
+
+  it.each([["md", physician], ["charge_rn", charge]] as const)("shows the ward research table to %s", (_, who) => {
+    store(who);
+    at("/ward/research");
+    expect(screen.getByText(`ward research page for ${who.clinician_id}`)).toBeTruthy();
+  });
+
+  it.each([["rn", nurse], ["admin", admin]] as const)("sends %s from the ward research address to the ward", (_, who) => {
+    store(who);
+    at("/ward/research");
+    expect(screen.getByText(`ward page for ${who.clinician_id}`)).toBeTruthy();
+    expect(screen.queryByText(/ward research page/)).toBeNull();
+  });
+
+  it("sends a signed-out visitor of the ward research table to sign-in, remembering where", () => {
+    at("/ward/research");
+    expect(screen.getByText("sign-in page from /ward/research")).toBeTruthy();
+  });
+
+  it("has no ward research route in the fixture build", () => {
+    api.hasWardResearch = false;
+    store(physician);
+    at("/ward/research");
+    api.hasWardResearch = true;
+    expect(screen.queryByText(/ward research page/)).toBeNull();
   });
 
   it("sends a signed-out visitor of the lab to sign-in, remembering where", () => {

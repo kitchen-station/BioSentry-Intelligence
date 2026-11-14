@@ -45,3 +45,14 @@ describe("hasLabQuestions", () => {
     expect((await import("./index")).hasLabQuestions).toBe(true);
   });
 });
+
+describe("hasWardResearch", () => {
+  it("is true only when the build is wired to an API", async () => {
+    vi.stubEnv("VITE_API_URL", "");
+    vi.resetModules();
+    expect((await import("./index")).hasWardResearch).toBe(false);
+    vi.stubEnv("VITE_API_URL", "http://127.0.0.1:8000");
+    vi.resetModules();
+    expect((await import("./index")).hasWardResearch).toBe(true);
+  });
+});
