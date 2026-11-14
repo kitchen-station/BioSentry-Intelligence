@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 from test_baseline_route import served
-from test_model_inputs import Counting, read, stay
+from test_model_inputs import MODELS, Counting, read, stay
 from test_overview import ADMIN, _last_seq, _rows_since, add_admin, write
 from test_store import NOW, ORIGIN, Api, api, obs, start  # noqa: F401 (api: fixture)
 
@@ -235,7 +235,7 @@ def test_each_event_kind_carries_its_fields_and_no_note_text_and_nothing_of_anot
 def statements(api: Api, run: Any) -> list[str]:
     store, _ = read(api)
     audit = AuditLog(store.conn, api.wall, store.role_of)
-    wards = WardService(store, audit)
+    wards = WardService(store, audit, MODELS)
     counting = Counting(store.conn)
     store.conn = counting
     run(store, audit, wards)
@@ -245,9 +245,10 @@ def statements(api: Api, run: Any) -> list[str]:
 def test_the_ward_read_runs_the_same_statements_as_before_and_reads_nothing_of_the_history(api: Api) -> None:
     start(api, patients=[stay("s-1", 20), stay("s-2", 20)])
     ran = statements(api, lambda s, a, w: w.ward("rn-delacruz"))
-    assert len(ran) == 3 + 3 * 2  # who may see (the role twice and the assigned set), then 3 reads per patient
+    # Who may see (the role twice and the assigned set), 3 reads per patient, and the two reads of the models.
+    assert len(ran) == 3 + 3 * 2 + 2
     joined = " ".join(ran)
-    for table in ("clinician_action", "clinical_note", "temperature"):
+    for table in ("clinician_action", "clinical_note"):
         assert table not in joined
 
 

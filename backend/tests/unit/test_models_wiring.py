@@ -66,13 +66,14 @@ def importers(module: str) -> set[str]:
 
 
 def test_only_the_wiring_imports_the_model_modules() -> None:
-    assert importers("biosentry.services.model_signals") == {"services/ward.py"}
+    # The stay history reads the grid helpers (the bin window, the four series on one grid): display only.
+    assert importers("biosentry.services.model_signals") == {"services/ward.py", "services/history.py"}
     assert importers("biosentry.services.models") == {
         "api/app.py",
         "services/model_signals.py",
         "services/ward.py",
     }
-    assert importers("biosentry.services.as_of") == {"services/model_signals.py"}
+    assert importers("biosentry.services.as_of") == {"services/model_signals.py", "services/history.py"}
 
 
 def test_the_arbiter_and_the_ranking_code_only_receive_results() -> None:
