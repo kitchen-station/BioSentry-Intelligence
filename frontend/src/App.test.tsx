@@ -160,6 +160,31 @@ describe("restoring the session", () => {
   });
 });
 
+describe("the chat bubble", () => {
+  const md: Session = { clinician_id: "md-santos", ward: "W4", role: "md" };
+  const ask = () => screen.queryByRole("button", { name: "Ask" });
+
+  it("is not on the sign-in page", () => {
+    at("/ward");
+    expect(ask()).toBeNull();
+  });
+
+  it.each([
+    [charge, "/ward", true],
+    [md, "/ward", true],
+    [md, "/patient/p-001", true],
+    [nurse, "/ward", false],
+    [nurse, "/patient/p-001", true],
+    [admin, "/overview", false],
+    [admin, "/patient/p-001", false],
+    [md, "/ask", false],
+  ])("for %o at %s: shown %s", (who, path, shown) => {
+    store(who);
+    at(path);
+    expect(ask() !== null).toBe(shown);
+  });
+});
+
 describe("route guards", () => {
   it.each(["/ward", "/patient/p-001", "/station", "/research", "/pipeline"])(
     "sends a signed-out visitor from %s to sign-in, remembering where they were going",
