@@ -31,14 +31,14 @@ const rng = (a: string, b: string) => `${clk(a)} to ${formatClock(Date.parse(b))
 const run = (over: Partial<HistoryRun>): HistoryRun => ({
   bins: 2, start: T("08:00"), end: T("09:00"), ongoing: false, peak_score: 9, peak_level: "high", peak_at: T("08:30"),
   reasons: ["Total 9 (≥7): high"], provenance: { computed_at: T("10:00"), rule: "news2_as_of_bins", source: "derived", synthetic: true, tier: "A" },
-  state: "alert", ...over,
+  state: "alert", in_episode: null, ...over,
 });
 const ev = (over: Partial<HistoryEvent>): HistoryEvent => ({
   at: T("08:30"), by: "rn-manalo", kind: "acknowledged", note_id: null, role: null, score: 9, source: "clinician_action", ...over,
 });
 const hist = (over: Partial<PatientHistory> = {}): PatientHistory => ({
   bins: 8, events: [], events_cut: false, grid_from: T("08:00"), grid_to: T("12:00"), label: LABEL, patient_id: "p-001",
-  runs: [], runs_cut: false, synthetic: true, unavailable: null, ...over,
+  runs: [], runs_cut: false, simulated_episode: null, synthetic: true, unavailable: null, ...over,
 });
 const odd = (over: Record<string, unknown>) => ({ ...hist(), ...over }) as unknown as PatientHistory;
 
