@@ -16,7 +16,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
 from starlette.requests import Request
 from test_api import PATH_VALUES, PUBLIC_ROUTES, VALID_BODIES, _route_table
-from test_store import DATA, NOW, Api, api, new_run, sim_patient  # noqa: F401 (api: fixture)
+from test_store import DATA, NOW, ORIGIN, Api, api, new_run, sim_patient, start  # noqa: F401 (api: fixture)
 
 from biosentry.api.app import REFUSED_ACTIONS, WRITE_ACTIONS, create_app
 from biosentry.core.audit import AuditLog
@@ -123,6 +123,13 @@ def test_the_admin_sees_every_patient_on_the_ward_and_one_audit_row_is_written(a
     reyes = next(c for c in body.clinicians if c.id == "rn-reyes")
     assert reyes.patients == len(DATA["clinicians"]["rn-reyes"]["patients"])
     assert body.clinicians[0].id == min(c.id for c in body.clinicians)
+
+
+def test_the_overview_is_as_of_the_ward_time_not_the_wall_clock(api: Api) -> None:
+    add_admin(api)
+    start(api)
+    api.wall.now += timedelta(seconds=20)
+    assert overview(api).json()["as_of"] == ORIGIN
 
 
 def test_no_patient_name_appears_anywhere_in_the_overview(api: Api) -> None:

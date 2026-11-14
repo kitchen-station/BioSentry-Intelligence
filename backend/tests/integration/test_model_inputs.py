@@ -146,6 +146,7 @@ def test_the_service_on_a_posted_run(api: Api) -> None:
     assert isinstance(ok.probability, Computed) and isinstance(ok.check, Computed) and ok.policy == Computed(False, ok.policy.provenance, ok.policy.window)  # type: ignore[union-attr]
     assert ok.provenance["tier_c/student_vitals"].sim_run_id == store.run_id
     assert ok.provenance["tier_c/student_vitals"].bin_end == ms.bin_window(ok.probability.provenance.observed_at)[1]
+    assert ok.probability.provenance.computed_at == RUN0  # ward time, the calendar of observed_at; the wall clock is months on
     assert (got["q-2"].probability, got["q-2"].policy) == (NotComputed(ms.NOT_RANKED),) * 2
     assert (got["q-3"].probability, got["q-3"].check, got["q-3"].policy) == (NotComputed(ms.FORMING),) * 3
     assert (got["q-4"].probability, got["q-4"].check, got["q-4"].policy) == (NotComputed(ms.NOT_COUNTED),) * 3
