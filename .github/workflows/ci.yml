@@ -106,6 +106,53 @@ jobs:
       - run: make api-install
       - run: make api-test
 
+  # The research package's own tests (research/README.md, RESEARCH-GATE): they run in the backend's
+  # environment and import the backend's NEWS2 and baseline code, so a backend change can break them.
+  # The backend job does not collect them.
+  research:
+    name: research
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: ${{ github.workspace }}/backend/src:${{ github.workspace }}
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - run: make api-install
+      - run: uv run python -m pytest -q -p no:cacheprovider ../research/tests
+        working-directory: backend
+
+  # The two images the team server builds (deploy/setup.sh). No other job builds them: a Dockerfile
+  # or an ignore file that drifts from the code is seen here, not on the server.
+  image-api:
+    name: image-api
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: docker build --tag biosentry-api .
+
+  # The web image holds the dashboard and the ward simulator, so its build needs the simulator's
+  # repository beside this one, at its default branch as deploy/setup.sh takes it. A change there
+  # that breaks this build fails this job: that is the same break the server would meet.
+  image-web:
+    name: image-web
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: kitchen-station/biosentry-ward-sim
+          path: biosentry-ward-sim
+          persist-credentials: false
+      - run: >-
+          docker build --file deploy/web.Dockerfile
+          --build-context frontend=frontend
+          --build-context sim=biosentry-ward-sim
+          --tag biosentry-web deploy
+
   audit:
     name: audit (informational)
     runs-on: ubuntu-latest
@@ -124,7 +171,7 @@ jobs:
   ci-gate:
     name: ci-gate
     if: always()
-    needs: [typecheck, build, lint, test, backend]
+    needs: [typecheck, build, lint, test, backend, research, image-api, image-web]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
