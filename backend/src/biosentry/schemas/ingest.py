@@ -215,6 +215,7 @@ class LiveWard(Contract):
     shared: View | None
     patients: list[PatientView]
     can_control: Flag  # whether this clinician's role may send the sim commands
+    now: AwareDatetime  # ward time this answer was computed at: every age and due time on the page is measured against it
 
 
 BED_LABEL = r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,19}$"

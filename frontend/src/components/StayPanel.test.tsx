@@ -26,7 +26,8 @@ const settle = () => act(async () => {});
 
 // Two clock days before "today" keep every time on another day, so every line carries its date.
 const T = (hhmm: string, d = "2026-01-05") => `${d}T${hhmm}:00Z`;
-const clk = (iso: string) => formatClockDay(Date.parse(iso));
+const NOW = Date.now(); // ward time as served, passed in; the panel never reads the browser's clock for "today"
+const clk = (iso: string) => formatClockDay(Date.parse(iso), NOW);
 const rng = (a: string, b: string) => `${clk(a)} to ${formatClock(Date.parse(b))}`; // both ends on one old day: the date once
 const run = (over: Partial<HistoryRun>): HistoryRun => ({
   bins: 2, start: T("08:00"), end: T("09:00"), ongoing: false, peak_score: 9, peak_level: "high", peak_at: T("08:30"),
@@ -43,7 +44,7 @@ const hist = (over: Partial<PatientHistory> = {}): PatientHistory => ({
 const odd = (over: Record<string, unknown>) => ({ ...hist(), ...over }) as unknown as PatientHistory;
 
 const open = async () => {
-  render(<StayPanel patientId="p-001" onSignOut={signOut} />);
+  render(<StayPanel patientId="p-001" onSignOut={signOut} now={NOW} />);
   const d = document.querySelector("details")!;
   d.open = true;
   fireEvent(d, new Event("toggle"));
@@ -63,7 +64,7 @@ afterEach(() => {
 describe("when it reads", () => {
   it("is closed with no call, reads once on first open, not on close and reopen, once more on Refresh, never on a timer", async () => {
     vi.useFakeTimers();
-    render(<StayPanel patientId="p-001" onSignOut={signOut} />);
+    render(<StayPanel patientId="p-001" onSignOut={signOut} now={NOW} />);
     const d = document.querySelector("details")!;
     expect(d.open).toBe(false);
     expect(screen.getByText("Stay").tagName).toBe("SUMMARY");
@@ -164,12 +165,22 @@ describe("the list", () => {
   });
 
   it("an ongoing alert prints its end time and (last stored set), never now, and a time today carries no date", async () => {
-    const now = Date.now();
+    const now = NOW;
     const at = new Date(now - 60_000).toISOString();
     api.getPatientHistory.mockResolvedValue(hist({ grid_from: at, grid_to: new Date(now).toISOString(), runs: [run({ start: at, end: new Date(now).toISOString(), ongoing: true })] }));
     await open();
     expect(lines()[0]).toBe(`${formatClock(Date.parse(at))} to ${formatClock(now)} (last stored set) \u00b7 NEWS2 at an alert level, up to 9 (high) \u00b7 Total 9 (\u22657): high`);
     expect(document.body.textContent).not.toMatch(/\bnow\b/);
+  });
+
+  it("decides \"today\" from the ward's time: a run on the served day has no date, whatever the browser's day is", async () => {
+    api.getPatientHistory.mockResolvedValue(hist({ runs: [run({})] }));
+    render(<StayPanel patientId="p-001" onSignOut={signOut} now={Date.parse(T("12:00"))} />);
+    const d = document.querySelector("details")!;
+    d.open = true;
+    fireEvent(d, new Event("toggle"));
+    await settle();
+    expect(lines()[0]!.startsWith(`${formatClock(Date.parse(T("08:00")))} to ${formatClock(Date.parse(T("09:00")))}`)).toBe(true);
   });
 
   it("prints both dates when the ends of a run are on different days", async () => {

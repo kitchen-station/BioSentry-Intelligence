@@ -348,6 +348,7 @@ _BUILDERS: dict[type[BaseModel], Any] = {
         "tier_status": [tier_status()],
         "ranked": [score_row()],
         "abstained": [abstained_row()],
+        "now": "2026-09-03T07:00:00Z",
     },
     TierAScore: lambda: {"score": 9, "label": "NEWS2 9"},
     TierBreakdown: lambda: {
@@ -362,6 +363,7 @@ _BUILDERS: dict[type[BaseModel], Any] = {
         "tier_breakdown": {
             "tier_a": {"score": 9, "label": "NEWS2 9"},
         },
+        "now": "2026-09-03T07:00:00Z",
     },
     ClinicalNote: lambda: {
         "id": "n-001",
@@ -446,7 +448,7 @@ _BUILDERS: dict[type[BaseModel], Any] = {
         "runs": [_BUILDERS[HistoryRun]()], "runs_cut": False,
         "events": [_BUILDERS[HistoryEvent]()], "events_cut": False,
     },
-    LiveWard: lambda: {"shared": {"clockS": 90}, "patients": [], "can_control": False},
+    LiveWard: lambda: {"shared": {"clockS": 90}, "patients": [], "can_control": False, "now": "2026-09-03T07:00:00Z"},
     OverviewPatient: lambda: {
         "bed": "4A",
         "state": "ranked",

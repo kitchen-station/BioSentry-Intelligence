@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { PatientStay } from "../types";
-import { getStays, usesServer } from "../api";
+import { getStays, getWard, usesServer } from "../api";
+import { hasWardNow, syncWardNow, useWardNow } from "../components/wardNow";
 import { bedRows, dayTicks, FLOW_DAYS, flowStats, formatStay, recentMoves } from "./flowMath";
 import styles from "./Flow.module.css";
 
@@ -17,24 +18,25 @@ const status = (stay: PatientStay) => (stay.outcome ? OUTCOME[stay.outcome] : "O
 export function FlowSection() {
   const [stays, setStays] = useState<PatientStay[] | null>(null);
   const [failed, setFailed] = useState(false);
-  const [now, setNow] = useState(() => Date.now());
+  const now = useWardNow(); // ward time from the newest ward or patient read
   const pollMs = usesServer ? 5_000 : 15_000; // the API changes as the simulator runs; the fixture never does
 
   useEffect(() => {
+    // The stays carry no time of their own: with no ward read yet, the ward is read for its time.
     const refresh = () =>
-      getStays()
-        .then((all) => {
-          setStays(all);
-          setNow(Date.now());
-          setFailed(false);
-        })
-        .catch(() => setFailed(true));
+      Promise.all([
+        hasWardNow() ? undefined : getWard().then((w) => syncWardNow(w.now)),
+        getStays().then(setStays),
+      ]).then(
+        () => setFailed(false),
+        () => setFailed(true),
+      );
     void refresh();
     const timer = setInterval(() => void refresh(), pollMs);
     return () => clearInterval(timer);
   }, [pollMs]);
 
-  const stats = stays && flowStats(stays, now);
+  const stats = stays && now > 0 ? flowStats(stays, now) : null;
   const recent = stays ? recentMoves(stays, RECENT) : [];
   return (
     <div className={styles.flow}>

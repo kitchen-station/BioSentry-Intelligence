@@ -15,7 +15,8 @@ beforeEach(async () => {
   patients = loaded.filter((p): p is PatientDetail => p !== null);
 });
 
-const html = (vitals: Vitals) => renderToStaticMarkup(<CurrentVitals vitals={vitals} />);
+const NOW = Date.parse("2026-09-03T07:00:00Z"); // ward time as served: the browser's own clock is never read
+const html = (vitals: Vitals) => renderToStaticMarkup(<CurrentVitals vitals={vitals} now={NOW} />);
 
 describe("CURRENT VITALS", () => {
   it("writes blood pressure as systolic/diastolic", () => {
@@ -108,13 +109,14 @@ describe("MeasurementDisplay", () => {
   it("refuses to stringify a structured value without a formatter", () => {
     // The type system already rejects this call; the runtime guard backs it up.
     // @ts-expect-error a structured value needs a format()
-    const render = () => renderToStaticMarkup(<MeasurementDisplay measurement={bp()} />);
+    const render = () => renderToStaticMarkup(<MeasurementDisplay measurement={bp()} now={NOW} />);
     expect(render).toThrow(/needs a format/);
   });
 
   it("accepts a structured value with a formatter", () => {
     const out = renderToStaticMarkup(
       <VitalRow
+        now={NOW}
         label="Blood pressure"
         measurement={bp()}
         format={(v) => `${v.systolic}/${v.diastolic}`}
@@ -133,7 +135,8 @@ describe("a value a nurse typed", () => {
       ...base,
       heart_rate: { ...hr, provenance: { ...hr.provenance, source: "nurse", observed_at: "2026-09-03T06:45:00Z" } },
     };
-    const text = enteredByNurse(Date.parse("2026-09-03T06:45:00Z"));
+    const text = enteredByNurse(Date.parse("2026-09-03T06:45:00Z"), NOW);
+    expect(text).not.toContain("Sep"); // the ward's today: no date, whatever the browser's day is
     const out = html(vitals);
     expect(out).toContain(`> ${text}<`);
     expect(out).toContain(`title="${text}"`);

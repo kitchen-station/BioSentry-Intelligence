@@ -449,6 +449,18 @@ def test_a_sim_run_is_scored_computed_and_timed_on_the_wall_clock(api: Api) -> N
     assert history[-1]["time"] == iso(NOW - timedelta(minutes=15))
 
 
+def test_the_ward_and_the_patient_carry_the_ward_time_they_were_computed_at(api: Api) -> None:
+    seeded = api.ward("rn-manalo")["now"]
+    assert seeded == "2026-09-03T07:00:00Z"  # the seeded run's own as_of, not the wall clock
+    detail = api.client.get("/patients/p-001", headers=api.as_("rn-manalo")).json()
+    assert detail["now"] == seeded
+    start(api)
+    api.wall.now += timedelta(seconds=20)
+    h = api.as_("rn-delacruz")
+    assert api.ward("rn-delacruz")["now"] == iso(api.wall.now)  # a posted run: the wall clock
+    assert api.client.get("/patients/s-1", headers=h).json()["now"] == iso(api.wall.now)
+
+
 def test_a_batch_moves_the_run_forward_in_one_transaction(api: Api) -> None:
     run_id = start(api)
     api.wall.now += timedelta(minutes=10)
@@ -770,6 +782,7 @@ def test_served_times_are_whole_seconds_with_a_z_suffix_even_after_shifting(api:
     api.client.post("/patients/s-1/notes", headers=h, json=note)
     api.client.post("/patients/s-1/labs", headers=h, json={"potassium": 4.1})
     seen = served_times(api.ward("rn-delacruz"))  # a sim run, shifted onto the wall clock
+    seen += [api.client.get("/wards/W4/live", headers=h).json()["now"]]  # the ward time too
     seen += served_times(api.client.get("/patients/s-1", headers=h).json())
     seen += served_times(api.client.get("/patients/s-1/notes", headers=h).json())
     seen += served_times(api.client.get("/audit", headers=h).json())
@@ -1550,7 +1563,16 @@ def live(api: Api, who: str) -> dict[str, Any]:
     assert response.status_code == 200, response.text
     body: dict[str, Any] = response.json()
     assert isinstance(body.pop("can_control"), bool)  # what it says is its own test, below
+    body.pop("now")  # ward time as served: its own test, below
     return body
+
+
+def test_the_live_view_carries_the_ward_time_it_was_computed_at(api: Api) -> None:
+    h = api.as_("rn-manalo")
+    assert api.client.get("/wards/W4/live", headers=h).json()["now"] == "2026-09-03T07:00:00Z"  # seeded: as_of
+    start(api)
+    api.wall.now += timedelta(seconds=20)
+    assert api.client.get("/wards/W4/live", headers=api.as_("rn-delacruz")).json()["now"] == iso(api.wall.now)
 
 
 def test_the_live_view_is_scoped_audited_and_replaced_whole(api: Api) -> None:

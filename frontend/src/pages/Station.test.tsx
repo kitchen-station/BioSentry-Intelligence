@@ -21,6 +21,7 @@ const api = vi.hoisted(() => ({
   extractPatientFromFile: vi.fn(),
   listAllPatients: vi.fn(),
   getStays: vi.fn(),
+  getWard: vi.fn(),
   usesServer: false,
 }));
 vi.mock("../api", () => api);
@@ -75,6 +76,7 @@ describe("Station tabs", () => {
 
   it("opens patient flow", async () => {
     api.getStays.mockResolvedValue([]);
+    api.getWard.mockResolvedValue({ now: "2026-09-03T07:00:00Z" });
     page();
     fireEvent.click(screen.getByRole("button", { name: "Patient flow" }));
     expect(await screen.findByText("No arrivals or departures yet.")).toBeTruthy();

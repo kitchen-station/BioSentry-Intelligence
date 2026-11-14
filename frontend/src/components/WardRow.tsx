@@ -41,7 +41,7 @@ export function WardRow({ row, role, now, ageOffsetS }: Props) {
   const p = news2Points(row.vitals);
   // Either figure can be null on a row ranked from nurse entries: never compute with a null.
   const age = row.last_update_s === null ? null : row.last_update_s + ageOffsetS;
-  const nurse = nurseEntryText(row.vitals);
+  const nurse = nurseEntryText(row.vitals, now);
   const patch = patchInUse(row.vitals);
   return (
     <Link to={`/patient/${row.id}`} className={styles.link}>
@@ -92,21 +92,21 @@ export function WardRow({ row, role, now, ageOffsetS }: Props) {
             <span className={styles.sparkLabel}>HR</span>
             <Sparkline data={row.vital_trends.heart_rate} width={72} height={20} color="var(--trace-hr)" fill />
             <span className={styles.sparkVal}>
-              <MeasurementDisplay measurement={row.vitals.heart_rate} />
+              <MeasurementDisplay now={now} measurement={row.vitals.heart_rate} />
             </span>
           </div>
           <div className={styles.sparkRow} data-points={p.respiratory_rate}>
             <span className={styles.sparkLabel}>RR</span>
             <Sparkline data={row.vital_trends.respiratory_rate} width={72} height={20} color="var(--trace-rr)" fill />
             <span className={styles.sparkVal}>
-              <MeasurementDisplay measurement={row.vitals.respiratory_rate} />
+              <MeasurementDisplay now={now} measurement={row.vitals.respiratory_rate} />
             </span>
           </div>
           <div className={styles.sparkRow} data-points={p.spo2}>
             <span className={styles.sparkLabel}>SpO2</span>
             <Sparkline data={row.vital_trends.spo2} width={72} height={20} color="var(--trace-spo2)" fill />
             <span className={styles.sparkVal}>
-              <MeasurementDisplay measurement={row.vitals.spo2} format={(v) => `${v}%`} />
+              <MeasurementDisplay now={now} measurement={row.vitals.spo2} format={(v) => `${v}%`} />
             </span>
           </div>
         </div>
@@ -116,13 +116,14 @@ export function WardRow({ row, role, now, ageOffsetS }: Props) {
           <div className={styles.nursePair} data-points={p.blood_pressure}>
             <span className={styles.nurseLabel}>BP</span>
             <MeasurementDisplay
+              now={now}
               measurement={row.vitals.blood_pressure}
               format={formatBloodPressure}
             />
           </div>
           <div className={styles.nursePair} data-points={p.consciousness}>
             <span className={styles.nurseLabel}>AVPU</span>
-            <MeasurementDisplay measurement={row.vitals.consciousness} />
+            <MeasurementDisplay now={now} measurement={row.vitals.consciousness} />
           </div>
           <div className={styles.labLine}>
             {row.labs.freshness_hours !== null

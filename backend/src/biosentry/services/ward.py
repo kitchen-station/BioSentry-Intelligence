@@ -20,7 +20,7 @@ from biosentry.domain.arbiter import NotRanked, PolicySignal, Ranked, TierCSigna
 from biosentry.domain.computed import Computed, NotComputed
 from biosentry.domain.scoring.tier_a import News2Score
 from biosentry.domain.scoring.tier_c.confidence import Check
-from biosentry.repositories.postgres import OUT_OF_DATE, PostgresStore
+from biosentry.repositories.postgres import OUT_OF_DATE, PostgresStore, whole
 from biosentry.schemas import (
     AbstainedRow,
     PatientDetail,
@@ -258,6 +258,7 @@ class WardService:
             tier_status=self._store.tier_status,
             ranked=ranked,
             abstained=abstained,
+            now=whole(self._store.now()),
         )
 
     def detail_or_abstained(
@@ -277,7 +278,10 @@ class WardService:
             tier_a=TierAScore(score=row.score, label=f"NEWS2 = {row.score}"),
         )
         return PatientDetail(
-            **row.model_dump(), vital_history=state.vital_history, tier_breakdown=breakdown
+            **row.model_dump(),
+            vital_history=state.vital_history,
+            tier_breakdown=breakdown,
+            now=whole(self._store.now()),
         )
 
     def patient(self, clinician_id: str, patient_id: str) -> PatientDetail | None:
@@ -304,6 +308,7 @@ class WardService:
                 **view,
                 "patients": [p for p in view["patients"] if p["id"] in visible],
                 "can_control": self._store.can_control(clinician_id),
+                "now": whole(self._store.now()),
             }
         )
 

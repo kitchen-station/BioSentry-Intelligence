@@ -6,16 +6,19 @@ import type { PatientStay } from "../types";
 
 const api = vi.hoisted(() => ({
   getStays: vi.fn(),
+  getWard: vi.fn(),
   build: { usesServer: false },
 }));
 vi.mock("../api", () => ({
   getStays: api.getStays,
+  getWard: api.getWard,
   get usesServer() {
     return api.build.usesServer;
   },
 }));
 
 import { FlowSection } from "./Flow";
+import { forgetWardNow, syncWardNow } from "../components/wardNow";
 import { bedRows, dayTicks, flowStats, formatStay, recentMoves } from "./flowMath";
 
 const NOW = Date.parse("2026-03-15T12:00:00Z");
@@ -82,7 +85,13 @@ describe("Flow page", () => {
         <FlowSection />
       </MemoryRouter>,
     );
-  beforeEach(() => void vi.useFakeTimers({ now: NOW, toFake: ["Date"] }));
+  // The browser says 14 Nov 2026; the ward, as served, says 15 Mar 2026: every figure follows the ward.
+  const BROWSER = Date.parse("2026-11-14T09:00:00Z");
+  beforeEach(() => {
+    vi.useFakeTimers({ now: BROWSER, toFake: ["Date"] });
+    forgetWardNow();
+    api.getWard.mockResolvedValue({ now: new Date(NOW).toISOString() });
+  });
   afterEach(() => {
     cleanup();
     vi.useRealTimers();
@@ -95,6 +104,30 @@ describe("Flow page", () => {
     await screen.findByRole("heading", { name: "Recent movement" });
     expect(screen.getAllByRole("link", { name: "Cruz, Ana" })).toHaveLength(1); // d: arrival known, still here
     expect(screen.getAllByRole("img", { name: "Cruz, Ana, Higher care" })).toHaveLength(1);
+  });
+
+  it("counts the last day against the ward's time, not the browser's", async () => {
+    api.getStays.mockResolvedValue(STAYS);
+    show();
+    await screen.findByRole("heading", { name: "Recent movement" });
+    expect(screen.getByText("In, last 24 h").nextSibling?.textContent).toBe("2");
+    expect(screen.getByText("Out, last 24 h").nextSibling?.textContent).toBe("1");
+  });
+
+  it("reads the ward once for its time only when no page has read it", async () => {
+    syncWardNow(new Date(NOW).toISOString());
+    api.getStays.mockResolvedValue(STAYS);
+    show();
+    await screen.findByRole("heading", { name: "Recent movement" });
+    expect(api.getWard).not.toHaveBeenCalled();
+  });
+
+  it("says so when the ward's time cannot be read", async () => {
+    api.getWard.mockRejectedValue(new Error("down"));
+    api.getStays.mockResolvedValue(STAYS);
+    show();
+    await screen.findByRole("alert");
+    expect(screen.queryByText("Recent movement")).toBeNull();
   });
 
   it("says when nobody has moved yet", async () => {
