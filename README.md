@@ -1,6 +1,22 @@
 # BioSentry
 
-**Live demo:** <https://biosentry-dashboard.pages.dev> (synthetic data, no real sign-in; deploys from `main`)
+## Use it now
+
+BioSentry is deployed. You do not need to install anything to see it.
+
+| App | Address | What it is |
+|---|---|---|
+| Dashboard | <https://biosentry-dashboard.pages.dev> | The clinician's ranked list on a sample ward. Choose a clinician; any passphrase is accepted. |
+| Ward simulation | <https://biosentry-ward-sim.pages.dev> | The simulated hospital that feeds the dashboard. No sign-in. |
+
+Both public sites deploy from `main` and show synthetic patients. They have no server behind them, so each
+runs alone on sample data and what you enter is gone on reload.
+
+The connected version (the simulation writes to one API and the dashboard reads the same ward, live) runs on
+the team's server. It is private to the team: a clinician signs in with their own passphrase. Ask the team for
+access; [`deploy/README.md`](deploy/README.md) says how it is built and kept.
+
+To run or change the code yourself, see [Run it yourself](#run-it-yourself-developers).
 
 A ranked early-warning list for hospital wards in the Philippines.
 
@@ -25,16 +41,21 @@ each nurse and physician who to see next.
 The list is sorted by **NEWS2**, a published bedside early-warning score (Tier A). A patient
 who meets a NEWS2 trigger sits above one who does not. The own-baseline finding (Tier B) is listed as a
 reason and breaks ties between equal NEWS2 totals below a trigger; it never moves a patient past a NEWS2
-difference. No other Tier B finding and no Tier C risk is shown: no model computes them yet.
+difference. Two research models can add a flag to a row as one more reason, labelled synthetic and not
+validated. A flag never moves a patient on the list.
 
-**What is here.** The dashboard (`frontend/`) and a slim API (`backend/`: FastAPI over PostgreSQL). The
-ML models and the training code were removed ahead of the Huawei overhaul and are in git history. The
+**What is here.** The dashboard (`frontend/`) and a slim API (`backend/`: FastAPI over PostgreSQL); the
+research models as plain files with their held-out results (`models/`), the code that trains them
+(`training/`), the research agent (`research/`) and the team deployment (`deploy/`). The
 API serves the committed synthetic ward (`frontend/src/data/synthetic.json`), seeded into the database,
 and takes a live ward from the ward simulation.
 
 **This is not a diagnosis system.** It ranks and displays. A human decides.
 
-## Run it
+## Run it yourself (developers)
+
+You do not need this to see BioSentry: the deployed apps are under [Use it now](#use-it-now). This section is
+for people who change the code.
 
 You need Node.js `^20.19` or `>=22.12` and make. For the API you also need
 [uv](https://docs.astral.sh/uv/) (it fetches Python 3.11 itself) and [Docker](https://docs.docker.com/get-docker/)
