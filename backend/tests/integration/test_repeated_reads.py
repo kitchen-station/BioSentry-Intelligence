@@ -20,6 +20,7 @@ READS = [
     ("view_baseline", f"/patients/{PID}/baseline", PID),
     ("view_lab_runs", "/wards/W4/lab/runs", "W4"),
     ("view_lab_questions", "/wards/W4/lab/questions", "W4"),
+    ("view_patient_questions", f"/patients/{PID}/questions", PID),
 ]
 
 
@@ -38,7 +39,7 @@ def rows(api: Api, who: str, action: str | None = None) -> list[dict[str, Any]]:
     )
 
 
-def test_the_rule_names_six_reads_and_one_minute() -> None:
+def test_the_rule_names_seven_reads_and_one_minute() -> None:
     assert VIEW_ROW_EVERY == timedelta(minutes=1)
     assert REPEATED_VIEWS == {a for a, _, _ in READS}
 
@@ -62,6 +63,17 @@ def test_two_reads_in_a_minute_leave_one_row_and_a_later_one_a_second(
     ] * 2
     assert written[0]["role"] == written[1]["role"] == ("charge_rn" if who == RN else "md")
     assert written[1]["at"] - written[0]["at"] == timedelta(seconds=61)
+
+
+def test_opening_one_answer_twice_in_a_minute_leaves_two_rows(api: Api) -> None:
+    # Reading an answer is not a timer's read: every opening is recorded.
+    assert "view_patient_question" not in REPEATED_VIEWS
+    asked = api.client.post(f"/patients/{PID}/questions", headers=api.as_(MD), json={"question": "What changed?"})
+    assert asked.status_code == 201
+    for _ in range(2):
+        assert get(api, f"/patients/{PID}/questions/{asked.json()['id']}").status_code == 200
+    seen = [(r["resource"], r["outcome"]) for r in rows(api, MD, "view_patient_question")]
+    assert seen == [(f"patient_question:{asked.json()['id']}", "ok")] * 2
 
 
 def test_two_clinicians_reading_the_same_list_leave_a_row_each(api: Api) -> None:
