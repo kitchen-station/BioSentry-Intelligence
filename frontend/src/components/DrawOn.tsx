@@ -10,7 +10,7 @@ const DRAW_MS = 700;
 export function useDrawFrom(keys: readonly unknown[]): { from: number; version: number } {
   const [s, setS] = useState({ keys, version: 0, from: -1 });
   const k = appendedCount(s.keys, keys);
-  if (k === 0) return s;
+  if (k === 0 || (keys.length === 0 && s.keys.length === 0)) return s; // empty twice: nothing to draw
   const next = { keys, version: s.version + 1, from: k === null ? -1 : keys.length - 1 - k };
   setS(next);
   return next;

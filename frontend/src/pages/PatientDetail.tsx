@@ -5,8 +5,8 @@ import type { ClinicalNote, PatientDetail as PatientDetailType, Session, Session
 import { getPatient, getNotes, addNote, canRecordVitals, usesServer } from "../api";
 import { SessionMenu } from "../components/SessionMenu";
 import { SimulatedNote } from "../components/LabFrame";
-import { BaselinePanel } from "../components/BaselinePanel";
-import { useBaseline } from "../components/useBaseline";
+import { BaselinePanel, isComputed, isObj, num } from "../components/BaselinePanel";
+import { useBaseline, type BaselineState } from "../components/useBaseline";
 import { CurrentVitals, VitalRow } from "../components/CurrentVitals";
 import { TrendChart } from "../components/TrendChart";
 import { formatClock, formatSimClock, patchInUse } from "../components/format";
@@ -17,6 +17,25 @@ import { standing } from "../components/vitalsDraft";
 import styles from "./PatientDetail.module.css";
 
 // --- Shared sub-components ---
+
+// The patient's own band for one vital, from the answer the page already loaded. An older server
+// without the two fields, a vital still forming, a build without the route and an answer of an
+// odd shape give no band (the panel says the baseline could not be loaded; the page never blanks).
+function bandOf(baseline: BaselineState, vital: string) {
+  const b: unknown = baseline;
+  if (!isObj(b) || !Array.isArray(b.vitals)) return undefined;
+  const v: unknown = b.vitals.find((x) => isObj(x) && x.vital === vital);
+  if (!isObj(v) || v.status !== "computed" || !isComputed(v) || !num(v.band_low) || !num(v.band_high)) return undefined;
+  return { low: v.band_low, high: v.band_high, flagged: v.significant };
+}
+
+// The read serves every stored bin, so the title says the span of what is drawn.
+function trendTitle(history: PatientDetailType["vital_history"]) {
+  const ms = Object.values(history).flatMap((pts) => pts.map((p) => Date.parse(p.time))).filter(Number.isFinite);
+  if (ms.length === 0) return "Vital trends";
+  const h = Math.floor((Math.max(...ms) - Math.min(...ms)) / 3_600_000);
+  return `Vital trends \u00b7 ${h < 1 ? "under 1 h" : `${h} h`}`;
+}
 
 type Drawer = "notes" | "charts" | null;
 
@@ -167,6 +186,9 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
 
   if (!patient) return <Bare session={session} onSignOut={onSignOut} />;
 
+  const hrBand = bandOf(baseline, "heart_rate");
+  const rrBand = bandOf(baseline, "respiratory_rate");
+  const spo2Band = bandOf(baseline, "spo2");
   const reasons = patient.escalation_reasons;
   const signal = patchInUse(patient.vitals) ? patient.signal_quality : null;
 
@@ -275,7 +297,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
           <div className={styles.overlayPanel}>
             <div className={styles.overlayHeader}>
               <span className={styles.overlayTitle}>
-                {drawer === "notes" ? `Clinical notes${notes.length > 0 ? ` \u00b7 ${notes.length}` : ""}` : "Vital trends -- last 6 hours"}
+                {drawer === "notes" ? `Clinical notes${notes.length > 0 ? ` \u00b7 ${notes.length}` : ""}` : trendTitle(patient.vital_history)}
               </span>
               {failedSince !== null && (
                 <span>Cannot reach the ward server since {formatClock(failedSince)}.</span>
@@ -333,6 +355,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
                   unit="bpm"
                   warningHigh={100}
                   warningLow={60}
+                  band={hrBand}
                 />
                 <TrendChart
                   data={patient.vital_history.respiratory_rate}
@@ -341,6 +364,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
                   unit="/min"
                   warningHigh={20}
                   warningLow={12}
+                  band={rrBand}
                 />
                 <TrendChart
                   data={patient.vital_history.spo2}
@@ -348,7 +372,13 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
                   color="var(--trace-spo2)"
                   unit="%"
                   warningLow={94}
+                  band={spo2Band}
                 />
+                {(hrBand || rrBand || spo2Band) && (
+                  <p className={styles.pending}>
+                    Shaded: this patient's own baseline (synthetic, not validated). Not a normal range.
+                  </p>
+                )}
                 <p className={styles.pending}>
                   Charts show patch data only. Values entered by a nurse are not plotted.
                 </p>

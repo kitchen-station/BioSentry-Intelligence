@@ -352,6 +352,12 @@
             ],
             "type": "string"
           },
+          "band_high": {
+            "type": "number"
+          },
+          "band_low": {
+            "type": "number"
+          },
           "baseline_from": {
             "format": "date-time",
             "type": "string"
@@ -444,6 +450,8 @@
           "anchored_at",
           "delta",
           "z",
+          "band_low",
+          "band_high",
           "run_bins",
           "since",
           "significant",

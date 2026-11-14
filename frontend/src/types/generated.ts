@@ -97,6 +97,8 @@ export interface components {
         readonly BaselineComputed: {
             /** @enum {string} */
             readonly anchored_at: "admission" | "first_kept_bin";
+            readonly band_high: number;
+            readonly band_low: number;
             /** Format: date-time */
             readonly baseline_from: string;
             readonly baseline_median: number;

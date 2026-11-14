@@ -31,6 +31,14 @@ describe("useDrawFrom", () => {
     rerender({ keys: ["x", "y", "z"] }); // a different series: draw it all
     expect(result.current).toMatchObject({ from: -1, version: 2 });
   });
+
+  it("stays still when the series is empty again (a new empty array each render must not loop)", () => {
+    const { result, rerender } = renderHook(({ keys }) => useDrawFrom(keys), { initialProps: { keys: [] as string[] } });
+    rerender({ keys: [] });
+    expect(result.current).toMatchObject({ from: -1, version: 0 });
+    rerender({ keys: ["a"] }); // the first bin: draw it
+    expect(result.current).toMatchObject({ from: -1, version: 1 });
+  });
 });
 
 const widthAfter = (fromX: number, toX: number) => {

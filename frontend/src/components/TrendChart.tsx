@@ -26,6 +26,8 @@ interface Props {
   color?: string;
   warningHigh?: number;
   warningLow?: number;
+  /** The patient's own baseline, as the server sent it. The chart only maps it to pixels. */
+  band?: { low: number; high: number; flagged: boolean };
 }
 
 export function TrendChart({
@@ -38,6 +40,7 @@ export function TrendChart({
   color = "var(--data)",
   warningHigh,
   warningLow,
+  band,
 }: Props) {
   const draw = useDrawFrom(data.map((d) => `${d.time}|${d.value}`));
   const values = data.map((d) => d.value);
@@ -61,9 +64,15 @@ export function TrendChart({
   const times = data.map((d) => Date.parse(d.time));
   const xs =
     xByTime(times, padL, plotW) ?? data.map((_, i) => xByIndex(i, data.length, padL, plotW));
+  const yOf = (v: number) => padT + plotH - ((v - min) / range) * plotH;
   const points: (Pt | null)[] = data.map((d, i) =>
-    d.value === null ? null : { x: xs[i], y: padT + plotH - ((d.value - min) / range) * plotH },
+    d.value === null ? null : { x: xs[i], y: yOf(d.value) },
   );
+  // The band is cut to the drawn range; wholly outside it nothing is drawn, the words stay.
+  const bandTop = band && yOf(Math.min(band.high, max));
+  const bandBottom = band && yOf(Math.max(band.low, min));
+  const bandText =
+    band && `Own baseline ${band.low} to ${band.high} ${unit}${band.flagged ? " \u00b7 Flagged" : ""}`;
   const latest = points[points.length - 1];
   const latestValue = values[values.length - 1];
   const timesUsable = xByTime(times, padL, plotW) !== null;
@@ -98,7 +107,10 @@ export function TrendChart({
           justifyContent: "space-between",
         }}
       >
-        <span>{label}</span>
+        <span>
+          {label}
+          {bandText && <span style={{ textTransform: "none" }}>{` \u00b7 ${bandText}`}</span>}
+        </span>
         <span style={{ fontFamily: "var(--font-mono)", color: "var(--ink)" }}>
           {latestValue === null ? "--" : `${latestValue} ${unit}`}
         </span>
@@ -108,6 +120,8 @@ export function TrendChart({
         height={height}
         viewBox={`0 0 ${width} ${height}`}
         preserveAspectRatio="none"
+        role="img"
+        aria-label={bandText ? `${label} trend. ${bandText}` : `${label} trend`}
       >
         {/* Grid lines */}
         {yTicks.map((t) => (
@@ -151,6 +165,18 @@ export function TrendChart({
             </>
           );
         })()}
+
+        {bandTop !== undefined && bandBottom !== undefined && bandTop < bandBottom && (
+          <rect
+            data-testid="own-baseline-band"
+            x={padL}
+            y={bandTop}
+            width={plotW}
+            height={bandBottom - bandTop}
+            fill={color}
+            opacity={0.15}
+          />
+        )}
 
         <DrawOn fromX={fromX} toX={width} height={height} version={draw.version}>
           <path d={areaPath(points, padT + plotH)} fill={color} opacity={0.06} />

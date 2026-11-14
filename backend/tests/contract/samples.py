@@ -257,6 +257,8 @@ _BUILDERS: dict[type[BaseModel], Any] = {
         "anchored_at": "admission",
         "delta": 20.0,
         "z": 3.4,
+        "band_low": 58.1,
+        "band_high": 81.9,
         "run_bins": 4,
         "since": "2026-09-03T06:00:00Z",
         "significant": True,

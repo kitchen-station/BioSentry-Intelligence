@@ -85,6 +85,7 @@ class Deviation:
     z: float
     run_bins: int  # consecutive valid bins, ending at the latest, past k in the bad direction
     since_bin: int | None  # index from admission where that run starts; None when no run
+    spread: float  # the divisor of z: max(1.4826 x MAD, floor), own units
 
 
 DEFAULTS = BaselineParams()
@@ -139,4 +140,4 @@ def baseline_finding(
         pathway=spec.pathway,
     )
     since = len(bins) - run if run else None
-    return finding, Deviation(vital, value, median, delta, z, run, since)
+    return finding, Deviation(vital, value, median, delta, z, run, since, spread)

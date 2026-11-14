@@ -68,6 +68,7 @@ PATHS = (
         for k in (
             "vital", "status", "baseline_median", "latest", "latest_at", "latest_age_s", "baseline_from",
             "anchored_at", "delta", "z", "run_bins", "since", "significant", "direction", "pathway", "unit",
+            "band_low", "band_high",
             "bins_valid", "bins_needed", "reason",
         )  # computed, forming and unavailable together
     }  # fmt: skip

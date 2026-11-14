@@ -113,6 +113,8 @@ class BaselineService:
                     ),
                     delta=round(dev.delta, 1),
                     z=round(dev.z, 1),
+                    band_low=round(dev.baseline_median - DEFAULTS.k * dev.spread, 1),
+                    band_high=round(dev.baseline_median + DEFAULTS.k * dev.spread, 1),
                     run_bins=dev.run_bins,
                     since=None if dev.since_bin is None else start + dev.since_bin * BIN,
                     significant=finding.significant,
