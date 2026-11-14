@@ -315,3 +315,29 @@ def test_write_never_touches_an_existing_tmp_file_and_a_folder_out_is_one_refusa
     assert ex.main(["registry", *ARGS, "--out", str(folder)]) == 2
     assert capsys.readouterr().err.count("\n") == 1
     assert list(folder.iterdir()) == [] and sorted(p.name for p in tmp_path.iterdir()) == ["dir", "out.json", "out.json.tmp"]
+
+
+def test_the_set_2_note_comes_from_the_analysis_file_and_nothing_else(tmp_path):
+    _, _, path = toy_held_out(tmp_path)
+
+    def entry(i, gain, ratio, verdict):
+        return {"id": i, "gain": {"estimate": gain}, "alert_ratio": {"estimate": ratio}, "verdict": verdict}
+
+    analysis = tmp_path / "analysis.json"
+    analysis.write_text(json.dumps({"trials": 7, "primary": [
+        entry("news2_or_student", -0.04011, 1.2541, "a loss is shown"),
+        entry("news2_or_student_checked", 0.01812, 1.0478, "a gain beyond chance is shown"),
+        entry("news2_or_reward_final", -0.01266, 1.1311, "a loss is shown")]}))
+    obj = make(tmp_path, "evaluations", "--held-out", str(path), "--set-2-analysis", str(analysis))[1]
+    note = obj["notes"][-1]
+    assert note == ("These rows are held-out set 1 (91 episodes). Held-out set 2 (7 trials), gain over chance when added "
+                    "to NEWS2: student -0.040, 1.254x alerts, a loss is shown; checked student +0.018, 1.048x alerts, "
+                    "a gain beyond chance is shown; reward policy -0.013, 1.131x alerts, a loss is shown.")
+    assert len(note) <= 300
+    without = make(tmp_path, "evaluations", "--held-out", str(path), name="n.json")[1]
+    assert obj["body"] == without["body"] and obj["notes"][:-1] == without["notes"]
+    bad = tmp_path / "bad.json"
+    bad.write_text(json.dumps({"trials": 7, "primary": []}))
+    assert ex.main(["evaluations", *ARGS, "--held-out", str(path), "--set-2-analysis", str(bad),
+                    "--out", str(tmp_path / "z.json")]) == 2
+    assert not (tmp_path / "z.json").exists()

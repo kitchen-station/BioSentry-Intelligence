@@ -969,7 +969,8 @@
  "format": "biosentry-evaluation/4",
  "notes": [
   "The reward policy's rules are absent: its held-out result exists only as a text report, and a text report is never a source of a number.",
-  "6 rule rows appeared in more than one held-out file with the same values; each is kept once."
+  "6 rule rows appeared in more than one held-out file with the same values; each is kept once.",
+  "These rows are held-out set 1 (91 episodes). Held-out set 2 (400 trials), gain over chance when added to NEWS2: student -0.040, 1.254x alerts, a loss is shown; checked student +0.018, 1.048x alerts, a gain beyond chance is shown; reward policy -0.013, 1.131x alerts, a loss is shown."
  ],
  "provenance": {
   "commit": "e82cb9a9481e714a72a8241bf48366c6fc86f7b2",
