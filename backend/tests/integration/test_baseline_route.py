@@ -656,6 +656,7 @@ def test_a_ward_read_runs_the_same_statements_with_or_without_the_finding(
         return real(self, *args, **kw)
 
     def statements() -> int:
+        api.wall.now += timedelta(seconds=61)  # outside the minute: each read writes its row
         seen[0] = 0
         api.ward("rn-delacruz")
         return seen[0]

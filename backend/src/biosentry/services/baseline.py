@@ -50,7 +50,7 @@ class BaselineService:
         if state is None or isinstance(decide(state), NotRanked):
             self._audit.append(clinician_id, "view_baseline", patient_id, "not_found")
             return None
-        self._audit.append(clinician_id, "view_baseline", patient_id, "ok")
+        self._audit.append_view(clinician_id, "view_baseline", patient_id)
         now = self._store.now()  # the clock `last_update_s` is measured on
         admitted_at = state.admitted_at
         vitals: list[BaselineComputed | BaselineForming | BaselineUnavailable] = []

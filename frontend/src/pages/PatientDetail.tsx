@@ -266,7 +266,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
           </div>
         </div>
       </div>
-      {readOnly && <p className={styles.readOnly}>Read-only. Every view is recorded in the audit log.</p>}
+      {readOnly && <p className={styles.readOnly}>Read-only. Views are recorded in the audit log.</p>}
 
       {/* Overlay panels */}
       {drawer && (

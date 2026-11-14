@@ -514,7 +514,7 @@ describe("PatientDetail for an administrator (read only)", () => {
     api.canRecordVitals = true;
     page("admin");
     await loaded();
-    expect(screen.getByText("Read-only. Every view is recorded in the audit log.")).toBeTruthy();
+    expect(screen.getByText("Read-only. Views are recorded in the audit log.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Record vitals" })).toBeNull();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Notes" }));

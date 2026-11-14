@@ -9,7 +9,7 @@ hash-chained form comes later. `resource` comes from the caller, so it is cut at
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 from biosentry.repositories.postgres import Conn, whole
@@ -18,6 +18,13 @@ RESOURCE_MAX = 200
 Outcome = Literal["ok", "not_found", "denied", "rejected", "limited"]
 Clock = Callable[[], datetime]
 RoleOf = Callable[[str], str | None]
+# The reads the dashboard repeats on a timer. A repeat of one of these by the same clinician on the
+# same resource with outcome ok is recorded at most once in VIEW_ROW_EVERY (the owner's decision
+# for the automatic refresh). Every other action, and every outcome but ok, is always recorded.
+REPEATED_VIEWS = frozenset(
+    {"view_ward", "view_live", "view_patient", "view_baseline", "view_lab_runs"}
+)
+VIEW_ROW_EVERY = timedelta(minutes=1)
 
 
 def utc_now() -> datetime:
@@ -57,12 +64,35 @@ class AuditLog:
             ),
         )
 
-    def count(self, action: str, resource: str, outcome: Outcome, since: datetime) -> int:
-        """How many records of this action on this resource with this outcome came after `since`."""
+    def append_view(self, clinician_id: str, action: str, resource: str) -> None:
+        """An ok read. A timer-driven read (REPEATED_VIEWS) already recorded for this clinician
+        on this resource within VIEW_ROW_EVERY is not recorded again; the data is served anyway."""
+        now = self._clock()
+        # `until`: a row stamped after now (the host clock stepped back) must not hide this read.
+        if action in REPEATED_VIEWS and self.count(
+            action, resource, "ok", now - VIEW_ROW_EVERY, clinician_id, now
+        ):
+            return
+        self.append(clinician_id, action, resource, "ok")
+
+    def count(
+        self,
+        action: str,
+        resource: str,
+        outcome: Outcome,
+        since: datetime,
+        clinician_id: str | None = None,
+        until: datetime | None = None,
+    ) -> int:
+        """How many records of this action on this resource with this outcome came after `since`
+        (and at or before `until`, when given); only this clinician's when one is given."""
+        end = whole(until) if until else None
         row = self._conn.execute(
             "SELECT count(*) AS n FROM audit_log"
-            " WHERE action = %s AND resource = %s AND outcome = %s AND at > %s",
-            (action, resource, outcome, whole(since)),
+            " WHERE action = %s AND resource = %s AND outcome = %s AND at > %s"
+            " AND (%s::text IS NULL OR clinician_id = %s)"
+            " AND (%s::timestamptz IS NULL OR at <= %s)",
+            (action, resource, outcome, whole(since), clinician_id, clinician_id, end, end),
         ).fetchone()
         assert row is not None
         return int(row["n"])
