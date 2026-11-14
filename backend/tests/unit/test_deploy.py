@@ -322,7 +322,7 @@ def test_the_web_server_hides_the_ingest_door_and_passes_requests_only_to_the_ap
 # --- deploy/compose.public.yaml ----------------------------------------------------------------
 
 
-def test_public_mode_publishes_nothing_and_pins_the_origins_and_the_open_view_off() -> None:
+def test_public_mode_publishes_nothing_pins_the_origins_and_opens_the_view_only_by_its_own_line() -> None:
     # The whole file, line for line: public mode adds no port, no network, no volume and no service.
     capped = ["logging:", "driver: json-file", "options:", "max-size: 10m", 'max-file: "3"']
     assert _code(DEPLOY / "compose.public.yaml") == [
@@ -331,7 +331,9 @@ def test_public_mode_publishes_nothing_and_pins_the_origins_and_the_open_view_of
         "environment:",
         # The two public sites, exact origins: no wildcard, no third one.
         "BIOSENTRY_CORS_ORIGINS: https://biosentry-dashboard.pages.dev,https://biosentry-ward-sim.pages.dev",
-        'BIOSENTRY_OPEN_WARD_VIEW: "false"',  # never watched without a sign-in while public
+        # Off unless the separate line BIOSENTRY_PUBLIC_OPEN_WARD_VIEW=true is in .env. The plain
+        # BIOSENTRY_OPEN_WARD_VIEW is not read here: it cannot turn the public view on by accident.
+        "BIOSENTRY_OPEN_WARD_VIEW: ${BIOSENTRY_PUBLIC_OPEN_WARD_VIEW:-false}",
         *capped,  # a flood of requests cannot fill the disk with log lines
         "web:",
         *capped,
@@ -540,6 +542,56 @@ def test_setup_refuses_a_public_host_line_it_cannot_read_and_does_not_start_priv
     done = _run(host, "setup.sh")
     assert done.returncode == 1 and "PUBLIC_HOST=name" in done.stderr
     assert not any("up -d" in call for call in _calls(host))
+
+
+def test_the_public_view_default_is_off_and_the_plain_value_is_not_what_public_mode_reads() -> None:
+    text = (DEPLOY / "compose.public.yaml").read_text(encoding="utf-8")
+    assert re.findall(r"\$\{(BIOSENTRY\w*)[:-]", text) == ["BIOSENTRY_PUBLIC_OPEN_WARD_VIEW"]  # the only one read
+    assert "${BIOSENTRY_PUBLIC_OPEN_WARD_VIEW:-false}" in text  # unset means off
+    assert "${BIOSENTRY_OPEN_WARD_VIEW" not in text
+
+
+def test_setup_says_nothing_about_a_public_ward_page_unless_it_is_on(host: dict[str, Path]) -> None:
+    for lines in ((), ("BIOSENTRY_PUBLIC_OPEN_WARD_VIEW=false",)):
+        _set(host, "PUBLIC_HOST=server.tail1234.ts.net", *lines)
+        done = _run(host, "setup.sh")
+        assert done.returncode == 0 and _calls(host)[-1] == PUBLIC_UP and "without a sign-in" not in done.stdout
+        (host["deploy"] / ".env").unlink()
+        host["log"].unlink()
+
+
+def test_setup_says_so_when_the_public_ward_page_is_on(host: dict[str, Path]) -> None:
+    _set(host, "PUBLIC_HOST=server.tail1234.ts.net", "BIOSENTRY_PUBLIC_OPEN_WARD_VIEW=false", "BIOSENTRY_PUBLIC_OPEN_WARD_VIEW=true")
+    done = _run(host, "setup.sh")  # the last line wins, as compose reads the file
+    assert done.returncode == 0 and _calls(host)[-1] == PUBLIC_UP
+    assert "BIOSENTRY_PUBLIC_OPEN_WARD_VIEW=true" in done.stdout and "without a sign-in" in done.stdout
+    assert "no names" in done.stdout and "Control still needs a sign-in" in done.stdout
+
+
+@pytest.mark.parametrize(
+    "line",
+    [  # a spelling compose could read as on, or that the API would stop on: refused, nothing started
+        "BIOSENTRY_PUBLIC_OPEN_WARD_VIEW=TRUE",
+        "BIOSENTRY_PUBLIC_OPEN_WARD_VIEW=yes",
+        "BIOSENTRY_PUBLIC_OPEN_WARD_VIEW=",
+        'BIOSENTRY_PUBLIC_OPEN_WARD_VIEW="true"',
+        "BIOSENTRY_PUBLIC_OPEN_WARD_VIEW=true # on",
+        "BIOSENTRY_PUBLIC_OPEN_WARD_VIEW = true",
+        " BIOSENTRY_PUBLIC_OPEN_WARD_VIEW=true",
+        "export BIOSENTRY_PUBLIC_OPEN_WARD_VIEW=true",
+    ],
+)
+def test_setup_refuses_a_public_view_line_it_cannot_read_and_starts_nothing(host: dict[str, Path], line: str) -> None:
+    _set(host, "PUBLIC_HOST=server.tail1234.ts.net", line)
+    done = _run(host, "setup.sh")
+    assert done.returncode == 1 and "BIOSENTRY_PUBLIC_OPEN_WARD_VIEW=true or" in done.stderr
+    assert not any("up -d" in call for call in _calls(host))
+
+
+def test_setup_does_not_read_the_public_view_line_in_private_mode(host: dict[str, Path]) -> None:
+    _set(host, "BIOSENTRY_PUBLIC_OPEN_WARD_VIEW=true")
+    done = _run(host, "setup.sh")
+    assert done.returncode == 0 and _calls(host)[-1] == UP and "without a sign-in" not in done.stdout
 
 
 def test_setup_allows_public_mode_with_the_open_ward_view_off(host: dict[str, Path]) -> None:

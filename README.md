@@ -276,7 +276,9 @@ applied to made-up patients.
   start) adds one route, `GET /wards/{ward}/open-view`, that shows anyone who can reach the API the ward
   simulator's drawing with no sign-in: bed, rank and NEWS2 band, and staff figures, no names or ids. It serves
   a synthetic run only, still needs a sign-in for control, and its views leave at most one audit row a
-  minute. It is allowed in production and logs a warning at start. Never use it on a public address.
+  minute. It is allowed in production and logs a warning at start. On a public address (`deploy/compose.public.yaml`) the
+  team's value is not read; the separate `BIOSENTRY_PUBLIC_OPEN_WARD_VIEW=true` opts in (`deploy/README.md`, "The
+  public ward page", owner decision 2026-11-14).
 
 ## Licence
 

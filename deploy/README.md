@@ -84,8 +84,8 @@ call it anyway). "Public mode" is the one supported way to let them use this API
   around `ufw`'s rules, so the safety here is that two ports are bound to loopback and the third is not
   published at all. Do not edit `compose.yaml` to publish any of them, and open nothing but SSH in the
   provider's firewall (Tailscale needs no inbound port).
-- `BIOSENTRY_OPEN_WARD_VIEW=true` lets anyone who can open the address watch the ward simulator without signing in (bed colours, staff figures, no names); control still needs a sign-in. It is off unless set to `true`, it serves only a run marked synthetic, and the API logs a warning at start when it is on. Public mode (`compose.public.yaml`) forces it off.
-- Never turn it on where the address is public (`tailscale funnel`, a public IP or a tunnel): every person who can reach the page sees the ward.
+- `BIOSENTRY_OPEN_WARD_VIEW=true` lets anyone who can open the address watch the ward simulator without signing in (bed colours, staff figures, no names); control still needs a sign-in. It is off unless set to `true`, it serves only a run marked synthetic, and the API logs a warning at start when it is on. Public mode (`compose.public.yaml`) does not read this value: it has its own line, `BIOSENTRY_PUBLIC_OPEN_WARD_VIEW` ("The public ward page", below), so this one can never open the ward to the internet by accident.
+- Do not set it where the address is public (`tailscale funnel`, a public IP or a tunnel) unless you mean every person who can reach the page to see the ward. For a public address use the separate line.
 - A clinician still signs in with their own passphrase, on both pages. The API answers each one only for
   their own patients and writes an audit row for every view. Tailscale decides who can reach the address;
   the passphrase decides whose patients they see.
@@ -272,11 +272,12 @@ In order:
 3. **Add one line to `deploy/.env`:** `PUBLIC_HOST=<this-host>.<your-tailnet>.ts.net` (the name
    `tailscale serve status` shows, lower case, no `https://`, no `export`, no spaces).
    `BIOSENTRY_OPEN_WARD_VIEW` must not be `true` in that file: `setup.sh` stops if both are set there,
-   and `compose.public.yaml` forces it off whatever the file or the shell says.
+   and `compose.public.yaml` does not read it. Watching the ward without a sign-in is off in public mode
+   unless you add the separate line `BIOSENTRY_PUBLIC_OPEN_WARD_VIEW=true` ("The public ward page", below).
 4. **Run `deploy/setup.sh`.** With `PUBLIC_HOST` set it adds `compose.public.yaml`: the API accepts
    browser calls from exactly `https://biosentry-dashboard.pages.dev` and
-   `https://biosentry-ward-sim.pages.dev`, watching the ward without a sign-in is forced off, and the
-   API's and the web server's logs are capped. It opens nothing itself. It prints the next command.
+   `https://biosentry-ward-sim.pages.dev`, watching the ward without a sign-in is off (unless the line
+   above says otherwise), and the API's and the web server's logs are capped. It opens nothing itself. It prints the next command.
 5. **Open the door:** `sudo tailscale funnel --bg --https=443 http://127.0.0.1:8080`. Then
    `tailscale funnel status` must list this one address and no longer say `(tailnet only)`.
 6. **Check from a device that is not on the tailnet** (a phone on mobile data). With the name from step
@@ -296,6 +297,37 @@ this host; the second half opens the private door again, and `tailscale funnel s
 While public mode is on, start the stack with `deploy/setup.sh` only. A plain `docker compose up` leaves
 out `compose.public.yaml`.
 
+### The public ward page (optional, off by default)
+
+The owner decided on 2026-11-14 that the public ward page needs no sign-in "for now". It is a separate
+opt-in. In `deploy/.env`, next to `PUBLIC_HOST`:
+
+    BIOSENTRY_PUBLIC_OPEN_WARD_VIEW=true
+
+Written exactly so, at the start of a line: `setup.sh` refuses any other spelling and starts nothing. With
+the line missing, or `=false`, nothing changes. Public mode never reads the plain
+`BIOSENTRY_OPEN_WARD_VIEW`, so an old `true` there cannot open it. Run `deploy/setup.sh` again; it says
+in one line that the page is open. To close it: remove the line, run `deploy/setup.sh` again.
+
+What a visitor sees (`GET /api/wards/W4/open-view`, no credential read, the same for every caller). Only
+while the stored run is marked synthetic. Nothing else is in the answer:
+
+- the ward's id, and the two flags `synthetic: true` and `can_control: false`;
+- for each occupied bed: its label, whether it is ranked, its rank and its NEWS2 band (low, low-medium,
+  medium, high);
+- the simulator's clock, its speed and whether it ended;
+- for each figure on the ward (staff): role (nurse, charge nurse, doctor), position, which way it faces,
+  whether it walks, and its stage. No name, no id, no task;
+- the last few bed moves: a number, a bed label, in or out.
+
+A visitor sees no patient name, id, age, vital sign, lab value, note or alert text, and cannot send a
+command: control still needs a sign-in. The data is synthetic; no real patient is in it. A bed's rank and
+band do show how sick each bed is on the simulated ward.
+
+The call is allowed from the same two sites as every other call (`BIOSENTRY_CORS_ORIGINS`: the dashboard
+and the ward simulator on `pages.dev`). Anyone can still call it from a script. The view writes at most
+one audit row a minute, however many people watch.
+
 ### What changes for an attacker
 
 On the internet when public mode is on: the sign-in page, the two pages, and every route under `/api`.
@@ -311,6 +343,8 @@ What protects it:
   reachable from outside.
 - A request body over 1 MB is refused, and a client that sends too slowly is dropped.
 - The data is synthetic. There is no real patient in it.
+- With the public ward page on, the one route that needs no sign-in is `GET /api/wards/{ward}/open-view`: it
+  answers a fixed, name-free drawing and writes at most one audit row a minute.
 
 What does not:
 
