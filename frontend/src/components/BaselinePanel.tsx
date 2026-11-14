@@ -58,7 +58,7 @@ const when = (iso: string) => {
 // away from zero, taken from the number's decimal text (so 72.85 gives 72.9, which toFixed and
 // Math.round(x * 10) get wrong in binary). Temperature always shows the decimal. The served value
 // is the element's title.
-const shown = (vital: string, x: number) => {
+export const shown = (vital: string, x: number) => {
   const a = String(Math.abs(x));
   const r = a.includes("e") ? Number(Math.abs(x).toFixed(1)) : Number(`${Math.round(Number(`${a}e1`))}e-1`);
   const t = vital === "temperature" ? r.toFixed(1) : String(r);
