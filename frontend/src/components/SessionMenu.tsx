@@ -29,6 +29,7 @@ export function SessionMenu({ session, onSignOut }: Props) {
       <nav aria-label="Pages" className={styles.nav}>
         {admin && <NavLink to="/overview" className={styles.place}>Overview</NavLink>}
         <NavLink to="/ward" end className={styles.place}>Ward</NavLink>
+        {station && <NavLink to="/ask" className={styles.place}>Ask</NavLink>}
         {station && <NavLink to="/station" className={styles.place}>Station</NavLink>}
         {typeof analytics === "string" && ANALYTICS_PATH.test(analytics) && (
           <a href={analytics} target="_blank" rel="noopener noreferrer" className={styles.place}>Analytics</a>

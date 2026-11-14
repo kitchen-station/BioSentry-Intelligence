@@ -495,7 +495,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
 
           {hasPatientQuestions && !readOnly && (
             <div className={styles.panel}>
-              <AskPatient key={patient.id} patientId={patient.id} clinicianId={session.clinician_id} onSignOut={onSignOut} />
+              <AskPatient key={patient.id} patientId={patient.id} clinicianId={session.clinician_id} role={session.role} onSignOut={onSignOut} />
             </div>
           )}
 

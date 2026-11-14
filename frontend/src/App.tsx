@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import type { Session } from "./types";
-import { restoreSession, clearSession, hasLabQuestions } from "./api";
+import { restoreSession, clearSession } from "./api";
 import { SignIn } from "./pages/SignIn";
 import { Ward } from "./pages/Ward";
 import { PatientDetail } from "./pages/PatientDetail";
@@ -9,7 +9,7 @@ import { Station } from "./pages/Station";
 import { Pipeline } from "./pages/Pipeline";
 import { Research } from "./pages/Research";
 import { Lab } from "./pages/Lab";
-import { Ask } from "./pages/Ask";
+import { AskChat } from "./pages/AskChat";
 import { Overview } from "./pages/Overview";
 
 // Per tab, gone when the tab closes. Only who is signed in is kept here, never a token: with the
@@ -86,6 +86,7 @@ export function App() {
   // The lab's own tools (simulated runs, a question for the research agent) open for those who can use them; a staff nurse cannot.
   const developer = session?.role === "admin";
   const usesLab = developer || session?.role === "md" || session?.role === "charge_rn";
+  const clinician = session?.role === "md" || session?.role === "charge_rn"; // the roles that may ask
   const toWard = <Navigate to="/ward" replace />;
 
   return (
@@ -116,16 +117,18 @@ export function App() {
           session ? <Overview session={session} onSignOut={signOut} /> : <ToSignIn gone={gone} />
         }
       />
+      {["/ask", "/ask/patient/:id"].map((path) => (
+        <Route
+          key={path}
+          path={path}
+          element={session ? (clinician ? <AskChat session={session} onSignOut={signOut} /> : toWard) : <ToSignIn gone={gone} />}
+        />
+      ))}
       <Route
         path="/lab"
         element={session ? (usesLab ? <Lab session={session} onSignOut={signOut} /> : toWard) : <ToSignIn gone={gone} />}
       />
-      {hasLabQuestions && (
-        <Route
-          path="/lab/ask"
-          element={session ? (usesLab ? <Ask session={session} onSignOut={signOut} /> : toWard) : <ToSignIn gone={gone} />}
-        />
-      )}
+      <Route path="/lab/ask" element={session ? (clinician ? <Navigate to="/ask" replace /> : toWard) : <ToSignIn gone={gone} />} />
       <Route
         path="/lab/research"
         element={session ? (developer ? <Research session={session} onSignOut={signOut} /> : toWard) : <ToSignIn gone={gone} />}

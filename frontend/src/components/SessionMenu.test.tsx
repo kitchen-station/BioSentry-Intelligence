@@ -66,8 +66,8 @@ describe("SessionMenu", () => {
 
   it.each([
     ["rn", ["Ward"]],
-    ["charge_rn", ["Ward", "Station"]],
-    ["md", ["Ward", "Station"]],
+    ["charge_rn", ["Ward", "Ask", "Station"]],
+    ["md", ["Ward", "Ask", "Station"]],
     ["admin", ["Overview", "Ward"]],
   ] as const)("shows %s only the bar links for routes it can use", (role, names) => {
     menu({ clinician_id: "x-1", ward: "W4", role });
@@ -83,6 +83,13 @@ describe("SessionMenu", () => {
     menu({ clinician_id: "md-santos", ward: "W4", role: "md" }, path);
     const mark = (n: string) => screen.getByRole("link", { name: n }).getAttribute("aria-current");
     for (const n of ["Ward", "Station"]) expect(mark(n)).toBe(n === current ? "page" : null);
+  });
+
+  it.each(["md", "charge_rn"] as const)("sends %s to the Ask page from the bar, and marks it on a thread", async (role) => {
+    menu({ clinician_id: "x-1", ward: "W4", role }, "/ask/patient/p-001");
+    expect(screen.getByRole("link", { name: "Ask" }).getAttribute("aria-current")).toBe("page");
+    await userEvent.click(screen.getByRole("link", { name: "Ask" }));
+    expect(screen.getByText("at /ask")).toBeTruthy();
   });
 
   it("marks Overview for an admin on /overview", () => {

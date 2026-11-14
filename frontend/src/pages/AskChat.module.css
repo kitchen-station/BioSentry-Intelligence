@@ -1,0 +1,44 @@
+/* The Ask page: its heading, the thread picker and one quiet line. The thread has its own styles. */
+
+.title {
+  margin: 0 0 var(--sp-3);
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 28px;
+  color: var(--ink);
+}
+
+.quiet {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--label);
+}
+
+.picker {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.pick {
+  display: inline-block;
+  padding: var(--sp-1) var(--sp-3);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+/* The current thread is told by a heavy border and bold type, not by colour alone. */
+.pick[aria-current="page"] {
+  font-weight: 700;
+  border: 2px solid var(--primary);
+}
