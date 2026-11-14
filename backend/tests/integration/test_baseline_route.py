@@ -53,9 +53,8 @@ def history_times(api: Api, pid: str = "s-1") -> list[str]:
 
 
 def served(api: Api, minute: int) -> str:
-    """The served time of a bin stored at this sim minute: its stored time plus the run's shift."""
-    (row,) = api.sql("SELECT last_batch_at - as_of AS shift FROM run ORDER BY id DESC LIMIT 1")
-    moment = datetime.fromisoformat(ORIGIN) + timedelta(minutes=minute) + row["shift"]
+    """The served time of a bin stored at this sim minute: the run's origin plus the minute."""
+    moment = datetime.fromisoformat(ORIGIN) + timedelta(minutes=minute)
     return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
@@ -264,7 +263,7 @@ def test_a_stale_latest_says_when_it_was_taken(api: Api) -> None:
     hr = vitals(api)["heart_rate"]
     assert (hr["latest"], hr["significant"]) == (90.0, True)  # still served, and now dated
     assert hr["latest_at"] == begun(api, 27 * 15)
-    lag = api.wall.now - datetime.fromisoformat(hr["latest_at"])
+    lag = datetime.fromisoformat(served(api, two_days)) - datetime.fromisoformat(hr["latest_at"])  # ward time, not the wall clock
     assert lag == timedelta(minutes=two_days - 27 * 15 + 15)
 
 
@@ -274,26 +273,27 @@ def test_the_age_is_the_servers_and_counts_from_the_end_of_the_latest_bin(api: A
     batch_at = batch(minute=last, bins=[], observations=[], events=[])
     assert api.post(f"/sim/runs/{run_id}/batch", batch_at).status_code == 204
     assert vitals(api)["heart_rate"]["latest_age_s"] == 0  # the bin's end is its stored time: now
-    api.wall.now += timedelta(minutes=20)  # a known shift: 20 minutes past the bin's end
+    api.wall.now += timedelta(hours=6)  # the wall clock never moves the age: only the ward's own minutes do
+    assert vitals(api)["heart_rate"]["latest_age_s"] == 0
+    minutes_on = batch(minute=last + 20, bins=[], observations=[], events=[])  # 20 ward minutes past the bin's end
+    assert api.post(f"/sim/runs/{run_id}/batch", minutes_on).status_code == 204
     assert vitals(api)["heart_rate"]["latest_age_s"] == 20 * 60
-    api.wall.now += timedelta(hours=6)  # inside the token's 12 hours
-    # the patch kept sampling: the same shift, a newer sample (and still no new bin)
+    # the patch kept sampling: a newer sample (and still no new bin)
     later = batch(minute=last + 380, bins=[], observations=[], events=[])
     assert api.post(f"/sim/runs/{run_id}/batch", later).status_code == 204
     stale = vitals(api)["heart_rate"]
-    assert stale["latest_age_s"] == 20 * 60 + 6 * 3600
+    assert stale["latest_age_s"] == 380 * 60
     assert stale["latest_at"] == begun(api, last)  # still the bin's start, not its end
 
 
 def test_the_times_are_the_bin_start_and_the_age_counts_from_the_stored_bin_time(api: Api) -> None:
     last = 24 * 15  # the stored time of the latest bin: the END of its window
     run_id = start(api, patients=[patient(bins=rows("s-1", "heart_rate", [*BASE, 90.0]))])
-    assert api.post(f"/sim/runs/{run_id}/batch", batch(minute=last, bins=[])).status_code == 204
-    api.wall.now += timedelta(minutes=7)
+    assert api.post(f"/sim/runs/{run_id}/batch", batch(minute=last + 7, bins=[])).status_code == 204  # 7 ward minutes on
     stored = datetime.fromisoformat(served(api, last))  # T
     hr = vitals(api)["heart_rate"]
     assert datetime.fromisoformat(hr["latest_at"]) == stored - timedelta(minutes=15)
-    assert hr["latest_age_s"] == int((api.wall.now - stored).total_seconds()) == 7 * 60
+    assert hr["latest_age_s"] == int((datetime.fromisoformat(served(api, last + 7)) - stored).total_seconds()) == 7 * 60
     first = datetime.fromisoformat(served(api, 0))  # the first kept bin's stored time
     assert datetime.fromisoformat(hr["baseline_from"]) == first - timedelta(minutes=15)
 

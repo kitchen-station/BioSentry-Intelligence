@@ -220,7 +220,8 @@ def add_batch(
                     for i, e in enumerate(body.events, 1)
                 ],
             )
-        as_of = whole(_at(origin, body.minute))
+        # Ward time only moves forward: a late batch with an older minute stores its rows but never moves `now` back.
+        as_of = max(whole(_at(origin, body.minute)), run["as_of"] or whole(_at(origin, body.minute)))
         if as_of.replace(minute=0, second=0) != run["as_of"].replace(minute=0, second=0):
             cutoff = as_of - timedelta(days=retention_days)
             conn.execute("DELETE FROM vital_bin WHERE run_id = %s AND bin_at < %s", (run_id, cutoff))

@@ -275,7 +275,7 @@ def ward_model_signals(
     prepared = {pid: prepare(states[pid], temperature.get(pid, [])) for pid in ok}
     windows = {pid: observation_window(p, models) for pid, p in prepared.items() if isinstance(p, Prepared)}
     rows = store.observations_between((pid, lo, hi) for pid, (lo, hi) in windows.items())
-    now = store.clock()
+    now = store.now()  # ward time, the calendar of observed_at
     out: dict[str, ModelSignals] = {}
     for pid, state in states.items():
         prep = prepared.get(pid)

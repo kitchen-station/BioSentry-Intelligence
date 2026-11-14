@@ -146,7 +146,7 @@ class PatientService:
             if value < 0:
                 self._audit.append(clinician_id, "enter_labs", patient_id, "rejected")
                 raise RejectedError(f"{name} cannot be negative")
-        now = self._store.run_now
+        now = self._store.now()
         self._store.record(Obs(patient_id, k, now, "lab", num=v) for k, v in entered.items())
         self._audit.append(clinician_id, "enter_labs", patient_id, "ok")
         state = self._store.read(patient_id)
@@ -173,7 +173,7 @@ class PatientService:
                 self._audit.append(clinician_id, "admit_patient", "-", "rejected")
                 raise
         store = self._store
-        now = store.run_now
+        now = store.now()
         try:
             with store.tx():
                 patient_id = store.next_patient_id()  # takes the run lock: the check below holds
@@ -274,7 +274,7 @@ class PatientService:
             self._audit.append(clinician_id, "record_vitals", patient_id, "rejected")
             raise
 
-        now = self._store.run_now
+        now = self._store.now()
 
         obs: dict[str, Obs] = {
             name: Obs(patient_id, name, now, "nurse", num=float(value))

@@ -424,7 +424,7 @@ def test_a_ranked_patient_who_loses_an_input_becomes_not_ranked(
             Obs(
                 "p-002",
                 "blood_pressure",
-                store.run_now,
+                store.now(),
                 "nurse",
                 "missing",
                 absent_reason="not_measured",

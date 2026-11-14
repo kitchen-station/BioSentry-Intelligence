@@ -81,7 +81,7 @@ class OverviewService:
         self._audit.append(admin_id, "view_overview", store.ward, "ok")
         return WardOverview(
             ward=store.ward,
-            as_of=_iso(now),
+            as_of=_iso(store.now()),  # ward time; `now` (the wall clock) only bounds the audit window
             receiving_data=store.receiving_data(),
             synthetic=store.synthetic,
             sim=_sim_status(view),
