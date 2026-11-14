@@ -22,6 +22,21 @@ describe("LabFrame", () => {
   });
 });
 
+describe("LabFrame, the clinician's wording", () => {
+  it("names What-if runs and says the trials are simulated", () => {
+    render(
+      <MemoryRouter initialEntries={["/what-if"]}>
+        <LabFrame whatIf session={{ clinician_id: "md-santos", ward: "W4", role: "md" }} onSignOut={() => {}}>
+          <p>inside</p>
+        </LabFrame>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/BioSentry . What-if runs/)).toBeTruthy();
+    expect(screen.getByRole("note").textContent).toBe("Simulated trials only. Nothing here changes a patient's rank.");
+    expect(screen.queryByText(/Simulation lab/)).toBeNull();
+  });
+});
+
 describe("SimulatedNote", () => {
   it("says the patients are simulated", () => {
     render(<SimulatedNote />);

@@ -64,7 +64,7 @@ describe("simulated runs: who sees what", () => {
 
   it("shows a nurse the list and no form", async () => {
     render(<LabRuns role="rn" />);
-    expect(await screen.findByText("Waiting for the lab worker")).toBeTruthy();
+    expect(await screen.findByText("Waiting to run")).toBeTruthy();
     expect(screen.getByText("A physician or the charge nurse can ask for a simulated run.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Ask for a simulated run" })).toBeNull();
   });
@@ -372,7 +372,7 @@ describe("simulated runs: the timer", () => {
   it("reads again by itself while a run is open, shows Done with no click, then stops", async () => {
     api.getLabRuns.mockResolvedValueOnce(open).mockResolvedValue(done);
     await start();
-    expect(screen.getByText("Waiting for the lab worker")).toBeTruthy();
+    expect(screen.getByText("Waiting to run")).toBeTruthy();
     await tick(5_000);
     expect(screen.getByText("Done")).toBeTruthy();
     expect(api.getLabRuns).toHaveBeenCalledTimes(2);
@@ -425,7 +425,7 @@ describe("simulated runs: the timer", () => {
     await start();
     await tick(5_000);
     expect((await screen.findByRole("alert")).textContent).toBe("The runs could not be read. Try Refresh.");
-    expect(screen.queryByText("Waiting for the lab worker")).toBeNull();
+    expect(screen.queryByText("Waiting to run")).toBeNull();
     await tick(60_000);
     expect(api.getLabRuns).toHaveBeenCalledTimes(2);
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
@@ -468,7 +468,7 @@ describe("simulated runs: the timer", () => {
 });
 
 describe("the state text flips when it changes", () => {
-  it("flips Waiting for the lab worker to the next state, and only that", async () => {
+  it("flips Waiting to run to the next state, and only that", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     api.getLabRuns.mockResolvedValueOnce([item({ id: 1 })]).mockResolvedValue([item({ id: 1, state: "done" })]);
     render(<LabRuns role="md" />);

@@ -84,8 +84,8 @@ export function App() {
 
   // The owner's rule: a clinician has no developer view. The research numbers and the pipeline open for an admin only.
   // The lab's own tools (simulated runs, a question for the research agent) open for those who can use them; a staff nurse cannot.
+  // A physician or charge nurse sees them as "What-if runs" at /what-if; /lab is the administrator's "Simulation lab".
   const developer = session?.role === "admin";
-  const usesLab = developer || session?.role === "md" || session?.role === "charge_rn";
   const clinician = session?.role === "md" || session?.role === "charge_rn"; // the roles that may ask
   const toWard = <Navigate to="/ward" replace />;
 
@@ -125,8 +125,12 @@ export function App() {
         />
       ))}
       <Route
+        path="/what-if"
+        element={session ? (clinician ? <Lab session={session} onSignOut={signOut} /> : toWard) : <ToSignIn gone={gone} />}
+      />
+      <Route
         path="/lab"
-        element={session ? (usesLab ? <Lab session={session} onSignOut={signOut} /> : toWard) : <ToSignIn gone={gone} />}
+        element={session ? (developer ? <Lab session={session} onSignOut={signOut} /> : clinician ? <Navigate to="/what-if" replace /> : toWard) : <ToSignIn gone={gone} />}
       />
       <Route path="/lab/ask" element={session ? (clinician ? <Navigate to="/ask" replace /> : toWard) : <ToSignIn gone={gone} />} />
       <Route
