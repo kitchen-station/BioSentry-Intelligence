@@ -4,7 +4,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiError, deleteRequest, getAuthToken, openSession, setAuthToken, uploadFile } from "./client";
+import { ApiError, deleteRequest, fetchJson, getAuthToken, openSession, postJson, READ_TIMEOUT_MS, setAuthToken, uploadFile } from "./client";
 
 let fetchMock: ReturnType<typeof vi.fn>;
 
@@ -103,5 +103,40 @@ describe("a refused request", () => {
     const failure = await deleteRequest("/x").catch((e: unknown) => e);
     expect(failure).toBeInstanceOf(ApiError);
     expect(failure).toMatchObject({ status: 502, body: "<html>Bad gateway</html>" });
+  });
+});
+
+describe("the read timeout", () => {
+  afterEach(() => vi.useRealTimers());
+  const hang = () =>
+    fetchMock.mockImplementation(
+      (_: string, init: RequestInit) =>
+        new Promise((_res, rej) => init.signal?.addEventListener("abort", () => rej(new Error("aborted")))),
+    );
+
+  it("fails a GET that has not answered in time", async () => {
+    vi.useFakeTimers();
+    hang();
+    const read = fetchJson("/wards/W4/rows");
+    const failed = expect(read).rejects.toThrow("aborted");
+    await vi.advanceTimersByTimeAsync(READ_TIMEOUT_MS - 1);
+    expect(sent()[1].signal?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(2);
+    await failed;
+  });
+
+  it("leaves a GET that answers alone, and clears its timer", async () => {
+    vi.useFakeTimers();
+    fetchMock.mockResolvedValue(Response.json({ ok: 1 }));
+    await expect(fetchJson("/x")).resolves.toEqual({ ok: 1 });
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("puts no timeout on a POST, a DELETE or an upload", async () => {
+    fetchMock.mockImplementation(() => Promise.resolve(Response.json({ ok: 1 })));
+    await postJson("/patients/p-001/notes", { a: 1 });
+    await deleteRequest("/x");
+    await uploadFile("/extract/labs", new File(["x"], "a.pdf"));
+    for (let i = 0; i < 3; i++) expect(sent(i)[1].signal).toBeUndefined();
   });
 });

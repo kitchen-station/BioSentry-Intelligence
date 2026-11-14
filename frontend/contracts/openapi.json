@@ -162,6 +162,7 @@
             "$ref": "#/components/schemas/AdmissionRoute"
           },
           "admittingContext": {
+            "maxLength": 4000,
             "type": "string"
           },
           "age": {
@@ -172,6 +173,7 @@
           "allergies": {
             "anyOf": [
               {
+                "maxLength": 4000,
                 "type": "string"
               },
               {
@@ -181,12 +183,15 @@
             "default": null
           },
           "attendingPhysician": {
+            "maxLength": 200,
             "type": "string"
           },
           "bed": {
+            "maxLength": 200,
             "type": "string"
           },
           "chiefComplaint": {
+            "maxLength": 4000,
             "type": "string"
           },
           "civilStatus": {
@@ -214,6 +219,7 @@
           "contactNumber": {
             "anyOf": [
               {
+                "maxLength": 200,
                 "type": "string"
               },
               {
@@ -227,6 +233,7 @@
             "type": "string"
           },
           "firstName": {
+            "maxLength": 200,
             "type": "string"
           },
           "heightCm": {
@@ -265,11 +272,13 @@
             "default": null
           },
           "lastName": {
+            "maxLength": 200,
             "type": "string"
           },
           "middleName": {
             "anyOf": [
               {
+                "maxLength": 200,
                 "type": "string"
               },
               {
@@ -281,6 +290,7 @@
           "nameExtension": {
             "anyOf": [
               {
+                "maxLength": 200,
                 "type": "string"
               },
               {
@@ -1400,15 +1410,18 @@
       },
       "NewNote": {
         "additionalProperties": false,
-        "description": "The body of POST /patients/{id}/notes. The server assigns id, time and the flag.",
+        "description": "The body of POST /patients/{id}/notes. The server assigns id, time and the flag, and also\nthe author and the role: they come from the session, and what the body says is not stored.",
         "properties": {
           "author": {
+            "maxLength": 200,
             "type": "string"
           },
           "content": {
+            "maxLength": 4000,
             "type": "string"
           },
           "role": {
+            "maxLength": 200,
             "type": "string"
           }
         },
@@ -1761,6 +1774,7 @@
           "admittingContext": {
             "anyOf": [
               {
+                "maxLength": 4000,
                 "type": "string"
               },
               {
@@ -1785,6 +1799,7 @@
           "allergies": {
             "anyOf": [
               {
+                "maxLength": 4000,
                 "type": "string"
               },
               {
@@ -1796,6 +1811,7 @@
           "attendingPhysician": {
             "anyOf": [
               {
+                "maxLength": 200,
                 "type": "string"
               },
               {
@@ -1807,6 +1823,7 @@
           "bed": {
             "anyOf": [
               {
+                "maxLength": 200,
                 "type": "string"
               },
               {
@@ -1818,6 +1835,7 @@
           "chiefComplaint": {
             "anyOf": [
               {
+                "maxLength": 4000,
                 "type": "string"
               },
               {
@@ -1851,6 +1869,7 @@
           "contactNumber": {
             "anyOf": [
               {
+                "maxLength": 200,
                 "type": "string"
               },
               {
@@ -1874,6 +1893,7 @@
           "firstName": {
             "anyOf": [
               {
+                "maxLength": 200,
                 "type": "string"
               },
               {
@@ -1920,6 +1940,7 @@
           "lastName": {
             "anyOf": [
               {
+                "maxLength": 200,
                 "type": "string"
               },
               {
@@ -1931,6 +1952,7 @@
           "middleName": {
             "anyOf": [
               {
+                "maxLength": 200,
                 "type": "string"
               },
               {
@@ -1942,6 +1964,7 @@
           "nameExtension": {
             "anyOf": [
               {
+                "maxLength": 200,
                 "type": "string"
               },
               {
@@ -2318,28 +2341,8 @@
           "synthetic": {
             "type": "boolean"
           },
-          "tier_b": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TierBData"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "tier_breakdown": {
             "$ref": "#/components/schemas/TierBreakdown"
-          },
-          "tier_c": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TierCData"
-              },
-              {
-                "type": "null"
-              }
-            ]
           },
           "tier_status": {
             "items": {
@@ -2377,8 +2380,6 @@
           "labs",
           "sort_tier",
           "tier_status",
-          "tier_b",
-          "tier_c",
           "escalation_reasons",
           "synthetic",
           "signal_quality",
@@ -2867,26 +2868,6 @@
           "synthetic": {
             "type": "boolean"
           },
-          "tier_b": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TierBData"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "tier_c": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TierCData"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "tier_status": {
             "items": {
               "$ref": "#/components/schemas/TierStatus"
@@ -2920,8 +2901,6 @@
           "labs",
           "sort_tier",
           "tier_status",
-          "tier_b",
-          "tier_c",
           "escalation_reasons",
           "synthetic",
           "signal_quality",
@@ -3048,74 +3027,6 @@
         "title": "TierAScore",
         "type": "object"
       },
-      "TierBData": {
-        "additionalProperties": false,
-        "properties": {
-          "findings": {
-            "items": {
-              "$ref": "#/components/schemas/TierBFinding"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "findings"
-        ],
-        "title": "TierBData",
-        "type": "object"
-      },
-      "TierBFinding": {
-        "additionalProperties": false,
-        "description": "A named observation with its own units. Not comparable on a shared scale.",
-        "properties": {
-          "detail": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "direction": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/FindingDirection"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "id": {
-            "type": "string"
-          },
-          "label": {
-            "type": "string"
-          },
-          "significant": {
-            "type": "boolean"
-          },
-          "source": {
-            "$ref": "#/components/schemas/ProvenanceSource"
-          },
-          "value": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "label",
-          "value",
-          "direction",
-          "source",
-          "significant"
-        ],
-        "title": "TierBFinding",
-        "type": "object"
-      },
       "TierBreakdown": {
         "additionalProperties": false,
         "properties": {
@@ -3128,82 +3039,12 @@
                 "type": "null"
               }
             ]
-          },
-          "tier_b": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TierBData"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "tier_c": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TierCData"
-              },
-              {
-                "type": "null"
-              }
-            ]
           }
         },
         "required": [
-          "tier_a",
-          "tier_b",
-          "tier_c"
+          "tier_a"
         ],
         "title": "TierBreakdown",
-        "type": "object"
-      },
-      "TierCAttribution": {
-        "additionalProperties": false,
-        "properties": {
-          "contribution": {
-            "type": "number"
-          },
-          "feature": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "feature",
-          "contribution"
-        ],
-        "title": "TierCAttribution",
-        "type": "object"
-      },
-      "TierCData": {
-        "additionalProperties": false,
-        "properties": {
-          "attributions": {
-            "items": {
-              "$ref": "#/components/schemas/TierCAttribution"
-            },
-            "type": "array"
-          },
-          "forecast_window": {
-            "type": "string"
-          },
-          "risk_probability": {
-            "maximum": 1,
-            "minimum": 0,
-            "type": "number"
-          },
-          "scored_seconds_ago": {
-            "minimum": 0,
-            "type": "number"
-          }
-        },
-        "required": [
-          "risk_probability",
-          "forecast_window",
-          "scored_seconds_ago",
-          "attributions"
-        ],
-        "title": "TierCData",
         "type": "object"
       },
       "TierCInput": {
@@ -3383,26 +3224,6 @@
           "synthetic": {
             "type": "boolean"
           },
-          "tier_b": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TierBData"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "tier_c": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TierCData"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "trend": {
             "$ref": "#/components/schemas/Trend"
           },
@@ -3430,8 +3251,6 @@
           "vital_trends",
           "vital_history",
           "labs",
-          "tier_b",
-          "tier_c",
           "signal_quality",
           "last_update_s",
           "synthetic",

@@ -143,7 +143,11 @@ def test_ranks_are_contiguous_and_follow_the_arbiter_within_the_callers_set(
 ) -> None:
     ward = WardResponse.model_validate(client.get("/wards/W4/rows", headers=as_(who)).json())
     assert [r.rank for r in ward.ranked] == list(range(1, len(ward.ranked) + 1))
-    rows = [ScoreRow.model_validate(r) for r in DATA["ranked"] if r["id"] in CLINICIANS[who]]
+    rows = [
+        ScoreRow.model_validate({k: v for k, v in r.items() if k not in {"tier_b", "tier_c"}})
+        for r in DATA["ranked"]
+        if r["id"] in CLINICIANS[who]
+    ]  # the fixture file keeps demo tier keys the schema no longer has
     expected = rank_ward(arbitrate(r.id, score_news2(inputs_from_vitals(r.vitals))) for r in rows)
     assert [r.id for r in ward.ranked] == [d.patient_id for _, d in expected.ranked]
 
@@ -247,6 +251,39 @@ def test_writes_are_audited(app_and_client: tuple[Any, TestClient]) -> None:
     client.delete("/patients/p-001/notes/n-001", headers=h)
     actions = [r.action for r in trail(app_and_client, "rn-manalo")]
     assert actions == ["add_note", "enter_labs", "delete_note"]
+
+
+def test_a_note_carries_the_signed_in_author_and_only_that_author_deletes_it(
+    app_and_client: tuple[Any, TestClient],
+) -> None:
+    _, client = app_and_client
+    author, other = as_("rn-manalo"), None
+    for candidate in ("rn-delacruz", "rn-reyes", "md-santos", "md-aquino"):
+        if client.get("/patients/p-001", headers=as_(candidate)).status_code == 200:
+            other = as_(candidate)
+            break
+    assert other is not None  # the patient is shared with one more clinician
+    forged = {"author": "Dr. Santos", "role": "MD", "content": "c"}
+    note = client.post("/patients/p-001/notes", headers=author, json=forged).json()
+    assert (note["author"], note["role"]) == ("rn-manalo", "Charge RN")  # the body's are ignored
+    url = f"/patients/p-001/notes/{note['id']}"
+    assert client.delete(url, headers=other).status_code == 404  # not their note
+    listed = client.get("/patients/p-001/notes", headers=author).json()
+    assert note["id"] in [n["id"] for n in listed]  # still there
+    assert client.delete(url, headers=author).status_code == 204
+    assert client.delete(url, headers=author).status_code == 404  # gone: nothing to delete
+    outcomes = [r.outcome for r in trail(app_and_client) if r.action == "delete_note"]
+    assert outcomes == ["not_found", "ok", "not_found"]
+
+
+def test_free_text_longer_than_its_limit_is_refused(client: TestClient) -> None:
+    h = as_("rn-manalo")
+    long_note = {"author": "a", "role": "RN", "content": "x" * 4001}
+    assert client.post("/patients/p-001/notes", headers=h, json=long_note).status_code == 422
+    at_limit = {"author": "a", "role": "RN", "content": "x" * 4000}
+    assert client.post("/patients/p-001/notes", headers=h, json=at_limit).status_code == 201
+    long_name = {"author": "a" * 201, "role": "RN", "content": "c"}
+    assert client.post("/patients/p-001/notes", headers=h, json=long_name).status_code == 422
 
 
 def test_my_audit_returns_only_my_own_trail(client: TestClient) -> None:
@@ -1193,3 +1230,39 @@ def test_the_api_serves_every_route_the_http_provider_calls(database_url: str) -
     normalised = {(m, p.replace("/wards/W4/", "/wards/{}/")) for m, p in frontend}
     missing = normalised - _app_routes(database_url)
     assert missing == set()
+
+
+# --- No seeded demo model output in any answer --------------------------------------------
+
+# Keys of the removed seeded Tier B findings and Tier C block: no model computes them (I1).
+SEEDED_KEYS = {
+    "tier_b", "tier_c", "risk_probability", "forecast_window", "scored_seconds_ago",
+    "attributions", "findings",
+}  # fmt: skip
+
+
+def _keys(value: Any) -> set[str]:
+    if isinstance(value, dict):
+        return set(value) | {k for v in value.values() for k in _keys(v)}
+    if isinstance(value, list):
+        return {k for v in value for k in _keys(v)}
+    return set()
+
+
+def test_no_answer_carries_a_seeded_tier_b_or_tier_c_value(
+    app_and_client: tuple[Any, TestClient],
+) -> None:
+    app, client = app_and_client
+    walked = set()
+    for method, template in _route_table(app):
+        if method != "GET" or template in {p for _, p in PUBLIC_ROUTES}:
+            continue
+        for who in ("rn-manalo", "md-aquino"):
+            # p-004 is NOT RANKED: its routes are walked too, so the key cannot hide on that path.
+            for values in (PATH_VALUES, {**PATH_VALUES, "patient_id": "p-004"}):
+                response = client.get(template.format(**values), headers=as_(who))
+                if response.status_code == 200:
+                    walked.add(template)
+                    assert not _keys(response.json()) & SEEDED_KEYS, (template, who)
+    assert {"/wards/{ward}/rows", "/patients/{patient_id}"} <= walked
+    assert _keys({"a": [{"tier_c": 1}]}) & SEEDED_KEYS  # the walk can see a deep key

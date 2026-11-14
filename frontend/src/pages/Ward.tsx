@@ -5,14 +5,12 @@ import type { AbstainedRow as AbstainedRowType, Session, VitalsRecorded, WardRes
 import {
   acknowledge as saveAcknowledgement,
   getAcknowledgements,
-  getLiveWard,
   getWard,
-  usesServer,
 } from "../api";
 import { WardRow } from "../components/WardRow";
 import { band, obsDue, unacknowledged } from "../components/risk";
-import { formatClock, formatSimClock, simStatus } from "../components/format";
-import type { SimStatus } from "../components/format";
+import { formatClock, formatSimClock } from "../components/format";
+import { useLivePoll } from "../components/useLivePoll";
 import { SimulatedNote } from "../components/LabFrame";
 import { SessionMenu } from "../components/SessionMenu";
 import { standing } from "../components/vitalsDraft";
@@ -66,37 +64,30 @@ export function Ward({ session, onSignOut }: Props) {
   // null until the server's acknowledgements arrive, so an alert already acknowledged never sounds.
   const [acked, setAcked] = useState<ReadonlyMap<string, number> | null>(null);
   const alerted = useRef(new Set<string>());
-  // Null until the simulator's status arrives, and whenever there is none to show.
-  const [sim, setSim] = useState<SimStatus | null>(null);
-  // The API changes as the simulator runs: ask it more often than the fixture, which never changes.
-  const pollMs = usesServer ? 5_000 : 15_000;
 
-  // Keeps the last good ward on screen when a fetch fails, and says since when. With the API it
-  // also asks for the simulator's status in the same round, so the page has one poll: no status
-  // line when that fetch fails or `shared` is not what the simulator publishes. The fixture has no
-  // simulator and is not asked.
-  const refresh = useCallback(() => {
-    if (usesServer && !readOnly) {
-      getLiveWard().then(
-        (live) => setSim(simStatus(live?.shared)),
-        () => setSim(null),
-      );
-    }
-    getWard()
-      .then((w) => {
+  // Keeps the last good ward on screen when a fetch fails, and says since when. Each request takes
+  // the next number and an answer counts only if no later request was answered first: a slow old
+  // answer never brings back an older ward.
+  const issued = useRef(0);
+  const applied = useRef(0);
+  const load = useCallback(async () => {
+    const n = ++issued.current;
+    try {
+      const w = await getWard();
+      if (n > applied.current) {
+        applied.current = n;
         setData(w);
         setFetchedAt(Date.now());
         setFailedSince(null);
-      })
-      .catch(() => setFailedSince((t) => t ?? Date.now()));
-  }, [readOnly]);
-
-  useEffect(() => {
-    refresh();
-    if (readOnly) return;
-    const t = setInterval(refresh, pollMs);
-    return () => clearInterval(t);
-  }, [refresh, pollMs, readOnly]);
+      }
+      return true;
+    } catch {
+      if (n > applied.current) setFailedSince((t) => t ?? Date.now());
+      return false;
+    }
+  }, []);
+  // The speed comes from the live view read in the same round: see useLivePoll.
+  const { sim, refresh, pollMs } = useLivePoll(load, !readOnly);
 
   // A recorded value changes a patient's standing, which only the server can compute: say
   // what it said, then fetch the ward again so the ranking on screen is the server's.
@@ -192,6 +183,15 @@ export function Ward({ session, onSignOut }: Props) {
                   : `Updated ${fetchedAt ? formatClock(fetchedAt) : "--"}`}
             </span>
           </span>
+          {sim !== null && (
+            <>
+              <span className={styles.statusDivider} />
+              <span className={styles.statusItem} role="group" aria-label="Ward clock">
+                <span className={styles.statusLabel}>Ward clock</span>
+                <span className={styles.statusValue}>{formatSimClock(sim)}</span>
+              </span>
+            </>
+          )}
         </>
       } />
 
@@ -240,7 +240,7 @@ export function Ward({ session, onSignOut }: Props) {
 
         {readOnly && (
           <p className={styles.notice}>
-            Read-only. Every view is recorded in the audit log.{" "}
+            Read-only. Views are recorded in the audit log.{" "}
             <button type="button" className={styles.noticeClose} onClick={refresh}>Refresh</button>
           </p>
         )}
@@ -270,13 +270,6 @@ export function Ward({ session, onSignOut }: Props) {
           </p>
         )}
 
-        {sim !== null && (
-          <p className={styles.notice} role="status">
-            Simulator: {formatSimClock(sim)} &middot; {sim.counts.received} received &middot;{" "}
-            {sim.counts.rejected} rejected &middot; {sim.counts.abstained} abstained
-          </p>
-        )}
-
         <div className={styles.rowList}>
           {data.ranked.map((row) => (
             <WardRow key={row.id} row={row} role={session.role} now={now} ageOffsetS={ageOffsetS} />
@@ -292,7 +285,7 @@ export function Ward({ session, onSignOut }: Props) {
       </main>
 
       <footer className={styles.footer}>
-        Advisory only. BioSentry does not replace a monitor alarm. Every view is
+        Advisory only. BioSentry does not replace a monitor alarm. Views are
         logged for audit under {session.clinician_id}.
       </footer>
     </div>

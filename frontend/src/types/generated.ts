@@ -351,7 +351,8 @@ export interface components {
         };
         /**
          * NewNote
-         * @description The body of POST /patients/{id}/notes. The server assigns id, time and the flag.
+         * @description The body of POST /patients/{id}/notes. The server assigns id, time and the flag, and also
+         *     the author and the role: they come from the session, and what the body says is not stored.
          */
         readonly NewNote: {
             readonly author: string;
@@ -562,9 +563,7 @@ export interface components {
             readonly sort_tier: components["schemas"]["Tier"];
             readonly supporting: string;
             readonly synthetic: boolean;
-            readonly tier_b: components["schemas"]["TierBData"] | null;
             readonly tier_breakdown: components["schemas"]["TierBreakdown"];
-            readonly tier_c: components["schemas"]["TierCData"] | null;
             readonly tier_status: readonly components["schemas"]["TierStatus"][];
             readonly trend: components["schemas"]["Trend"];
             readonly vital_history: components["schemas"]["VitalHistoryFull"];
@@ -690,8 +689,6 @@ export interface components {
             readonly sort_tier: components["schemas"]["Tier"];
             readonly supporting: string;
             readonly synthetic: boolean;
-            readonly tier_b: components["schemas"]["TierBData"] | null;
-            readonly tier_c: components["schemas"]["TierCData"] | null;
             readonly tier_status: readonly components["schemas"]["TierStatus"][];
             readonly trend: components["schemas"]["Trend"];
             readonly vital_trends: components["schemas"]["VitalTrends"];
@@ -740,41 +737,9 @@ export interface components {
             readonly label: string;
             readonly score: number;
         };
-        /** TierBData */
-        readonly TierBData: {
-            readonly findings: readonly components["schemas"]["TierBFinding"][];
-        };
-        /**
-         * TierBFinding
-         * @description A named observation with its own units. Not comparable on a shared scale.
-         */
-        readonly TierBFinding: {
-            /** @default null */
-            readonly detail?: string | null;
-            readonly direction: components["schemas"]["FindingDirection"] | null;
-            readonly id: string;
-            readonly label: string;
-            readonly significant: boolean;
-            readonly source: components["schemas"]["ProvenanceSource"];
-            readonly value: string;
-        };
         /** TierBreakdown */
         readonly TierBreakdown: {
             readonly tier_a: components["schemas"]["TierAScore"] | null;
-            readonly tier_b: components["schemas"]["TierBData"] | null;
-            readonly tier_c: components["schemas"]["TierCData"] | null;
-        };
-        /** TierCAttribution */
-        readonly TierCAttribution: {
-            readonly contribution: number;
-            readonly feature: string;
-        };
-        /** TierCData */
-        readonly TierCData: {
-            readonly attributions: readonly components["schemas"]["TierCAttribution"][];
-            readonly forecast_window: string;
-            readonly risk_probability: number;
-            readonly scored_seconds_ago: number;
         };
         /**
          * TierCInput
@@ -825,8 +790,6 @@ export interface components {
             readonly signal_quality: number | null;
             readonly supporting: string;
             readonly synthetic: boolean;
-            readonly tier_b: components["schemas"]["TierBData"] | null;
-            readonly tier_c: components["schemas"]["TierCData"] | null;
             readonly trend: components["schemas"]["Trend"];
             readonly vital_history: components["schemas"]["VitalHistoryFull"];
             readonly vital_trends: components["schemas"]["VitalTrends"];
@@ -979,11 +942,7 @@ export type Spo2ScaleMeasurement = components['schemas']['Spo2ScaleMeasurement']
 export type Spo2ScalePresent = components['schemas']['Spo2ScalePresent'];
 export type Tier = components['schemas']['Tier'];
 export type TierAScore = components['schemas']['TierAScore'];
-export type TierBData = components['schemas']['TierBData'];
-export type TierBFinding = components['schemas']['TierBFinding'];
 export type TierBreakdown = components['schemas']['TierBreakdown'];
-export type TierCAttribution = components['schemas']['TierCAttribution'];
-export type TierCData = components['schemas']['TierCData'];
 export type TierCInput = components['schemas']['TierCInput'];
 export type TierStatus = components['schemas']['TierStatus'];
 export type Trend = components['schemas']['Trend'];

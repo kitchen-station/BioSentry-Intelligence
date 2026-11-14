@@ -149,3 +149,10 @@ def test_a_retention_that_is_not_a_whole_number_of_days_in_range_is_refused(give
     assert str(error.value) == "BIOSENTRY_RETENTION_DAYS must be a whole number from 1 to 36500"
     with pytest.raises(ConfigError, match="BIOSENTRY_RETENTION_DAYS"):
         Settings(retention_days=0)
+
+
+def test_production_refuses_a_wildcard_cors_origin() -> None:
+    for origins in ("*", "https://biosentry-dashboard.pages.dev,https://*.pages.dev"):
+        with pytest.raises(ConfigError, match="exact origins"):
+            Settings.from_env({**PRODUCTION, "BIOSENTRY_CORS_ORIGINS": origins})
+    assert Settings.from_env({"BIOSENTRY_CORS_ORIGINS": "*"}).cors_origins == ("*",)  # local only

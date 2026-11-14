@@ -182,7 +182,7 @@ describe("SessionMenu", () => {
 
   beforeEach(() => vi.stubEnv("VITE_API_URL", "http://api.test"));
 
-  const NOTICE = "A ward administrator can see which beds you are assigned, counts of your actions from the last 24 hours, and every patient's page, including the notes you write.";
+  const NOTICE = "A ward administrator can see which beds you are assigned, counts of your recorded actions from the last 24 hours, and every patient's page, including the notes you write.";
 
   it.each(["rn", "md", "charge_rn"] as const)("tells a %s on an API build that an administrator sees counts", async (role) => {
     menu({ clinician_id: "x-1", ward: "W4", role });

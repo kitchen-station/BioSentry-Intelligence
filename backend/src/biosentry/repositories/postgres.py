@@ -28,7 +28,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from biosentry.core.config import DEV_DATABASE_PASSWORD, ConfigError, restricted
-from biosentry.schemas import ClinicalNote, LabPanel, TierStatus, UnscoredPatient
+from biosentry.schemas import ClinicalNote, LabPanel, TierStatus, UnscoredPatient, VitalHistory
 
 LIVE_WITHIN = timedelta(seconds=30)  # a sim run whose last batch is older is not "receiving data"
 CONTROL_ROLES = ("md", "charge_rn")  # the roles that may send commands to the ward simulation
@@ -43,6 +43,7 @@ DEVICE_VITALS = ("heart_rate", "respiratory_rate", "spo2", "temperature")
 VITALS = (*DEVICE_VITALS, "blood_pressure", "consciousness", "supplemental_o2", "spo2_scale")
 LABS = tuple(name for name in LabPanel.model_fields if name != "freshness_hours")
 HISTORY_VITALS = ("heart_rate", "respiratory_rate", "spo2")
+CHARTED_VITALS = ("blood_pressure", "consciousness", "supplemental_o2", "spo2_scale")
 
 Conn = psycopg.Connection[dict[str, Any]]
 
@@ -107,6 +108,22 @@ def lock_run(conn: Conn, run_id: int) -> None:
     # Upgrade: a counter row (or sequence) per run and id kind if write throughput ever matters.
     assert conn.info.transaction_status != TransactionStatus.IDLE, "lock_run needs a transaction"
     conn.execute("SELECT pg_advisory_xact_lock(%s)", (run_id,))
+
+
+@dataclass(frozen=True, slots=True)
+class StoredObservation:
+    """One stored observation as the models' as-of rebuild reads it, in served time."""
+
+    patient_id: str
+    code: str
+    source: str
+    observed_at: datetime
+    id: int
+    quality: str
+    num: float | None
+    num2: float | None
+    txt: str | None
+    absent_reason: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -188,18 +205,16 @@ _PATIENT = (
     "signal_quality",
     "last_sample_at",
     "admission",
-    "tier_b",
-    "tier_c",
     "story",
     "admitted_at",
 )
 
 
-_JSON = ("admission", "tier_b", "tier_c")
+_JSON = ("admission",)
 
 
 def insert_patient(conn: Conn, run_id: int, patient_id: str, p: dict[str, Any]) -> None:
-    """`admission`, `tier_b` and `tier_c` are JSON-ready values (dicts), not strings."""
+    """`admission` is a JSON-ready value (a dict), not a string."""
     conn.execute(
         f"INSERT INTO patient (run_id, id, {', '.join(_PATIENT)})"
         f" VALUES (%s, %s, {', '.join(['%s'] * len(_PATIENT))})",
@@ -541,8 +556,6 @@ class PostgresStore:
                     for v in HISTORY_VITALS
                 },
                 "labs": labs,
-                "tier_b": p["tier_b"],
-                "tier_c": p["tier_c"],
                 "signal_quality": p["signal_quality"],
                 "last_update_s": (
                     max(0.0, (run_now - sample).total_seconds()) if sample else None
@@ -551,6 +564,63 @@ class PostgresStore:
                 "admitted_at": self._when(p["admitted_at"]) if p["admitted_at"] else None,
             }
         )
+
+    def temperature_bins(self, ids: Iterable[str]) -> dict[str, list[VitalHistory]]:
+        """The stored temperature bins of these patients, in bin order, in ONE statement. For the
+        models only: temperature is not in HISTORY_VITALS and not in any response."""
+        out: dict[str, list[VitalHistory]] = defaultdict(list)
+        for r in self.conn.execute(
+            "SELECT patient_id, bin_at, value FROM vital_bin WHERE run_id = %s"
+            " AND patient_id = ANY(%s) AND vital = 'temperature' ORDER BY patient_id, bin_at",
+            (self.run_id, sorted(set(ids))),
+        ):
+            out[r["patient_id"]].append(
+                VitalHistory.model_construct(time=self._when(r["bin_at"]), value=r["value"])
+            )
+        return dict(out)
+
+    def observations_between(
+        self, windows: Iterable[tuple[str, datetime, datetime]]
+    ) -> dict[str, list[StoredObservation]]:
+        """For each (patient, from, to) in served time, in ONE statement: every row of the four
+        charted codes and every nurse-typed row of the four device codes with
+        from <= observed_at <= to (a device's own rows are not needed: the bins hold them), plus, for each charted
+        code, the newest row before `from` (the as-of rule has no age limit). Per patient, oldest
+        first by (observed_at, id). Served by `observation_latest`."""
+        wins = sorted(windows)
+        if not wins:
+            return {}
+        pids = [w[0] for w in wins]
+        lows = [w[1] - self.shift for w in wins]
+        highs = [w[2] - self.shift for w in wins]
+        cols = "o.patient_id, o.code, o.source, o.observed_at, o.id, o.quality, o.num, o.num2, o.txt, o.absent_reason"
+        out: dict[str, list[StoredObservation]] = defaultdict(list)
+        for r in self.conn.execute(
+            "WITH w AS (SELECT * FROM unnest(%(p)s::text[], %(lo)s::timestamptz[], %(hi)s::timestamptz[])"
+            " AS w(patient_id, lo, hi))"
+            f" SELECT {cols} FROM w JOIN observation o ON o.run_id = %(run)s"
+            " AND o.patient_id = w.patient_id AND o.code = ANY(%(all)s)"
+            " AND (o.code = ANY(%(charted)s) OR o.source = 'nurse')"
+            " AND o.observed_at >= w.lo AND o.observed_at <= w.hi"
+            f" UNION ALL SELECT {cols} FROM w CROSS JOIN unnest(%(charted)s::text[]) AS c(code)"
+            f" CROSS JOIN LATERAL (SELECT {cols} FROM observation o WHERE o.run_id = %(run)s"
+            " AND o.patient_id = w.patient_id AND o.code = c.code AND o.observed_at < w.lo"
+            " ORDER BY o.observed_at DESC, o.id DESC LIMIT 1) AS o",
+            {
+                "p": pids,
+                "lo": lows,
+                "hi": highs,
+                "run": self.run_id,
+                "all": [*CHARTED_VITALS, *DEVICE_VITALS],
+                "charted": list(CHARTED_VITALS),
+            },
+        ):
+            out[r["patient_id"]].append(
+                StoredObservation(**{**r, "observed_at": self._when(r["observed_at"])})
+            )
+        for rows in out.values():
+            rows.sort(key=lambda o: (o.observed_at, o.id))
+        return dict(out)
 
     def stays(self, ids: frozenset[str]) -> list[dict[str, Any]]:
         rows = self.conn.execute(
@@ -649,12 +719,14 @@ class PostgresStore:
             )
         return next(n for n in self.notes(patient_id) if n.id == note_id)
 
-    def delete_note(self, patient_id: str, note_id: str) -> None:
-        self.conn.execute(
+    def delete_note(self, patient_id: str, note_id: str, author: str) -> bool:
+        """Whether a live note of this author was deleted."""
+        done = self.conn.execute(
             "UPDATE clinical_note SET deleted_at = %s WHERE run_id = %s AND patient_id = %s AND id = %s"
-            " AND deleted_at IS NULL",
-            (whole(self.run_now), self.run_id, patient_id, note_id),
+            " AND author = %s AND deleted_at IS NULL",
+            (whole(self.run_now), self.run_id, patient_id, note_id, author),
         )
+        return done.rowcount == 1
 
     # --- acknowledgements ----------------------------------------------------------------------
 

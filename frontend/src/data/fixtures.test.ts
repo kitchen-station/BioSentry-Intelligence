@@ -81,6 +81,12 @@ describe("ward shape", () => {
     expect(new Set(ids(ward)).size).toBe(12);
   });
 
+  it("I1: the seeded ward carries no typed trend: nothing computes it, so no row says rising", () => {
+    // Owner decision: the seeded demo ward shows no trend arrow. A live simulator run computes its own.
+    expect(ward.ranked.map((r) => r.trend)).toEqual(ward.ranked.map(() => "insufficient"));
+    expect(ward.ranked.filter((r) => r.trend === "rising")).toHaveLength(0);
+  });
+
   it("I3: sorted on Tier A by escalation level, then NEWS2 total; ranks are 1..n", () => {
     expect(ward.sort_tier).toBe("A");
     const escalated = (r: WardResponse["ranked"][number]) =>

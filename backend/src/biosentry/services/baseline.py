@@ -46,7 +46,7 @@ class BaselineService:
         if found is None:
             self._audit.append(clinician_id, "view_baseline", patient_id, "not_found")
             return None
-        self._audit.append(clinician_id, "view_baseline", patient_id, "ok")
+        self._audit.append_view(clinician_id, "view_baseline", patient_id)
         return found
 
     def compute(self, clinician_id: str, patient_id: str) -> BaselineResponse | None:

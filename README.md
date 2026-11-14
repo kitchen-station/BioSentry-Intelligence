@@ -25,7 +25,7 @@ each nurse and physician who to see next.
 The list is sorted by **NEWS2**, a published bedside early-warning score (Tier A). A patient
 who meets a NEWS2 trigger sits above one who does not. The own-baseline finding (Tier B) is listed as a
 reason and breaks ties between equal NEWS2 totals below a trigger; it never moves a patient past a NEWS2
-difference. Other Tier B findings are demo content.
+difference. No other Tier B finding and no Tier C risk is shown: no model computes them yet.
 
 **What is here.** The dashboard (`frontend/`) and a slim API (`backend/`: FastAPI over PostgreSQL). The
 ML models and the training code were removed ahead of the Huawei overhaul and are in git history. The
@@ -73,7 +73,7 @@ seeded before passphrases existed has none either: `make db-reset` seeds it agai
 count, and counts of each clinician's actions in the last 24 hours (by action and outcome; no patient and no
 time); the Overview shows no patient name. The admin also reads the ward list and each ranked patient's page, read
 only, with every patient on the ward whoever is assigned. The admin can read the notes of every patient on the
-ward, a NOT RANKED one too (it has no page for anyone). Every view is in the audit log under
+ward, a NOT RANKED one too (it has no page for anyone). Views are in the audit log (I7) under
 the admin's id and every write stays refused. This reverses the earlier rule that the admin saw no patient
 name. The role is granted only from a shell with database access, run from
 `backend/`: `uv run python -m biosentry.db.admin grant admin-<name>`, then
@@ -136,9 +136,9 @@ schemas. Every target is in the [Makefile](Makefile).
   is connected. An administrator types their id under "Administration" (API builds only) and lands on the
   Overview.
 - **Ward:** patients in priority order, each with its score and why. A patient the system
-  cannot score is listed as NOT RANKED, with the reason and what to record to fix it.
+  cannot score is listed as NOT RANKED, with the reason and what to record to fix it. With the API it reads again every 5 seconds (every 2 seconds while the ward runs at 60x and the tab is in front; an administrator reads once and on Refresh); the demo reads every 15 seconds. The top bar shows the ward's clock and speed.
 - **Patient detail:** the score and what drives it, vitals and labs with where each value
-  came from, notes, and trend charts (patch data only).
+  came from, notes, and trend charts (patch data only). With the API it reads again every 5 seconds (every 2 seconds while the ward runs at 60x and the tab is in front; an administrator reads once and on Refresh); the demo reads every 15 seconds. The top bar shows the ward's clock and speed.
 - **Overview:** for an admin only, read only, from the "Administration" entry at sign-in (shown when the
   dashboard talks to the API). Every bed and its state, who is assigned, each clinician's patient
   count, counts of their actions in the last 24 hours, and the simulator status. It reads again on Refresh, never on a timer, because every
@@ -183,7 +183,7 @@ active one: the seeded fixture ward, or a simulated ward posted to `/sim/*`.
 **Built**:
 
 - The dashboard: ward list, patient detail and station views, on a fixture provider or the API.
-- The API: sign-in to a session token, server-side clinician scope, audit on every view, NEWS2 and the
+- The API: sign-in to a session token, server-side clinician scope, audit on every view (a repeat once a minute, I7), NEWS2 and the
   escalation arbiter computed on read, notes, labs, admission, nurse-recorded vitals,
   acknowledgements, and ingest from the ward simulation.
 
@@ -210,7 +210,7 @@ applied to made-up patients.
 - **I4** Abstention is an output: NOT RANKED is a row with a reason and an instruction.
 - **I5** No training on BioSentry patients: local data calibrates and validates only.
 - **I6** The synthetic flag propagates: every fixture record says `synthetic: true`.
-- **I7** Privacy (RA 10173): one screen per clinician, their patients only, audit on every view.
+- **I7** Privacy (RA 10173): one screen per clinician, their patients only, audit on every view. A repeated read of the same page by the same clinician is recorded at most once a minute; the first read, every write, and every refusal or not-found answer to a signed-in clinician are always recorded (the owner's decision for the automatic refresh).
 - **I8** Transport: BLE to a gateway, then Wi-Fi or 4G to the cloud. NB-IoT is excluded.
 
 ## Design rules

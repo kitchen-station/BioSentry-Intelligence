@@ -54,11 +54,7 @@ from biosentry.schemas import (
     Session,
     Spo2ScaleMeasurement,
     TierAScore,
-    TierBData,
-    TierBFinding,
     TierBreakdown,
-    TierCAttribution,
-    TierCData,
     TierCInput,
     TierStatus,
     UnscoredPatient,
@@ -158,27 +154,6 @@ def tier_status() -> dict[str, Any]:
     return {"tier": "A", "live": True, "label": "NEWS2"}
 
 
-def finding() -> dict[str, Any]:
-    return {
-        "id": "af",
-        "label": "Arrhythmia burden",
-        "value": "12%",
-        "direction": "rising",
-        "source": "device",
-        "significant": True,
-        "detail": "AF episodes over 6h window",
-    }
-
-
-def tier_c_data() -> dict[str, Any]:
-    return {
-        "risk_probability": 0.23,
-        "forecast_window": "next 1-4h",
-        "scored_seconds_ago": 420,
-        "attributions": [{"feature": "Respiratory rate vs baseline", "contribution": 0.31}],
-    }
-
-
 def score_row() -> dict[str, Any]:
     return {
         "id": "p-001",
@@ -197,8 +172,6 @@ def score_row() -> dict[str, Any]:
         "labs": labs(),
         "sort_tier": "A",
         "tier_status": [tier_status()],
-        "tier_b": {"findings": [finding()]},
-        "tier_c": tier_c_data(),
         "escalation_reasons": [{"rule": "tier_a_threshold", "text": "NEWS2 >= 7"}],
         "synthetic": True,
         "signal_quality": 94,
@@ -210,7 +183,7 @@ def unscored() -> dict[str, Any]:
     row = score_row()
     keys = (
         "id", "name", "age", "sex", "bed", "admitting_context", "trend", "mechanism",
-        "supporting", "vitals", "vital_trends", "labs", "tier_b", "tier_c", "signal_quality",
+        "supporting", "vitals", "vital_trends", "labs", "signal_quality",
         "last_update_s", "synthetic",
     )  # fmt: skip
     state = {key: row[key] for key in keys}
@@ -315,10 +288,6 @@ _BUILDERS: dict[type[BaseModel], Any] = {
     LabPanel: labs,
     PartialLabInput: lambda: {"troponin": 0.04},
     TierStatus: tier_status,
-    TierBFinding: finding,
-    TierBData: lambda: {"findings": [finding()]},
-    TierCAttribution: lambda: {"feature": "BNP (last lab)", "contribution": -0.06},
-    TierCData: tier_c_data,
     TierCInput: lambda: {
         "patient_id": "p-001",
         "as_of": NOW,
@@ -350,8 +319,6 @@ _BUILDERS: dict[type[BaseModel], Any] = {
     TierAScore: lambda: {"score": 9, "label": "NEWS2 9"},
     TierBreakdown: lambda: {
         "tier_a": {"score": 9, "label": "NEWS2 9"},
-        "tier_b": {"findings": [finding()]},
-        "tier_c": tier_c_data(),
     },
     PatientDetail: lambda: {
         **score_row(),
@@ -361,8 +328,6 @@ _BUILDERS: dict[type[BaseModel], Any] = {
         },
         "tier_breakdown": {
             "tier_a": {"score": 9, "label": "NEWS2 9"},
-            "tier_b": None,
-            "tier_c": None,
         },
     },
     ClinicalNote: lambda: {

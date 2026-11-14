@@ -25,6 +25,13 @@ from samples import admit_input  # isort: skip
 NOW = datetime(2026, 10, 14, 12, 0, tzinfo=UTC)
 KEY = "test-ingest-key"
 DATA: dict[str, Any] = json.loads(DEFAULT_DATASET.read_text(encoding="utf-8"))
+SEEDED = ("tier_b", "tier_c")  # demo keys the fixture file keeps and the API no longer serves
+
+
+def bare(entry: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in entry.items() if k not in SEEDED}
+
+
 CLINICIANS: dict[str, list[str]] = {c: list(e["patients"]) for c, e in DATA["clinicians"].items()}
 
 
@@ -170,9 +177,10 @@ def start(api: Api, **kw: Any) -> int:
 
 @pytest.mark.parametrize("who", CLINICIANS)
 def test_a_seeded_database_reproduces_the_fixture(api: Api, who: str) -> None:
+    # The fixture file still holds demo tier keys; the API no longer serves them.
     ward = api.ward(who)
     mine = set(CLINICIANS[who])
-    expected = [r for r in DATA["ranked"] if r["id"] in mine]  # the fixture is in rank order
+    expected = [bare(r) for r in DATA["ranked"] if r["id"] in mine]  # the fixture is in rank order
     assert [{**r, "rank": i} for i, r in enumerate(expected, 1)] == ward["ranked"]
     assert [a for a in DATA["abstained"] if a["id"] in mine] == ward["abstained"]
     assert ward["receiving_data"] is True
@@ -185,7 +193,7 @@ def test_the_fixture_detail_pages_are_reproduced(api: Api) -> None:
     for row in DATA["ranked"]:
         detail = api.client.get(f"/patients/{row['id']}", headers=api.as_("rn-manalo")).json()
         assert detail["vital_history"] == DATA["details"][row["id"]]["vital_history"]
-        assert detail["tier_breakdown"] == DATA["details"][row["id"]]["tier_breakdown"]
+        assert detail["tier_breakdown"] == bare(DATA["details"][row["id"]]["tier_breakdown"])
 
 
 def test_notes_and_clinicians_are_seeded(api: Api) -> None:
@@ -1547,6 +1555,7 @@ def test_the_live_view_is_scoped_audited_and_replaced_whole(api: Api) -> None:
     assert live(api, "rn-delacruz") == {**sent, "patients": sent["patients"][0:3:2]}
     assert live(api, "rn-manalo") == {**sent, "patients": sent["patients"][:3]}
 
+    api.wall.now += timedelta(seconds=61)  # a repeat inside a minute leaves no row; this one does
     gone = batch(minute=6, departures=[{"patient_id": "s-1", "minute": 6, "outcome": "discharged"}])
     assert api.post(f"/sim/runs/{run_id}/batch", gone).status_code == 204
     assert [p["id"] for p in live(api, "rn-manalo")["patients"]] == ["s-2", "s-3"]
@@ -1557,7 +1566,7 @@ def test_the_live_view_is_scoped_audited_and_replaced_whole(api: Api) -> None:
         "SELECT clinician_id, resource, outcome FROM audit_log WHERE action = 'view_live'"
     )
     assert [r["clinician_id"] for r in rows] == [
-        "rn-manalo", "rn-reyes", "rn-delacruz", "rn-manalo", "rn-manalo", "rn-manalo",
+        "rn-manalo", "rn-reyes", "rn-delacruz", "rn-manalo",
     ]  # fmt: skip
     assert {(r["resource"], r["outcome"]) for r in rows} == {("W4", "ok")}
 

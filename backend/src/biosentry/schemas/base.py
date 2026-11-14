@@ -21,6 +21,9 @@ Percent = Annotated[float, Field(strict=True, allow_inf_nan=False, ge=0, le=100)
 NonNegInt = Annotated[int, Field(strict=True, ge=0)]
 Flag = Annotated[bool, Field(strict=True)]
 Age = Annotated[int, Field(strict=True, ge=0, le=150)]
+# Free text a clinician types. Bounded, so one request cannot store a megabyte in a field.
+Line = Annotated[str, Field(max_length=200)]
+Text = Annotated[str, Field(max_length=4000)]
 
 
 class Contract(BaseModel):
