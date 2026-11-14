@@ -18,17 +18,22 @@ const status = (stay: PatientStay) => (stay.outcome ? OUTCOME[stay.outcome] : "O
 export function FlowSection() {
   const [stays, setStays] = useState<PatientStay[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [, render] = useState(0); // a ward read that lands after the stays moves the page's time
   const now = useWardNow(); // ward time from the newest ward or patient read
   const pollMs = usesServer ? 5_000 : 15_000; // the API changes as the simulator runs; the fixture never does
 
   useEffect(() => {
-    // The stays carry no time of their own: with no ward read yet, the ward is read for its time.
+    // The stays carry no time of their own: they are counted against the ward's time, which only a
+    // read moves. A server's ward is read on every refresh; the fixture's once, when no page has.
     const refresh = () =>
       Promise.all([
-        hasWardNow() ? undefined : getWard().then((w) => syncWardNow(w.now, !usesServer)),
+        usesServer || !hasWardNow() ? getWard().then((w) => syncWardNow(w.now, !usesServer)) : undefined,
         getStays().then(setStays),
       ]).then(
-        () => setFailed(false),
+        () => {
+          setFailed(false);
+          render((n) => n + 1);
+        },
         () => setFailed(true),
       );
     void refresh();
