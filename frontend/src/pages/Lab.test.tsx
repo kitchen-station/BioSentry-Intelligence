@@ -23,6 +23,7 @@ const WRITES = [
   api.acknowledge, api.extractLabsFromFile, api.extractPatientFromFile, api.signIn, api.clearSession, api.requestLabRun, api.askLab,
 ];
 const session = { clinician_id: "md-santos", ward: "W4", role: "md" } as const;
+const admin = { clinician_id: "admin-ruiz", ward: "W4", role: "admin" } as const;
 const none = () => {};
 
 afterEach(() => {
@@ -31,21 +32,29 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const lab = () =>
+const lab = (who: typeof session | typeof admin = session) =>
   render(
     <MemoryRouter initialEntries={["/lab"]}>
       <Routes>
-        <Route path="/lab" element={<Lab session={session} onSignOut={none} />} />
-        <Route path="/lab/research" element={<Research session={session} onSignOut={none} />} />
-        <Route path="/lab/pipeline" element={<Pipeline session={session} onSignOut={none} />} />
+        <Route path="/lab" element={<Lab session={who} onSignOut={none} />} />
+        <Route path="/lab/research" element={<Research session={who} onSignOut={none} />} />
+        <Route path="/lab/pipeline" element={<Pipeline session={who} onSignOut={none} />} />
         <Route path="/ward" element={<p>the ward</p>} />
       </Routes>
     </MemoryRouter>,
   );
 
 describe("lab index", () => {
-  it("lists the three places and no simulator link in the fixture build", () => {
+  it("gives a physician no link to a developer page", () => {
     lab();
+    expect(screen.getByRole("heading", { level: 1, name: "Simulation lab" })).toBeTruthy();
+    for (const name of ["Research numbers", "The research agent's questions and answers", "The pipeline"]) {
+      expect(screen.queryByRole("link", { name })).toBeNull();
+    }
+  });
+
+  it("lists the three developer places for an admin, and no simulator link in the fixture build", () => {
+    lab(admin);
     expect(screen.getByRole("heading", { level: 1, name: "Simulation lab" })).toBeTruthy();
     const href = (name: string) => screen.getByRole("link", { name }).getAttribute("href");
     expect(href("Research numbers")).toBe("/lab/research");
@@ -93,14 +102,14 @@ describe("lab index", () => {
 describe("the lab writes nothing to the ward", () => {
   it("calls no write of the mocked api while every lab page renders and its in-lab links are clicked", async () => {
     api.getWard.mockResolvedValue(synthetic);
-    lab();
+    lab(admin);
     for (const name of ["Research numbers", "The pipeline"]) {
       await userEvent.click(screen.getByRole("link", { name }));
       expect(await screen.findByRole("heading", { level: 1, name })).toBeTruthy();
       await userEvent.click(screen.getByRole("link", { name: "Ward" }));
       expect(screen.getByText("the ward")).toBeTruthy();
       cleanup();
-      lab();
+      lab(admin);
     }
     for (const w of WRITES) expect(w).toHaveBeenCalledTimes(0);
   });
