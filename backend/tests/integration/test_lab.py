@@ -595,7 +595,7 @@ def test_the_claim_statement_cannot_start_a_row_that_is_no_longer_queued(api: Ap
 
         def claim_now() -> None:
             second.execute("BEGIN")
-            result.append(second.execute(CLAIM, (api.wall(),)).fetchall())
+            result.append(second.execute(CLAIM, (api.wall(), "compare")).fetchall())
             second.execute("COMMIT")
 
         thread = threading.Thread(target=claim_now)

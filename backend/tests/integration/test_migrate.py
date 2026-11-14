@@ -23,7 +23,7 @@ def _names(url: str) -> list[str]:
 
 
 def test_every_migration_is_recorded_once(database_url: str) -> None:
-    assert "0010_lab_run" in _names(database_url)
+    assert {"0010_lab_run", "0011_patient_question"} <= set(_names(database_url))
     assert _names(database_url) == [p.stem for p in migrations()]
     ensure(database_url)  # a restart
     with connect(database_url) as conn:
@@ -155,3 +155,40 @@ def test_a_session_from_the_stub_sign_in_does_not_survive_the_passphrase_migrati
         assert PostgresStore(conn, lambda: datetime.now(UTC)).clinician_for(token) is None
         kept = conn.execute("SELECT passphrase_hash FROM clinician WHERE id = 'rn-old'").fetchone()
     assert kept == {"passphrase_hash": None}  # the clinician stays; only the session went
+
+
+def test_a_compare_run_from_before_the_patient_question_survives_with_the_new_columns_empty(
+    blank_database_url: str, tmp_path: Path
+) -> None:
+    for path in migrations():
+        if path.stem < "0011":
+            shutil.copy(path, tmp_path)
+    insert = (
+        "INSERT INTO lab_run (ward, requested_by, requested_at, kind, mode, seed, days, baseline,"
+        " change, state{extra}) VALUES ('W4', 'md-old', now(), 'compare', 'w4', 1, 1,"
+        " 'news2_total_ge_5', 'news2_chart_trigger', {values})"
+    )
+    with connect(blank_database_url) as conn:
+        migrate(conn, tmp_path)
+        conn.execute("INSERT INTO clinician (id, role) VALUES ('md-old', 'md')")
+        conn.execute(insert.format(extra="", values="'queued'"))
+        conn.execute(
+            insert.format(
+                extra=", claimed_at, finished_at, report, report_text",
+                values="'done', now(), now(), '{\"a\": 1}', 't'",
+            )
+        )
+        before = conn.execute("SELECT id, state, mode, report, report_text FROM lab_run ORDER BY id").fetchall()
+        assert migrate(conn) == ["0011_patient_question"]
+        after = conn.execute("SELECT * FROM lab_run ORDER BY id").fetchall()
+        names = {
+            r["conname"]
+            for r in conn.execute(
+                "SELECT conname FROM pg_constraint WHERE conrelid = 'lab_run'::regclass"
+            )
+        }
+    assert [{k: r[k] for k in before[0]} for r in after] == before
+    for r in after:
+        for column in ("question", "run_id", "patient_id", "context", "context_sha256"):
+            assert r[column] is None
+    assert {"lab_run_kind_check", "lab_run_fields_of_kind", "lab_run_patient"} <= names
