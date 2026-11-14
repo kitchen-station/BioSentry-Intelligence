@@ -78,12 +78,25 @@ if [ -z "$public_host" ]; then
   echo "PUBLIC_HOST in deploy/.env must be this server's tailnet name, like server.tail1234.ts.net (lower case, no https://)" >&2
   exit 1
 fi
-# Anyone on the internet could then watch the ward without signing in: never both.
+# Public mode does not read the plain value, so it cannot open the ward to the internet. Still refused:
+# a line that says one thing and does another is how a mistake gets made. The public view has its own line.
 if grep -Eiq "^[[:space:]]*(export[[:space:]]+)?BIOSENTRY_OPEN_WARD_VIEW[[:space:]]*[=:][[:space:]\"']*true" .env; then
-  echo "PUBLIC_HOST and BIOSENTRY_OPEN_WARD_VIEW=true are both set in deploy/.env: remove one (a public address never shows the ward without a sign-in)" >&2
+  echo "PUBLIC_HOST and BIOSENTRY_OPEN_WARD_VIEW=true are both set in deploy/.env: remove BIOSENTRY_OPEN_WARD_VIEW (public mode does not read it; to show the ward to the public without a sign-in, set BIOSENTRY_PUBLIC_OPEN_WARD_VIEW=true instead)" >&2
   exit 1
 fi
+# The explicit opt-in to the public ward page (deploy/README.md, "Public mode"): exactly
+# BIOSENTRY_PUBLIC_OPEN_WARD_VIEW=true or =false at the start of a line. Any other spelling is refused here,
+# not read as "off": the operator meant something, and the API would stop at start on a word it does not know.
+opt_in='BIOSENTRY_PUBLIC_OPEN_WARD_VIEW'
+if grep -Ev "^${opt_in}=(true|false)$" .env | grep -Eq "^[[:space:]]*(export[[:space:]]+)?${opt_in}"; then
+  echo "${opt_in} in deploy/.env must be written as ${opt_in}=true or ${opt_in}=false at the start of a line (no export, no spaces, no quotes, no comment)" >&2
+  exit 1
+fi
+open_view=$(sed -n "s/^${opt_in}=//p" .env | tail -n 1)
 docker compose -f compose.yaml -f compose.public.yaml up -d --build --wait
+if [ "$open_view" = "true" ]; then
+  echo "NOTE: ${opt_in}=true: anyone who opens the public address sees the ward without a sign-in (bed colours, staff figures, no names, synthetic data only). Control still needs a sign-in."
+fi
 echo "up, set for a public address. The stack itself still answers on this host at 127.0.0.1:8080 and nowhere else."
 echo "to open it to the internet: sudo tailscale funnel --bg --https=443 http://127.0.0.1:8080"
 echo "to close it again:          sudo tailscale funnel reset && sudo tailscale serve --bg --https=443 http://127.0.0.1:8080"
