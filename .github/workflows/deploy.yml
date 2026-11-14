@@ -49,8 +49,11 @@ jobs:
         run: npm run lint
       - if: steps.gate.outputs.go == 'true'
         run: npm test
-      # Do not set VITE_API_URL here: VITE_ values end up in the public JS.
+      # VITE_ values end up in the public JS. VITE_API_URL is the public address of the API, which is not
+      # a secret. Never put the ingest key or any passphrase here. Unset, the site is the sample-data demo.
       - if: steps.gate.outputs.go == 'true'
         run: npm run build
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
       - if: steps.gate.outputs.go == 'true'
         run: npx --yes wrangler@4.155.0 pages deploy dist --project-name=biosentry-dashboard --branch=main --commit-hash=${{ github.sha }}
