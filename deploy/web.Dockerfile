@@ -26,7 +26,7 @@ FROM ${NODE} AS simulator
 WORKDIR /app
 COPY --from=sim package.json package-lock.json ./
 RUN npm ci
-COPY --from=sim index.html tsconfig.json vite.config.ts ./
+COPY --from=sim index.html tsconfig.json vite.config.ts build-guard.ts ./
 COPY --from=sim scenarios ./scenarios
 COPY --from=sim src ./src
 RUN VITE_VIEW_API_URL=/api npx vite build --base=/simulator/
