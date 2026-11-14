@@ -542,17 +542,40 @@ describe("every age and due time follows the ward's time as served", () => {
     expect(screen.getByText("Obs overdue").previousSibling?.textContent).toBe("0");
   });
 
-  it("goes overdue when the ward's time passes the due time, and keeps going while reads fail", async () => {
+  it("stamps the update and the outage with the ward's time of the last read, not the browser's", async () => {
     vi.useFakeTimers({ now: BROWSER });
+    api.build.usesServer = true;
+    const served = due - 30 * 60_000;
+    api.getWard.mockResolvedValue(wardAt(served));
+    page();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByText(`Updated ${formatClock(served)}`)).toBeTruthy();
+    api.getWard.mockRejectedValue(new Error("down"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(screen.getByText(`Offline since ${formatClock(served)}`)).toBeTruthy();
+  });
+
+  it("goes overdue when a read brings the ward's time past the due time, and stands there while reads fail", async () => {
+    vi.useFakeTimers({ now: BROWSER });
+    api.build.usesServer = true; // a server's ward time is its own; only the no-server demo keeps the browser's pace
     api.getWard.mockResolvedValue(wardAt(due - 30 * 60_000));
     page();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
     expect(screen.getByText(`Obs due ${formatClock(due)}`)).toBeTruthy();
+    api.getWard.mockResolvedValue(wardAt(due + 60_000)); // the ward's clock moved on 31 minutes: only a read says so
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(screen.getByText(/^Obs overdue 1 min$/)).toBeTruthy();
     api.getWard.mockRejectedValue(new Error("down"));
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(31 * 60_000); // the ward's 30 minutes pass, and one more
+      await vi.advanceTimersByTimeAsync(31 * 60_000); // the browser's minutes do not age the ward
     });
     expect(screen.getByText(/^Obs overdue 1 min$/)).toBeTruthy();
     expect(screen.getByText(/Cannot reach the ward server since/)).toBeTruthy();

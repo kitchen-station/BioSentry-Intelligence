@@ -11,6 +11,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import synthetic from "../data/synthetic.json";
 import type { BaselineComputed, BaselineResponse, ClinicalNote, LabPanel, PatientDetail as Detail, Session, SessionRole } from "../types";
+import { formatClockSeconds } from "../components/format";
 import { PatientDetail } from "./PatientDetail";
 
 // "Sep" or "Sept", whichever the runtime's en-GB gives: the clock uses the same call as the simulator.
@@ -112,12 +113,12 @@ const expectLabEntry = () => {
 };
 
 describe("the header clock is ward time, as served", () => {
-  const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const clock = formatClockSeconds;
   const SERVED = Date.parse("2026-09-03T07:00:00Z");
 
   afterEach(() => void vi.useRealTimers());
 
-  it("shows the server's time while the browser says another day, and steps with the browser's elapsed time", async () => {
+  it("shows the server's time while the browser says another day, and does not step with the browser's seconds", async () => {
     api.usesServer = true; // the page reads on a timer
     vi.useFakeTimers({ now: Date.parse("2026-11-14T21:30:00Z") });
     page("rn");
@@ -125,11 +126,11 @@ describe("the header clock is ward time, as served", () => {
       await vi.advanceTimersByTimeAsync(0);
     });
     expect(screen.getByText(clock(SERVED))).toBeTruthy();
-    api.getPatient.mockRejectedValue(new Error("down")); // the next read fails: the clock still runs
+    api.getPatient.mockRejectedValue(new Error("down")); // the next read fails: the ward's clock stands at the last read
     await act(async () => {
       await vi.advanceTimersByTimeAsync(20_000);
     });
-    expect(screen.getByText(clock(SERVED + 20_000))).toBeTruthy();
+    expect(screen.getByText(clock(SERVED))).toBeTruthy();
     expect(screen.getByText(/Cannot reach the ward server since/)).toBeTruthy();
   });
 

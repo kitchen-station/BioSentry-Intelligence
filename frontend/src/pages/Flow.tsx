@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { PatientStay } from "../types";
 import { getStays, getWard, usesServer } from "../api";
+import { formatClock, formatDay } from "../components/format";
 import { hasWardNow, syncWardNow, useWardNow } from "../components/wardNow";
 import { bedRows, dayTicks, FLOW_DAYS, flowStats, formatStay, recentMoves } from "./flowMath";
 import styles from "./Flow.module.css";
@@ -9,9 +10,8 @@ import styles from "./Flow.module.css";
 const RECENT = 12;
 const OUTCOME = { discharged: "Discharged", higher_care: "Higher care" } as const;
 
-const when = (iso: string) =>
-  new Date(iso).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-const day = (ms: number) => new Date(ms).toLocaleDateString([], { day: "numeric", month: "short" });
+const when = (iso: string) => `${formatDay(Date.parse(iso))}, ${formatClock(Date.parse(iso))}`;
+const day = formatDay;
 const status = (stay: PatientStay) => (stay.outcome ? OUTCOME[stay.outcome] : "On the ward");
 
 /** The Station's admin view of who came and went. Scoped by the server, like the ward. */
@@ -25,7 +25,7 @@ export function FlowSection() {
     // The stays carry no time of their own: with no ward read yet, the ward is read for its time.
     const refresh = () =>
       Promise.all([
-        hasWardNow() ? undefined : getWard().then((w) => syncWardNow(w.now)),
+        hasWardNow() ? undefined : getWard().then((w) => syncWardNow(w.now, !usesServer)),
         getStays().then(setStays),
       ]).then(
         () => setFailed(false),
