@@ -65,6 +65,17 @@ def test_two_reads_in_a_minute_leave_one_row_and_a_later_one_a_second(
     assert written[1]["at"] - written[0]["at"] == timedelta(seconds=61)
 
 
+def test_opening_one_answer_twice_in_a_minute_leaves_two_rows(api: Api) -> None:
+    # Reading an answer is not a timer's read: every opening is recorded.
+    assert "view_patient_question" not in REPEATED_VIEWS
+    asked = api.client.post(f"/patients/{PID}/questions", headers=api.as_(MD), json={"question": "What changed?"})
+    assert asked.status_code == 201
+    for _ in range(2):
+        assert get(api, f"/patients/{PID}/questions/{asked.json()['id']}").status_code == 200
+    seen = [(r["resource"], r["outcome"]) for r in rows(api, MD, "view_patient_question")]
+    assert seen == [(f"patient_question:{asked.json()['id']}", "ok")] * 2
+
+
 def test_two_clinicians_reading_the_same_list_leave_a_row_each(api: Api) -> None:
     for who in (RN, MD, RN, MD):
         get(api, "/wards/W4/rows", who)
