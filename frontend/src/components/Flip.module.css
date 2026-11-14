@@ -1,0 +1,59 @@
+/* The motion both apps agreed: flip about X, 90 degrees out then 90 in, only transform and opacity. */
+.flipbox {
+  display: inline-block;
+  position: relative;
+  perspective: 400px;
+}
+
+.flip {
+  display: inline-block; /* a transform does nothing on an inline box */
+  backface-visibility: hidden;
+  animation: flip-in var(--flip-ms) var(--flip-ease);
+}
+
+/* The old value is painted from data-old, so no old text exists in the DOM. */
+.flip-old {
+  position: absolute;
+  inset: 0;
+  white-space: nowrap; /* a long old value must not wrap down over the row below */
+  backface-visibility: hidden;
+  pointer-events: none;
+  animation: flip-out var(--flip-ms) var(--flip-ease) forwards;
+}
+
+.flip-old::before {
+  content: attr(data-old);
+}
+
+@keyframes flip-out {
+  0% {
+    transform: rotateX(0);
+    opacity: 1;
+  }
+  50%,
+  100% {
+    transform: rotateX(90deg);
+    opacity: 0;
+  }
+}
+
+@keyframes flip-in {
+  0%,
+  50% {
+    transform: rotateX(-90deg);
+    opacity: 0;
+  }
+  100% {
+    transform: rotateX(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flip {
+    animation: none;
+  }
+  .flip-old {
+    display: none;
+  }
+}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LabRunDetail, LabRunItem, SessionRole } from "../types";
 import { ApiError, getLabRun, getLabRuns, hasLabRuns, requestLabRun } from "../api";
+import { Flip } from "../components/Flip";
 import research from "./Research.module.css";
 import overview from "./Overview.module.css";
 import styles from "./LabRuns.module.css";
@@ -217,7 +218,7 @@ export function LabRuns({ role, onSignOut }: { role: SessionRole; onSignOut: () 
                       <td>{when(r.requested_at)}</td>
                       <td>{request(r)}</td>
                       <td>
-                        {state(r)}
+                        <Flip>{state(r)}</Flip>
                         {r.state === "done" && <> <button type="button" className={overview.refresh} onClick={() => void show(r.id)}>Show result</button></>}
                       </td>
                     </tr>

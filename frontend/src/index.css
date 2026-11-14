@@ -65,6 +65,9 @@
   --content-max: 640px;
   --ward-max: 960px;
   --page-max: 1200px;
+  --flip-ms: 320ms;
+  --flip-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --move-ms: 420ms;
 
   /* Typography */
   --font-display: "Fraunces", Georgia, serif;
