@@ -82,20 +82,20 @@ describe("BaselinePanel", () => {
     expect(screen.queryByText("Something else")).toBeNull();
   });
 
-  it("says a flagged change in words, with units, the run in bins and hours, and when it began", () => {
+  it("says a flagged change in words, with units, the run in 15-minute sets and hours, and when it began", () => {
     show(response([computed()]));
     expect(text()).toContain(
-      `Heart rate 90 bpm · +20 bpm from own baseline 70 bpm · Flagged rising for 4 bins (1 h), since ${when(at(60))}`,
+      `Heart rate 90 bpm · +20 bpm from own baseline 70 bpm · Flagged rising for 4 15-minute sets (1 h), since ${when(at(60))}`,
     );
     expect(items()[0].getAttribute("data-significant")).toBe("true");
     expect(text()).toContain("z 4.1 · circulatory");
   });
 
   it.each([
-    [1, "1 bin (15 min)"],
-    [3, "3 bins (45 min)"],
-    [6, "6 bins (1 h 30 min)"],
-  ])("words a run of %i bins as %s", (run_bins, expected) => {
+    [1, "1 15-minute set (15 min)"],
+    [3, "3 15-minute sets (45 min)"],
+    [6, "6 15-minute sets (1 h 30 min)"],
+  ])("words a run of %i sets as %s", (run_bins, expected) => {
     show(response([computed({ run_bins, since: null, direction: null })]));
     expect(text()).toContain(`Flagged for ${expected}`);
     expect(text()).not.toContain(", since ");
@@ -125,7 +125,7 @@ describe("BaselinePanel", () => {
 
   it("says a short run is not yet flagged and how far it has got, using the served k and p", () => {
     show(response([quiet({ run_bins: 2, z: 3.4, delta: 12 })], { params: { window_bins: 24, k: 2, p: 5 } }));
-    expect(text()).toContain("not flagged (only 2 of 5 bins so far)");
+    expect(text()).toContain("not flagged (only 2 of 5 15-minute sets so far)");
   });
 
   it("does not call a move other-way when it is below k, using the served k", () => {
@@ -140,9 +140,9 @@ describe("BaselinePanel", () => {
     expect(text(1)).toContain(" · -2.1 bpm from");
   });
 
-  it("says a baseline is still forming, with how many bins it has", () => {
+  it("says a baseline is still forming, with how many 15-minute sets it has", () => {
     show(response([{ vital: "respiratory_rate", status: "forming", bins_valid: 10, bins_needed: 24 }]));
-    expect(text()).toBe("Respiratory rate · baseline forming, 10 of 24 bins");
+    expect(text()).toBe("Respiratory rate · Own baseline: getting ready (10 of 24 15-minute sets)");
   });
 
   it("says why a vital has nothing, and does not guess when the reason is new", () => {
@@ -154,7 +154,7 @@ describe("BaselinePanel", () => {
     ]));
     expect(items().slice(0, 4).map((li) => li.textContent)).toEqual([
       "Temperature · no history yet",
-      "SpO2 · latest reading missing",
+      "SpO2 · latest 15-minute set missing",
       "Heart rate · not counted: no live patch reading",
       "Unrecognised finding",
     ]);
@@ -170,12 +170,12 @@ describe("BaselinePanel", () => {
     show(response([computed({ latest_age_s: age })]));
     expect(text().includes("Stale · ")).toBe(stale);
     expect(items()[0].querySelector("[data-stale]") !== null).toBe(stale);
-    expect(text()).toContain(`15-min median ${when(at(30))} to ${formatClock(T0 - 15 * 60_000)}`);
+    expect(text()).toContain(`15-minute set ${when(at(30))} to ${formatClock(T0 - 15 * 60_000)}`);
   });
 
   it("words the age with the existing formatter", () => {
     show(response([computed({ latest_age_s: 540 })]));
-    expect(text()).toContain(`15-min median ${when(at(30))} to ${formatClock(T0 - 15 * 60_000)}, ended 9 min ago`);
+    expect(text()).toContain(`15-minute set ${when(at(30))} to ${formatClock(T0 - 15 * 60_000)}, ended 9 min ago`);
   });
 
   it("shows the date with every time, so a time is never read as today", () => {
@@ -206,14 +206,14 @@ describe("BaselinePanel", () => {
 
   it("anchors on admission only when the server says so, and says the other two cases apart", () => {
     const from = when(at(600));
-    expect(anchors([computed()], true)).toEqual([`Baseline: first 24 valid bins, since admission, from ${from}`]);
+    expect(anchors([computed()], true)).toEqual([`Baseline: first 24 valid 15-minute sets, since admission, from ${from}`]);
     cleanup();
     expect(anchors([computed({ anchored_at: "first_kept_bin" })], true)).toEqual([
-      `Baseline: first 24 valid bins, from the earliest readings kept (not from admission), from ${from}`,
+      `Baseline: first 24 valid 15-minute sets, from the earliest 15-minute set kept (not from admission), from ${from}`,
     ]);
     cleanup();
     expect(anchors([computed({ anchored_at: "first_kept_bin" })], false)).toEqual([
-      `Baseline: first 24 valid bins, from the first stored reading (admission time not known), from ${from}`,
+      `Baseline: first 24 valid 15-minute sets, from the first stored 15-minute set (admission time not known), from ${from}`,
     ]);
     cleanup();
     expect(anchors([computed({ anchored_at: "elsewhere" as never })], true)[0]).not.toContain("since admission");
@@ -234,7 +234,8 @@ describe("BaselinePanel", () => {
 
   it("says fixture mode has no finding, and the frontend computes none", () => {
     show(null);
-    expect(screen.getByText("Own-baseline findings need the live API.")).toBeTruthy();
+    expect(screen.getByText("Own baseline: not shown in this version.")).toBeTruthy();
+    expect(screen.queryByText(/getting ready/)).toBeNull();
     expect(screen.queryByRole("region")).toBeNull();
   });
 
@@ -246,7 +247,7 @@ describe("BaselinePanel", () => {
 
   it("says it is loading", () => {
     show(undefined);
-    expect(screen.getByText("Loading baseline…")).toBeTruthy();
+    expect(screen.getByText("Own baseline: getting ready.")).toBeTruthy();
   });
 });
 
@@ -257,7 +258,7 @@ describe("BaselinePanel with a response of the wrong shape", () => {
     ["no params", { params: undefined }],
     ["params of the wrong type", { params: { window_bins: "24", k: 2, p: 3 } }],
     ["a body that is not an object", "oops"],
-  ])("%s: the error line, no throw", (_name, over) => {
+  ])("%s: the could-not-be-loaded line, no throw", (_name, over) => {
     show(typeof over === "string" ? over : response([computed()], over));
     expect(screen.getByText("Baseline could not be loaded.")).toBeTruthy();
   });
@@ -297,20 +298,20 @@ describe("BaselinePanel: the flagged direction comes from the vital", () => {
     const flaggedWay = (FLAGS[vital] === "rise") === (way === "up");
     expect(text()).toContain(
       flaggedWay
-        ? "not flagged (only 0 of 3 bins so far)"
+        ? "not flagged (only 0 of 3 15-minute sets so far)"
         : `not flagged (moved the other way; only a sustained ${FLAGS[vital]} is flagged)`,
     );
   });
 
   it("a heart rate that rose, with z served at exactly k and a run of 0, is not called the other way", () => {
     show(response([quiet({ z: 2, delta: 8.3, latest: 78.3 })]));
-    expect(text()).toContain("not flagged (only 0 of 3 bins so far)");
+    expect(text()).toContain("not flagged (only 0 of 3 15-minute sets so far)");
     expect(text()).not.toContain("other way");
   });
 
   it("an SpO2 that fell with a run of 0 says only 0 of 3, and a rise says the other way (fall flagged)", () => {
     show(response([quiet({ vital: "spo2", unit: "%", latest: 92, baseline_median: 96, delta: -4, z: -3, run_bins: 0 })]));
-    expect(text()).toContain("not flagged (only 0 of 3 bins so far)");
+    expect(text()).toContain("not flagged (only 0 of 3 15-minute sets so far)");
     cleanup();
     show(response([quiet({ vital: "spo2", unit: "%", latest: 99, baseline_median: 96, delta: 3, z: 2.5 })]));
     expect(text()).toContain("SpO2 99 % · +3 % from own baseline 96 % · not flagged (moved the other way; only a sustained fall is flagged)");
@@ -323,7 +324,7 @@ describe("BaselinePanel: the flagged direction comes from the vital", () => {
 });
 
 describe("BaselinePanel: what is missing and what is malformed", () => {
-  it("an empty list is the error line, not a heading over nothing", () => {
+  it("an empty list is the could-not-be-loaded line, not a heading over nothing", () => {
     show(response([]));
     expect(screen.getByText("Baseline could not be loaded.")).toBeTruthy();
     expect(screen.queryByRole("heading")).toBeNull();
@@ -340,7 +341,7 @@ describe("BaselinePanel: what is missing and what is malformed", () => {
 
   it("treats a wrong-typed direction or pathway as absent, never '[object Object]' or 'undefined'", () => {
     show(response([{ ...computed(), direction: { a: 1 }, pathway: undefined }]));
-    expect(text()).toContain("Flagged for 4 bins");
+    expect(text()).toContain("Flagged for 4 15-minute sets");
     expect(text()).not.toContain("object");
     expect(text()).not.toContain("undefined");
     expect(text()).toContain("z 4.1");

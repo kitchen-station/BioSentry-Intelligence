@@ -24,7 +24,7 @@ import styles from "./PatientDetail.module.css";
 
 // The patient's own band for one vital, from the answer the page already loaded. An older server
 // without the two fields, a vital still forming, a build without the route and an answer of an
-// odd shape give no band (the panel says the baseline could not be loaded; the page never blanks).
+// odd shape give no band (the panel words each case; the page never blanks).
 function bandOf(baseline: BaselineState, vital: string) {
   const b: unknown = baseline;
   if (!isObj(b) || !Array.isArray(b.vitals)) return undefined;
@@ -40,6 +40,27 @@ function trendTitle(history: PatientDetailType["vital_history"]) {
   const h = Math.floor((Math.max(...ms) - Math.min(...ms)) / 3_600_000);
   return `Vital trends \u00b7 ${h < 1 ? "under 1 h" : `${h} h`}`;
 }
+
+// The lab rows the page draws, in order. Other lab keys the server may send have no row.
+const LAB_ROWS = [
+  ["troponin", "Troponin", "ng/mL"],
+  ["ck_mb", "CK-MB", "U/L"],
+  ["bnp", "BNP", "pg/mL"],
+  ["nt_probnp", "NT-proBNP", "pg/mL"],
+  ["sodium", "Sodium", "mEq/L"],
+  ["potassium", "Potassium", "mEq/L"],
+  ["magnesium", "Magnesium", "mg/dL"],
+  ["creatinine", "Creatinine", "mg/dL"],
+  ["bun", "BUN", "mg/dL"],
+  ["hemoglobin", "Hemoglobin", "g/L"],
+  ["wbc", "WBC", "x10^9/L"],
+  ["platelet_count", "Platelets", "/mm^3"],
+  ["lactate", "Lactate", "mmol/L"],
+  ["sgpt", "SGPT", "U/L"],
+  ["sgot", "SGOT", "U/L"],
+  ["blood_glucose", "Blood glucose", "mg/dL"],
+  ["inr", "INR", ""],
+] as const;
 
 type Drawer = "notes" | "charts" | null;
 
@@ -279,7 +300,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
               )}
               {modelReasons.length > 0 && (
                 <>
-                  <span className={styles.summaryLabel}>Research models · rank unchanged</span>
+                  <span className={styles.summaryLabel}>Prediction models · rank unchanged</span>
                   <div className={styles.reasonList}>
                     {modelReasons.map((r) => (
                       <span key={r.rule} className={styles.reasonTag}>{r.text}</span>
@@ -420,7 +441,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
           </div>
 
           <div className={styles.panel}>
-            <p className={styles.panelEyebrow}>Tier A &mdash; Reference score</p>
+            <p className={styles.panelEyebrow}>NEWS2</p>
             <div className={styles.scoreBlock}>
               <span className={styles.scoreValue}>{patient.score}</span>
               <span className={styles.scoreLabel}>NEWS2</span>
@@ -428,8 +449,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
           </div>
 
           <div className={styles.panel}>
-            <p className={styles.panelEyebrow}>Tier B &mdash; Mechanism findings</p>
-            <p className={styles.pending}>Findings beyond NEWS2 show here when they are computed.</p>
+            <p className={styles.panelEyebrow}>Own baseline</p>
             <BaselinePanel baseline={baseline} />
             <ResearchModels models={patient.models} />
           </div>
@@ -486,26 +506,12 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
                 ` \u00b7 ${patient.labs.freshness_hours}h since collection`}
             </p>
             <div className={styles.vitalsGrid}>
-              {patient.labs.troponin && <VitalRow label="Troponin" measurement={patient.labs.troponin} unit="ng/mL" />}
-              {patient.labs.ck_mb && <VitalRow label="CK-MB" measurement={patient.labs.ck_mb} unit="U/L" />}
-              {patient.labs.bnp && <VitalRow label="BNP" measurement={patient.labs.bnp} unit="pg/mL" />}
-              {patient.labs.nt_probnp && <VitalRow label="NT-proBNP" measurement={patient.labs.nt_probnp} unit="pg/mL" />}
-              {patient.labs.sodium && <VitalRow label="Sodium" measurement={patient.labs.sodium} unit="mEq/L" />}
-              {patient.labs.potassium && <VitalRow label="Potassium" measurement={patient.labs.potassium} unit="mEq/L" />}
-              {patient.labs.magnesium && <VitalRow label="Magnesium" measurement={patient.labs.magnesium} unit="mg/dL" />}
-              {patient.labs.creatinine && <VitalRow label="Creatinine" measurement={patient.labs.creatinine} unit="mg/dL" />}
-              {patient.labs.bun && <VitalRow label="BUN" measurement={patient.labs.bun} unit="mg/dL" />}
-              {patient.labs.hemoglobin && <VitalRow label="Hemoglobin" measurement={patient.labs.hemoglobin} unit="g/L" />}
-              {patient.labs.wbc && <VitalRow label="WBC" measurement={patient.labs.wbc} unit="x10^9/L" />}
-              {patient.labs.platelet_count && <VitalRow label="Platelets" measurement={patient.labs.platelet_count} unit="/mm^3" />}
-              {patient.labs.lactate && <VitalRow label="Lactate" measurement={patient.labs.lactate} unit="mmol/L" />}
-              {patient.labs.sgpt && <VitalRow label="SGPT" measurement={patient.labs.sgpt} unit="U/L" />}
-              {patient.labs.sgot && <VitalRow label="SGOT" measurement={patient.labs.sgot} unit="U/L" />}
-              {patient.labs.blood_glucose && <VitalRow label="Blood glucose" measurement={patient.labs.blood_glucose} unit="mg/dL" />}
-              {patient.labs.inr && <VitalRow label="INR" measurement={patient.labs.inr} unit="" />}
-              {!patient.labs.troponin && !patient.labs.bnp && !patient.labs.potassium &&
-               !patient.labs.creatinine && !patient.labs.hemoglobin && (
-                <p className={styles.pending}>No lab values recorded</p>
+              {LAB_ROWS.map(([key, label, unit]) => {
+                const m = patient.labs[key];
+                return m && <VitalRow key={key} label={label} measurement={m} unit={unit} />;
+              })}
+              {LAB_ROWS.every(([key]) => !patient.labs[key]) && (
+                <p className={styles.pending}>No lab result yet.</p>
               )}
             </div>
           </div>

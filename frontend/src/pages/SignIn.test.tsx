@@ -199,6 +199,7 @@ describe("with the API", () => {
     expect([input.value, input.required, input.maxLength]).toEqual(["", true, 256]);
     expect(screen.queryByText(/anything/i)).toBeNull();
     expect(screen.queryByText(/accepts any passphrase/i)).toBeNull();
+    expect(screen.queryByText(/any passphrase/i)).toBeNull();
     expect(screen.getByText("After 5 failed attempts for a clinician, sign-in is locked for 15 minutes. Every attempt is recorded.")).toBeTruthy();
     expect(screen.getByText(/Pilot build: synthetic data only/)).toBeTruthy();
   });
