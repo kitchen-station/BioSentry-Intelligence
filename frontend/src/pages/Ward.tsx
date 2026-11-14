@@ -237,7 +237,7 @@ export function Ward({ session, onSignOut }: Props) {
         <div className={styles.sectionHeader}>
           <p className={styles.eyebrow}>Priority queue</p>
           <p className={styles.sortInfo}>
-            Sorted on {liveTiers.map((t) => t.label).join(", ") || `Tier ${data.sort_tier}`}
+            Sorted on {liveTiers.map((t) => t.label).join(", ") || "NEWS2"}
           </p>
         </div>
 

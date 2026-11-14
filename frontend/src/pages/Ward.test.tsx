@@ -82,6 +82,20 @@ describe("the simulated note", () => {
   });
 });
 
+describe("the sort line", () => {
+  it("names the live tiers, and says NEWS2 when no tier is listed", async () => {
+    page();
+    await screen.findByText(/Priority queue/);
+    expect(screen.getByText(/^Sorted on /).textContent).toBe(
+      `Sorted on ${ward().tier_status.filter((t) => t.live).map((t) => t.label).join(", ")}`,
+    );
+    cleanup();
+    api.getWard.mockResolvedValue({ ...ward(), tier_status: [] });
+    page();
+    expect(await screen.findByText("Sorted on NEWS2")).toBeTruthy();
+  });
+});
+
 describe("acknowledging an alert", () => {
   // Timed out at the default 5s on a slow Cloudflare build.
   it("saves through the API and closes the alert once it is saved", async () => {

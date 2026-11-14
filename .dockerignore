@@ -5,6 +5,12 @@
 !backend/uv.lock
 !backend/src
 !frontend/src/data/synthetic.json
+# The five files the model loader reads (backend/src/biosentry/services/models.py), and nothing else of models/.
+!models/manifest.json
+!models/tier_c/student_vitals/model.json
+!models/tier_c/confidence_check/calibration.json
+!models/tier_c/confidence_check/calibration.json.sha256
+!models/tier_b/reward_policy/policy.json
 **/__pycache__
 **/*.pyc
 **/*.egg-info

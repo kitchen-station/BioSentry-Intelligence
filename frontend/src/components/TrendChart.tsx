@@ -10,6 +10,7 @@ import {
   type Pt,
 } from "./chartPath";
 import { DrawOn, Tick, useDrawFrom } from "./DrawOn";
+import { shown } from "./BaselinePanel";
 
 interface DataPoint {
   time: string; // ISO 8601. From the API: the END of the 15-minute bin. The fixture file gives its start.
@@ -112,7 +113,7 @@ export function TrendChart({
           {bandText && <span style={{ textTransform: "none" }}>{` \u00b7 ${bandText}`}</span>}
         </span>
         <span style={{ fontFamily: "var(--font-mono)", color: "var(--ink)" }}>
-          {latestValue === null ? "--" : `${latestValue} ${unit}`}
+          {latestValue === null ? "--" : <span title={String(latestValue)}>{`${shown("", latestValue)} ${unit}`}</span>}
         </span>
       </div>
       <svg
