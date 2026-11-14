@@ -336,7 +336,8 @@ def _baseline(w: _Out, args: dict, base: object) -> list[str]:
                      else "at the first value the system kept, not at admission")
             out.append(f"{name}: the baseline is {w.n(e.get('baseline_median'))}, with this unit:\n{w.q(e.get('unit'))}\n"
                        f"It is the median of the first {w.n(window)} valid 15-minute values. The window starts {start}.")
-            out.append(f"The latest stored value is {w.n(e.get('latest'))} at {w.t(e.get('latest_at'))}. "
+            out.append(f"The latest stored value is {w.n(e.get('latest'))}. It is the median of the 15-minute set that starts at "
+                       f"{w.t(e.get('latest_at'))}. "
                        f"The difference from the baseline is {w.n(e.get('delta'))}. The z value is {w.n(e.get('z'))}.")
             if type(e.get("significant")) is not bool:
                 raise Bad
@@ -381,7 +382,8 @@ def _changes(w: _Out, args: dict, detail: dict) -> list[str]:
                    f"The latest value is {w.n(last[1])} at {w.t(last[2])}. {word} "
                    f"The lowest value is {w.n(low[1])} at {w.t(low[2])}. "
                    f"The highest value is {w.n(high[1])} at {w.t(high[2])}.")
-    out.append("The window ends at the newest value of each vital, not at the time of the question. The history holds "
+    out.append("Each value is the median of a 15-minute set, and its time is the end of that set. "
+               "The window ends at the newest value of each vital, not at the time of the question. The history holds "
                "heart rate, respiratory rate and SpO2 only. It holds no temperature, blood pressure or consciousness history.")
     return out
 

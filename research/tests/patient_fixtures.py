@@ -7,6 +7,8 @@ T0 = "2026-11-13T08:15:00Z"
 PROV = {"source": "device", "tier": None, "observed_at": T0, "computed_at": None, "model_id": None, "synthetic": True,
         "quality": "ok"}
 
+NO_MODEL = {"state": "not_computed", "reason": "no model file", "bin_start": None, "bin_end": None, "provenance": []}
+
 
 def num(v):
     return {"data": {"present": True, "value": v}, "provenance": PROV}
@@ -41,12 +43,12 @@ def detail_dict(**over):
                    "blood_pressure": absent("bp"), "consciousness": absent("c"), "supplemental_o2": absent("o"),
                    "spo2_scale": absent("s")},
         "vital_trends": {"heart_rate": [120], "respiratory_rate": [18], "spo2": [95], "temperature": [37.2]},
-        "labs": LABS, "sort_tier": "A", "tier_status": [], "tier_b": None, "tier_c": None,
+        "labs": LABS, "sort_tier": "A", "tier_status": [], "models": {"prediction": NO_MODEL, "alert_policy": NO_MODEL},
         "escalation_reasons": [{"rule": "tier_a_threshold", "text": "NEWS2 total 5 reached the trigger.", "pathway": None},
                                {"rule": "tier_b_finding", "text": "Heart rate 40 over baseline.", "pathway": "cardiac"}],
         "synthetic": True, "signal_quality": 90, "last_update_s": 12,
         "vital_history": {"heart_rate": series(HR), "respiratory_rate": series(RR), "spo2": series(SP)},
-        "tier_breakdown": {"tier_a": None, "tier_b": None, "tier_c": None},
+        "tier_breakdown": {"tier_a": None},
         }
     full = PatientDetail.model_validate(d).model_dump(mode="json")
     cut = {k: full[k] for k in DETAIL_KEYS}  # the allow-list of contract-patient-ask section 5
@@ -56,7 +58,7 @@ def detail_dict(**over):
 def baseline_dict(vitals=None):
     base = [{"vital": "heart_rate", "status": "computed", "baseline_median": 72.5, "latest": 120, "latest_at": T0,
              "latest_age_s": 60, "baseline_from": "2026-11-12T20:00:00Z", "anchored_at": "admission", "delta": 47.5,
-             "z": 4.2, "run_bins": 3, "since": "2026-11-13T07:30:00Z", "significant": True, "direction": "rising",
+             "z": 4.2, "band_low": 61.5, "band_high": 83.5, "run_bins": 3, "since": "2026-11-13T07:30:00Z", "significant": True, "direction": "rising",
              "pathway": None, "unit": "bpm"},
             {"vital": "respiratory_rate", "status": "forming", "bins_valid": 10, "bins_needed": 24},
             {"vital": "spo2", "status": "unavailable", "reason": "patch_not_live"}]
