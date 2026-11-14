@@ -1162,3 +1162,36 @@ def test_the_run_log_flags_are_checked_and_parent_folders_are_made(tmp_path, mon
     log = json.loads((tmp_path / "a" / "b" / "l.json").read_text())
     assert log["run_id"] is None and log["commit"] is None
     assert train_student.main(["x", "--out", str(tmp_path / "p")]) == 0 and not (tmp_path / "p" / "l.json").exists()
+
+
+# --- held-out set 2 ---
+
+def test_evaluate_student_set_2_refuses_before_opening_anything_but_manifests(tmp_path, opened):
+    log, note = opened
+    note.root = tmp_path
+    two = [ext_folder(tmp_path, f"h{s}", s) for s in (1001, 1002)]
+    dup = ext_folder(tmp_path, "dup", 1001)
+    one, tune, ext = (ext_folder(tmp_path, n, s) for n, s in (("one", 11), ("tune", 5), ("ext", 61)))
+    log.clear()
+    for folders, match in (([two[0], one], "must not mix held-out sets"), ([two[0], tune], "must not mix held-out sets"),
+                           ([two[0], dup], "given twice"), ([ext], "no folder of held-out set 2")):
+        with pytest.raises(TrialError, match=match):
+            evaluate_student.run([str(f) for f in folders], out=tmp_path, held_out_set=2)
+    with pytest.raises(TrialError, match="is not used here"):  # set 1 does not take a set-2 seed
+        evaluate_student.run([str(two[0])], out=tmp_path)
+    with pytest.raises(TrialError, match="seed 1001 is not used here"):
+        student.load_for_training([str(two[0])])
+    assert {name for _, name in log} == {"manifest.json"}
+
+
+def test_evaluate_student_passes_the_set_only_when_it_is_2(tmp_path, monkeypatch, capsys):
+    calls = []
+
+    def fake(folders, out, cache, workers, result=None, **kw):
+        calls.append(kw)
+        return "t\n"
+
+    monkeypatch.setattr(evaluate_student, "run", fake)
+    assert evaluate_student.main(["x", "--held-out-set", "2"]) == 0 and calls[-1] == {"held_out_set": 2}
+    assert evaluate_student.main(["x"]) == 0 and calls[-1] == {}
+    assert evaluate_student.main(["x", "--held-out-set", "4"]) == 2 and len(calls) == 2

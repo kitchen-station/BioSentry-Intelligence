@@ -427,9 +427,10 @@ The B6 loop is kept as `research/reward_loop_b6.py` for the research agent, reac
   episodes). Generation seeds start at 401, strictly increasing, each used once in the
   with-temperature schedule. Generation g of round 1 takes selection seeds 401+20(g-1) to
   408+20(g-1), then confirmation seeds 409+20(g-1) to 420+20(g-1). Round R+1 starts at the first
-  seed after round R's last generation. Budget: generation seeds 401-2800; a round starts only if
-  a full 40-generation round still fits (rounds 1-3 always do; round 4 only if rounds 1-3 used at
-  most 1,600 seeds). Seeds 61-340 belong to other slices and ward-v2 seeds 11-30 are held out:
+  seed after round R's last generation. Budget: generation seeds 401-1000 (seeds 1001-1400 are held-out
+  set 2 in any folder; the loaders refuse them); a round starts only if a full 40-generation round
+  still fits, and a round that already has generation files is never refused for the budget (rounds
+  1 and 2 began under the old 401-2800 budget). Seeds 61-340 belong to other slices and ward-v2 seeds 11-30 are held out:
   the loaders refuse them, and a manifest that names another seed or a trial whose days, speed
   or scenario hash differ from the validation trials', before any file but `manifest.json` is
   opened. Before a generation loads anything, every folder of its 20 seeds must have
@@ -728,6 +729,52 @@ missing) at bins 45 and 78, new blood pressure readings at bins 54 and 74 and ox
 come while the policy runs are 0. Bins 78 and 84 come inside the alerting stretch, so both policies go alerting, reset, not
 alerting for p - 1 scored bins, alerting again; `summary.totals.resets_after_run` counts these per variant. The file holds what the research code computes on every scored bin. It does not apply the product's
 gates (nothing computed while the baseline forms; the 672-bin cap): `baseline_formed` lets the backend test its own.
+
+## Held-out set 2 (declared before it is read)
+
+Written on 2026-11-14, before any trial of set 2 was read.
+
+Why: held-out set 1 (ward-v2 seeds 11-30; 91 episodes, 79 not cut short) is spent and too small to tell the
+gains we measured from zero.
+
+- The set: `ward-v2-heldout2`, seeds 1001 to 1400, 400 trials of 30 simulated days, default scenario, made at
+  simulator main 4b86f96 (data card: `models/data/ward-v2-heldout2/card.md`). Seeds 1001-1400 are the same
+  trials in any folder, so no loader that trains, tunes, calibrates or learns may open them: each refuses them
+  by seed number, from the manifest alone. The reward loop's generation seeds stop at 1000.
+- Scored, nothing re-tuned: the files committed on main. NEWS2 chart trigger and total 5 or more; the
+  own-baseline rule; the student and teacher; the confidence check; the reward policy and its generation 0;
+  each alone and OR NEWS2, with and without temperature, as on set 1.
+- Commands (`--held-out-set 1` is the default and prints exactly what it printed before; set 2 takes only
+  folders of seeds 1001-1400, each once, and refuses a list that mixes sets, a seed outside the set or a seed
+  twice, before any cohort file is opened). One trial is in memory at a time. Each command reads set 2 once:
+
+        python -m research.evaluate_student <set-2 folders> <ext 61-160 folders> --held-out-set 2 --cache /cache --json models/tier_c/student_vitals/held_out_2.json > models/tier_c/student_vitals/held_out_2.txt
+        python -m research.confidence evaluate <set-2 folders> --held-out-set 2 --json models/tier_c/confidence_check/heldout_2.json
+        python -m research.reward_loop --evaluate /data/trials/ward-v2-heldout2 --held-out-set 2 --out models/tier_b/reward_policy --json models/tier_b/reward_policy/held_out_2.json > models/tier_b/reward_policy/held_out_2.txt
+        python -m research.heldout2 analyse <the three JSON files> --out models/held_out_2/analysis.json
+
+  The confidence command writes `heldout_2.txt` and refuses a second run (its own guard; set 1's file is not
+  touched). For the other two, a second read is refused by procedure.
+- Per-trial counts: every held-out JSON now carries `trials`, a list by seed. For each rule it has alerts,
+  shifts (patient-days x 2), alerting bins and bins, evaluated episodes and those alerting in any bin and with
+  a new alert, the same for episodes not cut short, control windows and those alerting in any bin and with a
+  new alert, and the per-kind any-bin counts. The pooled numbers are the sums of these. Set 2's context also
+  has `held_out_set: 2`.
+- The analysis (`research.heldout2`, standard library): the unit is the trial. 2,000 resamples of the trials
+  with replacement (SplitMix64, seed 20261114), every ratio recomputed from the summed counts, percentile
+  intervals at 95% and at 98.33% (index floor(t m) and floor((1 - t) m) - 1, t = 1/40 and 1/120).
+  Three primary comparisons, NEWS2 OR X against NEWS2 alone, on episodes not cut short: gain in excess over
+  chance = [any-bin rate - chance any-bin](NEWS2 or X) - [any-bin rate - chance any-bin](NEWS2), for X = the
+  student, the student with the confidence check, the reward policy final (all with temperature).
+  Verdict: "a gain beyond chance is shown" if and only if the lower end of the 98.33% interval (Bonferroni
+  for three comparisons) is above 0; "a loss is shown" if its upper end is below 0; otherwise "no gain beyond
+  chance is shown". The 95% interval and the ratio of alerts per patient per 12 h to NEWS2's, with its
+  interval, are printed beside every verdict. The secondary table (the same three without temperature; each
+  X alone; median lead; per-kind any-bin counts) has intervals and no verdict word. The confidence check keeps
+  its set-1 quantity and its MET / NOT MET rule.
+- What is not done: no threshold, q, policy or model changes after the read; set 2 does not choose between the
+  with- and no-temperature files. A gain shown is a statement about this simulator only: synthetic, not
+  validated.
 
 ## Real data (eICU-CRD Demo 2.0.1)
 

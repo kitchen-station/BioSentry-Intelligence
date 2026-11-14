@@ -11,12 +11,13 @@ import os
 import sys
 from dataclasses import dataclass
 from fractions import Fraction
+from pathlib import Path
 
 from . import baseline_policy
 from .alerts import POLICIES
 from .evaluate import HELD_OUT, TUNING, Pool, score_trial
 from .rescore import check_parity
-from .trials import TrialError, load_trial
+from .trials import TrialError, _int_field, _json, load_trial, show
 
 KS = (1.5, 2.0, 2.5, 3.0, 3.5, 4.0)
 PS = (2, 3, 4, 6, 8)
@@ -50,7 +51,23 @@ def excess(hits: int, episodes: int, chance_hits: int, controls: int) -> Fractio
     return _frac(hits, episodes) - _frac(chance_hits, controls)
 
 
+def _check_seeds(folders: list[str]) -> None:
+    """Only manifest.json is opened: a seed outside 1 to 30 (held-out set 2 among them) is refused before
+    any other file is."""
+    for folder in folders:
+        name = show(Path(folder).name)
+        if not Path(folder).is_dir():
+            raise TrialError(f"{name}: not a folder")
+        try:
+            seed = _int_field(_json(Path(folder), "manifest.json"), "seed", "manifest.json", 0, 2**31 - 1)
+        except TrialError as e:
+            raise TrialError(f"{name}: {e}") from None
+        if seed not in TUNING and seed not in HELD_OUT:
+            raise TrialError(f"{name}: seed {seed} is in neither split (1 to 30)")
+
+
 def sweep(folders: list[str]) -> tuple[list[dict], Setting | None, dict]:
+    _check_seeds(folders)
     trials = []
     for folder in sorted(folders):
         trial = load_trial(folder)

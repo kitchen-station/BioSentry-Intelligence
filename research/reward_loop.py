@@ -3,7 +3,7 @@
     python -m research.reward_loop --data <ward-v2-ext> --out <dir> --round R [--change key=value --why "text"] [--jobs N]
     python -m research.reward_loop --data <ward-v2-ext> --out <dir> --no-temperature [--jobs N]
     python -m research.reward_loop --out <dir> --stop "reason"
-    python -m research.reward_loop --evaluate <ward-v2> --out <dir> [--json <held-out.json>]
+    python -m research.reward_loop --evaluate <ward-v2> --out <dir> [--held-out-set 1|2] [--json <held-out.json>]
     python -m research.reward_loop --run-log <file> --run-id <id> --commit <sha> --out <dir>
 
 The rules are in research/README.md. A (1+30) evolution strategy with a reward: not deep or
@@ -28,6 +28,7 @@ from . import evaluate
 from .alerts import POLICIES
 from .baseline_policy import NO_TEMP, baseline_policies
 from .bootstrap import SplitMix64
+from .reward_policy import _MEMO as _POLICY_MEMO
 from .reward_policy import FORMS, LAMBDA, NAMES, P_MAX, THETA_MIN, Params, Prepared, generation_zero, policies, prepare, score
 from .rescore import check_parity
 from .trials import Trial, TrialError, _int_field, _json, load_trial
@@ -35,6 +36,8 @@ from . import reward_loop_b6
 from .reward_loop_b6 import policy_file  # noqa: F401  (legacy: research/agent/ still uses it)
 
 HELD_OUT = evaluate.HELD_OUT
+# Seeds 1001-1400 are held-out set 2 in ANY folder (same seed, same generator): no loader here may open them.
+HELD_OUT_2 = evaluate.HELD_OUT_2
 SEED = 20261112
 NO_TEMP_DIR = "no_temperature"
 LEDGER = "experiments.jsonl"
@@ -58,7 +61,7 @@ class Plan:
 
     val_seeds: range = range(341, 401)
     first_seed: int = 401
-    last_seed: int = 2800
+    last_seed: int = 1000  # seeds 1001-1400 are held-out set 2
     confirm: int = 12
     candidates: int = 30
     max_generations: int = 40
@@ -164,7 +167,7 @@ def sigma_start(cfg: dict) -> dict:
 def _manifest(root, seed: int, allowed: tuple) -> tuple[Path, dict]:
     """The manifest is the first file opened. A held-out seed, one outside `allowed` (ext seeds
     61-340 among them) or a manifest naming another seed is refused before anything else is read."""
-    if seed in HELD_OUT or not any(seed in r for r in allowed):
+    if seed in HELD_OUT or seed in HELD_OUT_2 or not any(seed in r for r in allowed):
         raise TrialError(f"seed {seed}: not allowed here")
     folder = Path(root) / f"seed-{seed:02d}"
     if not folder.is_dir():
@@ -243,7 +246,7 @@ class FolderSource:
     def check(self, seeds) -> None:
         """Every seed of a batch needs its manifest and summary; otherwise nothing is loaded."""
         for s in seeds:
-            if s in HELD_OUT or not any(s in r for r in self.plan.allowed):
+            if s in HELD_OUT or s in HELD_OUT_2 or not any(s in r for r in self.plan.allowed):
                 raise TrialError(f"seed {s}: not allowed here")
         if any(not (self.root / f"seed-{s:02d}" / f).is_file() for s in seeds for f in ("manifest.json", "summary.json")):
             raise NeedSeeds(min(seeds), max(seeds))
@@ -680,7 +683,10 @@ def run_round(out: Path, rnd: int, source, plan: Plan, runner: Runner, change: s
         cfg, chg = parse_change(change, inc_pol["config"])
         start, prev, seed0 = Params.from_dict(inc_pol["params"]), inc_sha, judged[rnd - 2]["seeds"]["last"] + 1
     start = start_params(start, frozen_set(cfg, True))
-    if seed0 + plan.max_generations * (cfg["selection_trials"] + plan.confirm) - 1 > plan.last_seed:
+    # A round that already has generation files was checked when it started (rounds 1 and 2 began under the
+    # old 401-2800 budget): resuming or verifying it never refuses for the budget.
+    started = any((out / "rounds" / f"round-{rnd}").glob("gen-*.json"))
+    if not started and seed0 + plan.max_generations * (cfg["selection_trials"] + plan.confirm) - 1 > plan.last_seed:
         raise refuse(f"budget: a full {plan.max_generations}-generation round from seed {seed0} no longer fits; "
                      "append the stop line")
     spec = Spec(out / "rounds" / f"round-{rnd}", out / "rounds" / f"round-{rnd}" / "policy.json", rnd, True,
@@ -752,11 +758,12 @@ def run_no_temperature(out: Path, source, plan: Plan, runner: Runner, log=print)
 
 # --- held-out, once ---------------------------------------------------------------------------
 
-def _held_out_folders(root) -> list[str]:
-    """Only `seed-11` to `seed-30` by name, each with its manifest read first and naming that seed;
-    a wrong folder (ward-v2-ext) has none and is refused before any cohort file is opened."""
+def _held_out_folders(root, held_out_set: int = 1) -> list[str]:
+    """Only `seed-11` to `seed-30` (set 2: `seed-1001` to `seed-1400`) by name, each with its manifest read
+    first and naming that seed; a wrong folder (ward-v2-ext) has none and is refused before any cohort file
+    is opened."""
     found = []
-    for s in HELD_OUT:
+    for s in evaluate.held_range(held_out_set):
         folder = Path(root) / f"seed-{s:02d}"
         if not folder.is_dir():
             continue
@@ -764,11 +771,12 @@ def _held_out_folders(root) -> list[str]:
             raise TrialError(f"seed-{s:02d}: manifest names another seed; refused")
         found.append(str(folder))
     if not found:
-        raise TrialError("no held-out trials: needs seed-11 to seed-30 folders")
+        raise TrialError("no held-out trials: needs seed-11 to seed-30 folders" if held_out_set == 1 else
+                         "no held-out trials: needs seed-1001 to seed-1400 folders")
     return found
 
 
-def evaluate_held_out(root: str, out: Path, result: dict | None = None) -> str:
+def evaluate_held_out(root: str, out: Path, result: dict | None = None, held_out_set: int = 1) -> str:
     led = read_ledger(out / LEDGER)
     if not any(x.get("decision") == "stop" for x in led):
         raise refuse("the ledger has no stop line; the held-out run comes last")
@@ -784,7 +792,7 @@ def evaluate_held_out(root: str, out: Path, result: dict | None = None) -> str:
     b4, _ = evaluate._baseline_params()
     k, p = b4.k, b4.p
     pols = (POLICIES[0], *baseline_policies(k, p), *baseline_policies(k, p, "_no_temp", NO_TEMP), *rows)
-    return evaluate.run(_held_out_folders(root), pols, result)
+    return evaluate.run(_held_out_folders(root, held_out_set), pols, result, held_out_set, _POLICY_MEMO.clear)
 
 
 # --- the run log: committed records only, no trial is opened ---------------------------------------
@@ -883,7 +891,8 @@ def main(argv: list[str], *, plan: Plan | None = None, source=None) -> int:
     plan = plan or Plan()
     ap = _Parser(prog="research.reward_loop", add_help=False, allow_abbrev=False)
     ap.add_argument("--out", required=True)
-    for a in ("--data", "--evaluate", "--change", "--why", "--stop", "--run-log", "--run-id", "--commit", "--json"):
+    for a in ("--data", "--evaluate", "--change", "--why", "--stop", "--run-log", "--run-id", "--commit", "--json",
+              "--held-out-set"):
         ap.add_argument(a)
     ap.add_argument("--round", type=int)
     ap.add_argument("--jobs", type=int, default=1)
@@ -898,6 +907,8 @@ def main(argv: list[str], *, plan: Plan | None = None, source=None) -> int:
             raise refuse("usage: exactly one of --round, --no-temperature, --stop, --evaluate, --run-log (see research/README.md)")
         if a.json is not None and a.evaluate is None:
             raise refuse("--json goes with --evaluate")
+        if a.held_out_set is not None and a.evaluate is None:
+            raise refuse("--held-out-set goes with --evaluate")
         if (a.run_id is not None or a.commit is not None) and a.run_log is None:
             raise refuse("--run-id and --commit go with --run-log")
         if a.run_log is not None:
@@ -905,7 +916,8 @@ def main(argv: list[str], *, plan: Plan | None = None, source=None) -> int:
         elif a.evaluate is not None:
             evaluate.check_json_path(a.json)  # before any trial is read
             result: dict = {}
-            text = evaluate_held_out(a.evaluate, out, result if a.json else None)
+            text = evaluate_held_out(a.evaluate, out, result if a.json else None,
+                                     evaluate.check_set(a.held_out_set or 1))
             if a.json:
                 evaluate.write_json(a.json, result)
             sys.stdout.write(text)

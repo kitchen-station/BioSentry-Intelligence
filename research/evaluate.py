@@ -1,6 +1,6 @@
 """How NEWS2 alone performs as an alerting rule, against the simulator's true episodes.
 
-    python -m research.evaluate <trial folder>... [--json <held-out.json>]
+    python -m research.evaluate <trial folder>... [--held-out-set 1|2] [--json <held-out.json>]
 
 Prints plain deterministic text (no clock, no paths). Exit 2 with one line on any refusal.
 """
@@ -23,10 +23,11 @@ from .baseline_policy import NO_TEMP, baseline_policies, clear_cache
 from .alerts import POLICIES, REARM_BINS, Policy, scan
 from .events import TAIL_MINUTES, control_windows, expected_bins, stay_days, windows
 from .rescore import check_parity
-from .trials import BIN_MINUTES, KINDS, Trial, TrialError, load_trial
+from .trials import BIN_MINUTES, KINDS, Trial, TrialError, _int_field, _json, load_trial, show
 
 TUNING = range(1, 11)
-HELD_OUT = range(11, 31)
+HELD_OUT = range(11, 31)  # held-out set 1 (spent); the default everywhere
+HELD_OUT_2 = range(1001, 1401)  # held-out set 2: the same seeds in any folder, never used to train, tune or learn
 SHIFT_HOURS = 12
 PARAMS_PATH = Path(__file__).parent.parent / "models" / "tier_b" / "baseline" / "params.json"
 HELD_OUT_FORMAT = "biosentry-held-out/1"
@@ -68,6 +69,7 @@ class Pool:
     dropped: dict[str, int] = field(default_factory=lambda: defaultdict(int))
     tallies: dict[str, Tally] = field(default_factory=dict)
     units: dict[str, list[tuple]] = field(default_factory=lambda: defaultdict(list))
+    per_trial: list[dict] = field(default_factory=list)  # one small record per scored trial (the --json `trials`)
 
 
 def _any(minutes: list[int], lo: float, hi: float) -> bool:
@@ -75,7 +77,35 @@ def _any(minutes: list[int], lo: float, hi: float) -> bool:
     return i < len(minutes) and minutes[i] <= hi
 
 
+def _counts(t: Tally) -> dict:
+    return {"alerts": t.alerts, "bins": t.bins, "bins_alerting": t.on_bins, "any_bin": t.anyb, "new_alert": t.new,
+            "any_bin_not_cut_short": t.uncut_any, "new_alert_not_cut_short": t.uncut_new,
+            "chance_any": t.ctrl_any, "chance_new": t.ctrl_new,
+            **{f"kind_{k}": v for k, (_, v) in t.kinds.items()}}
+
+
 def score_trial(trial: Trial, policies: tuple[Policy, ...], pool: Pool, tail: int = TAIL_MINUTES) -> None:
+    before = {n: _counts(t) for n, t in pool.tallies.items()}
+    before_pool = (pool.evaluated, pool.uncut, pool.controls)
+    before_kinds = dict(pool.kind_evaluated)
+    _score_trial(trial, policies, pool, tail)
+    ev, unc, ctrl = (a - b for a, b in zip((pool.evaluated, pool.uncut, pool.controls), before_pool))
+    kev = {k: n - before_kinds.get(k, 0) for k, n in pool.kind_evaluated.items()}
+    rules = {}
+    for p in policies:
+        now, was = _counts(pool.tallies[p.name]), before.get(p.name, {})
+        d = {k: v - was.get(k, 0) for k, v in now.items()}
+        rules[p.name] = {
+            "alerts": d["alerts"], "shifts": trial.patient_days * 24 / SHIFT_HOURS, "bins": d["bins"],
+            "bins_alerting": d["bins_alerting"], "episodes": ev, "any_bin": d["any_bin"], "new_alert": d["new_alert"],
+            "episodes_not_cut_short": unc, "any_bin_not_cut_short": d["any_bin_not_cut_short"],
+            "new_alert_not_cut_short": d["new_alert_not_cut_short"], "control_windows": ctrl,
+            "chance_any": d["chance_any"], "chance_new": d["chance_new"],
+            "kinds": {k: {"evaluated": kev.get(k, 0), "any_bin": d.get(f"kind_{k}", 0)} for k in KINDS}}
+    pool.per_trial.append({"seed": trial.seed, "patient_days": trial.patient_days, "rules": rules})
+
+
+def _score_trial(trial: Trial, policies: tuple[Policy, ...], pool: Pool, tail: int) -> None:
     wins, dropped = windows(trial, tail)
     controls = control_windows(trial, wins)
     pool.trials += 1
@@ -211,17 +241,20 @@ def _tuning(k: float, p: int, source: str) -> str:
 
 
 def held_out_json(pool: Pool, policies: tuple[Policy, ...], rules: list[dict], params: BaselineParams,
-                  source: str, held: list[int]) -> dict:
-    """The contract's `context` and `rules` (research/export_evaluation.py), no clock, no path."""
-    return {"format": HELD_OUT_FORMAT,
-            "context": {"shift_hours": SHIFT_HOURS, "bin_minutes": BIN_MINUTES,
-                        "ci": {"level_percent": 95, "resamples": bootstrap.RESAMPLES,
-                               "generator_seed": bootstrap.SEED, "method": "patient-level bootstrap"},
-                        "trials": pool.trials, "patients": pool.patients, "patient_days": pool.patient_days,
-                        "episodes_evaluated": pool.evaluated, "episodes_not_cut_short": pool.uncut,
-                        "control_windows": pool.controls, "held_out_seeds": held,
-                        "tuning": _tuning(params.k, params.p, source)},
-            "rules": rules}
+                  source: str, held: list[int], held_out_set: int = 1) -> dict:
+    """The contract's `context` and `rules` (research/export_evaluation.py), no clock, no path. `trials` is
+    the per-trial counts (additive); set 2 adds `held_out_set` to the context (set 1's context is unchanged)."""
+    context = {"shift_hours": SHIFT_HOURS, "bin_minutes": BIN_MINUTES,
+               "ci": {"level_percent": 95, "resamples": bootstrap.RESAMPLES,
+                      "generator_seed": bootstrap.SEED, "method": "patient-level bootstrap"},
+               "trials": pool.trials, "patients": pool.patients, "patient_days": pool.patient_days,
+               "episodes_evaluated": pool.evaluated, "episodes_not_cut_short": pool.uncut,
+               "control_windows": pool.controls, "held_out_seeds": held,
+               "tuning": _tuning(params.k, params.p, source)}
+    if held_out_set != 1:
+        context["held_out_set"] = held_out_set
+    return {"format": HELD_OUT_FORMAT, "context": context, "rules": rules,
+            "trials": sorted(pool.per_trial, key=lambda t: t["seed"])}
 
 
 def _scratch(path: str) -> tuple[int, str]:
@@ -255,6 +288,57 @@ def write_json(path: str, obj: dict) -> None:
         if tmp is not None and os.path.exists(tmp):
             os.remove(tmp)
         raise TrialError("--json: cannot write that file") from None
+
+
+def pop_set(argv: list[str]) -> tuple[list[str], int]:
+    """`--held-out-set 1|2` out of an argument list; 1 when absent."""
+    if "--held-out-set" not in argv:
+        return argv, 1
+    i = argv.index("--held-out-set")
+    if i + 1 >= len(argv) or "--held-out-set" in argv[i + 2:]:
+        raise TrialError("usage: --held-out-set 1|2, once")
+    return argv[:i] + argv[i + 2:], check_set(argv[i + 1])
+
+
+def check_set(value) -> int:
+    if str(value) not in ("1", "2"):
+        raise TrialError("--held-out-set: 1 or 2")
+    return int(value)
+
+
+def held_range(held_out_set: int) -> range:
+    return HELD_OUT_2 if held_out_set == 2 else HELD_OUT
+
+
+def check_set2_seeds(seeds: list[tuple[str, int]]) -> None:
+    """(folder name, manifest seed) pairs: each seed must be in set 2, once. Before any other file is opened."""
+    seen = set()
+    for name, seed in seeds:
+        if seed in seen:
+            raise TrialError(f"{name}: seed {seed} given twice")
+        seen.add(seed)
+        if seed not in HELD_OUT_2:
+            mixed = " (the list mixes held-out sets or holds a tuning seed)" if seed in TUNING or seed in HELD_OUT else ""
+            raise TrialError(f"{name}: seed {seed} is not in held-out set 2 (seeds {HELD_OUT_2.start} to "
+                             f"{HELD_OUT_2.stop - 1}){mixed}")
+
+
+def _set2_manifests(folders: list[str]) -> None:
+    """Only manifest.json is opened."""
+    out = []
+    for folder in sorted(folders):
+        name = show(Path(folder).name)
+        if not Path(folder).is_dir():
+            raise TrialError(f"{name}: not a folder")
+        try:
+            out.append((name, _int_field(_json(Path(folder), "manifest.json"), "seed", "manifest.json", 0, 2**31 - 1)))
+        except TrialError as e:
+            raise TrialError(f"{name}: {e}") from None
+    check_set2_seeds(out)
+
+
+def _seed_text(seeds: list[int]) -> str:
+    return ", ".join(str(x) for x in seeds)
 
 
 def pop_json(argv: list[str]) -> tuple[list[str], str | None]:
@@ -389,10 +473,16 @@ def _baseline_params() -> tuple[BaselineParams, str]:
         raise _bad(str(e)) from None
 
 
-def run(folders: list[str], policies: tuple[Policy, ...] | None = None, result: dict | None = None) -> str:
-    """The printed text. When `result` is a dict it is filled with the held-out JSON (same numbers, same pass)."""
+def run(folders: list[str], policies: tuple[Policy, ...] | None = None, result: dict | None = None,
+        held_out_set: int = 1, release=None) -> str:
+    """The printed text. When `result` is a dict it is filled with the held-out JSON (same numbers, same pass).
+    One trial is in memory at a time: each is loaded, parity-checked, scored and dropped; `release` (when given)
+    is called after each scored trial so a caller's per-stay caches do not grow with the number of trials."""
     if not folders:
         raise TrialError("no trial folders given")
+    held_range_ = held_range(held_out_set)
+    if held_out_set == 2:
+        _set2_manifests(folders)  # a refusal here has opened no cohort file
     params, source = _baseline_params()
     if policies is None:
         policies = (
@@ -405,7 +495,7 @@ def run(folders: list[str], policies: tuple[Policy, ...] | None = None, result: 
         trial = load_trial(folder)
         if trial.seed in seeds:
             raise TrialError(f"{trial.name}: seed {trial.seed} given twice")
-        if trial.seed not in TUNING and trial.seed not in HELD_OUT:
+        if trial.seed not in TUNING and trial.seed not in HELD_OUT and held_out_set == 1:
             raise TrialError(f"{trial.name}: seed {trial.seed} is in neither split (1 to 30)")
         seeds[trial.seed] = trial.name
         key = (trial.days, trial.speed, trial.scenario_sha256)
@@ -415,18 +505,21 @@ def run(folders: list[str], policies: tuple[Policy, ...] | None = None, result: 
         for name, value in (("sim commit", trial.sim_commit), ("node major", trial.node_major)):
             shapes[name].add(value)
         parity_rows += check_parity(trial)
-        if trial.seed in HELD_OUT:
+        if trial.seed in held_range_:
             score_trial(trial, policies, pool)
             clear_cache()
+            if release is not None:
+                release()
+        del trial  # before the next load: never two trials at once
     _sanity(pool, policies)
 
     days, speed, sha = first
     tuning = sorted(s for s in seeds if s in TUNING)
-    held = sorted(s for s in seeds if s in HELD_OUT)
+    held = sorted(s for s in seeds if s in held_range_)
     join = lambda xs: ", ".join(str(x) for x in sorted(xs, key=str))  # noqa: E731
     rules = _rules(pool, policies, _ci(pool))
     if result is not None:
-        result.update(held_out_json(pool, policies, rules, params, source, held))
+        result.update(held_out_json(pool, policies, rules, params, source, held, held_out_set))
     lines = [
         "BioSentry: NEWS2 alone as an alerting rule (offline research, simulated data)",
         "format version: 1",
@@ -436,11 +529,14 @@ def run(folders: list[str], policies: tuple[Policy, ...] | None = None, result: 
         f"simulator speed: {speed}x",
         f"scenario sha256: {sha}",
         f"parity: {parity_rows} cohort rows re-scored with the backend NEWS2, 0 mismatches",
-        f"tuning seeds (1 to 10), loaded and parity-checked but not scored here (the sweep tunes on them): "
-        f"{join(tuning) or 'none'}",
+        *([f"tuning seeds (1 to 10), loaded and parity-checked but not scored here (the sweep tunes on them): "
+           f"{join(tuning) or 'none'}"] if held_out_set == 1 else ["tuning seeds: none (held-out set 2 takes no tuning seed)"]),
         f"baseline policies: k={params.k}, p={params.p}, from {source}; the *_no_temp rows are a "
         "sensitivity check (temperature left out, same k and p, not tuned)",
-        f"held-out seeds (11 to 30), the only ones scored: {join(held)}",
+        (f"held-out seeds (11 to 30), the only ones scored: {join(held)}" if held_out_set == 1 else
+         f"held-out set 2, seeds 1001 to 1400, the only ones scored: "
+         + (f"{len(held)} trials" if len(held) == 400 else f"{len(held)} of 400 trials given"
+            + (f" ({join(held)})" if len(held) <= 20 else ""))),
         f"held-out patients: {pool.patients}",
         f"held-out patient-days (summary.json): {pool.patient_days:.1f}",
         "starting patients (admit minute 0) are left out of sensitivity and kept for alert burden;",
@@ -478,9 +574,10 @@ def run(folders: list[str], policies: tuple[Policy, ...] | None = None, result: 
 def main(argv: list[str]) -> int:
     try:
         argv, json_path = pop_json(argv)
+        argv, held_out_set = pop_set(argv)
         check_json_path(json_path)
         result: dict = {}
-        text = run(argv, result=result if json_path else None)
+        text = run(argv, result=result if json_path else None, held_out_set=held_out_set)
         if json_path:
             write_json(json_path, result)
     except TrialError as e:

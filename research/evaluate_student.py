@@ -1,6 +1,7 @@
 """Held-out rows for the distilled vitals student (slice M1), next to NEWS2 and the baseline.
 
     python -m research.evaluate_student <trial folder>... [--cache <dir>] [--workers N] [--json <held-out.json>]
+                                        [--held-out-set 1|2]
 
 Give the ward-v2 folders of seeds 11 to 30 (scored once) and the ward-v2-ext folders of seeds 61
 to 160 (to refit on), and, when metadata.json says `byte_reproducible: false`, also the ward-v2-ext
@@ -12,6 +13,10 @@ and re-scores the committed ONNX on validation (log loss within 1e-6 of metadata
 student rows run the committed ONNX through onnxruntime. Ward-v2 seeds 1 to 10 are refused; ext
 seeds 301-340 and 31-60 are skipped after reading only their manifest.json. Exit 2 with one line on
 any refusal.
+
+`--held-out-set 2` scores the ward-v2-heldout2 folders of seeds 1001 to 1400 (one trial in memory at a
+time) instead of seeds 11 to 30; a list that also holds ward-v2 seeds 1 to 30 is refused before any
+cohort file is opened. The refit still uses the ext folders of seeds 61 to 160 and, when needed, 261 to 300.
 """
 
 import json
@@ -69,8 +74,10 @@ def _validation_log_loss(sess, val, temp: bool, kind: str) -> float:
     return log_loss(y, onnx_predict(sess, x))
 
 
-def student_policies(train, val, meta: dict, out: Path) -> tuple[tuple, list[str]]:
+def student_policies(train, val, meta: dict, out: Path, scorers: list | None = None) -> tuple[tuple, list[str]]:
+    """`scorers`, when a list, collects every Scorer made, so the caller can drop their per-stay memos."""
     policies, notes = [], []
+    scorers = [] if scorers is None else scorers
     exact, g = meta["byte_reproducible"], Grid.from_dict(meta["grid"])
     for tag, m in meta["variants"].items():
         refit = refit_variant(train, m["temperature"], m, g)
@@ -81,8 +88,8 @@ def student_policies(train, val, meta: dict, out: Path) -> tuple[tuple, list[str
         t_thr = m["thresholds"]["teacher"]["threshold"]
         if t_thr is not None:
             cell = Cell(teacher)
-            policies.append(prob_policy(f"teacher{sfx}", Scorer(lambda x, c=cell: forward(c, x), m["temperature"],
-                                                                "teacher"), t_thr))
+            scorers.append(Scorer(lambda x, c=cell: forward(c, x), m["temperature"], "teacher"))
+            policies.append(prob_policy(f"teacher{sfx}", scorers[-1], t_thr))
         s_thr = m["thresholds"]["student"]["threshold"] if m["student"] else None
         if m["student"] is None:
             notes.append(f"{tag}: nothing shipped (no network beat the constant): no student rows")
@@ -104,6 +111,7 @@ def student_policies(train, val, meta: dict, out: Path) -> tuple[tuple, list[str
                                      f"{m['student']['val_log_loss_onnx']} by more than {VAL_LOSS_TOL}")
             if s_thr is not None:
                 sc = Scorer(lambda x, s=sess: onnx_predict(s, x), m["temperature"], kind)
+                scorers.append(sc)
                 policies += [prob_policy(f"student{sfx}", sc, s_thr), prob_policy(f"news2_or_student{sfx}", sc, s_thr, True)]
         label = "no usable threshold on seeds 261-300 (no t keeps both its alerts and its time in alert within NEWS2's): no row"
         notes.append(f"{tag}: {m['shipped']}, {m['features_student'] and len(m['features_student'])} student inputs; "
@@ -112,11 +120,37 @@ def student_policies(train, val, meta: dict, out: Path) -> tuple[tuple, list[str
     return tuple(policies), notes
 
 
+def _split_set2(folders: list[str]) -> tuple[list[str], list[str]]:
+    """(set-2 folders, the others) by manifest.json only. Refuses ward-v2 seeds 1 to 30 in the list, a seed
+    given twice and any set-2 shape fault, before anything else is opened."""
+    held, rest = [], []
+    for folder in sorted(folders):
+        seed, m = _manifest(folder)
+        name = Path(folder).name[:40]
+        if seed in evaluate.HELD_OUT_2:
+            _check_shape(folder, m)
+            held.append((name, seed, folder))
+        elif seed in evaluate.TUNING or seed in evaluate.HELD_OUT:
+            raise TrialError(f"{name}: seed {seed} is ward-v2 seeds 1 to 30; with --held-out-set 2 the list "
+                             "must not mix held-out sets or hold a tuning seed")
+        else:
+            rest.append(folder)
+    evaluate.check_set2_seeds([(n, s) for n, s, _ in held])
+    return [f for _, _, f in held], rest
+
+
 def run(folders: list[str], out: Path = OUT, cache: str | None = None, workers: int | None = None,
-        result: dict | None = None) -> str:
-    train, held = load_for_evaluation(folders, cache, workers)
+        result: dict | None = None, held_out_set: int = 1) -> str:
+    if held_out_set == 2:
+        held, rest = _split_set2(folders)
+        if not held:  # before any ext trial is read
+            raise TrialError("no folder of held-out set 2 (seeds 1001 to 1400) given")
+        train, _ = load_for_evaluation(rest, cache, workers)
+    else:
+        train, held = load_for_evaluation(folders, cache, workers)
     if not held:
-        raise TrialError("no ward-v2 folder of seeds 11 to 30 given")
+        raise TrialError("no ward-v2 folder of seeds 11 to 30 given" if held_out_set == 1 else
+                         "no folder of held-out set 2 (seeds 1001 to 1400) given")
     meta = _json(out, "metadata.json")
     if meta.get("framework") != "MindSpore":
         raise TrialError("metadata.json: not a MindSpore student")
@@ -133,27 +167,37 @@ def run(folders: list[str], out: Path = OUT, cache: str | None = None, workers: 
             raise TrialError("metadata.json says byte_reproducible is false: give the ward-v2-ext folders of "
                              "seeds 261 to 300 too")
         val = extract_all(ext, cache, workers)
-    extra, notes = student_policies(train, val, meta, out)
+    scorers: list = []
+    extra, notes = student_policies(train, val, meta, out, scorers)
+    del train, val  # the refit is done: only the policies are needed while the trials are scored one at a time
     params, _ = evaluate._baseline_params()
     policies = (POLICIES + baseline_policies(params.k, params.p)
                 + baseline_policies(params.k, params.p, "_no_temp", NO_TEMP) + extra)
-    text = evaluate.run(held, policies, result)
+    def release() -> None:
+        Scorer.clear()
+        for sc in scorers:
+            sc._memo.clear()
+
+    text = evaluate.run(held, policies, result, held_out_set, release)
     mode = ("refitted the chosen teacher and student and matched their weight and ONNX sha256 to metadata.json"
             if meta["byte_reproducible"] else
             "byte_reproducible is false: the committed files matched by sha256 and the committed ONNX re-scored "
             "on seeds 261-300; the teacher was refitted without a bytes check")
+    where = "ward-v2 seeds 11-30" if held_out_set == 1 else "held-out set 2 (ward-v2-heldout2 seeds 1001-1400)"
     head = [f"student rows (slice M1, MindSpore {meta['framework_version']}): trained on seeds 61-160, "
-            "chosen on 261-300, scored here once on ward-v2 seeds 11-30", mode, *notes, ""]
+            f"chosen on 261-300, scored here once on {where}", mode, *notes, ""]
     return "\n".join(head) + "\n" + text
 
 
 def main(argv: list[str]) -> int:
     try:
         argv, json_path = evaluate.pop_json(argv)
+        argv, held_out_set = evaluate.pop_set(argv)
         evaluate.check_json_path(json_path)  # before any trial is read
         a = _parser().parse_args(argv)
         result: dict = {}
-        text = run(a.folders, Path(a.out) if a.out else OUT, a.cache, a.workers, result if json_path else None)
+        text = run(a.folders, Path(a.out) if a.out else OUT, a.cache, a.workers, result if json_path else None,
+                   **({"held_out_set": 2} if held_out_set == 2 else {}))
         if json_path:
             evaluate.write_json(json_path, result)
     except TrialError as e:
