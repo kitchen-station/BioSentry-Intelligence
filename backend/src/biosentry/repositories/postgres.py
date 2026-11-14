@@ -8,8 +8,8 @@ real news2() and arbiter, so a recorded value re-ranks the patient immediately.
 
 One connection per request (sync handlers run in the threadpool). Writers that compute an id as
 max + 1 take `pg_advisory_xact_lock(run_id)` first, so they take turns per run. The active run is
-always the newest `run` row. Stored times are run time; a sim run is shifted onto the wall clock when served
-(`shift` = last batch's wall time minus the run's `as_of`), a fixture run is served as stored.
+always the newest `run` row. Stored times are ward time (a sim run: its origin plus the minute) and are
+served as stored; "now" is the run's `as_of`. Only `receiving_data` uses the wall clock.
 """
 
 import hashlib
@@ -296,26 +296,14 @@ class PostgresStore:
         self.as_of: datetime = run["as_of"]
         self.last_batch_at: datetime | None = run["last_batch_at"]
         self.tier_status = [TierStatus.model_validate(t) for t in run["tier_status"]]
-        # A fixture run is served in its own time. A sim run is mapped onto the wall clock.
-        self.shift = self.last_batch_at - self.as_of if self.last_batch_at else timedelta(0)
 
     # --- time --------------------------------------------------------------------------------
 
     def now(self) -> datetime:
-        """Ward time as served: the fixture's as_of, or the wall clock for a sim run."""
-        return self.as_of if self.last_batch_at is None else self.clock()
-
-    @property
-    def run_now(self) -> datetime:
-        """Ward time in run time: what a write stores."""
-        # ponytail: a sim run's served times are all re-mapped under the current shift (last
-        # batch's wall time minus as_of), so a time stored here assumes the sim keeps real-time
-        # pace: if it is paused or its speed changes, nurse-entered times move relative to the
-        # sim's own readings. Upgrade: store wall time and the run's offset at write.
-        return self.now() - self.shift
-
-    def _when(self, moment: datetime) -> datetime:
-        return moment + self.shift
+        """Ward time: the run's `as_of` (a sim run: its origin plus the newest batch's minute).
+        Never the wall clock. Stored times are served as stored; a run saved with an older origin
+        keeps that origin and reads in its own calendar."""
+        return self.as_of
 
     def receiving_data(self) -> bool:
         return self.last_batch_at is None or is_live(self.last_batch_at, self.ended, self.clock())
@@ -443,8 +431,8 @@ class PostgresStore:
             "provenance": {
                 "source": row["source"],
                 "tier": row["tier"],
-                "observed_at": self._when(row["observed_at"]),
-                "computed_at": self._when(row["computed_at"]) if row["computed_at"] else None,
+                "observed_at": row["observed_at"],
+                "computed_at": row["computed_at"] if row["computed_at"] else None,
                 "model_id": row["model_id"],
                 "synthetic": bool(row["synthetic"]),
                 "quality": row["quality"],
@@ -475,7 +463,7 @@ class PostgresStore:
         # A device value written after the nurse value replaced it for good, even if the patch
         # then drops out: the nurse value does not come back.
         replaced = any(r["absent_reason"] is None and key(r) > key(nurse) for r in others)
-        valid = self.run_now - nurse["observed_at"] <= NURSE_VALID
+        valid = self.now() - nurse["observed_at"] <= NURSE_VALID
         # sampled_since: the simulator sends a device row only on change, so an unchanged live
         # value keeps an old time. A later sample means the patch is live.
         sampled_since = sample is not None and sample > nurse["observed_at"]
@@ -526,7 +514,7 @@ class PostgresStore:
         ):
             bins[b["vital"]].append((b["bin_at"], b["value"]))
 
-        run_now = self.run_now
+        run_now = self.now()
         ages = [
             max(0.0, (run_now - r["observed_at"]).total_seconds()) / 3600
             for code, r in latest.items()
@@ -552,7 +540,7 @@ class PostgresStore:
                     v: [value for _, value in bins[v][-TREND_BINS:]] for v in DEVICE_VITALS
                 },
                 "vital_history": {
-                    v: [{"time": self._when(at), "value": value} for at, value in bins[v]]
+                    v: [{"time": at, "value": value} for at, value in bins[v]]
                     for v in HISTORY_VITALS
                 },
                 "labs": labs,
@@ -561,7 +549,7 @@ class PostgresStore:
                     max(0.0, (run_now - sample).total_seconds()) if sample else None
                 ),
                 "synthetic": self.synthetic,
-                "admitted_at": self._when(p["admitted_at"]) if p["admitted_at"] else None,
+                "admitted_at": p["admitted_at"] if p["admitted_at"] else None,
             }
         )
 
@@ -575,7 +563,7 @@ class PostgresStore:
             (self.run_id, sorted(set(ids))),
         ):
             out[r["patient_id"]].append(
-                VitalHistory.model_construct(time=self._when(r["bin_at"]), value=r["value"])
+                VitalHistory.model_construct(time=r["bin_at"], value=r["value"])
             )
         return dict(out)
 
@@ -591,8 +579,8 @@ class PostgresStore:
         if not wins:
             return {}
         pids = [w[0] for w in wins]
-        lows = [w[1] - self.shift for w in wins]
-        highs = [w[2] - self.shift for w in wins]
+        lows = [w[1] for w in wins]
+        highs = [w[2] for w in wins]
         cols = "o.patient_id, o.code, o.source, o.observed_at, o.id, o.quality, o.num, o.num2, o.txt, o.absent_reason"
         out: dict[str, list[StoredObservation]] = defaultdict(list)
         for r in self.conn.execute(
@@ -616,7 +604,7 @@ class PostgresStore:
             },
         ):
             out[r["patient_id"]].append(
-                StoredObservation(**{**r, "observed_at": self._when(r["observed_at"])})
+                StoredObservation(**{**r, "observed_at": r["observed_at"]})
             )
         for rows in out.values():
             rows.sort(key=lambda o: (o.observed_at, o.id))
@@ -637,9 +625,9 @@ class PostgresStore:
             " UNION ALL SELECT 'clinical_note', 'add_note', NULL, timestamp, NULL, id, role"
             " FROM clinical_note WHERE run_id = %(run)s AND patient_id = %(p)s AND deleted_at IS NULL"
             ") AS e WHERE at >= %(lo)s AND at <= %(hi)s ORDER BY at DESC, source DESC LIMIT %(n)s",
-            {"run": self.run_id, "p": patient_id, "lo": start - self.shift, "hi": end - self.shift, "n": limit},
+            {"run": self.run_id, "p": patient_id, "lo": start, "hi": end, "n": limit},
         ).fetchall()
-        return [{**r, "at": self._when(r["at"])} for r in reversed(rows)]
+        return [{**r, "at": r["at"]} for r in reversed(rows)]
 
     def stays(self, ids: frozenset[str]) -> list[dict[str, Any]]:
         rows = self.conn.execute(
@@ -650,8 +638,8 @@ class PostgresStore:
         return [
             {
                 **r,
-                "admitted_at": self._when(r["admitted_at"]) if r["admitted_at"] else None,
-                "left_at": self._when(r["left_at"]) if r["left_at"] else None,
+                "admitted_at": r["admitted_at"] if r["admitted_at"] else None,
+                "left_at": r["left_at"] if r["left_at"] else None,
                 "synthetic": self.synthetic,
             }
             for r in rows
@@ -707,7 +695,7 @@ class PostgresStore:
             ClinicalNote.model_validate(
                 {
                     **{k: r[k] for k in ("id", "patient_id", "author", "role", "content")},
-                    "timestamp": self._when(r["timestamp"]),
+                    "timestamp": r["timestamp"],
                     "synthetic": bool(r["synthetic"]),
                 }
             )
@@ -731,7 +719,7 @@ class PostgresStore:
                     patient_id,
                     author,
                     role,
-                    whole(self.run_now),
+                    whole(self.now()),
                     content,
                     self.synthetic,
                 ),
@@ -743,7 +731,7 @@ class PostgresStore:
         done = self.conn.execute(
             "UPDATE clinical_note SET deleted_at = %s WHERE run_id = %s AND patient_id = %s AND id = %s"
             " AND author = %s AND deleted_at IS NULL",
-            (whole(self.run_now), self.run_id, patient_id, note_id, author),
+            (whole(self.now()), self.run_id, patient_id, note_id, author),
         )
         return done.rowcount == 1
 
@@ -763,7 +751,7 @@ class PostgresStore:
             " VALUES (%s, %s, %s, %s, %s)"
             " ON CONFLICT (run_id, patient_id, clinician_id) DO UPDATE"
             " SET score = EXCLUDED.score, at = EXCLUDED.at",
-            (self.run_id, patient_id, clinician_id, score, whole(self.run_now)),
+            (self.run_id, patient_id, clinician_id, score, whole(self.now())),
         )
 
     # --- the feed the ward sim reads -----------------------------------------------------------
@@ -777,7 +765,7 @@ class PostgresStore:
         self.conn.execute(
             "INSERT INTO clinician_action (run_id, kind, patient_id, clinician_id, at, data)"
             " VALUES (%s, %s, %s, %s, %s, %s)",
-            (self.run_id, kind, patient_id, clinician_id, whole(self.run_now), Jsonb(data)),
+            (self.run_id, kind, patient_id, clinician_id, whole(self.now()), Jsonb(data)),
         )
 
     def actions(self, run_id: int, after: int) -> list[dict[str, Any]]:
@@ -801,7 +789,7 @@ class PostgresStore:
         self.conn.execute(
             "INSERT INTO sim_command (run_id, kind, patient_id, clinician_id, at, data)"
             " VALUES (%s, %s, %s, %s, %s, %s)",
-            (self.run_id, kind, patient_id, clinician_id, whole(self.run_now), Jsonb(data)),
+            (self.run_id, kind, patient_id, clinician_id, whole(self.now()), Jsonb(data)),
         )
 
     def commands(self, run_id: int, after: int) -> list[dict[str, Any]]:

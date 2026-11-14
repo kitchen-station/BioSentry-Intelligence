@@ -165,6 +165,14 @@ def batch(minute: int = 0, **over: Any) -> dict[str, Any]:
     return {**body, **over}
 
 
+def forward(api: Api, minute: int) -> None:
+    """Move the newest run's ward time on to this sim minute with a batch that carries no reading."""
+    run_id = api.sql("SELECT max(id) AS i FROM run")[0]["i"]
+    api.tokens.clear()  # a session lasts as long as a nurse value: sign in again
+    body = batch(minute=minute, patients=[], observations=[], bins=[], events=[])
+    assert api.post(f"/sim/runs/{run_id}/batch", body).status_code == 204
+
+
 def start(api: Api, **kw: Any) -> int:
     response = api.post("/sim/runs", new_run(**kw))
     assert response.status_code == 201, response.text
@@ -433,20 +441,21 @@ def test_a_sim_run_is_scored_computed_and_timed_on_the_wall_clock(api: Api) -> N
     assert row["tier_status"] == [{"tier": "A", "label": "NEWS2", "live": True}]
     assert row["synthetic"] is True
     # Sim minute 0 is now: a reading from minute -2 is two minutes old.
+    run0 = datetime.fromisoformat(ORIGIN)
     hr = row["vitals"]["heart_rate"]["provenance"]
-    assert hr["observed_at"] == iso(NOW - timedelta(minutes=2))
+    assert hr["observed_at"] == iso(run0 - timedelta(minutes=2))
     assert row["vitals"]["blood_pressure"]["provenance"]["observed_at"] == iso(
-        NOW - timedelta(minutes=10)
+        run0 - timedelta(minutes=10)
     )
     assert row["last_update_s"] == 120
     api.wall.now += timedelta(seconds=20)
-    assert api.ward("rn-delacruz")["ranked"][0]["last_update_s"] == 140  # measured from wall now
+    assert api.ward("rn-delacruz")["ranked"][0]["last_update_s"] == 120  # measured from ward time, not the wall clock
     # Gaps are null, never zero; the sparkline is the last bins.
     assert row["vital_trends"]["heart_rate"] == [55.0, 70.0, None]
     detail = api.client.get("/patients/s-1", headers=api.as_("rn-delacruz")).json()
     history = detail["vital_history"]["heart_rate"]
     assert [p["value"] for p in history] == [55.0, 70.0, None]
-    assert history[-1]["time"] == iso(NOW - timedelta(minutes=15))
+    assert history[-1]["time"] == iso(datetime.fromisoformat(ORIGIN) - timedelta(minutes=15))
 
 
 def test_the_ward_and_the_patient_carry_the_ward_time_they_were_computed_at(api: Api) -> None:
@@ -457,8 +466,8 @@ def test_the_ward_and_the_patient_carry_the_ward_time_they_were_computed_at(api:
     start(api)
     api.wall.now += timedelta(seconds=20)
     h = api.as_("rn-delacruz")
-    assert api.ward("rn-delacruz")["now"] == iso(api.wall.now)  # a posted run: the wall clock
-    assert api.client.get("/patients/s-1", headers=h).json()["now"] == iso(api.wall.now)
+    assert api.ward("rn-delacruz")["now"] == ORIGIN  # a posted run: its origin plus the newest minute, not the wall clock
+    assert api.client.get("/patients/s-1", headers=h).json()["now"] == ORIGIN
 
 
 def test_a_batch_moves_the_run_forward_in_one_transaction(api: Api) -> None:
@@ -469,9 +478,10 @@ def test_a_batch_moves_the_run_forward_in_one_transaction(api: Api) -> None:
     assert row["trend"] == "stable" and row["signal_quality"] == 90
     # The new reading, at sim minute 10, is "now"; the old one at minute -2 is still 12 minutes old.
     assert row["vitals"]["heart_rate"]["data"]["value"] == 120
-    assert row["vitals"]["heart_rate"]["provenance"]["observed_at"] == iso(api.wall.now)
+    run0 = datetime.fromisoformat(ORIGIN)
+    assert row["vitals"]["heart_rate"]["provenance"]["observed_at"] == iso(run0 + timedelta(minutes=10))
     assert row["vitals"]["respiratory_rate"]["provenance"]["observed_at"] == iso(
-        api.wall.now - timedelta(minutes=12)
+        run0 - timedelta(minutes=2)
     )
     (run,) = api.sql("SELECT * FROM run WHERE id = %s", run_id)
     assert run["as_of"] == datetime(2026, 1, 1, 0, 10, tzinfo=UTC)
@@ -540,7 +550,7 @@ def test_a_batch_into_a_new_sim_hour_prunes_what_is_older_than_the_retention(api
     assert vitals["heart_rate"]["data"]["value"] == 120
     assert vitals["blood_pressure"]["data"]["value"] == {"systolic": 88, "diastolic": 52}
     assert vitals["blood_pressure"]["provenance"]["observed_at"] == iso(
-        api.wall.now - timedelta(minutes=week + 70)
+        datetime.fromisoformat(ORIGIN) - timedelta(minutes=10)
     )
     assert api.sql(kept, old_run, old_run) == [other]  # another run is never pruned
 
@@ -771,7 +781,7 @@ def served_times(node: Any) -> list[str]:
     return []
 
 
-def test_served_times_are_whole_seconds_with_a_z_suffix_even_after_shifting(api: Api) -> None:
+def test_served_times_are_whole_seconds_with_a_z_suffix_even_for_a_sim_run(api: Api) -> None:
     api.wall.now = NOW + timedelta(microseconds=654_321)  # a real clock is never on the second
     fixture_times = served_times(api.ward("rn-manalo"))  # a fixture run, served as stored
     run_id = start(api)
@@ -781,7 +791,7 @@ def test_served_times_are_whole_seconds_with_a_z_suffix_even_after_shifting(api:
     note = {"author": "a", "role": "RN", "content": "c"}
     api.client.post("/patients/s-1/notes", headers=h, json=note)
     api.client.post("/patients/s-1/labs", headers=h, json={"potassium": 4.1})
-    seen = served_times(api.ward("rn-delacruz"))  # a sim run, shifted onto the wall clock
+    seen = served_times(api.ward("rn-delacruz"))  # a sim run, served in ward time
     seen += [api.client.get("/wards/W4/live", headers=h).json()["now"]]  # the ward time too
     seen += served_times(api.client.get("/patients/s-1", headers=h).json())
     seen += served_times(api.client.get("/patients/s-1/notes", headers=h).json())
@@ -1015,7 +1025,6 @@ def test_an_unknown_patient_reads_as_none_and_a_never_recorded_input_is_missing(
 # --- A nurse-typed device value: valid for 12 hours, never erased by an absent device row -------
 
 FOUR = {"heart_rate": 118, "respiratory_rate": 24, "spo2": 93, "temperature": 38.5}
-HOUR12 = timedelta(hours=12)
 
 
 def hr_of(api: Api) -> Any:
@@ -1051,11 +1060,9 @@ def test_a_nurse_value_ranks_a_patient_with_no_patch_for_twelve_hours(api: Api) 
     assert post.status_code == 200 and post.json()["ranked"] is True
     ranked = api.ward("rn-delacruz")["ranked"][0]
     assert ranked["last_update_s"] is None
-    api.wall.now += HOUR12
-    api.tokens.clear()
+    forward(api, 12 * 60)
     assert [r["id"] for r in api.ward("rn-delacruz")["ranked"]] == ["s-1"]
-    api.wall.now += timedelta(seconds=1)
-    api.tokens.clear()
+    forward(api, 12 * 60 + 1)
     ward = api.ward("rn-delacruz")
     assert ward["ranked"] == []
     (row,) = ward["abstained"]
@@ -1070,8 +1077,7 @@ def test_one_expired_nurse_value_is_named_and_the_others_are_not(api: Api) -> No
     patient["observations"] = [o for o in patient["observations"] if o["code"] != "heart_rate"]
     start(api, patients=[patient])
     record_hr(api)
-    api.wall.now += HOUR12 + timedelta(seconds=1)
-    api.tokens.clear()
+    expire(api)
     (row,) = api.ward("rn-delacruz")["abstained"]
     assert row["reason"] == "Heart rate out of date"
     assert row["instruction"].endswith(", or enter the observations")
@@ -1137,7 +1143,7 @@ def test_an_expired_nurse_value_under_a_newer_device_value_serves_the_device_val
 def test_an_expired_nurse_value_does_not_fall_back_to_an_older_device_value(api: Api) -> None:
     start(api)
     record_hr(api)  # newer than the device row at minute -2; the patch does not sample again
-    api.wall.now += HOUR12 + timedelta(seconds=1)
+    expire(api)
     m = hr_of(api)
     assert (m.data.reason, m.provenance.source.value) == ("out_of_date", "nurse")
 
@@ -1197,8 +1203,7 @@ def drop(patient: dict, *codes: str) -> None:
 
 
 def expire(api: Api) -> None:
-    api.wall.now += HOUR12 + timedelta(seconds=1)
-    api.tokens.clear()
+    forward(api, 12 * 60 + 1)
 
 
 def test_an_out_of_date_measurement_is_missing_nurse_and_keeps_the_entry_time(api: Api) -> None:
@@ -1572,7 +1577,7 @@ def test_the_live_view_carries_the_ward_time_it_was_computed_at(api: Api) -> Non
     assert api.client.get("/wards/W4/live", headers=h).json()["now"] == "2026-09-03T07:00:00Z"  # seeded: as_of
     start(api)
     api.wall.now += timedelta(seconds=20)
-    assert api.client.get("/wards/W4/live", headers=api.as_("rn-delacruz")).json()["now"] == iso(api.wall.now)
+    assert api.client.get("/wards/W4/live", headers=api.as_("rn-delacruz")).json()["now"] == ORIGIN  # not the wall clock
 
 
 def test_the_live_view_is_scoped_audited_and_replaced_whole(api: Api) -> None:

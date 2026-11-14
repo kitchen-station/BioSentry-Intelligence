@@ -10,7 +10,7 @@ import pytest
 from test_baseline_route import served
 from test_model_inputs import MODELS, Counting, read, stay
 from test_overview import ADMIN, _last_seq, _rows_since, add_admin, write
-from test_store import NOW, ORIGIN, Api, api, obs, start  # noqa: F401 (api: fixture)
+from test_store import NOW, ORIGIN, Api, api, forward, obs, start  # noqa: F401 (api: fixture)
 
 from biosentry.core.audit import AuditLog
 from biosentry.schemas.history import HISTORY_LABEL
@@ -113,7 +113,7 @@ def test_a_stay_where_news2_rises_into_a_trigger_and_falls_again_is_one_alert_ru
         "source": "derived", "tier": "A", "rule": "news2_as_of_bins", "synthetic": True,
         "computed_at": run["provenance"]["computed_at"],
     }  # fmt: skip
-    assert run["provenance"]["computed_at"] == NOW.strftime("%Y-%m-%dT%H:%M:%SZ")
+    assert run["provenance"]["computed_at"] == ORIGIN  # ward time: the run's origin plus the newest minute
     assert got["events"] == []
 
 
@@ -178,15 +178,16 @@ def test_each_event_kind_carries_its_fields_and_no_note_text_and_nothing_of_anot
     start(api, patients=[cuff, stay("s-2", 20)])
     run_id = api.sql("SELECT max(id) AS i FROM run")[0]["i"]
     write(api, "UPDATE patient SET admitted_at = %s WHERE run_id = %s AND id IN ('s-1', 's-2')",
-          datetime.fromisoformat(ORIGIN), run_id)  # run time: served time is this plus the run's shift
+          datetime.fromisoformat(ORIGIN) + timedelta(minutes=1), run_id)  # ward time: served as stored; the run starts a minute before the stay
     nurse, doctor = api.as_("rn-delacruz"), api.as_("md-santos")
     post = api.client.post
 
     def at(minutes: int) -> None:
-        api.wall.now = NOW + timedelta(minutes=minutes)
+        if minutes > 0:  # ward time only moves on; the run starts at minute 0, a minute before the stay
+            forward(api, minutes)
 
-    at(-60)
     assert post("/patients/s-1/acknowledgement", headers=nurse, json={"score": 1}).status_code == 204  # before the stay
+    write(api, "UPDATE clinician_action SET at = %s WHERE run_id = %s", datetime.fromisoformat(ORIGIN) - timedelta(minutes=60), run_id)  # ward time never runs back: place it before the stay
     at(60)
     assert post("/patients/s-1/acknowledgement", headers=nurse, json={"score": 7}).status_code == 204
     at(70)
@@ -203,16 +204,13 @@ def test_each_event_kind_carries_its_fields_and_no_note_text_and_nothing_of_anot
     assert api.client.delete(f"/patients/s-1/notes/{gone.json()['id']}", headers=nurse).status_code == 204
     at(130)
     assert post("/patients/s-2/notes", headers=nurse, json={"author": "x", "role": "rn", "content": "MARKER-OTHER"}).status_code == 201
-    at(400)  # after the latest bin
-    assert post("/patients/s-1/acknowledgement", headers=nurse, json={"score": 9}).status_code == 204
-    at(0)
     response = get(api)
     assert response.status_code == 200
     for text in ("MARKER", "Dr Zed", "content"):
         assert text not in response.text
     events = response.json()["events"]
     assert [(e["kind"], e["at"]) for e in events] == [
-        ("admitted", served(api, 0)), ("bp_charted", served(api, 45)), ("acknowledged", served(api, 60)),
+        ("admitted", served(api, 1)), ("bp_charted", served(api, 45)), ("acknowledged", served(api, 60)),
         ("vitals_recorded", served(api, 90)), ("note_added", served(api, 120)),
     ]  # the pressure typed in the app at 90 is one act: no second entry for its row
     admitted, bp, ack, vitals, note = events
@@ -223,6 +221,8 @@ def test_each_event_kind_carries_its_fields_and_no_note_text_and_nothing_of_anot
     assert (note["by"], note["role"], note["note_id"], note["source"]) == (None, "md", kept.json()["id"], "clinical_note")
     assert set(note) == {"kind", "at", "by", "role", "score", "note_id", "source"}
     assert [e["kind"] for e in response.json()["events"] if e["score"] == 5] == []
+    at(400)  # after the latest bin
+    assert post("/patients/s-1/acknowledgement", headers=nurse, json={"score": 9}).status_code == 204
     at(450)  # read again later: what was done after the last stored bin is part of the stay
     later = get(api).json()
     assert [(e["kind"], e["at"], e["score"]) for e in later["events"]][-1] == ("acknowledged", served(api, 400), 9)

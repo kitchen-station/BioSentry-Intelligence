@@ -105,7 +105,7 @@ def test_the_two_batched_queries_return_what_the_rule_needs_in_one_statement_eac
         times = [t.time for t in temperature[p]]
         assert times == sorted(times) and len(times) == 30 + i
     assert store.temperature_bins([]) == {}  # one statement even for none is still a statement, never a loop
-    windows = [(p, RUN0 + timedelta(minutes=lo) + store.shift, RUN0 + timedelta(minutes=hi) + store.shift)
+    windows = [(p, RUN0 + timedelta(minutes=lo), RUN0 + timedelta(minutes=hi))
                for p, lo, hi in [("q-1", 35, 60), ("q-2", -5, 20), ("q-3", 200, 300)]]
     counting.sql.clear()
     got = store.observations_between(windows)
@@ -113,7 +113,6 @@ def test_the_two_batched_queries_return_what_the_rule_needs_in_one_statement_eac
     everything = api.sql("SELECT patient_id, code, source, observed_at, id FROM observation WHERE run_id = %s", run_id)
     codes = {"blood_pressure", "consciousness", "supplemental_o2", "spo2_scale", *VITALS}
     for p, lo, hi in windows:
-        lo, hi = lo - store.shift, hi - store.shift
         mine = [r for r in everything if r["patient_id"] == p and r["code"] in codes
                 and (r["code"] not in VITALS or r["source"] == "nurse")]  # a device's own rows are not read
         want = {r["id"] for r in mine if lo <= r["observed_at"] <= hi}
@@ -134,10 +133,9 @@ def test_the_service_on_a_posted_run(api: Api) -> None:
         obs("q-2", "blood_pressure", -10, "nurse", absent_reason="not_recorded")]
     patients = [stay("q-1", 30), no_bp, stay("q-3", 10), stay("q-4", 30), stay("q-5", 0)]
     start(api, patients=patients)
-    api.wall.now = NOW + timedelta(minutes=460)  # after the last device reading: the typed value then stands
-    posted = api.client.post("/patients/q-4/vitals", headers=api.as_("rn-delacruz"), json={"heart_rate": 100})
-    assert posted.status_code == 200
-    api.wall.now = NOW
+    run_id = api.sql("SELECT max(id) AS i FROM run")[0]["i"]
+    typed = batch(minute=0, patients=[], bins=[], events=[], observations=[obs("q-4", "heart_rate", 460, "nurse", num=100)])
+    assert api.post(f"/sim/runs/{run_id}/batch", typed).status_code == 204  # a typed value newer than the last device reading: it then stands
     pids = ["q-1", "q-2", "q-3", "q-4", "q-5"]
     store, states = read(api, *pids)
     counting = Counting(store.conn)

@@ -78,6 +78,6 @@ def started(store: PostgresStore, patient_id: str) -> Started | None:
     origin = row["origin"]
     return Started(
         row["kind"],
-        _at(origin, row["start_minute"]) + store.shift,
-        _at(origin, row["full_minute"]) + store.shift,
+        _at(origin, row["start_minute"]),
+        _at(origin, row["full_minute"]),
     )
