@@ -78,6 +78,7 @@ from biosentry.schemas import (
     SessionToken,
     VitalsRecorded,
     WardOverview,
+    WardResearch,
     WardResponse,
 )
 from biosentry.schemas.episodes import Episodes
@@ -100,6 +101,7 @@ from biosentry.services.patient_ask import PatientAskService
 from biosentry.services.patients import PatientService, RejectedError
 from biosentry.services.models import load_models
 from biosentry.services.ward import WardService
+from biosentry.services.ward_research import WardResearchService
 
 NOT_FOUND = "Not found"
 SIGN_IN_FAILURES = 5  # failed sign-ins for one id within the window, then 429
@@ -166,6 +168,7 @@ class Context:
     patients: PatientService
     baselines: BaselineService
     history: HistoryService
+    research: WardResearchService
     overview: OverviewService
     questions: PatientAskService
 
@@ -271,6 +274,7 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
             audit = AuditLog(conn, clock, store.role_of)
             wards = WardService(store, audit, models)
             baselines = BaselineService(store, audit, wards)
+            history = HistoryService(store, audit, wards)
             return Context(
                 conn,
                 store,
@@ -278,7 +282,8 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
                 wards,
                 PatientService(store, audit, wards),
                 baselines,
-                HistoryService(store, audit, wards),
+                history,
+                WardResearchService(store, audit, wards, baselines, history.alert),
                 OverviewService(store, audit, wards),
                 PatientAskService(store, audit, wards, baselines),
             )
@@ -456,6 +461,18 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
             ctx.audit.append(who, "view_overview", ward, "not_found")
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return ctx.overview.overview(who)
+
+    @app.get("/wards/{ward}/research", response_model=WardResearch)
+    def ward_research(ward: str, ctx: Ctx, who: Who) -> WardResearch:
+        # The whole ward, for the clinicians who may also steer the sim (an md, the charge nurse).
+        # A staff nurse and an admin are refused, as /live refuses an admin.
+        if not ctx.store.can_control(who):
+            ctx.audit.append(who, "view_ward_research", ward, "denied")
+            raise HTTPException(status_code=403, detail="Forbidden")
+        if ward != ctx.store.ward:
+            ctx.audit.append(who, "view_ward_research", ward, "not_found")
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return ctx.research.research(who)
 
     @app.get("/wards/{ward}/live", response_model=LiveWard)
     def ward_live(ward: str, ctx: Ctx, who: Who) -> LiveWard:

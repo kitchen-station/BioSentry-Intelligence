@@ -33,6 +33,7 @@ import type {
   PatientDetail,
   PatientExtractionResult,
   PatientHistory,
+  WardResearch,
   PatientQuestionDetail,
   PatientQuestionItem,
   QuestionDetail,
@@ -99,6 +100,10 @@ export const httpProvider: ApiProvider = {
 
   getLabQuestion(id: number): Promise<QuestionDetail> {
     return fetchJson<QuestionDetail>(`/wards/W4/lab/questions/${id}`);
+  },
+
+  getWardResearch(): Promise<WardResearch> {
+    return fetchJson<WardResearch>("/wards/W4/research");
   },
 
   getPatientHistory(patientId: string): Promise<PatientHistory> {

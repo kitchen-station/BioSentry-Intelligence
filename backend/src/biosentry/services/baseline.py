@@ -18,6 +18,7 @@ from biosentry.domain.arbiter import NotRanked
 from biosentry.domain.computed import NotComputed
 from biosentry.domain.scoring.tier_b.baseline import DEFAULTS, VITALS, baseline_finding
 from biosentry.repositories.postgres import PostgresStore
+from biosentry.schemas import UnscoredPatient
 from biosentry.schemas.baseline import (
     BASELINE_LABEL,
     BaselineComputed,
@@ -59,6 +60,11 @@ class BaselineService:
         )
         if state is None or isinstance(decide(state), NotRanked):
             return None
+        return self.of(state)
+
+    def of(self, state: UnscoredPatient) -> BaselineResponse:
+        """The baseline of a patient already read. No scope check: the caller decided who may see it."""
+        patient_id = state.id
         now = self._store.now()  # the clock `last_update_s` is measured on
         admitted_at = state.admitted_at
         vitals: list[BaselineComputed | BaselineForming | BaselineUnavailable] = []

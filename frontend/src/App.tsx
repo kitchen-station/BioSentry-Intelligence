@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import type { Session } from "./types";
-import { restoreSession, clearSession } from "./api";
+import { restoreSession, clearSession, hasWardResearch } from "./api";
 import { SignIn } from "./pages/SignIn";
 import { Ward } from "./pages/Ward";
 import { PatientDetail } from "./pages/PatientDetail";
@@ -11,6 +11,7 @@ import { Research } from "./pages/Research";
 import { Lab } from "./pages/Lab";
 import { AskChat } from "./pages/AskChat";
 import { Overview } from "./pages/Overview";
+import { WardResearch } from "./pages/WardResearch";
 
 // Per tab, gone when the tab closes. Only who is signed in is kept here, never a token: with the
 // API the token lives in memory, so a reload returns to sign-in (restoreSession says false). With
@@ -99,6 +100,12 @@ export function App() {
         path="/ward"
         element={session ? <Ward session={session} onSignOut={signOut} /> : <ToSignIn gone={gone} />}
       />
+      {hasWardResearch && (
+        <Route
+          path="/ward/research"
+          element={session ? (session.role === "md" || session.role === "charge_rn" ? <WardResearch session={session} onSignOut={signOut} /> : toWard) : <ToSignIn gone={gone} />}
+        />
+      )}
       <Route
         path="/patient/:id"
         element={session ? <PatientDetail session={session} onSignOut={signOut} /> : <ToSignIn gone={gone} />}

@@ -18,6 +18,7 @@ from biosentry.domain.arbiter import NotRanked, arbitrate
 from biosentry.domain.computed import NotComputed
 from biosentry.domain.scoring.tier_a import Risk
 from biosentry.repositories.postgres import NURSE_VALID, PostgresStore, StoredObservation
+from biosentry.schemas import UnscoredPatient
 from biosentry.schemas.history import (
     HISTORY_LABEL,
     HistoryEvent,
@@ -29,7 +30,7 @@ from biosentry.schemas.history import (
 
 from .as_of import news2_as_of
 from .episodes import Started, started
-from .model_signals import NO_BINS, NOT_ALIGNED, PAST_CAP, bin_window, prepare_series
+from .model_signals import NO_BINS, NOT_ALIGNED, PAST_CAP, Prepared, bin_window, prepare_series
 from .scoring import BIN, decide
 from .ward import WardService
 
@@ -52,6 +53,16 @@ class BinState:
 
 
 QUIET = BinState("quiet")
+
+
+@dataclass(frozen=True, slots=True)
+class Rebuilt:
+    prep: Prepared
+    start: datetime
+    end: datetime
+    until: datetime
+    rows: Sequence[StoredObservation]
+    bins: list[BinState]
 
 
 def classify(device: dict[str, float | None], rows: Sequence[StoredObservation], end: datetime, *, earlier: bool,
@@ -168,31 +179,49 @@ class HistoryService:
         if state is None or isinstance(decide(state), NotRanked):
             return None
         store = self._store
-        h = state.vital_history
-        temperature = store.temperature_bins([patient_id]).get(patient_id, [])
-        points = {"heart_rate": h.heart_rate, "respiratory_rate": h.respiratory_rate, "spo2": h.spo2, "temperature": temperature}
-        prep = prepare_series(points, state.admitted_at)
+        found = self.rebuild(state)
         episode = started(store, patient_id)
         shown = None if episode is None else SimulatedEpisode(kind=episode.kind, start=episode.start, full=episode.full, source="simulation")  # type: ignore[arg-type]
         whole = dict(patient_id=patient_id, synthetic=state.synthetic, label=HISTORY_LABEL, simulated_episode=shown)
-        if isinstance(prep, NotComputed):  # no history, and the answer says why
+        if isinstance(found, NotComputed):  # no history, and the answer says why
             return PatientHistory(
-                **whole, unavailable=UNAVAILABLE[prep.reason], grid_from=None, grid_to=None, bins=0,
+                **whole, unavailable=UNAVAILABLE[found.reason], grid_from=None, grid_to=None, bins=0,
                 runs=[], runs_cut=False, events=[], events_cut=False,
             )
+        runs, runs_cut = fold(found.bins, found.prep.start, store.now(), state.synthetic, episode)
+        stored = store.history_events(patient_id, found.start, found.until, MAX_EVENTS + 1)
+        done, events_cut = events(state.admitted_at, found.rows, stored, found.start, found.until)
+        return PatientHistory(
+            **whole, unavailable=None, grid_from=found.start, grid_to=found.end, bins=found.prep.last + 1,
+            runs=runs, runs_cut=runs_cut, events=done, events_cut=events_cut,
+        )
+
+    def rebuild(self, state: UnscoredPatient) -> Rebuilt | NotComputed:
+        """Every stored bin of the stay, classified: the one place the bins are built. No scope check:
+        the caller decided who may see the patient. It reads no simulation truth."""
+        store = self._store
+        h = state.vital_history
+        temperature = store.temperature_bins([state.id]).get(state.id, [])
+        points = {"heart_rate": h.heart_rate, "respiratory_rate": h.respiratory_rate, "spo2": h.spo2, "temperature": temperature}
+        prep = prepare_series(points, state.admitted_at)
+        if isinstance(prep, NotComputed):
+            return prep
         start, end = bin_window(prep.at(0))[0], bin_window(prep.at(prep.last))[1]
         # From 12 hours before the first bin's end: the rebuild's own window (a nurse-typed device value).
         # To now, not only to the last bin's end: a row after it is no input of any bin, but it is an event.
         until = max(end, store.now())
-        rows = store.observations_between([(patient_id, bin_window(prep.at(0))[1] - NURSE_VALID, until)]).get(patient_id, [])
+        rows = store.observations_between([(state.id, bin_window(prep.at(0))[1] - NURSE_VALID, until)]).get(state.id, [])
         bins = [
-            classify(prep.device(k), rows, bin_window(prep.at(k))[1], earlier=k < prep.last, patient_id=patient_id)
+            classify(prep.device(k), rows, bin_window(prep.at(k))[1], earlier=k < prep.last, patient_id=state.id)
             for k in range(prep.last + 1)
         ]
-        runs, runs_cut = fold(bins, prep.start, store.now(), state.synthetic, episode)
-        stored = store.history_events(patient_id, start, until, MAX_EVENTS + 1)
-        done, events_cut = events(state.admitted_at, rows, stored, start, until)
-        return PatientHistory(
-            **whole, unavailable=None, grid_from=start, grid_to=end, bins=prep.last + 1,
-            runs=runs, runs_cut=runs_cut, events=done, events_cut=events_cut,
-        )
+        return Rebuilt(prep, start, end, until, rows, bins)
+
+    def alert(self, state: UnscoredPatient) -> tuple[int, bool] | str:
+        """The bins at an alert level and whether the latest bin is one, or the reason the stay cannot
+        be rebuilt. The history's own bins: the sum of its alert runs' bins, with no run limit."""
+        found = self.rebuild(state)
+        if isinstance(found, NotComputed):
+            return UNAVAILABLE[found.reason]
+        alert = [b.state == "alert" for b in found.bins]
+        return sum(alert), alert[-1]

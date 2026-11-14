@@ -68,6 +68,15 @@ class BaselineUnavailable(Contract):
     reason: Literal["no_history", "latest_bin_missing", "patch_not_live"]
 
 
+class BaselineFlagged(Contract):
+    """A finding for a patient who is not the reader's: the flag and its direction, no value of any kind."""
+
+    vital: BaselineVital
+    status: Literal["flag_only"]
+    significant: Flag
+    direction: FindingDirection | None
+
+
 class BaselineResponse(Contract):
     patient_id: Annotated[str, Field(max_length=64)]
     synthetic: Flag

@@ -213,7 +213,7 @@ class WardService:
             return self._store.on_ward()
         return self._store.assigned(clinician_id)
 
-    def _view(
+    def view(
         self, ids: frozenset[str]
     ) -> tuple[list[ScoreRow], list[AbstainedRow], dict[str, UnscoredPatient]]:
         """Rows ranked relative to this set, and the state each row was built from."""
@@ -241,7 +241,7 @@ class WardService:
 
     def compute(self, ids: frozenset[str]) -> tuple[list[ScoreRow], list[AbstainedRow]]:
         """Ranked and NOT RANKED rows for these patients, ranked relative to this set."""
-        ranked, abstained, _ = self._view(ids)
+        ranked, abstained, _ = self.view(ids)
         return ranked, abstained
 
     # --- reads ---------------------------------------------------------------------------
@@ -268,7 +268,7 @@ class WardService:
         visible = self.visible(clinician_id)
         if patient_id not in visible:
             return None
-        ranked, abstained, states = self._view(visible)
+        ranked, abstained, states = self.view(visible)
         row = next((r for r in ranked if r.id == patient_id), None)
         if row is None:
             return next((a for a in abstained if a.id == patient_id), None)

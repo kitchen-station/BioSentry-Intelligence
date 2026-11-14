@@ -11,7 +11,7 @@ const fixture = vi.hoisted(() => {
   // Each method and how many arguments it takes (ApiProvider in contract.ts).
   const arity = {
     getWard: 0, getPatient: 1, getBaseline: 1, getNotes: 1, addNote: 4, deleteNote: 2, listAllPatients: 0, getStays: 0, getLiveWard: 0, getOverview: 0,
-    admitPatient: 1, enterLabResults: 2, recordVitals: 2, getAcknowledgements: 0, acknowledge: 2, requestLabRun: 1, getLabRuns: 0, getLabRun: 1, askPatient: 2, getPatientQuestions: 1, getPatientQuestion: 2, askLab: 1, getLabQuestions: 0, getLabQuestion: 1, getPatientHistory: 1,
+    admitPatient: 1, enterLabResults: 2, recordVitals: 2, getAcknowledgements: 0, acknowledge: 2, requestLabRun: 1, getLabRuns: 0, getLabRun: 1, askPatient: 2, getPatientQuestions: 1, getPatientQuestion: 2, askLab: 1, getLabQuestions: 0, getLabQuestion: 1, getPatientHistory: 1, getWardResearch: 0,
     extractLabsFromFile: 1, extractPatientFromFile: 1,
   } as const;
   const provider = Object.fromEntries(Object.keys(arity).map((n) => [n, vi.fn(async () => n)]));

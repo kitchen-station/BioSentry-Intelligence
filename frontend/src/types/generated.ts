@@ -93,6 +93,21 @@ export interface components {
             /** @default null */
             readonly weightKg?: number | null;
         };
+        /** AlertCounted */
+        readonly AlertCounted: {
+            readonly bins: number;
+            readonly minutes: number;
+            readonly ongoing: boolean;
+            /** @constant */
+            readonly status: "counted";
+        };
+        /** AlertUnavailable */
+        readonly AlertUnavailable: {
+            /** @enum {string} */
+            readonly reason: "no_bins" | "past_cap" | "not_aligned";
+            /** @constant */
+            readonly status: "unavailable";
+        };
         /** BaselineComputed */
         readonly BaselineComputed: {
             /** @enum {string} */
@@ -118,6 +133,18 @@ export interface components {
             /** @enum {string} */
             readonly vital: "heart_rate" | "respiratory_rate" | "spo2" | "temperature";
             readonly z: number;
+        };
+        /**
+         * BaselineFlagged
+         * @description A finding for a patient who is not the reader's: the flag and its direction, no value of any kind.
+         */
+        readonly BaselineFlagged: {
+            readonly direction: components["schemas"]["FindingDirection"] | null;
+            readonly significant: boolean;
+            /** @constant */
+            readonly status: "flag_only";
+            /** @enum {string} */
+            readonly vital: "heart_rate" | "respiratory_rate" | "spo2" | "temperature";
         };
         /** BaselineForming */
         readonly BaselineForming: {
@@ -844,6 +871,32 @@ export interface components {
             /** @enum {string} */
             readonly state: "queued" | "running" | "done" | "failed" | "refused";
         };
+        /**
+         * ResearchAbstained
+         * @description NOT RANKED: the arbiter's reason and instruction, no score, no rank.
+         */
+        readonly ResearchAbstained: {
+            readonly assigned: boolean;
+            readonly bed: string;
+            readonly id: string | null;
+            readonly instruction: string;
+            readonly name: string | null;
+            readonly reason: string;
+        };
+        /** ResearchRow */
+        readonly ResearchRow: {
+            readonly alert: components["schemas"]["AlertCounted"] | components["schemas"]["AlertUnavailable"];
+            readonly assigned: boolean;
+            readonly baseline: readonly (components["schemas"]["BaselineComputed"] | components["schemas"]["BaselineFlagged"] | components["schemas"]["BaselineForming"] | components["schemas"]["BaselineUnavailable"])[];
+            readonly bed: string;
+            readonly id: string | null;
+            /** @enum {string} */
+            readonly level: "low" | "low_medium" | "medium" | "high";
+            readonly models: components["schemas"]["RowModels"];
+            readonly name: string | null;
+            readonly rank: number;
+            readonly score: number;
+        };
         /** RowModels */
         readonly RowModels: {
             readonly alert_policy: components["schemas"]["ModelSignal"];
@@ -1060,6 +1113,18 @@ export interface components {
             readonly synthetic: boolean;
             readonly ward: string;
         };
+        /** WardResearch */
+        readonly WardResearch: {
+            readonly abstained: readonly components["schemas"]["ResearchAbstained"][];
+            /** @constant */
+            readonly label: "Each patient against their own baseline. Research view: synthetic, not validated. NEWS2 alone orders the list.";
+            /** Format: date-time */
+            readonly now: string;
+            readonly ranked: readonly components["schemas"]["ResearchRow"][];
+            /** @constant */
+            readonly synthetic: true;
+            readonly ward: string;
+        };
         /** WardResponse */
         readonly WardResponse: {
             readonly abstained: readonly components["schemas"]["AbstainedRow"][];
@@ -1086,7 +1151,10 @@ export type AcvpuPresent = components['schemas']['AcvpuPresent'];
 export type AdmissionCondition = components['schemas']['AdmissionCondition'];
 export type AdmissionRoute = components['schemas']['AdmissionRoute'];
 export type AdmitPatientInput = components['schemas']['AdmitPatientInput'];
+export type AlertCounted = components['schemas']['AlertCounted'];
+export type AlertUnavailable = components['schemas']['AlertUnavailable'];
 export type BaselineComputed = components['schemas']['BaselineComputed'];
+export type BaselineFlagged = components['schemas']['BaselineFlagged'];
 export type BaselineForming = components['schemas']['BaselineForming'];
 export type BaselineResponse = components['schemas']['BaselineResponse'];
 export type BaselineUnavailable = components['schemas']['BaselineUnavailable'];
@@ -1144,6 +1212,8 @@ export type ProvenanceSource = components['schemas']['ProvenanceSource'];
 export type QualityLevel = components['schemas']['QualityLevel'];
 export type QuestionDetail = components['schemas']['QuestionDetail'];
 export type QuestionItem = components['schemas']['QuestionItem'];
+export type ResearchAbstained = components['schemas']['ResearchAbstained'];
+export type ResearchRow = components['schemas']['ResearchRow'];
 export type RowModels = components['schemas']['RowModels'];
 export type ScoreRow = components['schemas']['ScoreRow'];
 export type Session = components['schemas']['Session'];
@@ -1166,6 +1236,7 @@ export type Vitals = components['schemas']['Vitals'];
 export type VitalsRecorded = components['schemas']['VitalsRecorded'];
 export type VitalTrends = components['schemas']['VitalTrends'];
 export type WardOverview = components['schemas']['WardOverview'];
+export type WardResearch = components['schemas']['WardResearch'];
 export type WardResponse = components['schemas']['WardResponse'];
 export type $defs = Record<string, never>;
 export type operations = Record<string, never>;

@@ -70,9 +70,34 @@ describe("SessionMenu", () => {
     ["md", ["Ward", "Ask", "Station"]],
     ["admin", ["Overview", "Ward"]],
   ] as const)("shows %s only the bar links for routes it can use", (role, names) => {
+    vi.stubEnv("VITE_API_URL", ""); // the fixture build: Ward research needs the API
     menu({ clinician_id: "x-1", ward: "W4", role });
     const bar = screen.getByRole("navigation", { name: "Pages" });
     expect(within(bar).getAllByRole("link").map((l) => l.textContent)).toEqual(names);
+  });
+
+  it.each([
+    ["rn", ["Ward"]],
+    ["charge_rn", ["Ward", "Ask", "Station", "Ward research"]],
+    ["md", ["Ward", "Ask", "Station", "Ward research"]],
+    ["admin", ["Overview", "Ward"]],
+  ] as const)("adds Ward research to the bar of %s only with the API and only for a physician or the charge nurse", (role, names) => {
+    vi.stubEnv("VITE_API_URL", "/api");
+    menu({ clinician_id: "x-1", ward: "W4", role });
+    const bar = screen.getByRole("navigation", { name: "Pages" });
+    expect(within(bar).getAllByRole("link").map((l) => l.textContent)).toEqual(names);
+  });
+
+  it("has no Ward research link in the fixture build, and the link opens the table", async () => {
+    vi.stubEnv("VITE_API_URL", "");
+    menu({ clinician_id: "md-santos", ward: "W4", role: "md" });
+    expect(screen.queryByRole("link", { name: "Ward research" })).toBeNull();
+    cleanup();
+    vi.stubEnv("VITE_API_URL", "/api");
+    menu({ clinician_id: "md-santos", ward: "W4", role: "md" });
+    await userEvent.click(screen.getByRole("link", { name: "Ward research" }));
+    expect(screen.getByText("at /ward/research")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Ward" }).getAttribute("aria-current")).toBeNull();
   });
 
   it.each([

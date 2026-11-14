@@ -403,6 +403,10 @@ describe("the fixture provider", () => {
     await expect(fixtureProvider.getPatientHistory("p-001")).rejects.toThrow("The stay history needs the server");
   });
 
+  it("has no ward research table: it needs the server", async () => {
+    await expect(fixtureProvider.getWardResearch()).rejects.toThrow("The ward research table needs the server");
+  });
+
   it("has no overview: it needs the API", async () => {
     await expect(fixtureProvider.getOverview()).rejects.toThrow("The overview needs the API");
   });
