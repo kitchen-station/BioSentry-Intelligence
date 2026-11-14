@@ -46,12 +46,34 @@ call it anyway). "Public mode" is the one supported way to let them use this API
   sits on an internal network (`labnet`) with the API alone (and, as on any Docker network, the host's
   own address on that bridge: keep the host's services off it, see the firewall note below): no route out
   and none to the database. Its
-  filesystem is read-only apart from an in-memory `/tmp` capped at 64 MB (Docker's own `/dev/shm` is
-  writable too; the worker does not use it), all capabilities are dropped, and it keeps
+  filesystem is read-only apart from an in-memory `/tmp` capped at 64 MB (Docker's own in-memory
+  `/dev/shm` and `/dev/mqueue` are writable too; the worker does not use them), all capabilities are dropped, and it keeps
   nothing. One run at a time, for up to 15 minutes; a run uses about one CPU (the service is capped at
   two) and 1 GB of memory at most. The largest request, a 30-day hospital run, took about 2 minutes and
   200 MB on a laptop. It refuses to start if a proxy
   variable (`HTTP_PROXY` and the like) is set, so do not give the stack one.
+- `ask-patient` is the patient question worker: it answers "Ask about this patient" on the patient page
+  (without it a question waits, then fails). It claims a question from the API with the ingest key,
+  answers it by code from the patient data that the API put into the job, and posts the answer back. No
+  language model. It is built by `deploy/worker.Dockerfile`: the backend's packages and the `research/`
+  code. It publishes no port and sits on `labnet` with the API: no route out and none to the database.
+  Its filesystem is read-only with no writable place but Docker's own in-memory `/dev/shm` and
+  `/dev/mqueue`, which it does not use;
+  all capabilities are dropped, and it keeps
+  nothing. It follows no redirect and uses no proxy, so the key goes to the API only. Capped at one CPU
+  and 256 MB.
+- `ask-lab` is the lab question worker: it answers the lab's Ask page (a question about the whole
+  simulated ward). The same image and the same isolation. It runs one of three fixed experiments on
+  stored simulator trials, about 15 to 100 seconds for one question; keyword rules choose the
+  experiment. It needs one folder that is not in the repository: **copy the trial root to the server
+  once**, `ward-v2/seed-01` to `ward-v2/seed-10` (18 MB), into `deploy/agent-trials/ward-v2/`
+  (`AGENT_TRIALS_DIR` in `deploy/.env` moves it; the files must be readable by any user). Copy no
+  held-out seed (11 to 30). While the folder is empty every lab question ends as failed with "the agent's
+  tool failed"; nothing else breaks, and no restart is needed after the copy. Mounted read-only. The
+  agent's own ledger of what it ran is in the named volume `agenthome`; `/tmp` is in memory, capped at
+  64 MB. Capped at two CPUs and 1 GB (one question peaked near 210 MB).
+- The tuned model for `ask-lab` is optional and off: `deploy/compose.tuned.yaml` turns it on (see "The
+  tuned model" below).
 - There is one ward. While the runner is live, a browser simulator started with the ingest key is
   **refused with 409** ("Another ward simulation is live"): use the ward on the server, not a second one.
   To run one from a browser anyway, stop the runner (`docker compose -f deploy/compose.yaml stop sim`);
@@ -62,8 +84,8 @@ call it anyway). "Public mode" is the one supported way to let them use this API
   around `ufw`'s rules, so the safety here is that two ports are bound to loopback and the third is not
   published at all. Do not edit `compose.yaml` to publish any of them, and open nothing but SSH in the
   provider's firewall (Tailscale needs no inbound port).
-- `BIOSENTRY_OPEN_WARD_VIEW=true` lets anyone who can open the address watch the ward simulator without signing in (bed colours, staff figures, no names); control still needs a sign-in. It is off unless set to `true`, it serves only a run marked synthetic, and the API logs a warning at start when it is on. Public mode (`compose.public.yaml`) forces it off.
-- Never turn it on where the address is public (`tailscale funnel`, a public IP or a tunnel): every person who can reach the page sees the ward.
+- `BIOSENTRY_OPEN_WARD_VIEW=true` lets anyone who can open the address watch the ward simulator without signing in (bed colours, staff figures, no names); control still needs a sign-in. It is off unless set to `true`, it serves only a run marked synthetic, and the API logs a warning at start when it is on. Public mode (`compose.public.yaml`) does not read this value: it has its own line, `BIOSENTRY_PUBLIC_OPEN_WARD_VIEW` ("The public ward page", below), so this one can never open the ward to the internet by accident.
+- Do not set it where the address is public (`tailscale funnel`, a public IP or a tunnel) unless you mean every person who can reach the page to see the ward. For a public address use the separate line.
 - A clinician still signs in with their own passphrase, on both pages. The API answers each one only for
   their own patients and writes an audit row for every view. Tailscale decides who can reach the address;
   the passphrase decides whose patients they see.
@@ -127,8 +149,54 @@ call it anyway). "Public mode" is the one supported way to let them use this API
 9. **Open the address** from a teammate's device that is on the tailnet, and sign in.
 
 Updating: `git pull && deploy/setup.sh` (it updates the simulator checkout too). Logs:
-`docker compose -f deploy/compose.yaml logs -f api` (or `sim`, `lab`, or `web`). A change to the dashboard or the
+`docker compose -f deploy/compose.yaml logs -f api` (or `sim`, `lab`, `ask-patient`, `ask-lab`, or `web`). A
+question worker's log line holds a job id and a state, never a question or an answer. A change to the dashboard or the
 simulator reaches the team the same way: that command rebuilds the pages on the server.
+
+## The tuned model (optional)
+
+Without this step `ask-lab` answers by keyword rules only. With it the rules still answer first, and
+the worker asks our fine-tuned small model only where the rules are silent. The model can only pick one
+of the three fixed experiments, or nothing (`research/README.md`, "Model mode").
+
+1. Put two folders on the server, under one parent, readable by any user:
+   - `base/`: `Qwen/Qwen2.5-0.5B-Instruct` at the revision in `research/agent_tuning/weights.json`
+     (955 MB, from the publisher's public repository);
+   - `adapter/`: our adapter release (2.1 MB, from our private storage: `training/agent/REGISTRY.md`,
+     section 6).
+2. Set `AGENT_WEIGHTS_DIR=<the parent folder>` in `deploy/.env`.
+3. `docker compose -f deploy/compose.yaml -f deploy/compose.tuned.yaml up -d --build ask-lab`
+   (in public mode add `-f deploy/compose.public.yaml` as the last file).
+   The log must say `model mode: on`.
+
+What it costs, measured on a laptop only (Linux aarch64 containers, 4 CPUs; not on x86_64, not on the
+server):
+
+- The image is 3.1 GB in place of 0.3 GB: it holds a second Python environment (MindSpore, CPU). The
+  build downloads about 1 GB of packages. On x86_64 the pinned list was never installed: check that
+  build before you rely on it (`research/agent_tuning/SERVER.md`).
+- Memory: the container peaked at 5.3 GB (6.0 GB in an earlier run). The limit is 7 GB.
+- Time: one model answer took 36 to 128 seconds in the earlier run. In this compose service, on a busy
+  laptop, one took about 3 minutes and one went over the worker's 240-second limit. When that happens the
+  rules answer, which for such a question is the fixed refusal, and the log says
+  `model mode: a question went to the rules (it took too long)`. A question the rules answer never
+  waits for the model.
+- The service takes 4 CPUs while a model answer runs: on a 4-CPU server the rest of the stack is slow
+  for that time.
+- Its 7 GB limit is more than half of a 12 GB server. The database, the API, the ward runner and the
+  other workers must fit in what is left: look at `docker stats` before and after you turn it on.
+
+The worker checks every weights file by sha256 at start and before each start of the model. With a
+folder missing or a file wrong the mode turns itself off and the rules answer every question. The model
+runs as a child process that gets no `BIOSENTRY_*` value in its environment, and the container has no
+route out. It is not a hard wall inside the container: the child runs as the same user as the worker,
+so a hostile package in the model's environment could read the ingest key from the worker's process and
+use it on the API (the container reaches the API and the host's own address on that bridge, nothing else).
+Those packages are pinned by exact version and not by
+hash (the rules-only image is: `uv.lock` holds the hashes).
+
+A plain `deploy/setup.sh` run starts `ask-lab` without this file, so with rules only: run the command
+of step 3 again after it.
 
 ## Backups
 
@@ -204,11 +272,12 @@ In order:
 3. **Add one line to `deploy/.env`:** `PUBLIC_HOST=<this-host>.<your-tailnet>.ts.net` (the name
    `tailscale serve status` shows, lower case, no `https://`, no `export`, no spaces).
    `BIOSENTRY_OPEN_WARD_VIEW` must not be `true` in that file: `setup.sh` stops if both are set there,
-   and `compose.public.yaml` forces it off whatever the file or the shell says.
+   and `compose.public.yaml` does not read it. Watching the ward without a sign-in is off in public mode
+   unless you add the separate line `BIOSENTRY_PUBLIC_OPEN_WARD_VIEW=true` ("The public ward page", below).
 4. **Run `deploy/setup.sh`.** With `PUBLIC_HOST` set it adds `compose.public.yaml`: the API accepts
    browser calls from exactly `https://biosentry-dashboard.pages.dev` and
-   `https://biosentry-ward-sim.pages.dev`, watching the ward without a sign-in is forced off, and the
-   API's and the web server's logs are capped. It opens nothing itself. It prints the next command.
+   `https://biosentry-ward-sim.pages.dev`, watching the ward without a sign-in is off (unless the line
+   above says otherwise), and the API's and the web server's logs are capped. It opens nothing itself. It prints the next command.
 5. **Open the door:** `sudo tailscale funnel --bg --https=443 http://127.0.0.1:8080`. Then
    `tailscale funnel status` must list this one address and no longer say `(tailnet only)`.
 6. **Check from a device that is not on the tailnet** (a phone on mobile data). With the name from step
@@ -228,6 +297,37 @@ this host; the second half opens the private door again, and `tailscale funnel s
 While public mode is on, start the stack with `deploy/setup.sh` only. A plain `docker compose up` leaves
 out `compose.public.yaml`.
 
+### The public ward page (optional, off by default)
+
+The owner decided on 2026-11-14 that the public ward page needs no sign-in "for now". It is a separate
+opt-in. In `deploy/.env`, next to `PUBLIC_HOST`:
+
+    BIOSENTRY_PUBLIC_OPEN_WARD_VIEW=true
+
+Written exactly so, at the start of a line: `setup.sh` refuses any other spelling and starts nothing. With
+the line missing, or `=false`, nothing changes. Public mode never reads the plain
+`BIOSENTRY_OPEN_WARD_VIEW`, so an old `true` there cannot open it. Run `deploy/setup.sh` again; it says
+in one line that the page is open. To close it: remove the line, run `deploy/setup.sh` again.
+
+What a visitor sees (`GET /api/wards/W4/open-view`, no credential read, the same for every caller). Only
+while the stored run is marked synthetic. Nothing else is in the answer:
+
+- the ward's id, and the two flags `synthetic: true` and `can_control: false`;
+- for each occupied bed: its label, whether it is ranked, its rank and its NEWS2 band (low, low-medium,
+  medium, high);
+- the simulator's clock, its speed and whether it ended;
+- for each figure on the ward (staff): role (nurse, charge nurse, doctor), position, which way it faces,
+  whether it walks, and its stage. No name, no id, no task;
+- the last few bed moves: a number, a bed label, in or out.
+
+A visitor sees no patient name, id, age, vital sign, lab value, note or alert text, and cannot send a
+command: control still needs a sign-in. The data is synthetic; no real patient is in it. A bed's rank and
+band do show how sick each bed is on the simulated ward.
+
+The call is allowed from the same two sites as every other call (`BIOSENTRY_CORS_ORIGINS`: the dashboard
+and the ward simulator on `pages.dev`). Anyone can still call it from a script. The view writes at most
+one audit row a minute, however many people watch.
+
 ### What changes for an attacker
 
 On the internet when public mode is on: the sign-in page, the two pages, and every route under `/api`.
@@ -239,9 +339,12 @@ What protects it:
 - Five wrong tries for a clinician lock that clinician's sign-in for 15 minutes. Every try is recorded.
 - A clinician sees only their own patients. An admin reads the ward overview and writes nothing.
 - The ingest door (`/api/sim/*`) answers 404 from outside: nobody can write ward data or take a lab job.
-- The database, the API's own port, the ward runner and the lab worker are not reachable from outside.
+- The database, the API's own port, the ward runner, the lab worker and the two question workers are not
+  reachable from outside.
 - A request body over 1 MB is refused, and a client that sends too slowly is dropped.
 - The data is synthetic. There is no real patient in it.
+- With the public ward page on, the one route that needs no sign-in is `GET /api/wards/{ward}/open-view`: it
+  answers a fixed, name-free drawing and writes at most one audit row a minute.
 
 What does not:
 

@@ -1,7 +1,9 @@
 # The tuned model on the team server: what it needs
 
-Nothing here is done. No image is built for the server, no file is on the server, and no compose
-service starts the worker. This page is the list to work from when the owner says go.
+Nothing here is done on the server: no image is built there and no file is there. The compose files
+exist since 2026-11-14: `deploy/compose.yaml` starts the worker with rules only, and
+`deploy/compose.tuned.yaml` adds the model (`deploy/README.md`, "The tuned model"). This page is the
+list of what that model image holds and what was measured.
 
 The model mode of the question worker is off unless two environment values are set. With them
 unset the worker is the rules-only worker (`research/README.md`, "Model mode").

@@ -1647,6 +1647,10 @@
           "can_control": {
             "type": "boolean"
           },
+          "now": {
+            "format": "date-time",
+            "type": "string"
+          },
           "patients": {
             "items": {
               "$ref": "#/components/schemas/PatientView"
@@ -1670,7 +1674,8 @@
         "required": [
           "shared",
           "patients",
-          "can_control"
+          "can_control",
+          "now"
         ],
         "title": "LiveWard",
         "type": "object"
@@ -2953,6 +2958,10 @@
           "name": {
             "type": "string"
           },
+          "now": {
+            "format": "date-time",
+            "type": "string"
+          },
           "rank": {
             "minimum": 1,
             "type": "integer"
@@ -3038,7 +3047,8 @@
           "last_update_s",
           "models",
           "vital_history",
-          "tier_breakdown"
+          "tier_breakdown",
+          "now"
         ],
         "title": "PatientDetail",
         "type": "object"
@@ -4840,6 +4850,10 @@
           "clinician": {
             "type": "string"
           },
+          "now": {
+            "format": "date-time",
+            "type": "string"
+          },
           "ranked": {
             "items": {
               "$ref": "#/components/schemas/ScoreRow"
@@ -4873,7 +4887,8 @@
           "sort_tier",
           "tier_status",
           "ranked",
-          "abstained"
+          "abstained",
+          "now"
         ],
         "title": "WardResponse",
         "type": "object"

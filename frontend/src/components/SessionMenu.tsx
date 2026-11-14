@@ -30,6 +30,7 @@ export function SessionMenu({ session, onSignOut }: Props) {
         {admin && <NavLink to="/overview" className={styles.place}>Overview</NavLink>}
         <NavLink to="/ward" end className={styles.place}>Ward</NavLink>
         {station && <NavLink to="/ask" className={styles.place}>Ask</NavLink>}
+        {station && <NavLink to="/what-if" className={styles.place}>What-if runs</NavLink>}
         {station && <NavLink to="/station" className={styles.place}>Station</NavLink>}
         {/* The same switch as the API build (hasWardResearch in api/index.ts), read here as the notice below reads it. */}
         {station && import.meta.env.VITE_API_URL && <NavLink to="/ward/research" className={styles.place}>Ward research</NavLink>}

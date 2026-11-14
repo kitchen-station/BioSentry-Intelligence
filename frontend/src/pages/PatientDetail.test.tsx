@@ -43,6 +43,7 @@ const base: Detail = {
   ...(synthetic.details as unknown as Record<string, Pick<Detail, "vital_history" | "tier_breakdown">>)[
     "p-001"
   ],
+  now: "2026-09-03T07:00:00Z", // ward time as served
 };
 const potassium = row.labs.potassium!;
 const LAB_KEYS = [
@@ -109,6 +110,42 @@ const expectLabEntry = () => {
   expect(screen.queryByRole("link", { name: "Simulation lab" })).toBeNull(); // in the menu, not the bar
   expect(screen.getAllByText("Simulated patients until a hospital is connected.")).toHaveLength(1);
 };
+
+describe("the header clock is ward time, as served", () => {
+  const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const SERVED = Date.parse("2026-09-03T07:00:00Z");
+
+  afterEach(() => void vi.useRealTimers());
+
+  it("shows the server's time while the browser says another day, and steps with the browser's elapsed time", async () => {
+    api.usesServer = true; // the page reads on a timer
+    vi.useFakeTimers({ now: Date.parse("2026-11-14T21:30:00Z") });
+    page("rn");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByText(clock(SERVED))).toBeTruthy();
+    api.getPatient.mockRejectedValue(new Error("down")); // the next read fails: the clock still runs
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20_000);
+    });
+    expect(screen.getByText(clock(SERVED + 20_000))).toBeTruthy();
+    expect(screen.getByText(/Cannot reach the ward server since/)).toBeTruthy();
+  });
+
+  it("shows a nurse's entry time without its date when it is the ward's today", async () => {
+    vi.useFakeTimers({ now: Date.parse("2026-11-14T21:30:00Z"), toFake: ["Date"] });
+    const hr = base.vitals.heart_rate;
+    api.getPatient.mockResolvedValue({
+      ...base,
+      vitals: { ...base.vitals, heart_rate: { ...hr, provenance: { ...hr.provenance, source: "nurse", observed_at: "2026-09-03T06:45:00Z" } } },
+    });
+    page("rn");
+    await loaded();
+    const at = new Date("2026-09-03T06:45:00Z").toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    expect(screen.getAllByText(`Entered by a nurse at ${at}`).length).toBeGreaterThan(0);
+  });
+});
 
 describe("PatientDetail", () => {
   it("says the patients are simulated, once, and has the session menu", async () => {

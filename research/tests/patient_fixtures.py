@@ -48,7 +48,7 @@ def detail_dict(**over):
                                {"rule": "tier_b_finding", "text": "Heart rate 40 over baseline.", "pathway": "cardiac"}],
         "synthetic": True, "signal_quality": 90, "last_update_s": 12,
         "vital_history": {"heart_rate": series(HR), "respiratory_rate": series(RR), "spo2": series(SP)},
-        "tier_breakdown": {"tier_a": None},
+        "tier_breakdown": {"tier_a": None}, "now": T0,
         }
     full = PatientDetail.model_validate(d).model_dump(mode="json")
     cut = {k: full[k] for k in DETAIL_KEYS}  # the allow-list of contract-patient-ask section 5

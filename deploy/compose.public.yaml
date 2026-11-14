@@ -10,8 +10,11 @@ services:
     environment:
       # The two public sites that may call this API from a browser, and no other origin.
       BIOSENTRY_CORS_ORIGINS: https://biosentry-dashboard.pages.dev,https://biosentry-ward-sim.pages.dev
-      # Watching the ward without a sign-in is never on while the address is public, whatever .env says.
-      BIOSENTRY_OPEN_WARD_VIEW: "false"
+      # Watching the ward without a sign-in (owner decision S-3, and for the public address on 2026-11-14,
+      # "for now") is off unless deploy/.env holds the separate line BIOSENTRY_PUBLIC_OPEN_WARD_VIEW=true.
+      # The plain BIOSENTRY_OPEN_WARD_VIEW of .env or the shell is not read here, so it can never turn the
+      # public view on by accident. What a visitor sees: deploy/README.md, "Public mode".
+      BIOSENTRY_OPEN_WARD_VIEW: ${BIOSENTRY_PUBLIC_OPEN_WARD_VIEW:-false}
     # The API writes one line for each request: capped, so a flood of requests cannot fill the disk
     # with log lines. The audit table in the database is not capped (README, "What does not").
     logging:

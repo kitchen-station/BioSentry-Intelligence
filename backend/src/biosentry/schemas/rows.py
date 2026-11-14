@@ -79,6 +79,7 @@ class WardResponse(Contract):
     tier_status: list[TierStatus]
     ranked: list[ScoreRow]
     abstained: list[AbstainedRow]
+    now: AwareDatetime  # ward time this answer was computed at: every age and due time on the page is measured against it
 
 
 class TierAScore(Contract):
@@ -93,6 +94,7 @@ class TierBreakdown(Contract):
 class PatientDetail(ScoreRow):
     vital_history: VitalHistoryFull
     tier_breakdown: TierBreakdown
+    now: AwareDatetime  # ward time this answer was computed at: every age and due time on the page is measured against it
 
 
 StayOutcome = Literal["discharged", "higher_care"]

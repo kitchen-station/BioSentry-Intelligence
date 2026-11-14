@@ -1013,8 +1013,9 @@ is set. The agent's own settings (`BIOSENTRY_AGENT_TRIALS`, `BIOSENTRY_AGENT_HOM
 commands.
 
 It needs Python 3.11, the backend package, the trial root read-only (`ward-v2`, seeds 1 to 10) and a
-writable agent home outside the repository. Nothing in this repository starts it, and where it runs is not
-decided.
+writable agent home outside the repository. The team deployment starts it as the `ask-lab` service
+(`deploy/compose.yaml`, `deploy/README.md`). It ran there on a laptop against a local API on 2026-11-14; it has
+not run on the server.
 
 Do not start the worker until the API serves `?kind=question` on the claim (dashboard round 6c, migration
 0011). An older API ignores `?kind=` and hands out a clinician's compare run. The worker refuses that job
@@ -1055,7 +1056,9 @@ experiments can pass, and the doctor gets an answer about another experiment. Th
 With the mode on, the question text reaches a language model. Prompt injection can at most make the model
 pick another of the three experiments, or refuse. A question that the guard refuses by its own rules never
 reaches the model. The model runs in a child process, one question at a time. Its environment holds no
-`BIOSENTRY_*` value, so it never holds the ingest key; the two folder paths are its arguments.
+`BIOSENTRY_*` value, so the key is not handed to it; the two folder paths are its arguments. It runs as the same
+user as the worker, so this does not stop hostile code in the model's environment from reading the key out of
+the worker's process.
 
 Loading has 300 s. One answer has 240 s, and that covers the write to the child too, so a child that does
 not read cannot block the worker. A failure kills the child's process group, the rules answer that question,
@@ -1092,8 +1095,9 @@ handled-id set and key rules. It claims `POST {base}/sim/lab/claim?kind=patient_
 response of up to 524288 bytes. It reads `BIOSENTRY_API_URL`, `BIOSENTRY_INGEST_KEY` and, optionally,
 `BIOSENTRY_AGENT_COMMIT`. It needs no trials folder and no agent home.
 
-Nothing in this repository starts this worker. The API routes it calls are on `main` since 2026-11-14; the worker
-has not run against them. It stops after a job of another kind.
+The team deployment starts this worker as the `ask-patient` service (`deploy/compose.yaml`). The API routes it
+calls are on `main` since 2026-11-14. It ran against a local API on a laptop that day (four questions about the
+seeded patient p-001: three answered, one refused); it has not run on the server. It stops after a job of another kind.
 
 The data lives in memory for one job. The worker writes no file. A log line holds a job id and a state only. The
 `done` record holds the kind, the arguments, the numbers and `data_sha256`, the hash of the patient object as
@@ -1101,7 +1105,6 @@ received (the contract's canonical JSON, NaN refused). It holds no copy of the d
 
 One claim body from the dashboard session's API (made on its branch, before the merge; the seeded patient p-001) is a test
 file: `tests/data/patient_question_job.json`. A test checks that the worker's hash of it is the hash that API
-stored when the question was asked, and that the job ends `done`. That is one sample, read from a file. The
-worker has still never talked to a running API.
+stored when the question was asked, and that the job ends `done`. That is one sample, read from a file.
 The sample was made before the API began to serve a baseline's times as the start of the 15 minutes, and before
 `band_low` and `band_high`. It stays as a check of the hash rule only; its baseline times are the old ones.

@@ -45,9 +45,12 @@ const lab = (who: typeof session | typeof admin = session) =>
   );
 
 describe("lab index", () => {
-  it("gives a physician no link to a developer page", () => {
+  it("gives a physician no link to a developer page, and calls the page What-if runs", () => {
     lab();
-    expect(screen.getByRole("heading", { level: 1, name: "Simulation lab" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "What-if runs" })).toBeTruthy();
+    expect(screen.getByText(/BioSentry . What-if runs/)).toBeTruthy();
+    expect(screen.getByRole("note").textContent).toBe("Simulated trials only. Nothing here changes a patient's rank.");
+    expect(screen.queryByText(/Simulation lab/)).toBeNull();
     for (const name of ["Research numbers", "The research agent's questions and answers", "The pipeline"]) {
       expect(screen.queryByRole("link", { name })).toBeNull();
     }
@@ -80,9 +83,16 @@ describe("lab index", () => {
     expect(screen.queryByRole("link", { name: "Ask the research agent" })).toBeNull();
   });
 
-  it("links the ward simulator, with its warning, when the one-address image serves it", () => {
+  it("shows a physician no ward simulator link, a developer tool, on the one-address image", () => {
     vi.stubEnv("VITE_API_URL", "/api");
     lab();
+    expect(screen.queryByText("Outside the lab")).toBeNull();
+    expect(screen.queryByRole("link", { name: "Open the ward simulator" })).toBeNull();
+  });
+
+  it("links the ward simulator, with its warning, when the one-address image serves it", () => {
+    vi.stubEnv("VITE_API_URL", "/api");
+    lab(admin);
     expect(screen.getByRole("heading", { name: "Outside the lab" })).toBeTruthy();
     expect(screen.getByText(/a change made there changes the ranks on the ward list/)).toBeTruthy();
     const link = screen.getByRole("link", { name: "Open the ward simulator" });
@@ -94,7 +104,7 @@ describe("lab index", () => {
 
   it("hides the simulator link for a local API address", () => {
     vi.stubEnv("VITE_API_URL", "http://127.0.0.1:8000");
-    lab();
+    lab(admin);
     expect(screen.queryByRole("link", { name: "Open the ward simulator" })).toBeNull();
   });
 

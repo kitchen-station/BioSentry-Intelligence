@@ -197,7 +197,7 @@ describe("route guards", () => {
   });
 
   const physician: Session = { clinician_id: "md-santos", ward: "W4", role: "md" };
-  const LAB = [["/lab", "lab page"]] as const;
+  const LAB = [["/what-if", "lab page"], ["/lab", "lab page"]] as const; // a clinician's /lab leads to /what-if
   const ASK = ["/ask", "/ask/patient/p-001"] as const;
   const DEVELOPER = [["/lab/research", "research page"], ["/lab/pipeline", "pipeline page"], ["/research", "research page"], ["/pipeline", "pipeline page"]] as const;
 
@@ -248,9 +248,12 @@ describe("route guards", () => {
     }
   });
 
-  it("shows every lab page to an admin, the old addresses too", () => {
+  it("shows every lab page to an admin, the old addresses too, and sends an admin from /what-if to the ward", () => {
     store(admin);
-    for (const [path, words] of [...LAB, ...DEVELOPER]) {
+    at("/what-if");
+    expect(screen.getByText("ward page for admin-ruiz")).toBeTruthy();
+    cleanup();
+    for (const [path, words] of [["/lab", "lab page"], ...DEVELOPER]) {
       const { unmount } = at(path);
       expect(screen.getByText(`${words} for admin-ruiz`)).toBeTruthy();
       unmount();

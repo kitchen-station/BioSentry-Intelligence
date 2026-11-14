@@ -106,9 +106,9 @@ function clean(raw: PatientHistory): Stay {
 
 const day = (ms: number) => new Date(ms).toDateString();
 
-function runLine(r: Run): string {
+function runLine(r: Run, now: number): string {
   const range =
-    day(r.start) === day(r.end) ? `${formatClockDay(r.start)} to ${formatClock(r.end)}` : `${formatClockDay(r.start, 0)} to ${formatClockDay(r.end, 0)}`;
+    day(r.start) === day(r.end) ? `${formatClockDay(r.start, now)} to ${formatClock(r.end)}` : `${formatClockDay(r.start, 0)} to ${formatClockDay(r.end, 0)}`;
   const head = r.ongoing ? `${range} (last stored set)` : range;
   const why = r.reasons.join(" \u00b7 ");
   if (r.state === "alert") {
@@ -120,13 +120,13 @@ function runLine(r: Run): string {
   return `${head} \u00b7 No heart rate reading`;
 }
 
-function episodeLine(e: Episode): string {
-  const times = day(e.start) === day(e.full) ? `${formatClockDay(e.start)}, fully in ${formatClock(e.full)}` : `${formatClockDay(e.start, 0)}, fully in ${formatClockDay(e.full, 0)}`;
+function episodeLine(e: Episode, now: number): string {
+  const times = day(e.start) === day(e.full) ? `${formatClockDay(e.start, now)}, fully in ${formatClock(e.full)}` : `${formatClockDay(e.start, 0)}, fully in ${formatClockDay(e.full, 0)}`;
   return `Simulated deterioration (${e.kind}): began ${times}`;
 }
 
-function eventLine(e: Ev): string {
-  const t = formatClockDay(e.at);
+function eventLine(e: Ev, now: number): string {
+  const t = formatClockDay(e.at, now);
   const by = e.by === null ? "" : ` by ${e.by}`;
   if (e.kind === "admitted") return `Admitted at ${t}`;
   if (e.kind === "acknowledged") return `Acknowledged${by} at ${t}${e.score === null ? "" : ` (NEWS2 ${e.score})`}`;
@@ -183,7 +183,7 @@ function Strip({ stay, from, to }: { stay: Stay; from: number; to: number }) {
   );
 }
 
-function Entries({ stay }: { stay: Stay }) {
+function Entries({ stay, now }: { stay: Stay; now: number }) {
   const used = new Set<Ev>();
   const items = [
     ...stay.runs.map((r) => {
@@ -200,18 +200,18 @@ function Entries({ stay }: { stay: Stay }) {
       {rows.map((row, i) => (
         <li key={i} className={styles.item}>
           {"episode" in row ? (
-            episodeLine(row.episode)
+            episodeLine(row.episode, now)
           ) : "run" in row ? (
             <>
-              {runLine(row.run)}
+              {runLine(row.run, now)}
               {row.inside.length > 0 && (
                 <ul className={styles.nested}>
-                  {[...row.inside].sort((a, b) => b.at - a.at).map((e, j) => <li key={j}>{eventLine(e)}</li>)}
+                  {[...row.inside].sort((a, b) => b.at - a.at).map((e, j) => <li key={j}>{eventLine(e, now)}</li>)}
                 </ul>
               )}
             </>
           ) : (
-            eventLine(row.event)
+            eventLine(row.event, now)
           )}
         </li>
       ))}
@@ -223,7 +223,7 @@ function Entries({ stay }: { stay: Stay }) {
  * The stay of one patient as a short history. It reads once when first opened and again only on Refresh:
  * each read is one audit row on the server, so no timer asks again. Closing and opening reads nothing.
  */
-export function StayPanel({ patientId, onSignOut }: { patientId: string; onSignOut: () => void }) {
+export function StayPanel({ patientId, onSignOut, now }: { patientId: string; onSignOut: () => void; now: number }) {
   const [stay, setStay] = useState<Stay | null>(null);
   const [asked, setAsked] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -261,7 +261,7 @@ export function StayPanel({ patientId, onSignOut }: { patientId: string; onSignO
   }, [patientId]);
 
   const crosses = stay !== null && stay.from !== null && stay.to !== null && day(stay.from) !== day(stay.to);
-  const end = (ms: number) => (crosses ? formatClockDay(ms, 0) : formatClockDay(ms));
+  const end = (ms: number) => (crosses ? formatClockDay(ms, 0) : formatClockDay(ms, now));
   const body = stay !== null && stay.unavailable === null;
 
   return (
@@ -291,7 +291,7 @@ export function StayPanel({ patientId, onSignOut }: { patientId: string; onSignO
             )}
             {stay.broken && <p className={styles.quiet}>The stay could not be shown.</p>}
             {!stay.broken && !stay.dropped && stay.runs.length === 0 && <p className={styles.quiet}>No alert level in the stored sets.</p>}
-            <Entries stay={stay} />
+            <Entries stay={stay} now={now} />
             {(stay.episode || stay.runs.some((r) => r.episode)) && (
               <p className={styles.quiet}>Known only because this is a simulation. A real ward has no such information.</p>
             )}
