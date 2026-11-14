@@ -5,7 +5,7 @@
 #   -> makes deploy/.env, mode 600, if it does not exist (random Postgres password and ingest key,
 #      never printed; an existing one is kept, and its mode put right)
 #   -> clones the ward simulator beside this repository (SIM_DIR), or updates it if it is there
-#   -> builds the images (the API, the ward runner and lab worker, and the web server with the two pages) and starts
+#   -> builds the images (the API, the ward runner and lab worker, the two question workers, and the web server with the two pages) and starts
 #      the stack, waiting until it is healthy.
 #   -> public mode, only when PUBLIC_HOST is set in deploy/.env (deploy/README.md, "Public mode"): it
 #      adds compose.public.yaml. This script never opens the address itself: it prints the command.

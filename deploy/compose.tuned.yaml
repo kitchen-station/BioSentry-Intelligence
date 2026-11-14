@@ -1,0 +1,34 @@
+# The tuned model for the lab question worker. Optional: add it after compose.yaml.
+#
+#     docker compose -f deploy/compose.yaml -f deploy/compose.tuned.yaml up -d --build ask-lab
+#
+# Without this file `ask-lab` answers by keyword rules only. With it, the rules still answer first
+# and the worker asks the tuned model only where the rules are silent (research/README.md, "Model
+# mode"; research/agent_tuning/SERVER.md has the measured time and memory). The model runs inside
+# the same container as a child process that gets no BIOSENTRY_* value in its environment. It runs
+# as the same user as the worker, so a hostile package in the model's environment could still read
+# the ingest key from the worker's process and use it on the API. The container reaches the API
+# and the host's own address on that bridge, nothing else. The packages are pinned by version, not by hash.
+#
+# The weights are not in the image. Put two folders on the server and name their parent in
+# deploy/.env as AGENT_WEIGHTS_DIR:
+#   base/     Qwen/Qwen2.5-0.5B-Instruct at the revision in research/agent_tuning/weights.json (955 MB)
+#   adapter/  our adapter release (2.1 MB)
+# The worker checks every file by sha256 against research/agent_tuning/weights.json at start and
+# before each start of the model. On a mismatch, or with a folder missing, the model mode turns
+# itself off and the rules answer every question: the log says so in one line.
+services:
+  ask-lab:
+    build:
+      target: worker-tuned
+    environment:
+      BIOSENTRY_AGENT_TUNED_BASE: /weights/base
+      BIOSENTRY_AGENT_TUNED_ADAPTER: /weights/adapter
+      BIOSENTRY_AGENT_TUNED_PYTHON: /opt/tuned/bin/python
+    volumes:
+      - ${AGENT_WEIGHTS_DIR:?set AGENT_WEIGHTS_DIR in deploy/.env}/base:/weights/base:ro
+      - ${AGENT_WEIGHTS_DIR:?set AGENT_WEIGHTS_DIR in deploy/.env}/adapter:/weights/adapter:ro
+    # The model peaked at 6.0 GB in a 4-CPU Linux container (aarch64), and one answer took 36 to
+    # 128 s. Fewer CPUs can push an answer past the worker's 240 s limit: the rules then answer.
+    mem_limit: 7g
+    cpus: 4

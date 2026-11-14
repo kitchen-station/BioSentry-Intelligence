@@ -19,3 +19,6 @@ coverage/
 
 # Deployment secrets
 /deploy/.env
+# Data the server holds for the question worker: trials and model weights, never committed
+/deploy/agent-trials/
+/deploy/agent-weights/

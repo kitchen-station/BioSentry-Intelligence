@@ -1,5 +1,5 @@
-# The team deployment on one server: PostgreSQL, the API, the ward simulator, the lab worker and the
-# web server that carries the two browser apps. Run from this directory or with
+# The team deployment on one server: PostgreSQL, the API, the ward simulator, the lab worker, the two
+# question workers and the web server that carries the two browser apps. Run from this directory or with
 # `-f deploy/compose.yaml`; deploy/setup.sh does it. Secrets come from deploy/.env (git-ignored,
 # made by setup.sh): a missing one stops compose with an error, there are no defaults.
 #
@@ -51,7 +51,7 @@ services:
       # Loopback only. API_PORT moves the host side when 8000 is taken (a second stack on one machine).
       - "127.0.0.1:${API_PORT:-8000}:8000"
     # `default` is what lets the published port work; `backend` (internal) is how it reaches the
-    # database; `labnet` (internal) is where the lab worker finds it.
+    # database; `labnet` (internal) is where the lab worker and the two question workers find it.
     networks: [default, backend, labnet]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
@@ -117,6 +117,78 @@ services:
     pids_limit: 128
     cpus: 2
 
+  # The patient question worker: it answers "Ask about this patient" on the dashboard's patient page.
+  # It claims one question from the API with the ingest key, answers it by code from the patient data
+  # that the API froze into the job, and posts the answer back (research/README.md, "The patient
+  # agent"). No language model. It publishes no port and sits on the internal network with the API
+  # alone: no route out, none to the database. It writes no file at all, so it has no writable place
+  # (but Docker's own in-memory /dev/shm and /dev/mqueue, as every container has).
+  # It follows no redirect and uses no proxy, so the key goes to the API host only.
+  ask-patient:
+    build:
+      context: ..
+      dockerfile: deploy/worker.Dockerfile
+      target: worker
+      # The build only (uv sync), on the host's network, for the reason the api's build is.
+      network: host
+    command: ["python", "-m", "research.patient_agent", "worker"]
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      BIOSENTRY_API_URL: http://api:8000
+      BIOSENTRY_INGEST_KEY: ${BIOSENTRY_INGEST_KEY:?set BIOSENTRY_INGEST_KEY in deploy/.env}
+    networks: [labnet]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    # One small job at a time, in memory: measured near 30 MB.
+    mem_limit: 256m
+    pids_limit: 64
+    cpus: 1
+
+  # The lab question worker: it answers the Ask page of the lab (a question about the whole simulated
+  # ward). It claims one question, runs one of three fixed experiments on stored simulator trials, and
+  # posts the answer back (research/README.md, "The question worker"). Keyword rules choose the
+  # experiment. The same image and the same isolation as `ask-patient`. Two folders:
+  #   /trials      read-only: the trial root. Copy `ward-v2/seed-01` to `seed-10` (18 MB) into
+  #                deploy/agent-trials/ward-v2/ on the server once (AGENT_TRIALS_DIR moves it). No
+  #                held-out seed belongs there. While the folder is empty every question ends as
+  #                failed with "the agent's tool failed"; nothing else breaks.
+  #   /agent-home  the agent's own ledger of what it ran (the agenthome volume). Nothing else is
+  #                writable but /tmp, which is in memory (and Docker's /dev/shm and /dev/mqueue).
+  # deploy/compose.tuned.yaml adds the tuned model for the questions the rules are silent on.
+  ask-lab:
+    build:
+      context: ..
+      dockerfile: deploy/worker.Dockerfile
+      target: worker
+      # The build only (uv sync), on the host's network, for the reason the api's build is.
+      network: host
+    command: ["python", "-m", "research.agent", "worker"]
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      BIOSENTRY_API_URL: http://api:8000
+      BIOSENTRY_INGEST_KEY: ${BIOSENTRY_INGEST_KEY:?set BIOSENTRY_INGEST_KEY in deploy/.env}
+      BIOSENTRY_AGENT_TRIALS: /trials
+      BIOSENTRY_AGENT_HOME: /agent-home
+    volumes:
+      - ${AGENT_TRIALS_DIR:-./agent-trials}:/trials:ro
+      - agenthome:/agent-home
+    networks: [labnet]
+    read_only: true
+    tmpfs: ["/tmp:size=64m"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    # One experiment at a time: measured near 16 s and 210 MB for one question on 2 CPUs.
+    mem_limit: 1g
+    pids_limit: 128
+    cpus: 2
+
   # The address the team opens: the dashboard at /, the full ward simulator at /simulator/ and the API at /api,
   # from one small web server (web.Dockerfile, Caddyfile). The pages call the API on their own address,
   # so there is no cross-origin request and no API address to bake into them. Like the api it is
@@ -156,8 +228,9 @@ networks:
   backend:
     internal: true # no route out, and nothing outside reaches it
   labnet:
-    internal: true # the API and the lab worker only
+    internal: true # the API, the lab worker and the two question workers only
 
 volumes:
   pgdata:
   simstate:
+  agenthome:
