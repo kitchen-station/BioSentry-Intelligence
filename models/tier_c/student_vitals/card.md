@@ -107,6 +107,45 @@ What it cannot show:
   model was read on them once. `evaluate_student` writes to standard output and has no run-once guard in code.
 - Held-out was not used to choose anything: the model, the variant and the threshold were fixed before the run.
 
+## Held-out set 2 (ward-v2-heldout2 seeds 1001 to 1400, read once on 2026-11-14)
+
+400 new trials, 1,743 episodes (1,601 not cut short), 93,230 control windows, 37,062 patients. The set was declared
+before it was read (`research/README.md`, "Held-out set 2"; data card `models/data/ward-v2-heldout2/card.md`). Nothing
+was re-tuned: thresholds, q and the policy are the committed files. Outputs: `models/tier_c/student_vitals/held_out_2.txt|.json`,
+`models/tier_c/confidence_check/heldout_2.txt|.json`, `models/tier_b/reward_policy/held_out_2.txt|.json`, and the
+declared analysis `models/held_out_2/analysis.txt|.json` (bootstrap over the 400 trials, 2,000 resamples).
+
+| Rule | Alerts per patient per 12 h | Time in alert | Any bin (not cut short) | Chance | Excess | Median lead (min) |
+|---|---|---|---|---|---|---|
+| NEWS2 chart trigger | 0.415 | 0.166 | 0.785 (1257/1601) | 0.479 | +0.306 | 46.6 |
+| Teacher | 0.397 | 0.071 | 0.743 (1189/1601) | 0.290 | +0.452 | 81.1 |
+| Student | 0.425 | 0.065 | 0.751 (1202/1601) | 0.308 | +0.443 | 82.9 |
+| NEWS2 or student | 0.521 | 0.193 | 0.843 (1350/1601) | 0.577 | +0.266 | 99.8 |
+| Student with the confidence check | 0.132 | 0.025 | 0.691 (1106/1601) | 0.084 | +0.607 | 38.9 |
+| NEWS2 or checked student | 0.435 | 0.172 | 0.820 (1313/1601) | 0.496 | +0.325 | 71.5 |
+| Reward policy, final | 0.164 | 0.036 | 0.669 (1071/1601) | 0.132 | +0.537 | 15.2 |
+| NEWS2 or reward policy, final | 0.470 | 0.186 | 0.828 (1326/1601) | 0.534 | +0.294 | 64.1 |
+
+The pre-registered verdicts, on the gain in excess over chance of "NEWS2 or X" against NEWS2 alone (two-sided 98.33%
+interval, trials as the unit; a result about this simulator only):
+
+| Added to NEWS2 | Gain in excess over chance | 98.33% interval | Windows added (of 1,601) | Alerts vs NEWS2 | Verdict |
+|---|---|---|---|---|---|
+| student | -0.0401 | -0.0542 to -0.0253 | +93 (1,350 vs 1,257) | 1.254 | a loss is shown |
+| student with the confidence check | +0.0181 | +0.0080 to +0.0291 | +56 (1,313 vs 1,257) | 1.048 | a gain beyond chance is shown |
+| reward policy, final | -0.0127 | -0.0245 to -0.0001 | +69 (1,326 vs 1,257) | 1.131 | a loss is shown (upper end -0.0001, at the edge) |
+
+- Set 1 (91 episodes) said "no gain beyond chance is shown" for all three. Set 2 has about 19 times the episodes and
+  separates them: more alerts bring more windows, but for the student and the reward policy by less than chance
+  predicts; for the checked student by a little more. Set 1 had a point gain of +0.033 for the student (excess
+  +0.243 against +0.210) and set 2 has -0.040; set 1 had no interval for the gain, so the two are not compared
+  further. Set 2 is the larger read and is the one to quote.
+- The gain for the checked student is small (about 1.8 points of any-bin rate over chance) and is bought with
+  4.8% more alerts. It is a statement about this simulator. Synthetic, not validated.
+- The secondary rows (no temperature, each rule alone, per-kind counts) are in `models/held_out_2/analysis.txt` and carry no verdict word.
+- Hypotensive episodes: the student alerts in 92 of 458, the checked student in 22 of 458 (on set 1 it was 0 of 27).
+  NEWS2 alerts in 169 of 458, and in 295 of the 458 NEWS2 saw no new blood pressure.
+
 ## Validation results (seeds 261-300)
 
 Validation log loss (lower is better) and average precision (AP, recorded where the run measured it; never used to

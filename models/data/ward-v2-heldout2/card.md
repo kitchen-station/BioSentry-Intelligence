@@ -7,7 +7,7 @@
 | synthetic | yes, `synthetic: true` in every manifest. No real patient data |
 | validated | no |
 | licence | none stated: our own simulator output |
-| present when read | (filled in by the orchestrator) |
+| present when read | read once per command on 2026-11-14 (student, confidence check, reward policy), then the analysis; outputs committed; never read again |
 
 Seeds 1001 to 1400: 400 trials of 30 simulated days. This is "held-out set 2". Ward-v2 seeds 11 to 30
 are "held-out set 1" and are spent.
