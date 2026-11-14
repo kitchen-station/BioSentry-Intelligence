@@ -220,9 +220,11 @@ describe("the ward's clock and speed in the bar", () => {
 });
 
 describe("how often the ward follows the run's speed", () => {
+  // The clock here moves only when a test moves it: no real time passes into a test, so a slow machine changes nothing.
+  // That rules out findBy and waitFor in this block (they wait on real time); `advance(0)` lets what is pending settle.
   beforeEach(() => {
     api.build.usesServer = true;
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.useFakeTimers();
   });
   const advance = (ms: number) =>
     act(async () => {
@@ -235,7 +237,8 @@ describe("how often the ward follows the run's speed", () => {
   const start = async (over: object) => {
     api.getLiveWard.mockResolvedValue(published(over));
     page();
-    await screen.findByRole("group", { name: "Ward clock" });
+    await advance(0);
+    expect(screen.getByRole("group", { name: "Ward clock" })).toBeTruthy();
     api.getWard.mockClear();
   };
 
@@ -302,7 +305,8 @@ describe("how often the ward follows the run's speed", () => {
   it("is 5 seconds when the live view cannot be read", async () => {
     api.getLiveWard.mockRejectedValue(new Error("down"));
     page();
-    await screen.findByText(/Priority queue/);
+    await advance(0);
+    expect(screen.getByText(/Priority queue/)).toBeTruthy();
     api.getWard.mockClear();
     await advance(2_500);
     expect(api.getWard).not.toHaveBeenCalled();
@@ -324,21 +328,28 @@ describe("how often the ward follows the run's speed", () => {
 
   it("a round that hangs until the read timeout fails, says so, and the next tick asks again", async () => {
     await start({ speed: 60 });
-    api.getWard.mockReturnValueOnce(hangsFor(10_000));
-    // Step in small slices to the instant the read times out, so no tick lands in the same slice.
-    for (let ms = 0; ms < 11_000 && !screen.queryByText(/Cannot reach the ward server since/); ms += 100) await advance(100);
+    // The read starts at the 2 s tick and times out 10.5 s later, at 12.5 s: half a second after one tick, never on one.
+    api.getWard.mockImplementationOnce(() => hangsFor(10_500));
+    await advance(2_000);
+    expect(api.getWard).toHaveBeenCalledTimes(1);
+    await advance(10_400); // the ticks at 4, 6, 8, 10 and 12 s find the round in flight
+    expect(api.getWard).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/Cannot reach the ward server since/)).toBeNull();
+    await advance(100); // the read times out
     expect(screen.getByText(/Cannot reach the ward server since/)).toBeTruthy();
     api.getWard.mockClear().mockResolvedValue(ward());
-    await advance(5_100);
+    await advance(4_900); // a failing ward is asked again after 5 s, not 2
+    expect(api.getWard).not.toHaveBeenCalled();
+    await advance(100);
     expect(api.getWard).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(screen.queryByText(/Cannot reach the ward server since/)).toBeNull());
+    expect(screen.queryByText(/Cannot reach the ward server since/)).toBeNull();
   });
 
   it("asks a failing ward every 5 seconds at 60x, and says so", async () => {
     await start({ speed: 60 });
     api.getWard.mockRejectedValue(new Error("down"));
     await advance(2_100); // the round that fails
-    expect(await screen.findByText(/Retrying every 5 seconds\./)).toBeTruthy();
+    expect(screen.getByText(/Retrying every 5 seconds\./)).toBeTruthy();
     api.getWard.mockClear();
     await advance(2_500);
     expect(api.getWard).not.toHaveBeenCalled();
