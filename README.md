@@ -1,5 +1,104 @@
 # BioSentry
 
+A ranked early-warning list for hospital wards in the Philippines.
+
+**This is not a diagnosis system.** It ranks and displays. A human decides.
+
+BioSentry answers one question: *of your twenty patients, see this one first.* It takes
+vital signs, adds what the hospital already knows (diagnosis, labs, and values a nurse
+types in: blood pressure and level of consciousness, and also heart rate, respiratory rate,
+SpO2 and temperature when there is no patch or the patch gives no reading) and puts every
+patient on one ranked list, one screen per clinician. So a patient can be ranked with no
+patch. A typed heart rate, respiratory rate, SpO2 or temperature counts for 12 hours (the
+longest gap NEWS2 allows between observation sets; using it for every score is our
+judgement), then the patient is NOT RANKED until it is entered again or the patch reads it
+again. A patch reading of the same vital, new or still current, replaces a typed value. Blood
+pressure, level of consciousness, oxygen and SpO2 scale do not expire. Trend charts show patch
+data only.
+
+**Why.** Philippine wards have too few nurses to watch every patient: the DOH standard for government
+hospitals is one nurse per 12 beds per shift ([DOH manual](https://www.dbm.gov.ph/wp-content/uploads/Issuances/2013/Joint%20Circular%202013/DOH/Manual%20RSSGH_%203%20levels.pdf)),
+and the Philippine General Hospital has reported 1:20
+([Acta Medica Philippina](https://actamedicaphilippina.upm.edu.ph/index.php/acta/article/download/3124/2110)).
+Automated alerts alone have not shown a clear cut in mortality
+([Cochrane review, McGaughey 2021](https://pmc.ncbi.nlm.nih.gov/articles/PMC8608437/)): the gap is unreliable
+alerts and too few people to act.
+BioSentry's contribution is the process, not the hardware: an offline-first ward system (patch,
+gateway and edge server, cloud sync when the network allows) that cuts false alarms and tells
+each nurse and physician who to see next.
+
+The list is sorted by **NEWS2**, a published bedside early-warning score (Tier A). A patient
+who meets a NEWS2 trigger sits above one who does not. The own-baseline finding (Tier B) is listed as a
+reason and breaks ties between equal NEWS2 totals below a trigger; it never moves a patient past a NEWS2
+difference. Two research models can add a flag to a row as one more reason, labelled synthetic and not
+validated. A flag never moves a patient on the list.
+
+**What is here.** The dashboard (`frontend/`) and a slim API (`backend/`: FastAPI over PostgreSQL); the
+research models as plain files with their held-out results (`models/`), the code that trains them
+(`training/`), the research agent (`research/`) and the team deployment (`deploy/`). The
+API serves the committed synthetic ward (`frontend/src/data/synthetic.json`), seeded into the database,
+and takes a live ward from the ward simulation.
+
+## Results
+
+On held-out simulated wards, the distilled MindSpore model catches more deteriorations than NEWS2 at the same
+alert burden, and spends less than half as long alerting.
+
+| Alerting rule | Alerts per patient per 12-hour shift (95% interval) | Deteriorations with an alert in time | Time in alert |
+|---|---|---|---|
+| NEWS2 chart trigger | 0.414 (0.395 to 0.434) | 36% (33 of 91) | 15.8% |
+| NEWS2 total of 5 or more | 0.340 (0.322 to 0.357) | 40% (36 of 91) | 12.0% |
+| **Distilled student (MindSpore 2.11)** | **0.413 (0.394 to 0.430)** | **56% (51 of 91)** | **6.4%** |
+
+20 held-out 30-day trials of the ward simulator, 1,873 patients, 91 deterioration episodes, patient-level
+bootstrap intervals. Every row was re-scored with the backend's NEWS2 with 0 mismatches. **These are not
+clinical results:** the same simulator makes the data and judges the alerts. The full table, method and other
+rules are in [`models/tier_c/student_vitals/held_out.txt`](models/tier_c/student_vitals/held_out.txt).
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph ward["Ward"]
+    sim["Ward simulator<br/>stands in for patch and monitor"]
+    nurse["Nurse entry<br/>BP, consciousness, oxygen"]
+  end
+  subgraph server["BioSentry server, Docker Compose"]
+    api["API: FastAPI<br/>NEWS2 and the escalation arbiter"]
+    models["Research models<br/>student, confidence check, reward policy"]
+    db[("PostgreSQL 18<br/>append-only audit log")]
+    web["Dashboard: React<br/>one ranked list per clinician"]
+  end
+  subgraph huawei["Huawei AI and cloud"]
+    ms["MindSpore 2.11<br/>trains the student"]
+    lite["MindSpore Lite<br/>model.ms for the edge"]
+    ma["ModelArts<br/>training job"]
+    obs["OBS<br/>model files, backups"]
+    ecs["ECS<br/>hosts the server"]
+    iot["IoTDA<br/>device data"]
+  end
+  sim -- "/sim/* with ingest key" --> api
+  nurse --> web
+  web -- "HTTPS, bearer token" --> api
+  api --- db
+  models --> api
+  ms -- "weights" --> models
+  ms --> lite
+  ma -.-> ms
+  ma -.-> obs
+  ecs -.-> server
+  iot -.-> api
+  classDef used fill:#fdecea,stroke:#c7000b,color:#000
+  classDef planned fill:#ffffff,stroke:#c7000b,stroke-dasharray:5 4,color:#000
+  class ms,lite used
+  class ma,obs,ecs,iot planned
+```
+
+Red: Huawei technology in use today. MindSpore 2.11 trains the student, and MindSpore Lite converts it
+(`models/tier_c/student_vitals/lite.txt`: converted, 20 of 20 test rows match). Dashed: Huawei Cloud services
+planned and not running yet. The API runs the student from its exported weights (`models/`), scores NEWS2 on
+every read, and stores no score.
+
 ## Use it now
 
 BioSentry is deployed. You do not need to install anything to see it.
@@ -23,40 +122,6 @@ in the `X-Ingest-Key` header. The ward simulation is one sender; any system that
 (a run, then batches of observations) reaches the same scoring, own-baseline tracking and ward list, with
 no change to the dashboard. Today the door accepts only data marked synthetic, and nothing here is
 validated for clinical use; a feed of real patients would need that rule changed, and a validation first.
-
-A ranked early-warning list for hospital wards in the Philippines.
-
-BioSentry answers one question: *of your twenty patients, see this one first.* It takes
-vital signs, adds what the hospital already knows (diagnosis, labs, and values a nurse
-types in: blood pressure and level of consciousness, and also heart rate, respiratory rate,
-SpO2 and temperature when there is no patch or the patch gives no reading) and puts every
-patient on one ranked list, one screen per clinician. So a patient can be ranked with no
-patch. A typed heart rate, respiratory rate, SpO2 or temperature counts for 12 hours (the
-longest gap NEWS2 allows between observation sets; using it for every score is our
-judgement), then the patient is NOT RANKED until it is entered again or the patch reads it
-again. A patch reading of the same vital, new or still current, replaces a typed value. Blood
-pressure, level of consciousness, oxygen and SpO2 scale do not expire. Trend charts show patch
-data only.
-
-**Why.** Ward nurse-to-patient ratios run 1:20 or worse (DOH standard 1:12), and automated
-alerts alone have not cut mortality: the gap is unreliable alerts and too few people to act.
-BioSentry's contribution is the process, not the hardware: an offline-first ward system (patch,
-gateway and edge server, cloud sync when the network allows) that cuts false alarms and tells
-each nurse and physician who to see next.
-
-The list is sorted by **NEWS2**, a published bedside early-warning score (Tier A). A patient
-who meets a NEWS2 trigger sits above one who does not. The own-baseline finding (Tier B) is listed as a
-reason and breaks ties between equal NEWS2 totals below a trigger; it never moves a patient past a NEWS2
-difference. Two research models can add a flag to a row as one more reason, labelled synthetic and not
-validated. A flag never moves a patient on the list.
-
-**What is here.** The dashboard (`frontend/`) and a slim API (`backend/`: FastAPI over PostgreSQL); the
-research models as plain files with their held-out results (`models/`), the code that trains them
-(`training/`), the research agent (`research/`) and the team deployment (`deploy/`). The
-API serves the committed synthetic ward (`frontend/src/data/synthetic.json`), seeded into the database,
-and takes a live ward from the ward simulation.
-
-**This is not a diagnosis system.** It ranks and displays. A human decides.
 
 ## Run it yourself (developers)
 
@@ -213,17 +278,21 @@ active one: the seeded fixture ward, or a simulated ward posted to `/sim/*`.
 - The API: sign-in to a session token, server-side clinician scope, audit on every view (a repeat once a minute, I7), NEWS2 and the
   escalation arbiter computed on read, notes, labs, admission, nurse-recorded vitals,
   acknowledgements, and ingest from the ward simulation.
+- The research models (synthetic, not validated): a distilled vitals student trained in MindSpore 2.11 and
+  converted to MindSpore Lite, a split-conformal confidence check on it, and a reward-driven alerting policy.
+  The API loads them and a flag adds a reason to a row; a flag never moves a patient.
+- The baseline comparison: alerts per patient per shift and deteriorations caught, against NEWS2, on
+  held-out simulated wards ([Results](#results)).
 
 **Pending:** an identity provider in place of per-clinician passphrases (a clinician locked out by five
 bad attempts stays locked for 15 minutes, whoever made them), cloud sync, a hash-chained audit log, Tier B beyond the
 own-baseline tie-break, a
-signal-quality model, conformal abstention, distilled edge models, anything measured on real
+signal-quality model, conformal abstention, the models on ward edge hardware, anything measured on real
 patients, a sensor pipeline (IoT Device Access), document extraction, and a plain-language
 explanation of each ranked alert for the nurse or physician.
 
-**Next:** deploy offline-first on Huawei Cloud (IoT Device Access, ModelArts, MindSpore Lite,
-Object Storage Service), then compare against a threshold-alarm baseline on false alarms per
-patient per shift. Not doing: federated learning, digital twins, reinforcement-learning
+**Next:** run the server on Huawei Cloud ECS, train on ModelArts with the data and outputs in OBS, and take
+device data through IoT Device Access. Not doing: federated learning, digital twins, reinforcement-learning
 assignment, ECG foundation models.
 
 This repository makes no claim about clinical performance. The scores are a published rule
