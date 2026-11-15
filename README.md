@@ -288,4 +288,7 @@ applied to made-up patients.
 
 ## Licence
 
+The code is MIT licensed ([LICENSE](LICENSE)). Datasets keep their own licences and none is committed here
+(`training/REGISTRY.md`).
+
 Competition entry for the Huawei ICT Competition Innovation Track. No real patient data exists in this repository.
