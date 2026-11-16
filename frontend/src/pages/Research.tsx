@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import type { Session } from "../types";
 import { LabFrame } from "../components/LabFrame";
-import { CONFIDENCE_CHECK as C, LEARNED_RULES, MODEL_FACTS as M, RESEARCH_PROVENANCE as P, RESEARCH_RESULTS, RUN_COMPARISON } from "../data/researchResults";
+import { CONFIDENCE_CHECK as C, HELD_OUT_2 as H2, LEARNED_RULES, MODEL_FACTS as M, RESEARCH_PROVENANCE as P, RESEARCH_RESULTS, RUN_COMPARISON } from "../data/researchResults";
 import { ResearchAgentSection } from "./ResearchAgentSection";
 import styles from "./Research.module.css";
 
@@ -16,6 +16,7 @@ const times = (id: string) => (rule(id).perShift / rule("ref_news2_chart_trigger
 const added = (n: number) => n - M.anyAllCounts.news2;
 const rule = (id: string) => LEARNED_RULES.find((r) => r.id === id)!;
 const signed = (x: number) => `${x < 0 ? "-" : "+"}${Math.abs(x).toFixed(3)}`;
+const signed4 = (x: number) => `${x < 0 ? "-" : "+"}${Math.abs(x).toFixed(4)}`;
 
 const Rate = ({ rate, n, d }: { rate: number; n?: number; d?: number }) => (
   <>
@@ -186,9 +187,26 @@ export function Research({ session, onSignOut }: Props) {
           <p>
             Added to NEWS2, the student alerts in {added(M.anyAllCounts.news2OrStudent)} more of {C.evaluated} episode windows at {times("news2_or_student")} times
             NEWS2&apos;s alerts. Most of that is what the extra alerts give by chance: the excess over chance is {signed(rule("news2_or_student").excess)} against {signed(rule("ref_news2_chart_trigger").excess)} for
-            NEWS2 alone, and excess has no interval. No gain beyond chance is shown. With the confidence check it is {added(M.anyAllCounts.news2OrStudentChecked)} more
+            NEWS2 alone, and excess has no interval. On this first held-out set (91 episodes) no gain beyond chance is shown. With the confidence check it is {added(M.anyAllCounts.news2OrStudentChecked)} more
             of {C.evaluated} at {times("news2_or_student_checked")} times the alerts, excess {signed(rule("news2_or_student_checked").excess)}. The reward-learned policy added to NEWS2 is {added(M.anyAllCounts.news2OrRewardFinal)} more
             of {C.evaluated} at {times("news2_or_reward_final")} times the alerts, excess {signed(rule("news2_or_reward_final").excess)}.
+          </p>
+          <p>
+            A second held-out set, {H2.trials} new trials ({num(H2.episodes)} episodes, {num(H2.notCutShort)} not cut short), was read once
+            afterwards, with an analysis written before the read. It is much larger, and it is the result to quote. The gain is the excess over
+            chance of NEWS2 plus the model, minus that of NEWS2 alone; the unit is the trial and the interval is 98.33%.
+          </p>
+          <ul data-testid="held-out-2">
+            {H2.rows.map((r) => (
+              <li key={r.id}>
+                NEWS2 or {r.name}: gain {signed4(r.gain)} ({signed4(r.lo)} to {signed4(r.hi)}), {r.windowsAdded} more episode windows at{" "}
+                {r.alertRatio.toFixed(3)} times NEWS2&apos;s alerts: {r.verdict}.
+              </li>
+            ))}
+          </ul>
+          <p>
+            The gain for the checked student is small and is bought with a few more alerts. The reward policy&apos;s upper end is at the edge of zero.
+            Both are statements about this simulator only.
           </p>
           <p>
             The prediction model is a small MindSpore network (one hidden layer, {num(M.studentParameters)} parameters)

@@ -174,3 +174,18 @@ export const RUN_COMPARISON: readonly { id: string; name: string; v1: RunSide; v
   { id: "baseline_alone", name: "Own baseline alone", v1: side(0.189, 0.769, 0.677, 0.851, 0.67), v2: side(0.042, 0.264, 0.174, 0.36, 0.246) },
   { id: "news2_or_baseline", name: "NEWS2 or own baseline", v1: side(0.473, 0.846, 0.771, 0.913, 0.374), v2: side(0.426, 0.659, 0.558, 0.758, 0.235) },
 ];
+
+// Transcribed from models/held_out_2/analysis.json (the declared analysis of held-out set 2: ward-v2 seeds 1001 to 1400,
+// read once on 2026-11-14). Gain in excess over chance of "NEWS2 or X" against NEWS2 alone, episodes not cut short;
+// the unit is the trial; interval 98.33% (three comparisons); windows added are of 1,601 (1,350, 1,313, 1,326 against 1,257).
+export const HELD_OUT_2 = {
+  trials: 400,
+  episodes: 1743,
+  notCutShort: 1601,
+  date: "2026-11-14",
+  rows: [
+    { id: "news2_or_student", name: "student", gain: -0.0401, lo: -0.0542, hi: -0.0253, alertRatio: 1.254, windowsAdded: 93, verdict: "a loss is shown" },
+    { id: "news2_or_student_checked", name: "student with the confidence check", gain: 0.0181, lo: 0.0080, hi: 0.0291, alertRatio: 1.048, windowsAdded: 56, verdict: "a gain beyond chance is shown" },
+    { id: "news2_or_reward_final", name: "reward-learned policy", gain: -0.0127, lo: -0.0245, hi: -0.0001, alertRatio: 1.131, windowsAdded: 69, verdict: "a loss is shown" },
+  ],
+} as const;

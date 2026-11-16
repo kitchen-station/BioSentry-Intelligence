@@ -129,7 +129,13 @@ describe("Research page", () => {
   it("states the findings, the provenance and that NEWS2 is unchanged", () => {
     show();
     expect(screen.getByText(/That rise has been removed, and temperature noise went from 0\.02 to 0\.1 C\./)).toBeTruthy();
-    expect(screen.getByText(/No gain beyond chance is shown\./)).toBeTruthy();
+    expect(screen.getByText(/On this first held-out set \(91 episodes\) no gain beyond chance is shown\./)).toBeTruthy();
+    const h2 = within(screen.getByTestId("held-out-2")).getAllByRole("listitem").map((li) => li.textContent);
+    expect(h2).toEqual([
+      "NEWS2 or student: gain -0.0401 (-0.0542 to -0.0253), 93 more episode windows at 1.254 times NEWS2's alerts: a loss is shown.",
+      "NEWS2 or student with the confidence check: gain +0.0181 (+0.0080 to +0.0291), 56 more episode windows at 1.048 times NEWS2's alerts: a gain beyond chance is shown.",
+      "NEWS2 or reward-learned policy: gain -0.0127 (-0.0245 to -0.0001), 69 more episode windows at 1.131 times NEWS2's alerts: a loss is shown.",
+    ]);
     expect(screen.getByText(/only 2 of 27 hypotensive episodes/)).toBeTruthy();
     expect(screen.getByText(/In 17 of 27, no cuff reading reached NEWS2 inside the window/)).toBeTruthy();
     expect(screen.getByText(/simulator commit f7647c5, scenario 95052d02/)).toBeTruthy();
@@ -166,7 +172,7 @@ describe("Research page", () => {
   it("states the learned-rule findings and the run ids", () => {
     show();
     const text = document.body.textContent!.replace(/\s+/g, " ");
-    expect(text).toContain("Added to NEWS2, the student alerts in 11 more of 91 episode windows at 1.27 times NEWS2's alerts. Most of that is what the extra alerts give by chance: the excess over chance is +0.243 against +0.210 for NEWS2 alone, and excess has no interval. No gain beyond chance is shown. With the confidence check it is 6 more of 91 at 1.06 times the alerts, excess +0.268. The reward-learned policy added to NEWS2 is 7 more of 91 at 1.12 times the alerts, excess +0.244.");
+    expect(text).toContain("Added to NEWS2, the student alerts in 11 more of 91 episode windows at 1.27 times NEWS2's alerts. Most of that is what the extra alerts give by chance: the excess over chance is +0.243 against +0.210 for NEWS2 alone, and excess has no interval. On this first held-out set (91 episodes) no gain beyond chance is shown. With the confidence check it is 6 more of 91 at 1.06 times the alerts, excess +0.268. The reward-learned policy added to NEWS2 is 7 more of 91 at 1.12 times the alerts, excess +0.244.");
     const k = MODEL_FACTS.anyAllCounts;
     expect([k.news2OrStudent - k.news2, k.news2OrStudentChecked - k.news2, k.news2OrRewardFinal - k.news2]).toEqual([11, 6, 7]);
     expect(screen.getByText(/Excess\s+cannot be more than 1 minus the chance rate, so it does not rank these rules\./)).toBeTruthy();

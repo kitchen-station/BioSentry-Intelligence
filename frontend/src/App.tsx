@@ -12,6 +12,8 @@ import { Lab } from "./pages/Lab";
 import { AskChat } from "./pages/AskChat";
 import { Overview } from "./pages/Overview";
 import { WardResearch } from "./pages/WardResearch";
+import { ChatBubble } from "./components/ChatBubble";
+import { asksWard } from "./components/roles";
 
 // Per tab, gone when the tab closes. Only who is signed in is kept here, never a token: with the
 // API the token lives in memory, so a reload returns to sign-in (restoreSession says false). With
@@ -87,10 +89,11 @@ export function App() {
   // The lab's own tools (simulated runs, a question for the research agent) open for those who can use them; a staff nurse cannot.
   // A physician or charge nurse sees them as "What-if runs" at /what-if; /lab is the administrator's "Simulation lab".
   const developer = session?.role === "admin";
-  const clinician = session?.role === "md" || session?.role === "charge_rn"; // the roles that may ask
+  const clinician = asksWard(session?.role); // the roles that may ask
   const toWard = <Navigate to="/ward" replace />;
 
   return (
+    <>
     <Routes>
       <Route
         path="/"
@@ -151,5 +154,7 @@ export function App() {
       <Route path="/research" element={session ? <Navigate to="/lab/research" replace /> : <ToSignIn gone={gone} />} />
       <Route path="/pipeline" element={session ? <Navigate to="/lab/pipeline" replace /> : <ToSignIn gone={gone} />} />
     </Routes>
+    {session && <ChatBubble session={session} onSignOut={signOut} />}
+    </>
   );
 }
