@@ -69,3 +69,11 @@ def test_the_oldest_go_at_the_limit_and_the_expired_go_first() -> None:
     clock.t += 9.5  # b is 10.5 old, c 9.5
     c.put("d", 4, c.version())
     assert [c.get(k) for k in "bcd"] == [MISSING, 3, 4]
+
+
+def test_the_default_limit_is_16_answers() -> None:
+    clock = Clock()
+    c = TtlCache(10.0, clock)
+    for i in range(40):
+        c.put(i, i, c.version())
+    assert sum(c.get(i) is not MISSING for i in range(40)) == 16 and c.get(39) == 39 and c.get(0) is MISSING

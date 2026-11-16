@@ -8,7 +8,8 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from test_overview import add_admin, write
+from test_overview import ADMIN, add_admin, write
+from test_read_window import long_stay
 from test_store import Api, api  # noqa: F401 (api: fixture)
 from test_units import PATIENTS, hospital, stay
 
@@ -133,3 +134,34 @@ def test_the_public_views_are_kept_whole_and_end_with_the_time(api: Api) -> None
     assert body(kept, "/wards/W4/open-view") != unit
     assert body(kept, "/wards/W4/open-view/beds/4A")[0] == 404  # the bed is gone: "no such bed", kept as an answer too
     assert body(kept, "/wards/W4/open-view/beds/4A")[0] == 404
+
+
+def test_an_entry_holds_the_rows_and_only_the_one_state_a_page_asked_for_never_a_ward_of_histories(api: Api) -> None:
+    hospital(api, [long_stay("w-1", "W4", "rn-delacruz", "md-santos", "4A"), long_stay("w-2", "W4", "rn-reyes", None, "4B"), *PATIENTS[1:]])
+    admin = add_admin(api)
+    _, kept = clients(api)
+    def items() -> dict[Any, Any]:
+        return dict(kept.app.state.view_cache._items)
+
+    assert kept.get("/wards/W4/rows", headers=admin).status_code == 200
+    [(_, (_, (ranked, abstained, states)))] = items().items()
+    assert len(ranked) + len(abstained) == 2 and states == {}  # the rows only: no state, no week of bins
+    assert kept.get("/patients/w-1", headers=admin).status_code == 200
+    held = [v[1][2] for v in items().values() if v[1][2]]
+    assert [set(s) for s in held] == [{"w-1"}] and len(held[0]["w-1"].vital_history.heart_rate) > 12  # the page's own patient
+    assert len(items()) <= 16
+
+
+def test_the_same_patients_for_two_roles_share_one_entry_and_differ_only_by_what_is_added_after_it(api: Api) -> None:
+    hospital(api, [*PATIENTS, stay("e-2", "ER", "rn-reyes", "md-santos", "E2")])
+    admin, charge = add_admin(api), api.as_("cn-er")  # both may see exactly the ER's two patients
+    plain, kept = clients(api)
+    as_admin = body(kept, "/wards/ER/rows", admin)[1]
+    assert len(kept.app.state.view_cache._items) == 1  # the admin's answer is now kept
+    as_charge = body(kept, "/wards/ER/rows", charge)[1]
+    assert len(kept.app.state.view_cache._items) == 1  # the charge nurse's read was served from it: no second entry
+    for part in ("ranked", "abstained", "ward", "kind", "tier_status"):
+        assert as_charge[part] == as_admin[part], part  # the shared part: the same bytes
+    assert {k for k in as_admin if as_admin[k] != as_charge[k]} == {"clinician"}  # what is added after the cache
+    assert (as_admin["clinician"], as_charge["clinician"]) == (ADMIN, "cn-er")
+    assert as_admin == body(plain, "/wards/ER/rows", admin)[1] and as_charge == body(plain, "/wards/ER/rows", charge)[1]

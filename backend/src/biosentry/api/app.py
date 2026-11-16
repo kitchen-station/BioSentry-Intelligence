@@ -329,6 +329,7 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
         openapi_url=None,
     )
     app.state.open_ctx = open_ctx
+    app.state.view_cache = cache  # tests look inside; nothing else reads it
     if settings.open_ward_view:
         logging.getLogger(__name__).warning(OPEN_VIEW_WARNING)
     app.add_middleware(

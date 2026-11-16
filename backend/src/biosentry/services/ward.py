@@ -282,18 +282,27 @@ class WardService:
             return self._store.on_ward(unit)
         return self._store.assigned(clinician_id, unit=unit)
 
-    def view(
+    def kept_view(
         self, ids: frozenset[str], whole_history: str | None = None
     ) -> tuple[list[ScoreRow], list[AbstainedRow], dict[str, UnscoredPatient]]:
-        """`_view`, kept for a few seconds. The key holds the exact set of patients: the reader's scope is
-        applied (by `visible`) before this is called, so a reader gets only an answer built for the very
-        same set, and an answer is never shared across scopes."""
+        """`view`, kept for a few seconds, and only what a route needs after the scope is applied: the rows,
+        and the state of `whole_history` (the one patient whose page is built). Never the states of the
+        others: they hold a week of bins each, and a ward of them in memory per entry is the wrong thing to keep.
+
+        The key holds the exact set of patients: the reader's scope is applied (by `visible`) before this is
+        called, so a reader gets only an answer built for the very same set, never one built for another."""
         ranked, abstained, states = self._cached(
-            self._key("view", ids, whole_history), lambda: self._view(ids, whole_history)
+            self._key("view", ids, whole_history), lambda: self._trimmed(*self.view(ids, whole_history), whole_history)
         )
         return list(ranked), list(abstained), dict(states)  # the caller's own containers; the rows are frozen
 
-    def _view(
+    @staticmethod
+    def _trimmed(
+        ranked: list[ScoreRow], abstained: list[AbstainedRow], states: dict[str, UnscoredPatient], keep: str | None
+    ) -> tuple[list[ScoreRow], list[AbstainedRow], dict[str, UnscoredPatient]]:
+        return ranked, abstained, {k: v for k, v in states.items() if k == keep}
+
+    def view(
         self, ids: frozenset[str], whole_history: str | None = None
     ) -> tuple[list[ScoreRow], list[AbstainedRow], dict[str, UnscoredPatient]]:
         """Rows ranked relative to this set, and the state each row was built from. The whole stored
@@ -338,7 +347,7 @@ class WardService:
 
     def compute(self, ids: frozenset[str]) -> tuple[list[ScoreRow], list[AbstainedRow]]:
         """Ranked and NOT RANKED rows for these patients, ranked relative to this set."""
-        ranked, abstained, _ = self.view(ids)
+        ranked, abstained, _ = self.kept_view(ids)
         return ranked, abstained
 
     # --- reads ---------------------------------------------------------------------------
@@ -378,7 +387,7 @@ class WardService:
         visible = self.visible(clinician_id)
         if patient_id not in visible:
             return None
-        ranked, abstained, states = self.view(visible, patient_id)
+        ranked, abstained, states = self.kept_view(visible, patient_id)
         row = next((r for r in ranked if r.id == patient_id), None)
         if row is None:
             held = next((a for a in abstained if a.id == patient_id), None)

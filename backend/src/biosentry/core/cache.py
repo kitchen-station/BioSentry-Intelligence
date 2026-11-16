@@ -27,11 +27,11 @@ class ViewCache(Protocol):
 
 class TtlCache:
     """One dict behind a lock (the API runs its handlers in a thread pool). `ttl` 0 or less: nothing is
-    kept. At most `limit` answers: the oldest go first (a ward answer with its history is large)."""
+    kept. At most `limit` answers: the oldest go first."""
 
     # shortcut: per process, so a write handled by another process is seen only after `ttl` (and a
     # sim batch at once, since the as_of of a run is in every key); upgrade: a shared cache with the same interface.
-    def __init__(self, ttl: float, clock: Callable[[], float], limit: int = 32) -> None:
+    def __init__(self, ttl: float, clock: Callable[[], float], limit: int = 16) -> None:
         self._ttl, self._clock, self._limit = ttl, clock, limit
         self._items: dict[Hashable, tuple[float, Any]] = {}
         self._version = 0
