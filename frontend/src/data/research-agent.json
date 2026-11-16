@@ -1,14 +1,14 @@
 {
   "provenance": {
-    "source": "Transcript in the description of pull request 19 (merged into main as c8f0ce8; no ledger is committed). Run from a snapshot of commit 3405cd3 on ward-v2 simulator trials, unattended, with a scratch agent home and an empty scratch models folder, so no file in this repository's models/ changed. The sweep's k 4.0, p 8 is already in models/tier_b/baseline/params.json; against that folder nothing would have been proposed. Nobody was at the keyboard: the questions and the sign-off were typed by the unattended run, not by a doctor, and the sign-off is not a person's sign-off of anything. Question ids are worked out from the record counts; the transcript does not print them.",
+    "source": "The run's ledger, committed as research/agent/records/pr19-run/ledger.jsonl (sha256 340e0bcc2306e37d4044896fb54b321e61c6b627f8b1bd42917c4b97c4c454e9), from the run in pull request 19 (merged into main as c8f0ce8). Run from a snapshot of commit 3405cd3 on ward-v2 simulator trials, unattended, with a scratch agent home and an empty scratch models folder, so no file in this repository's models/ changed. The sweep's k 4.0, p 8 is already in models/tier_b/baseline/params.json; against that folder nothing would have been proposed. Nobody was at the keyboard: the questions and the sign-off were typed by the unattended run, not by a doctor, and the sign-off is not a person's sign-off of anything.",
     "records": 21,
-    "exportedBy": "hand-exported from the transcript",
+    "exportedBy": "copied from the ledger's export (frontend/src/data/evaluation/research-agent.json)",
     "date": "2026-11-13"
   },
   "questions": [
     {
       "id": "S-0014",
-      "askedAt": null,
+      "askedAt": "2026-11-13T05:05:46Z",
       "question": "What if we alerted at a NEWS2 total of 7 or more?",
       "template": "news2_threshold",
       "status": "answered",
@@ -37,7 +37,7 @@
     },
     {
       "id": "S-0016",
-      "askedAt": null,
+      "askedAt": "2026-11-13T05:06:17Z",
       "question": "Is a patient's own baseline better than NEWS2 at catching deterioration early?",
       "template": "baseline_vs_news2",
       "status": "answered",
@@ -71,7 +71,7 @@
     },
     {
       "id": "S-0018",
-      "askedAt": null,
+      "askedAt": "2026-11-13T05:07:33Z",
       "question": "How many alerts would each nurse get per shift?",
       "template": "alerts_per_nurse",
       "status": "answered",
@@ -94,7 +94,7 @@
     },
     {
       "id": "S-0020",
-      "askedAt": null,
+      "askedAt": "2026-11-13T05:08:08Z",
       "question": "Should we give this patient oxygen when the alert fires?",
       "template": "none",
       "status": "refused",

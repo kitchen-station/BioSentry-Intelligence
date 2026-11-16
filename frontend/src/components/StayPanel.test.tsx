@@ -26,7 +26,7 @@ const settle = () => act(async () => {});
 
 // Two clock days before "today" keep every time on another day, so every line carries its date.
 const T = (hhmm: string, d = "2026-01-05") => `${d}T${hhmm}:00Z`;
-const NOW = Date.now(); // ward time as served, passed in; the panel never reads the browser's clock for "today"
+const NOW = new Date(2026, 0, 7, 12, 0).getTime(); // two days after T's default day, mid-day so NOW - 1 min is the same day; ward time as served, passed in; the panel never reads the browser's clock for "today"
 const clk = (iso: string) => formatClockDay(Date.parse(iso), NOW);
 const rng = (a: string, b: string) => `${clk(a)} to ${formatClock(Date.parse(b))}`; // both ends on one old day: the date once
 const run = (over: Partial<HistoryRun>): HistoryRun => ({

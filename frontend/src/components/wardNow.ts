@@ -16,11 +16,6 @@ export function syncWardNow(served: string): void {
   anchor = { server, local: Date.now() };
 }
 
-/** Whether any read has set the clock. */
-export function hasWardNow(): boolean {
-  return anchor !== null;
-}
-
 /** Test only: forget every read. */
 export function forgetWardNow(): void {
   anchor = null;

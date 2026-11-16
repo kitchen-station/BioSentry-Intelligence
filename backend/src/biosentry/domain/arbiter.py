@@ -60,7 +60,8 @@ _NAME = {
     "temperature": "temperature",
 }
 PREDICTION_FLAG = "Prediction model flag (synthetic, not validated)"
-POLICY_FLAG = "Alert policy flag (learned by reward; synthetic, not validated)"
+# Held-out set 2 (models/held_out_2/analysis.txt) shows a loss for this policy: the text says so where it shows.
+POLICY_FLAG = "Alert policy flag (learned by reward; a loss on held-out set 2; synthetic, not validated)"
 _DEVICE_INSTRUCTION = "Check the patch is applied and the signal is verified, or enter the observations"
 _NO_DEVICE_INSTRUCTION = "Apply the patch and verify the signal, or enter the observations"
 

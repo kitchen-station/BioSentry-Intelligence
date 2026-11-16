@@ -88,10 +88,12 @@ flowchart LR
     models["Research models<br/>student, confidence check, reward policy"]
     db[("PostgreSQL 18<br/>append-only audit log")]
     web["Dashboard: React<br/>one ranked list per clinician"]
+    agent["Question workers<br/>a patient, or the simulated ward"]
   end
   subgraph huawei["Huawei AI and cloud"]
     ms["MindSpore 2.11<br/>trains the student"]
-    lite["MindSpore Lite<br/>model.ms for the edge"]
+    lite["MindSpore Lite<br/>converted and checked; edge runtime planned"]
+    nlp["MindNLP 0.5.1 on MindSpore 2.7<br/>LoRA-tunes the research agent"]
     ma["ModelArts<br/>training job"]
     obs["OBS<br/>model files, backups"]
     ecs["ECS<br/>hosts the server"]
@@ -104,19 +106,22 @@ flowchart LR
   models --> api
   ms -- "weights" --> models
   ms --> lite
+  agent -- "claims jobs" --> api
+  nlp -- "adapter, optional tuned mode" --> agent
   ma -.-> ms
   ma -.-> obs
   ecs -.-> server
   iot -.-> api
   classDef used fill:#fdecea,stroke:#c7000b,color:#000
   classDef planned fill:#ffffff,stroke:#c7000b,stroke-dasharray:5 4,color:#000
-  class ms,lite used
+  class ms,lite,nlp used
   class ma,obs,ecs,iot planned
 ```
 
 Red: Huawei technology in use today. MindSpore 2.11 trains the student, and MindSpore Lite converts it
-(`models/tier_c/student_vitals/lite.txt`: converted, 20 of 20 test rows match). Dashed: Huawei Cloud services
-planned and not running yet. The API runs the student from its exported weights (`models/`), scores NEWS2 on
+(`models/tier_c/student_vitals/lite.txt`: converted, 20 of 20 test rows match; nothing runs `model.ms` yet).
+MindNLP 0.5.1 on MindSpore 2.7 LoRA-tunes the model that the lab question worker can use
+(`research/agent_tuning/`, `deploy/compose.tuned.yaml`). Dashed: Huawei Cloud services planned and not running yet. The API runs the student from its exported weights (`models/`), scores NEWS2 on
 every read, and stores no score.
 
 ## Use it now
@@ -126,10 +131,11 @@ BioSentry is deployed. You do not need to install anything to see it.
 | App | Address | What it is |
 |---|---|---|
 | Dashboard | <https://biosentry-dashboard.pages.dev> | The clinician's ranked list on a sample ward. Choose a clinician; any passphrase is accepted. |
-| Ward simulation | <https://biosentry-ward-sim.pages.dev> | The simulated hospital that feeds the dashboard. No sign-in. |
+| Ward simulation | <https://biosentry-ward-sim.pages.dev> | The simulated hospital, and a read-only view of the team server's ward W4 (no names or ids). No sign-in to watch. |
 
-Both public sites deploy from `main` and show synthetic patients. They have no server behind them, so each
-runs alone on sample data and what you enter is gone on reload.
+Both public sites deploy from `main` and show synthetic patients. The dashboard has no server behind it: it runs
+alone on a sample ward, and what you enter is gone on reload. Its research pages are open to every demo clinician
+(<https://biosentry-dashboard.pages.dev/lab/research>).
 
 The connected version (the simulation writes to one API and the dashboard reads the same ward, live) runs on
 the team's server. It is private to the team: a clinician signs in with their own passphrase. Ask the team for
@@ -265,8 +271,8 @@ schemas. Every target is in the [Makefile](Makefile).
   simulator from the lab page.
   A physician or the charge nurse can ask for a simulated run: the simulator's compare runs two arms from one seed that differ in one change (partly paired in hospital mode), apart from the ward that is running. A lab worker beside the ward runner runs it; the
   API only stores the request and the result. Results are synthetic and not validated, and nothing in them changes a
-  rank. Each clinician has one at a time and 10 in 24 hours; the ward has 5 waiting at most. No lab worker is deployed yet,
-  so a request fails after an hour until one is. The list reads again every 5 seconds while a run is queued or running, and stops when none is.
+  rank. Each clinician has one at a time and 10 in 24 hours; the ward has 5 waiting at most. The `lab` service of
+  deploy/compose.yaml runs them; while it is not running, a request fails after an hour. The list reads again every 5 seconds while a run is queued or running, and stops when none is.
 
 ## What the database stores
 
@@ -326,7 +332,7 @@ applied to made-up patients.
 - **I4** Abstention is an output: NOT RANKED is a row with a reason and an instruction.
 - **I5** No training on BioSentry patients: local data calibrates and validates only.
 - **I6** The synthetic flag propagates: every fixture record says `synthetic: true`.
-- **I7** Privacy (RA 10173): one screen per clinician, their patients only, audit on every view. A repeated read of the same page by the same clinician is recorded at most once a minute; the first read, every write, and every refusal or not-found answer to a signed-in clinician are always recorded (the owner's decision for the automatic refresh).
+- **I7** Privacy (the technical safeguards of RA 10173; see [Privacy](#privacy)): one screen per clinician, their patients only, audit on every view. A repeated read of the same page by the same clinician is recorded at most once a minute; the first read, every write, and every refusal or not-found answer to a signed-in clinician are always recorded (the owner's decision for the automatic refresh).
 - **I8** Transport: BLE to a gateway, then Wi-Fi or 4G to the cloud. NB-IoT is excluded.
 
 ## Design rules
@@ -374,6 +380,37 @@ applied to made-up patients.
   minute. It is allowed in production and logs a warning at start. On a public address (`deploy/compose.public.yaml`) the
   team's value is not read; the separate `BIOSENTRY_PUBLIC_OPEN_WARD_VIEW=true` opts in (`deploy/README.md`, "The
   public ward page", owner decision 2026-11-14).
+
+## Privacy
+
+No real patient's data is in this repository or on the team server. The database refuses a run whose
+`synthetic` flag is false (I6), and the one real dataset, the open, de-identified eICU-CRD demo, is used
+offline for aggregate numbers only (`models/data/eicu-crd-demo/card.md`).
+
+**What the code enforces now:** the technical safeguards that the Data Privacy Act of 2012 (RA 10173) asks for.
+
+- **Need to know.** A clinician's list holds their assigned patients only. A patient they may not see answers
+  the same 404 as one that does not exist.
+- **Accountability.** Every view, write and refusal leaves an audit row, and audit rows cannot be deleted (I7).
+- **Least data to the agents.** A question about a patient freezes an allow-listed copy of that patient's data,
+  with no name, bed, id, free text, note or lab (`backend/src/biosentry/schemas/lab.py`). The worker that
+  answers it has no route to the internet, calls no outside model, and writes nothing.
+- **Sessions.** The dashboard keeps the token in memory only, and the server stores only its sha256.
+- **The public ward view** shows bed, rank and NEWS2 band, never a name or id, and only for a synthetic run.
+- **Retention.** A run's vital bins older than `BIOSENTRY_RETENTION_DAYS` (7 when unset) are deleted.
+
+**What a hospital would add before the first real patient.** None of this is built; most of it is organisation, not code.
+
+- A Data Protection Officer, a privacy impact assessment, and registration with the National Privacy Commission.
+- A lawful basis and a notice for processing health data, which is sensitive personal information, and a
+  way for patients to see and correct what is held about them.
+- Breach notification to the Commission within 72 hours.
+- **Data kept in the Philippines.** The server and its backups would run on Huawei Cloud ECS and OBS in the
+  AP-Manila region, with OBS server-side encryption for the backups. Today `deploy/backup.sh` writes
+  unencrypted dumps beside the database. Training stays on synthetic data (I5), so no patient record has to
+  leave the country to train on ModelArts.
+- An identity provider in place of per-clinician passphrases. Sign-out would also end the session on the
+  server; today a token lasts until it expires, up to 12 hours.
 
 ## Licence
 

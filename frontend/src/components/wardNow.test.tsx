@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
-import { forgetWardNow, hasWardNow, syncWardNow, useWardNow } from "./wardNow";
+import { forgetWardNow, syncWardNow, useWardNow } from "./wardNow";
 
 const SERVED = "2026-09-03T07:00:00Z";
 
@@ -17,11 +17,9 @@ describe("ward time", () => {
   });
 
   it("is 0 before any read, and the server's time plus what has passed after one", () => {
-    expect(hasWardNow()).toBe(false);
     const { result } = renderHook(() => useWardNow());
     expect(result.current).toBe(0);
     syncWardNow(SERVED);
-    expect(hasWardNow()).toBe(true);
     act(() => void vi.advanceTimersByTime(5000));
     expect(result.current).toBe(Date.parse(SERVED) + 5000);
   });

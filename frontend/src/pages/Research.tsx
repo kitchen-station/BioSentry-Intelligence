@@ -103,7 +103,7 @@ export function Research({ session, onSignOut }: Props) {
               </tbody>
             </table>
           </div>
-          <p>None of these learned rules is used by the ward list, the rank or any alert.</p>
+          <p>The API loads the student with its confidence check and the reward policy: each can add a flag to a ward row as one more reason. A flag never moves a patient on the list.</p>
         </section>
 
         <section className={styles.card} aria-labelledby="check">

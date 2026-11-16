@@ -180,7 +180,7 @@ describe("Research page", () => {
     expect(screen.getByText(/a student model trained with MindSpore that exports as ONNX\. Each model was scored on the held-out seeds once, by procedure\. The same seeds were used earlier for earlier models\. Nothing was\s+tuned on the held-out trials\./)).toBeTruthy();
     expect(screen.queryByText(/not a bigger model/)).toBeNull();
     expect(screen.queryByText(/no usable threshold/)).toBeNull();
-    expect(screen.getByText("None of these learned rules is used by the ward list, the rank or any alert.")).toBeTruthy();
+    expect(screen.getByText("The API loads the student with its confidence check and the reward policy: each can add a flag to a ward row as one more reason. A flag never moves a patient on the list.")).toBeTruthy();
     expect(screen.getByText("Time in alert: the share of patient time with an alert open.")).toBeTruthy();
     expect(screen.getByText(/it cannot be\s+more than 1 minus the chance rate\./)).toBeTruthy();
     expect(Object.keys(RESEARCH_PROVENANCE)).not.toContain("studentCommit");

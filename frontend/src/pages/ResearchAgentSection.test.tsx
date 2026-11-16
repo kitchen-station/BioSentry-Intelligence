@@ -24,11 +24,14 @@ describe("research agent section", () => {
     expect(items[0].textContent).toContain("Answered");
   });
 
-  it("never invents an ask time and shows no question id", () => {
+  it("shows the ledger's ask times, says when none is recorded, and shows no question id", () => {
     show();
-    expect(screen.getAllByText("Time not recorded in the transcript")).toHaveLength(4);
-    expect(screen.queryByText(/Asked /)).toBeNull();
+    expect(screen.getByText("Asked 2026-11-13T05:05:46Z")).toBeTruthy();
+    expect(screen.getAllByText(/^Asked /)).toHaveLength(4);
     expect(screen.queryByText(/S-00/)).toBeNull();
+    cleanup();
+    show({ ...RESEARCH_AGENT, questions: [{ ...RESEARCH_AGENT.questions[0], askedAt: null }] });
+    expect(screen.getByText("Time not recorded")).toBeTruthy();
   });
 
   it("shows the only sign-off verbatim, with the proposal id and the source", () => {
@@ -38,7 +41,7 @@ describe("research agent section", () => {
     expect(screen.getByText(/This page cannot ask it anything yet/)).toBeTruthy();
     expect(screen.getByText(/typed by the unattended run, not by a doctor/)).toBeTruthy();
     expect(screen.getByRole("heading", { level: 3, name: "Proposals" })).toBeTruthy();
-    expect(screen.getByText(/^Source: Transcript in the description of pull request 19 \(merged into main as c8f0ce8;/).textContent).toMatch(/ 21 ledger records, hand-exported from the transcript, 2026-11-13\.$/);
+    expect(screen.getByText(/^Source: The run's ledger, committed as research\/agent\/records\/pr19-run\/ledger\.jsonl \(sha256 340e0bcc/).textContent).toMatch(/ 21 ledger records, copied from the ledger's export \(frontend\/src\/data\/evaluation\/research-agent\.json\), 2026-11-13\.$/);
     expect(screen.getByText(/^Synthetic, not validated\./)).toBeTruthy();
   });
 
