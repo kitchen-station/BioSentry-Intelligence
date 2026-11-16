@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { enteredByNurse, patchInUse, formatAge, formatBloodPressure, formatClock, formatClockDay, formatOxygen, formatSimClock, formatSpo2Scale, simStatus } from "./format";
+import { enteredByNurse, patchInUse, formatAge, formatBloodPressure, formatClock, formatClockDay, formatClockSeconds, formatDay, formatOxygen, formatSimClock, formatSpo2Scale, simStatus } from "./format";
 import type { SimStatus } from "./format";
 import type { Vitals } from "../types";
 
@@ -84,15 +84,33 @@ describe("formatSimClock", () => {
   });
 });
 
+// A moment on the ward's own clock (Manila, UTC+8), whatever zone the browser is in.
+const ward = (y: number, m: number, d: number, h: number, min = 0): number => Date.UTC(y, m, d, h - 8, min);
+
+describe("the ward's calendar", () => {
+  it("prints a stored time as the ward's clock reads it, not the browser's", () => {
+    const origin = Date.parse("2026-09-03T07:00:00Z"); // the simulator's start: 15:00 in Manila
+    expect(formatClock(origin)).toMatch(/^(15:00|0?3:00\s?PM)$/);
+    expect(formatClockSeconds(origin + 5000)).toMatch(/^(15:00:05|0?3:00:05\s?PM)$/);
+    expect(formatDay(origin)).toMatch(/3/);
+  });
+
+  it("changes the day at the ward's midnight, not the browser's", () => {
+    const late = ward(2026, 8, 3, 23, 30);
+    expect(formatClockDay(late, ward(2026, 8, 3, 23, 59))).toBe(formatClock(late)); // the same ward day
+    expect(formatClockDay(late, ward(2026, 8, 4, 0, 30))).toBe(`${formatDay(late)}, ${formatClock(late)}`); // the next
+  });
+});
+
 describe("enteredByNurse", () => {
-  const at = new Date(2026, 8, 3, 7, 40).getTime();
+  const at = ward(2026, 8, 3, 7, 40);
 
   it("gives the time alone for an entry made today", () => {
-    expect(enteredByNurse(at, new Date(2026, 8, 3, 19, 0).getTime())).toBe(`Entered by a nurse at ${formatClock(at)}`);
+    expect(enteredByNurse(at, ward(2026, 8, 3, 19, 0))).toBe(`Entered by a nurse at ${formatClock(at)}`);
   });
 
   it("adds the day for an entry from another day, so it does not read as today's", () => {
-    const text = enteredByNurse(at, new Date(2026, 8, 5, 7, 40).getTime());
+    const text = enteredByNurse(at, ward(2026, 8, 5, 7, 40));
     expect(text.startsWith(`Entered by a nurse at ${formatClock(at)}, `)).toBe(true);
     expect(text).toMatch(/3/);
   });
@@ -124,11 +142,11 @@ describe("patchInUse", () => {
 });
 
 describe("formatClockDay", () => {
-  const now = new Date(2026, 10, 14, 12, 0).getTime();
+  const now = ward(2026, 10, 14, 12, 0);
   it("gives the clock for today and the date with the clock for another day", () => {
-    const today = new Date(2026, 10, 14, 9, 5).getTime();
-    const before = new Date(2026, 10, 13, 22, 15).getTime();
+    const today = ward(2026, 10, 14, 9, 5);
+    const before = ward(2026, 10, 13, 22, 15);
     expect(formatClockDay(today, now)).toBe(formatClock(today));
-    expect(formatClockDay(before, now)).toBe(`${new Date(before).toLocaleDateString([], { day: "numeric", month: "short" })}, ${formatClock(before)}`);
+    expect(formatClockDay(before, now)).toBe(`${formatDay(before)}, ${formatClock(before)}`);
   });
 });

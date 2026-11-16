@@ -122,6 +122,26 @@ describe("Flow page", () => {
     expect(api.getWard).toHaveBeenCalled();
   });
 
+  it("reads the ward on every refresh against a server, so the last day moves with the ward", async () => {
+    vi.useFakeTimers({ now: BROWSER });
+    api.build.usesServer = true;
+    syncWardNow(new Date(NOW).toISOString());
+    api.getStays.mockResolvedValue(STAYS);
+    show();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(api.getWard).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("In, last 24 h").nextSibling?.textContent).toBe("2");
+    api.getWard.mockResolvedValue({ now: new Date(NOW + 30 * 24 * 3_600_000).toISOString() }); // the ward moves a month on
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    expect(api.getWard).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("In, last 24 h").nextSibling?.textContent).toBe("0");
+    api.build.usesServer = false;
+  });
+
   it("says so when the ward's time cannot be read", async () => {
     api.getWard.mockRejectedValue(new Error("down"));
     api.getStays.mockResolvedValue(STAYS);

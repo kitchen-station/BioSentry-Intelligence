@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { PatientHistory } from "../types";
 import { ApiError, getPatientHistory } from "../api";
-import { formatClock, formatClockDay } from "./format";
+import { dayKey, formatClock, formatClockDay } from "./format";
+import { since } from "./wardNow";
 import styles from "./StayPanel.module.css";
 
 const MIN_W = 0.8; // percent of the strip: a run of no length still shows
@@ -104,7 +105,7 @@ function clean(raw: PatientHistory): Stay {
   };
 }
 
-const day = (ms: number) => new Date(ms).toDateString();
+const day = dayKey;
 
 function runLine(r: Run, now: number): string {
   const range =
@@ -243,7 +244,7 @@ export function StayPanel({ patientId, onSignOut, now }: { patientId: string; on
     getPatientHistory(patientId)
       .then((raw) => {
         setStay(clean(raw));
-        setReadAt(formatClock(Date.now()));
+        setReadAt(formatClock(since(Date.now()))); // ward time of the last read
         setError(null);
       })
       .catch((failure: unknown) => {

@@ -7,14 +7,14 @@ import { Flip } from "../components/Flip";
 import { SessionMenu } from "../components/SessionMenu";
 import { SimulatedNote } from "../components/LabFrame";
 import { StayPanel } from "../components/StayPanel";
-import { syncWardNow, useWardNow } from "../components/wardNow";
+import { since, syncWardNow, useWardNow } from "../components/wardNow";
 import { AskPatient } from "../components/AskPatient";
 import { BaselinePanel, isComputed, isObj, num } from "../components/BaselinePanel";
 import { ResearchModels } from "../components/ResearchModels";
 import { useBaseline, type BaselineState } from "../components/useBaseline";
 import { CurrentVitals, VitalRow } from "../components/CurrentVitals";
 import { TrendChart } from "../components/TrendChart";
-import { formatClock, formatSimClock, patchInUse } from "../components/format";
+import { formatClock, formatClockSeconds, formatSimClock, patchInUse } from "../components/format";
 import { useLivePoll } from "../components/useLivePoll";
 import { band, driftResponse, response } from "../components/risk";
 import { VitalsEntry } from "../components/VitalsEntry";
@@ -97,7 +97,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
   const baseline = useBaseline(id, saves);
   const [patient, setPatient] = useState<PatientDetailType | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const now = useWardNow(); // ward time as served, advancing since the last good read
+  const now = useWardNow(); // ward time as served at the last good read
   const [notes, setNotes] = useState<ClinicalNote[]>([]);
   const [noteText, setNoteText] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -129,9 +129,9 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
         const first = shown.current !== id;
         if (p) {
           shown.current = id;
-          syncWardNow(p.now);
+          syncWardNow(p.now, !usesServer);
           setPatient(p);
-          setLastGood(Date.now());
+          setLastGood(Date.parse(p.now)); // the ward's own time of the read
           setFailedSince(null);
           setStaleSince(null);
         } else if (first) setNotFound(true);
@@ -235,7 +235,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
               {signal === null ? "No patch signal" : `Signal ${signal}%`}
             </span>
             <span className={styles.stripUpdate}>
-              {new Date(now).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              {formatClockSeconds(now)}
             </span>
             <span className={styles.stripId}>{patient.id}</span>
             <SessionMenu session={session} onSignOut={onSignOut} />
@@ -251,11 +251,11 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
         )}
         {/* Here, not in a panel: the big score must not look current when it is not. */}
         {failedSince !== null && (
-          <p className={styles.summaryLabel} role="status">Cannot reach the ward server since {formatClock(failedSince)}.</p>
+          <p className={styles.summaryLabel} role="status">Cannot reach the ward server since {formatClock(since(failedSince))}.</p>
         )}
         {staleSince !== null && unranked === null && (
           <p className={styles.summaryLabel} role="status">
-            No longer on your ranked list. Figures from {formatClock(lastGood ?? staleSince)}.{" "}
+            No longer on your ranked list. Figures from {formatClock(lastGood ?? since(staleSince))}.{" "}
             <Link to="/ward">Back to ward</Link>
           </p>
         )}
@@ -337,7 +337,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
                 {drawer === "notes" ? `Clinical notes${notes.length > 0 ? ` \u00b7 ${notes.length}` : ""}` : trendTitle(patient.vital_history)}
               </span>
               {failedSince !== null && (
-                <span>Cannot reach the ward server since {formatClock(failedSince)}.</span>
+                <span>Cannot reach the ward server since {formatClock(since(failedSince))}.</span>
               )}
               <button type="button" className={styles.overlayClose} onClick={() => setDrawer(null)}>&times;</button>
             </div>
@@ -372,7 +372,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
                           <span className={styles.noteAuthor}>{note.author}</span>
                           <span className={styles.noteRole}>{note.role}</span>
                           <span className={styles.noteTime}>
-                            {new Date(note.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            {formatClock(Date.parse(note.timestamp))}
                           </span>
                         </div>
                         <p className={styles.noteContent}>{note.content}</p>

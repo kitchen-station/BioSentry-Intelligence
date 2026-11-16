@@ -1,6 +1,6 @@
 import { useId, type ReactNode } from "react";
 import type { BaselineComputed } from "../types";
-import { STALE_AFTER_S, formatAge, formatClock } from "./format";
+import { STALE_AFTER_S, formatAge, formatClock, formatDay } from "./format";
 import type { BaselineState } from "./useBaseline";
 import styles from "./BaselinePanel.module.css";
 
@@ -51,7 +51,7 @@ export function isComputed(v: Record<string, unknown>): v is BaselineComputed {
 // Day and month with every time: a bare clock time reads as today.
 const when = (iso: string) => {
   const ms = Date.parse(iso);
-  return `${new Date(ms).toLocaleDateString([], { day: "numeric", month: "short" })} ${formatClock(ms)}`;
+  return `${formatDay(ms)} ${formatClock(ms)}`;
 };
 
 // Display rounding for `latest` (a 15-minute median), the same for every vital: one decimal, half

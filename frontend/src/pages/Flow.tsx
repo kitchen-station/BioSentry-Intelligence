@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { PatientStay } from "../types";
 import { getStays, getWard, usesServer } from "../api";
+import { formatClock, formatDay } from "../components/format";
 import { syncWardNow, useWardNow } from "../components/wardNow";
 import { bedRows, dayTicks, FLOW_DAYS, flowStats, formatStay, recentMoves } from "./flowMath";
 import styles from "./Flow.module.css";
@@ -9,15 +10,15 @@ import styles from "./Flow.module.css";
 const RECENT = 12;
 const OUTCOME = { discharged: "Discharged", higher_care: "Higher care" } as const;
 
-const when = (iso: string) =>
-  new Date(iso).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-const day = (ms: number) => new Date(ms).toLocaleDateString([], { day: "numeric", month: "short" });
+const when = (iso: string) => `${formatDay(Date.parse(iso))}, ${formatClock(Date.parse(iso))}`;
+const day = formatDay;
 const status = (stay: PatientStay) => (stay.outcome ? OUTCOME[stay.outcome] : "On the ward");
 
 /** The Station's admin view of who came and went. Scoped by the server, like the ward. */
 export function FlowSection() {
   const [stays, setStays] = useState<PatientStay[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [, render] = useState(0); // a ward read that lands after the stays moves the page's time
   const now = useWardNow(); // ward time from the newest ward or patient read
   const pollMs = usesServer ? 5_000 : 15_000; // the API changes as the simulator runs; the fixture never does
 
@@ -26,10 +27,13 @@ export function FlowSection() {
     // 60x a new stay never starts after the page's clock (a negative length).
     const refresh = () =>
       Promise.all([
-        getWard().then((w) => syncWardNow(w.now)),
+        getWard().then((w) => syncWardNow(w.now, !usesServer)),
         getStays().then(setStays),
       ]).then(
-        () => setFailed(false),
+        () => {
+          setFailed(false);
+          render((n) => n + 1);
+        },
         () => setFailed(true),
       );
     void refresh();

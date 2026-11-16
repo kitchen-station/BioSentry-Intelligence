@@ -6,13 +6,14 @@ import {
   acknowledge as saveAcknowledgement,
   getAcknowledgements,
   getWard,
+  usesServer,
 } from "../api";
 import { Flip, useMoveOnReorder } from "../components/Flip";
 import { WardRow } from "../components/WardRow";
 import { band, obsDue, unacknowledged } from "../components/risk";
 import { formatClock, formatSimClock } from "../components/format";
 import { useLivePoll } from "../components/useLivePoll";
-import { syncWardNow, useWardNow } from "../components/wardNow";
+import { since, syncWardNow, useWardNow } from "../components/wardNow";
 import { SimulatedNote } from "../components/LabFrame";
 import { SessionMenu } from "../components/SessionMenu";
 import { standing } from "../components/vitalsDraft";
@@ -61,7 +62,7 @@ export function Ward({ session, onSignOut }: Props) {
   const [data, setData] = useState<WardResponse | null>(null);
   const [fetchedAt, setFetchedAt] = useState<number | null>(null);
   const [failedSince, setFailedSince] = useState<number | null>(null);
-  const now = useWardNow(); // ward time as served, advancing since the last good read
+  const now = useWardNow(); // ward time as served at the last good read
   const [notice, setNotice] = useState<string | null>(null);
   // null until the server's acknowledgements arrive, so an alert already acknowledged never sounds.
   const [acked, setAcked] = useState<ReadonlyMap<string, number> | null>(null);
@@ -78,9 +79,9 @@ export function Ward({ session, onSignOut }: Props) {
       const w = await getWard();
       if (n > applied.current) {
         applied.current = n;
-        syncWardNow(w.now);
+        syncWardNow(w.now, !usesServer);
         setData(w);
-        setFetchedAt(Date.now());
+        setFetchedAt(Date.parse(w.now)); // the ward's own time of the read
         setFailedSince(null);
       }
       return true;
@@ -179,7 +180,7 @@ export function Ward({ session, onSignOut }: Props) {
               {!data.receiving_data
                 ? "No signal"
                 : failedSince
-                  ? `Offline since ${formatClock(failedSince)}`
+                  ? `Offline since ${formatClock(since(failedSince))}`
                   : `Updated ${fetchedAt ? formatClock(fetchedAt) : "--"}`}
             </span>
           </span>
@@ -197,8 +198,8 @@ export function Ward({ session, onSignOut }: Props) {
 
       {failedSince && (
         <p className={styles.offline} role="status">
-          Cannot reach the ward server since {formatClock(failedSince)}. Showing data from{" "}
-          {fetchedAt ? formatClock(fetchedAt) : "--"}; ages below keep counting. {retry}
+          Cannot reach the ward server since {formatClock(since(failedSince))}. Showing data from{" "}
+          {fetchedAt ? formatClock(fetchedAt) : "--"}; ages below stand at that time. {retry}
         </p>
       )}
       <SimulatedNote />
