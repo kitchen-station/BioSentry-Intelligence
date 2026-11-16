@@ -12,6 +12,7 @@ from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from biosentry.api.app import UNAUTHENTICATED_WRITES, WRITE_ACTIONS, Context, create_app
+from biosentry.core import audit as audit_module
 from biosentry.core.config import DEFAULT_DATASET, Settings
 from biosentry.db.seed import DEV_PASSPHRASE
 from biosentry.domain.arbiter import arbitrate, rank_ward
@@ -292,6 +293,19 @@ def test_my_audit_returns_only_my_own_trail(client: TestClient) -> None:
     mine = client.get("/audit", headers=as_("md-aquino")).json()
     assert {e["action"] for e in mine} == {"sign_in", "list_patients"}
     assert all(set(e) == {"seq", "at", "action", "resource", "outcome"} for e in mine)
+
+
+def test_my_audit_returns_my_newest_rows_only_oldest_first(
+    app_and_client: tuple[Any, TestClient], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(audit_module, "AUDIT_LIMIT", 2)
+    _, client = app_and_client
+    h = as_("md-aquino")
+    for path in ("/patients", "/patients/p-003", "/patients/p-007"):
+        client.get(path, headers=h)
+    mine = [e["seq"] for e in client.get("/audit", headers=h).json()]
+    every = [r.seq for r in ctx(app_and_client).audit.records("md-aquino")]
+    assert len(every) > 2 and mine == every[-2:]
 
 
 def test_the_audit_trail_holds_no_patient_data(app_and_client: tuple[Any, TestClient]) -> None:

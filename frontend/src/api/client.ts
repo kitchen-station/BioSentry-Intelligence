@@ -98,11 +98,12 @@ async function request<T>(
 // Reads the body inside the timeout too: a stalled body is as dead as a stalled connection.
 async function respond<T>(res: Response): Promise<T> {
   if (!res.ok) {
-    let body: unknown;
+    const text = await res.text(); // read once: a failed res.json() would leave nothing to read
+    let body: unknown = text;
     try {
-      body = await res.json();
+      body = JSON.parse(text);
     } catch {
-      body = await res.text();
+      // not JSON (a proxy's 502 page): the text is the body
     }
     throw new ApiError(res.status, res.statusText, body);
   }
