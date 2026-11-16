@@ -14,7 +14,7 @@ from samples import sample
 OPTIONAL_OUTPUT_FIELDS = {
     ("AbstainedDetail", "last_seen"),  # inherited from the row
     ("AbstainedRow", "last_seen"),
-    *((m, f) for m in ("AbstainedRow", "AbstainedDetail") for f in ("vitals", "vital_trends")),  # a shown or unranked unit's rows
+    *((m, f) for m in ("AbstainedRow", "AbstainedDetail") for f in ("vitals", "vital_trends", "unit_kind")),  # a shown or unranked unit's rows
     ("EscalationReason", "pathway"),
     ("UnscoredPatient", "last_seen"),
     ("Provenance", "variant"),

@@ -5,10 +5,14 @@ a rank (I4), and the public open view and bed card keep giving state only."""
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
+from samples import abstained_row  # isort: skip
 from test_open_view import watch  # noqa: F401 (watch: the API with the setting on)
 from test_overview import ADMIN, add_admin
-from test_store import Api, api  # noqa: F401 (api: fixture)
+from test_store import Api, api, obs  # noqa: F401 (api: fixture)
 from test_units import PATIENTS, depart, get, hospital
+
+from biosentry.schemas import AbstainedRow
 
 FIVE = {"heart_rate", "respiratory_rate", "spo2", "temperature", "blood_pressure"}
 NO_SCORE = {"score", "rank", "tier_breakdown", "models", "escalation_reasons", "sort_tier", "tier_status"}
@@ -19,7 +23,7 @@ def test_the_same_vitals_and_trends_a_ranked_row_has_are_on_a_shown_or_unranked_
     [own] = get(api, "md-santos", "/wards/W4/rows").json()["ranked"]
     for who, unit, pid in (("cn-er", "ER", "e-1"), ("cn-icu", "ICU", "i-1")):
         [row] = get(api, who, f"/wards/{unit}/rows").json()["abstained"]
-        assert row["id"] == pid and not NO_SCORE & row.keys()
+        assert row["id"] == pid and not NO_SCORE & row.keys() and row["unit_kind"] == ("shown" if unit == "ER" else "unranked")
         assert row["vitals"].keys() == own["vitals"].keys() and set(own["vitals"]) >= FIVE
         assert row["vital_trends"].keys() == own["vital_trends"].keys()
         assert row["vitals"]["heart_rate"]["data"]["value"] is not None  # a stored value, with its provenance
@@ -59,6 +63,34 @@ def test_a_ranked_unit_row_that_is_not_ranked_is_unchanged(api: Api) -> None:
     hospital(api, [gone, *PATIENTS[1:]])
     [row] = get(api, "md-santos", "/wards/W4/rows").json()["abstained"]
     assert row["vitals"] is None and row["vital_trends"] is None and row["last_seen"]
+
+
+def test_a_w4_patient_whose_device_stopped_keeps_vitals_null_and_last_seen_is_the_only_way_values_show(api: Api) -> None:
+    gaps = [obs("w-1", code, -1, absent_reason="no_signal") for code in ("heart_rate", "respiratory_rate", "spo2", "temperature")]
+    stopped = {**PATIENTS[0], "observations": [*PATIENTS[0]["observations"], *gaps]}  # newer than the stored values
+    hospital(api, [stopped, *PATIENTS[1:]])
+    body = get(api, "md-santos", "/wards/W4/rows").json()
+    assert body["ranked"] == []
+    [row] = body["abstained"]
+    assert (row["id"], row["unit_kind"], row["vitals"], row["vital_trends"]) == ("w-1", "ranked", None, None)
+    assert row["reason"].startswith("No device data")
+    assert row["last_seen"]["heart_rate"]["data"]["value"] == 118  # the stored value, with its own time and source
+    page = get(api, "md-santos", "/patients/w-1").json()
+    assert (page["vitals"], page["vital_trends"]) == (None, None) and page["last_seen"]["heart_rate"]
+
+
+@pytest.mark.parametrize("kind", ["shown", "unranked"])
+def test_the_schema_takes_vitals_on_a_row_of_a_shown_or_unranked_unit(kind: str) -> None:
+    assert AbstainedRow.model_validate({**abstained_row(), "unit_kind": kind}).vitals is not None
+
+
+@pytest.mark.parametrize("kind", ["ranked", None])
+@pytest.mark.parametrize("field", ["vitals", "vital_trends"])
+def test_the_schema_refuses_vitals_on_any_other_row_whoever_builds_it(kind: str | None, field: str) -> None:
+    other = "vital_trends" if field == "vitals" else "vitals"
+    with pytest.raises(ValidationError, match="shown or unranked"):
+        AbstainedRow.model_validate({**abstained_row(), "unit_kind": kind, other: None})
+    assert AbstainedRow.model_validate({**abstained_row(), "unit_kind": kind, "vitals": None, "vital_trends": None})
 
 
 def test_a_stay_that_ended_is_gone_for_the_charge_nurse_and_the_admin(api: Api) -> None:

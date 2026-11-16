@@ -34,6 +34,8 @@ export interface components {
             readonly synthetic: boolean;
             /** @default null */
             readonly unit?: string | null;
+            /** @default null */
+            readonly unit_kind?: ("ranked" | "shown" | "unranked") | null;
             readonly vital_history: components["schemas"]["VitalHistoryFull"];
             /** @default null */
             readonly vital_trends?: components["schemas"]["VitalTrends"] | null;
@@ -64,6 +66,8 @@ export interface components {
             readonly synthetic: boolean;
             /** @default null */
             readonly unit?: string | null;
+            /** @default null */
+            readonly unit_kind?: ("ranked" | "shown" | "unranked") | null;
             /** @default null */
             readonly vital_trends?: components["schemas"]["VitalTrends"] | null;
             /** @default null */

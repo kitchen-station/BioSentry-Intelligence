@@ -255,6 +255,7 @@ def abstained_row() -> dict[str, Any]:
         "last_seen": vitals(),
         "vitals": vitals(),
         "vital_trends": vital_trends(),
+        "unit_kind": "shown",
     }
 
 
