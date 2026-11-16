@@ -396,9 +396,13 @@ class Actions(Contract):
     actions: list[Action]  # at most 200, oldest first
 
 
+SKIP_MINUTES = (60, 360, 720, 1440)  # +1 h, +6 h, +12 h, +1 day
+
+
 class NewCommand(Contract):
-    """What a clinician asks of the simulation. A speed goes with `set_speed` and nothing else; a
-    patient goes with the four patient kinds and nothing else; `reset` takes neither."""
+    """What a clinician asks of the simulation. A speed goes with `set_speed` and nothing else;
+    minutes go with `skip` and nothing else (60, 360, 720 or 1440: the whole run moves ahead); a
+    patient goes with the four patient kinds and nothing else; `reset` takes none of them."""
 
     kind: Literal[
         "set_speed",
@@ -407,19 +411,25 @@ class NewCommand(Contract):
         "start_arrhythmia",
         "detach_patch",
         "apply_patch",
+        "skip",
     ]
     patient_id: Id | None = None
     speed: Annotated[int, Field(strict=True)] | None = None  # 0, 1, 10 or 60, checked below
+    minutes: Annotated[int, Field(strict=True)] | None = None  # skip only: 60, 360, 720 or 1440
 
     @model_validator(mode="after")
     def _the_fields_of_the_kind(self) -> Self:
         if self.speed not in (None, 0, 1, 10, 60):
             raise ValueError("speed is 0, 1, 10 or 60")
-        patient = self.kind not in ("set_speed", "reset")
-        if (self.patient_id is not None) != patient or (self.speed is not None) != (
-            self.kind == "set_speed"
+        if self.minutes not in (None, *SKIP_MINUTES):
+            raise ValueError("minutes is 60, 360, 720 or 1440")
+        patient = self.kind not in ("set_speed", "reset", "skip")
+        if (
+            (self.patient_id is not None) != patient
+            or (self.speed is not None) != (self.kind == "set_speed")
+            or (self.minutes is not None) != (self.kind == "skip")
         ):
-            raise ValueError("a command takes the patient or speed its kind names, and no other")
+            raise ValueError("a command takes the patient, speed or minutes its kind names, and no other")
         return self
 
 
@@ -431,6 +441,7 @@ class Command(Contract):
     patient_id: str | None
     clinician_id: str
     speed: int | None = None
+    minutes: int | None = None  # skip only
     unit: str | None = None  # the {ward} the clinician sent it from
 
 

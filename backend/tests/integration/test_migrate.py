@@ -179,7 +179,9 @@ def test_a_compare_run_from_before_the_patient_question_survives_with_the_new_co
             )
         )
         before = conn.execute("SELECT id, state, mode, report, report_text FROM lab_run ORDER BY id").fetchall()
-        assert migrate(conn) == ["0011_patient_question", "0012_sim_episode", "0013_lab_question", "0014_hospital_units"]
+        assert migrate(conn) == [
+            "0011_patient_question", "0012_sim_episode", "0013_lab_question", "0014_hospital_units", "0015_sim_skip"
+        ]  # fmt: skip
         after = conn.execute("SELECT * FROM lab_run ORDER BY id").fetchall()
         names = {
             r["conname"]
@@ -222,7 +224,7 @@ def test_a_compare_run_and_a_patient_question_survive_the_general_question_migra
             " 'patient_question', 'q', 1, 'p-1', '{}', repeat('a', 64), 'queued')"
         )
         before = conn.execute("SELECT * FROM lab_run ORDER BY id").fetchall()
-        assert migrate(conn) == ["0013_lab_question", "0014_hospital_units"]
+        assert migrate(conn) == ["0013_lab_question", "0014_hospital_units", "0015_sim_skip"]
         assert conn.execute("SELECT * FROM lab_run ORDER BY id").fetchall() == before
         conn.execute(
             "INSERT INTO lab_run (ward, requested_by, requested_at, kind, question, state)"
@@ -254,7 +256,9 @@ def test_a_ward_from_before_units_becomes_one_ranked_unit_with_every_row_kept(
             "INSERT INTO sim_command (run_id, kind, patient_id, clinician_id, at, data)"
             " VALUES (1, 'set_speed', NULL, 'md-old', now(), '{\"speed\": 1}')"
         )
-        assert migrate(conn) == ["0014_hospital_units"]
+        assert migrate(conn) == ["0014_hospital_units", "0015_sim_skip"]
+        assert conn.execute("SELECT commands_read FROM run").fetchall() == [{"commands_read": 0}]  # nothing read yet
+        assert conn.execute("SELECT kind FROM sim_command").fetchall() == [{"kind": "set_speed"}]  # the old row stays
         assert conn.execute("SELECT id, position, name, floor, kind, live_view FROM run_unit").fetchall() == [
             {"id": "W4", "position": 0, "name": "W4", "floor": None, "kind": "ranked",
              "live_view": {"shared": {"n": 1}, "patients": []}}

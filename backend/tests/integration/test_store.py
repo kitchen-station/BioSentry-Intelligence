@@ -1890,7 +1890,7 @@ def test_a_command_goes_on_the_feed_in_order_with_what_it_says_and_who_sent_it(a
         ("set_speed", None, "rn-manalo", 0),
     ]  # fmt: skip
     assert rows == [
-        {"kind": k, "patient_id": p, "clinician_id": c, "speed": v, "unit": "W4"}
+        {"kind": k, "patient_id": p, "clinician_id": c, "speed": v, "minutes": None, "unit": "W4"}
         for k, p, c, v in expected
     ]
     later = sent(api, run_id, after=seqs[3])

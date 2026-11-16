@@ -297,6 +297,7 @@ def commands(store: PostgresStore, run_id: int, after: int) -> list[dict[str, An
     with transaction(store.conn):  # under the run's lock, as `actions`
         if _locked_newest(store.conn, run_id) is None:
             return None
+        store.mark_commands_read(run_id, after)  # the sim asking after N has taken every command up to N
         return store.commands(run_id, after)
 
 
@@ -312,13 +313,15 @@ def add_command(
     if body.patient_id is not None and body.patient_id not in store.assigned(who, unit=ward):
         audit.append(who, "sim_command", resource, "not_found")
         return False
-    data = {} if body.speed is None else {"speed": body.speed}
+    data = {k: v for k, v in (("speed", body.speed), ("minutes", body.minutes)) if v is not None}
     try:
         with store.tx():
             run = _locked_newest(store.conn, store.run_id)
             assert run is not None  # the store was made on it
             if not is_live(run["last_batch_at"], run["ended"], store.clock()):
                 raise ConflictError("The ward is not receiving data from a running simulation")
+            if body.kind == "skip" and store.skip_waiting():  # one at a time: no queue of skips
+                raise ConflictError("An earlier skip has not been picked up by the simulation yet")
             store.add_command(body.kind, who, body.patient_id, data, ward)
     except ConflictError:  # audited after the rollback, or the row would go with it
         audit.append(who, "sim_command", resource, "rejected")

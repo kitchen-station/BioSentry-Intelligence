@@ -897,6 +897,23 @@ class PostgresStore:
             (self.run_id, kind, patient_id, clinician_id, whole(self.now()), Jsonb(data), unit),
         )
 
+    def skip_waiting(self) -> bool:
+        """Whether a skip of this run is above the cursor the sim last fetched the feed with."""
+        row = self.conn.execute(
+            "SELECT EXISTS (SELECT 1 FROM sim_command c JOIN run r ON r.id = c.run_id"
+            " WHERE c.run_id = %s AND c.kind = 'skip' AND c.seq > r.commands_read) AS waiting",
+            (self.run_id,),
+        ).fetchone()
+        assert row is not None  # an aggregate always answers
+        waiting: bool = row["waiting"]
+        return waiting
+
+    def mark_commands_read(self, run_id: int, after: int) -> None:
+        """The sim fetched the feed after `after`: it has every command up to it. Never moves back."""
+        self.conn.execute(
+            "UPDATE run SET commands_read = GREATEST(commands_read, %s) WHERE id = %s", (after, run_id)
+        )
+
     def commands(self, run_id: int, after: int) -> list[dict[str, Any]]:
         """The next 200 command rows of a run after `after`, oldest first (as `actions`)."""
         rows = self.conn.execute(
