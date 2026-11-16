@@ -338,11 +338,31 @@ def test_a_command_carries_the_unit_it_was_sent_from(api: Api) -> None:
 # --- Admitting in the app --------------------------------------------------------------------------
 
 
-def test_an_admission_goes_to_the_callers_unit_unless_a_unit_is_named(api: Api) -> None:
+def test_an_admission_into_a_unit_that_is_not_the_callers_is_refused_and_opens_nothing(api: Api) -> None:
+    """The admitter is assigned the new patient: without the refusal one admission would make any
+    unit hers, and open its research view, live view, lab and commands."""
+    hospital(api)
+    before = count(api, "patient")
+    for unit in ("MED3A", "W4", "ICU"):
+        refused = send(api, "cn-er", "/patients", {**admit_input(), "bed": "Z1", "unit": unit})
+        assert refused.status_code == 403, unit
+    assert count(api, "patient") == before and count(api, "clinician_action") == 0
+    denied = api.sql("SELECT resource FROM audit_log WHERE clinician_id = 'cn-er' AND action = 'admit_patient' AND outcome = 'denied' ORDER BY seq")
+    assert [r["resource"] for r in denied] == ["MED3A", "W4", "ICU"]
+    for path in ("live", "research", "lab/runs", "lab/questions"):
+        assert get(api, "cn-er", f"/wards/MED3A/{path}").status_code == 403, path
+    assert send(api, "cn-er", "/wards/MED3A/sim/commands", {"kind": "set_speed", "speed": 10}).status_code == 403
+
+
+def test_an_admission_goes_to_the_callers_unit_or_to_a_named_unit_that_is_already_theirs(api: Api) -> None:
     run_id = hospital(api)
     form = admit_input()  # bed 4A
     assert send(api, "md-santos", "/patients", form).status_code == 409  # W4 has a patient in 4A
     assert send(api, "cn-er", "/patients", form).json()["unit"] == "ER"  # per unit: the same bed in the ER is free
+    own = send(api, "cn-er", "/patients", {**form, "bed": "E7", "unit": "ER"})  # her own unit, named
+    assert (own.status_code, own.json()["unit"], own.json()["floor"]) == (201, "ER", 0)
+    # a unit that is not hers by her row, and already hers by a patient she has there now
+    write(api, "INSERT INTO care_assignment (run_id, patient_id, clinician_id) VALUES (%s, 'm-1', 'cn-er')", run_id)
     named = send(api, "cn-er", "/patients", {**form, "unit": "MED3A"})
     assert (named.status_code, named.json()["unit"], named.json()["floor"]) == (201, "MED3A", 3)
     refused = send(api, "cn-er", "/patients", {**form, "bed": "Z9", "unit": "NOPE"})
@@ -350,7 +370,7 @@ def test_an_admission_goes_to_the_callers_unit_unless_a_unit_is_named(api: Api) 
     assert api.sql("SELECT count(*) AS n FROM patient WHERE bed = 'Z9'") == [{"n": 0}]
     assert api.sql("SELECT outcome FROM audit_log WHERE action = 'admit_patient' ORDER BY seq DESC LIMIT 1") == [{"outcome": "rejected"}]
     admitted = api.client.get(f"/sim/runs/{run_id}/actions", headers={"X-Ingest-Key": "test-ingest-key"}).json()["actions"]
-    assert [(a["kind"], a["unit"]) for a in admitted] == [("admit_patient", "ER"), ("admit_patient", "MED3A")]
+    assert [(a["kind"], a["unit"]) for a in admitted] == [("admit_patient", "ER"), ("admit_patient", "ER"), ("admit_patient", "MED3A")]
     assert send(api, "cn-er", "/patients", {**form, "bed": "Z8", "unit": "bad id"}).status_code == 422
 
 

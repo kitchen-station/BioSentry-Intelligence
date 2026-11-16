@@ -651,6 +651,11 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
 
     @app.post("/patients", response_model=AbstainedRow, status_code=201)
     def admit_patient(form: AdmitPatientInput, ctx: Ctx, who: Writer) -> AbstainedRow:
+        # Judged before the admission: the admitter is assigned the new patient, so admitting into
+        # another unit would make that unit theirs and open every whole-unit answer of it.
+        if form.unit in ctx.store.units and not ctx.store.belongs(who, form.unit):
+            ctx.audit.append(who, "admit_patient", form.unit, "denied")
+            raise HTTPException(status_code=403, detail="Forbidden")
         return ctx.patients.admit(who, form)
 
     @app.get("/patients/{patient_id}/notes", response_model=list[ClinicalNote])
