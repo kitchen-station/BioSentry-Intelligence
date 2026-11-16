@@ -768,26 +768,34 @@ class PostgresStore:
         ).fetchall()
         return rows[0]["id"] if len(rows) == 1 else None
 
-    def open_history(self, patient_id: str, hours: int, points: int) -> dict[str, list[dict[str, Any]]]:
+    def open_history(
+        self, patient_id: str, hours: int, points: int, admitted_at: datetime | None
+    ) -> dict[str, list[dict[str, Any]]]:
         """The last `hours` of ward time of the four device vitals (the stored 15-minute bins, a gap
         kept as a null) and of the charted blood pressures, oldest first, at most `points` of each,
-        the newest kept. Only these columns are read: no name, id or score reaches the answer."""
+        the newest kept. Nothing from before this stay's admission (`admitted_at`): the runner may
+        send a moved person's earlier readings on the new stay, and a public card must not let a
+        visitor follow one person across beds. A bin is stamped with its END, so a bin that ends at
+        the admission holds only earlier time and is left out; a reading at the admission is in.
+        Only these columns are read: no name, id or score reaches the answer."""
         end = self.now()
         since = end - timedelta(hours=hours)
         out: dict[str, list[dict[str, Any]]] = {v: [] for v in (*DEVICE_VITALS, "blood_pressure")}
         for r in self.conn.execute(
             "SELECT vital, bin_at, value FROM (SELECT vital, bin_at, value, ROW_NUMBER() OVER"
             " (PARTITION BY vital ORDER BY bin_at DESC) AS n FROM vital_bin WHERE run_id = %s"
-            " AND patient_id = %s AND vital = ANY(%s) AND bin_at > %s AND bin_at <= %s) AS t"
+            " AND patient_id = %s AND vital = ANY(%s) AND bin_at > %s AND bin_at <= %s"
+            " AND (%s::timestamptz IS NULL OR bin_at > %s)) AS t"
             " WHERE n <= %s ORDER BY vital, bin_at",
-            (self.run_id, patient_id, list(DEVICE_VITALS), since, end, points),
+            (self.run_id, patient_id, list(DEVICE_VITALS), since, end, admitted_at, admitted_at, points),
         ):
             out[r["vital"]].append({"time": r["bin_at"], "value": r["value"], "source": "device"})
         pressures = self.conn.execute(
             "SELECT observed_at, num, num2, source FROM observation WHERE run_id = %s AND patient_id = %s"
             " AND code = 'blood_pressure' AND absent_reason IS NULL AND num IS NOT NULL AND num2 IS NOT NULL"
-            " AND observed_at > %s AND observed_at <= %s ORDER BY observed_at DESC, id DESC LIMIT %s",
-            (self.run_id, patient_id, since, end, points),
+            " AND observed_at > %s AND observed_at <= %s AND (%s::timestamptz IS NULL OR observed_at >= %s)"
+            " ORDER BY observed_at DESC, id DESC LIMIT %s",
+            (self.run_id, patient_id, since, end, admitted_at, admitted_at, points),
         ).fetchall()
         out["blood_pressure"] = [
             {"time": r["observed_at"], "systolic": int(r["num"]), "diastolic": int(r["num2"]), "source": r["source"]}

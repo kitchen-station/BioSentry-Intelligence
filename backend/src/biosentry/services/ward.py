@@ -461,7 +461,9 @@ class WardService:
             reason=None,
             vitals=vitals,
             trend=state.trend,
-            history=OpenHistory(hours=HISTORY_HOURS, **self._store.open_history(state.id, HISTORY_HOURS, HISTORY_POINTS)),
+            history=OpenHistory(
+                hours=HISTORY_HOURS, **self._store.open_history(state.id, HISTORY_HOURS, HISTORY_POINTS, state.admitted_at)
+            ),
         )
 
     def summaries(self, clinician_id: str) -> list[PatientSummary]:
