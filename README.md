@@ -73,7 +73,8 @@ Every row was re-scored with the backend's NEWS2 with 0 mismatches. **These are 
 simulator makes the data and judges the alerts. The full tables and method are in
 [`models/tier_c/student_vitals/held_out_2.txt`](models/tier_c/student_vitals/held_out_2.txt) (set 2) and
 [`models/held_out_2/analysis.txt`](models/held_out_2/analysis.txt) (the pre-registered analysis); set 1 is in
-[`models/tier_c/student_vitals/held_out.txt`](models/tier_c/student_vitals/held_out.txt).
+[`models/tier_c/student_vitals/held_out.txt`](models/tier_c/student_vitals/held_out.txt). To regenerate any of them, see
+[Reproduce the results](#reproduce-the-results).
 
 ## Architecture
 
@@ -123,6 +124,17 @@ Red: Huawei technology in use today. MindSpore 2.11 trains the student, and Mind
 MindNLP 0.5.1 on MindSpore 2.7 LoRA-tunes the model that the lab question worker can use
 (`research/agent_tuning/`, `deploy/compose.tuned.yaml`). Dashed: Huawei Cloud services planned and not running yet. The API runs the student from its exported weights (`models/`), scores NEWS2 on
 every read, and stores no score.
+
+## Screenshots
+
+| | |
+|---|---|
+| ![The ranked ward list](docs/screenshots/dashboard-ward.png) | ![A patient's page](docs/screenshots/dashboard-patient.png) |
+| The ranked ward list: a charge nurse on the sample ward, sorted on NEWS2, with the reason and next step for each patient. | One patient: each NEWS2 part with its points, the next step, labs, and the research models' flags. |
+| ![Research numbers](docs/screenshots/dashboard-research.png) | ![The ward simulator](docs/screenshots/sim-ward.png) |
+| The research numbers in the Simulation lab: every alert rule against chance, on held-out simulated wards. | The ward simulator, watching the team server's ward W4 read-only. |
+
+All patients are synthetic.
 
 ## Use it now
 
@@ -243,6 +255,56 @@ taken (`latest_at`), where the baseline starts (`baseline_from`) and whether adm
 `make db-up` first (each test works in its own copy of a seeded database and drops it). `make db-reset`
 drops every table and seeds again. `make contract` regenerates `frontend/src/types/generated.ts` from the Pydantic
 schemas. Every target is in the [Makefile](Makefile).
+
+## Reproduce the results
+
+Every number in [Results](#results) comes from simulator trials that are not committed (about 1.8 MB
+per 30-day trial; 400 for set 2). Make them with the ward simulator,
+[kitchen-station/biosentry-ward-sim](https://github.com/kitchen-station/biosentry-ward-sim), on Node 25, at
+the commit each data card names:
+
+| Trials | Sim commit | Seeds | Data card |
+|---|---|---|---|
+| ward-v2 (set 1 is seeds 11 to 30) | `f7647c5` | 11 to 30 | [`models/data/ward-v2/card.md`](models/data/ward-v2/card.md) |
+| ward-v2-ext (trains the student) | `b4b7cdc` | 61 to 160 | [`models/data/ward-v2-ext/card.md`](models/data/ward-v2-ext/card.md) |
+| ward-v2-heldout2 (set 2) | `4b86f96` | 1001 to 1400 | [`models/data/ward-v2-heldout2/card.md`](models/data/ward-v2-heldout2/card.md) |
+
+```bash
+# in biosentry-ward-sim, once per row of the table
+git checkout f7647c5 && npm ci
+npx vite build --ssr src/trial.ts --outDir dist/trial --logLevel warn
+mkdir -p trials/ward-v2   # the runner needs the parent folder; each seed folder must be new
+for N in $(seq 11 30); do
+  TRIAL_SIM_COMMIT=f7647c5 node dist/trial/trial.js --scenario scenarios/default.json --seed $N --days 30 --out trials/ward-v2/seed-$(printf %02d $N)
+done
+```
+
+Then score them from this repository, in Docker, with the research environment (MindSpore 2.11). The set-up
+line is the one in `research/README.md`, "Gate (ML-GATE)":
+
+```bash
+docker build --target build -t biosentry-api-build .
+docker run --rm -v "$PWD":/app -v biosentry-research-venv:/venv -w /app/research -e UV_PROJECT_ENVIRONMENT=/venv -e UV_LINK_MODE=copy -e UV_PYTHON_DOWNLOADS=never biosentry-api-build sh -c "uv sync --locked && ln -sf \$(ls /venv/lib/python3.11/site-packages/scikit_learn.libs/libgomp-*.so.1.0.0 | head -1) /venv/lib/libgomp.so.1"
+alias run='docker run --rm -v "$PWD":/app -v <your trials folder>:/data:ro -v biosentry-research-venv:/venv -w /app -e PYTHONPATH=/app/backend/src:/app -e LD_LIBRARY_PATH=/venv/lib biosentry-api-build /venv/bin/python -m'
+
+# set 1: the NEWS2 rules and the student; compare with the committed file
+run research.evaluate_student /data/ward-v2/seed-{11..30} /data/ward-v2-ext/seed-{61..160} > held_out.txt
+diff held_out.txt models/tier_c/student_vitals/held_out.txt
+# set 2: the same with --held-out-set 2, then the declared test (four commands)
+run research.evaluate_student /data/ward-v2-heldout2/seed-{1001..1400} /data/ward-v2-ext/seed-{61..160} --held-out-set 2 > held_out_2.txt
+diff held_out_2.txt models/tier_c/student_vitals/held_out_2.txt
+```
+
+The four set-2 commands, with the confidence check, the reward policy and `research.heldout2 analyse`, are in
+[`research/README.md`, "Held-out set 2"](research/README.md#held-out-set-2-declared-before-it-is-read).
+
+- **The output is plain deterministic text, so `diff` must print nothing.** The commands read no clock and no paths.
+- **The student is refitted, not loaded.** `evaluate_student` retrains the chosen teacher and student and
+  refuses to print a number unless their weights and ONNX match the committed files byte for byte. That match
+  is promised only on linux aarch64 (Docker on an Apple-silicon Mac); the code pins MindSpore to one kernel
+  thread. On x86-64 the command can refuse.
+- **NEWS2 itself** is re-scored on every row with the backend's code; the output's `parity` line must say
+  0 mismatches.
 
 ## What you will see
 
