@@ -215,7 +215,7 @@ def test_a_model_flag_does_not_move_a_row(api: Api, monkeypatch: pytest.MonkeyPa
     world(api)
     quiet = research(api)
     api.client = client_for(api, REAL)
-    force(monkeypatch, p=1.0, alert=True)
+    force(monkeypatch, p=1.0)
     flagged = research(api)
     assert {r["models"]["prediction"]["state"] for r in flagged["ranked"]} >= {"flag"}
     assert [(r["bed"], r["id"], r["rank"], r["score"]) for r in flagged["ranked"]] == [
