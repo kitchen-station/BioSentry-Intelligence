@@ -89,6 +89,7 @@ from .rows import (
     TierBreakdown,
     UnscoredPatient,
     WardResponse,
+    WardUnit,
 )
 from .tiers import (
     EscalationReason,
@@ -127,6 +128,7 @@ CONTRACT_MODELS: tuple[type[BaseModel], ...] = (
     ScoreRow,
     AbstainedRow,
     WardResponse,
+    WardUnit,
     TierAScore,
     TierBreakdown,
     PatientDetail,
@@ -272,4 +274,5 @@ __all__ = [
     "VitalsRecorded",
     "WardOverview",
     "WardResponse",
+    "WardUnit",
 ]

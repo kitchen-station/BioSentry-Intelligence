@@ -156,7 +156,7 @@ def test_a_patient_who_has_left_is_not_on_the_overview(api: Api) -> None:
 def set_view(api: Api, shared: Any) -> None:
     write(
         api,
-        "UPDATE run SET live_view = %s::jsonb WHERE id = (SELECT max(id) FROM run)",
+        "UPDATE run_unit SET live_view = %s::jsonb WHERE run_id = (SELECT max(id) FROM run)",
         json.dumps({"shared": shared, "patients": [{"id": "p-001", "note": "x"}]}),
     )
 
@@ -204,7 +204,7 @@ def test_sim_is_null_when_the_stored_view_is_not_as_read(api: Api, bad: Any) -> 
 
 def test_sim_is_null_when_the_view_has_no_shared_key(api: Api) -> None:
     add_admin(api)
-    write(api, "UPDATE run SET live_view = '{}'::jsonb WHERE id = (SELECT max(id) FROM run)")
+    write(api, "UPDATE run_unit SET live_view = '{}'::jsonb WHERE run_id = (SELECT max(id) FROM run)")
     assert overview(api).json()["sim"] is None
 
 
@@ -370,7 +370,7 @@ def test_the_write_actions_are_still_the_body_bearing_routes_only(api: Api) -> N
 
 
 READS = [("GET", p) for p in (
-    "/wards/{ward}/rows", "/wards/{ward}/stays", "/wards/{ward}/overview", "/wards/{ward}/live",
+    "/wards", "/wards/{ward}/rows", "/wards/{ward}/stays", "/wards/{ward}/overview", "/wards/{ward}/live",
     "/wards/{ward}/research", "/wards/{ward}/lab/runs", "/wards/{ward}/lab/runs/{lab_run_id}", "/wards/{ward}/lab/questions",
     "/wards/{ward}/lab/questions/{lab_run_id}", "/patients",
     "/patients/{patient_id}", "/patients/{patient_id}/baseline", "/patients/{patient_id}/history",
@@ -821,7 +821,7 @@ def test_the_live_view_of_an_admin_has_no_patient_even_without_the_route_check(a
     add_admin(api)
     write(
         api,
-        "UPDATE run SET live_view = %s::jsonb WHERE id = (SELECT max(id) FROM run)",
+        "UPDATE run_unit SET live_view = %s::jsonb WHERE run_id = (SELECT max(id) FROM run)",
         json.dumps({"shared": GOOD, "patients": [{"id": "p-001", "view": {"bed": "p-001"}}]}),
     )
     _, wards, _ = _services(api)

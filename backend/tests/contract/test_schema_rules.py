@@ -16,6 +16,12 @@ OPTIONAL_OUTPUT_FIELDS = {
     ("Provenance", "variant"),
     ("Provenance", "file_sha256"),
     ("Provenance", "run_id"),
+    # Units (hospital-units): a client and a fixture from before units omit them.
+    *((m, f) for m in ("ScoreRow", "PatientDetail") for f in ("unit", "floor", "person")),
+    *(("AbstainedRow", f) for f in ("unit", "floor", "person", "news2_risk")),
+    *(("WardResponse", f) for f in ("name", "floor", "kind")),
+    *(("PatientStay", f) for f in ("unit", "floor", "person", "to_unit")),
+    *(("OverviewPatient", f) for f in ("unit", "floor")),
 }
 
 IDS = [m.__name__ for m in CONTRACT_MODELS]
@@ -87,6 +93,8 @@ def test_numeric_fields_on_output_models_are_all_required() -> None:
         if model in INPUT_MODELS:
             continue
         for name, info in model.model_fields.items():
+            if name == "floor" and (model.__name__, name) in OPTIONAL_OUTPUT_FIELDS:
+                continue  # the one exception: a unit's floor, null when not known, absent before units
             annotation = str(info.annotation)
             if "float" in annotation or "int" in annotation:
                 assert info.is_required(), f"{model.__name__}.{name} is numeric with a default"

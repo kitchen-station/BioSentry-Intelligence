@@ -23,8 +23,8 @@ ABSTAINED = {"bed", "assigned", "id", "name", "reason", "instruction"}
 MINE = {"p-001", "p-002", "p-006", "p-008", "p-011"}  # md-santos's patients in the fixture ward
 # Measured: the statements one read runs for the fixture ward of 12 patients (about five for each: the ward's rows,
 # the baseline and the stay history's alert bins are read for every patient, plus the audit row). It pins the cost, so a new
-# query on this route shows up here.
-STATEMENTS = 67
+# query on this route shows up here. 68 since units: one read of the caller's own unit (whose unit is this?).
+STATEMENTS = 68
 
 
 def get(api: Api, who: str = "md-santos", path: str = URL) -> Any:

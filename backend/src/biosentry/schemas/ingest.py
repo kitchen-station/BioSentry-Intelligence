@@ -15,11 +15,13 @@ from typing import Annotated, Any, Literal, Self
 
 from pydantic import AfterValidator, AwareDatetime, Field, JsonValue, field_validator, model_validator
 
+from .admission import UNIT_ID
 from .base import Age, Contract, Flag, Num, Percent
 from .clinical import LabPanel
 from .common import ProvenanceSource, QualityLevel, Trend
 
 Id = Annotated[str, Field(min_length=1, max_length=64)]
+UnitId = Annotated[str, Field(pattern=UNIT_ID)]
 Text = Annotated[str, Field(max_length=500)]
 Minute = Annotated[int, Field(strict=True, ge=-1_000_000, le=10_000_000)]
 Code = Literal[
@@ -87,6 +89,8 @@ class Event(Contract):
 
 class NewRunPatient(Contract):
     id: Id
+    unit: UnitId | None = None  # null: the run's home unit
+    person: Id | None = None  # the same for every stay of one person
     name: Annotated[str, Field(max_length=120)]
     age: Age | None
     sex: Annotated[str, Field(max_length=20)] | None
@@ -114,7 +118,24 @@ class Admission(NewRunPatient):
 class Departure(Contract):
     patient_id: Id
     minute: Minute
-    outcome: Literal["discharged", "higher_care"]
+    outcome: Literal["discharged", "higher_care", "transferred", "died"]
+    to_unit: UnitId | None = None
+
+    @model_validator(mode="after")
+    def _a_transfer_names_its_unit(self) -> Self:
+        if (self.to_unit is not None) != (self.outcome == "transferred"):
+            raise ValueError("to_unit goes with the outcome transferred and no other")
+        return self
+
+
+class NewUnit(Contract):
+    id: UnitId
+    name: Annotated[str, Field(min_length=1, max_length=60)]
+    floor: Annotated[int, Field(strict=True, ge=-5, le=200)] | None
+    kind: Literal["ranked", "shown", "unranked"]
+
+
+HOME = NewUnit(id="W4", name="Ward W4", floor=None, kind="ranked")
 
 
 class NewRun(Contract):
@@ -122,13 +143,19 @@ class NewRun(Contract):
     source: Literal["synthetic"]
     seed: Seed | None
     origin: Origin
-    patients: Annotated[list[NewRunPatient], Field(min_length=1, max_length=200)]
+    units: Annotated[list[NewUnit], Field(min_length=1, max_length=12)] | None = None  # null: one unit, W4
+    patients: Annotated[list[NewRunPatient], Field(min_length=1, max_length=400)]
 
     @model_validator(mode="after")
     def _unique_ids(self) -> Self:
         ids = [p.id for p in self.patients]
         if len(ids) != len(set(ids)):
             raise ValueError("patient ids must be unique")
+        names = [u.id for u in self.units or [HOME]]
+        if len(names) != len(set(names)):
+            raise ValueError("unit ids must be unique")
+        if any(p.unit not in (None, *names) for p in self.patients):
+            raise ValueError("a patient's unit is a unit of the run")
         return self
 
 
@@ -149,7 +176,7 @@ class Batch(Contract):
     minute: Minute
     ended: Flag
     counts: Counts
-    patients: Annotated[list[BatchPatient], Field(max_length=200)]
+    patients: Annotated[list[BatchPatient], Field(max_length=400)]
     observations: Annotated[list[Obs], Field(max_length=MAX_ROWS)]
     bins: Annotated[list[Bin], Field(max_length=MAX_ROWS)]
     events: Annotated[list[Event], Field(max_length=2_000)]
@@ -195,9 +222,10 @@ class PatientView(Contract):
 
 
 class LiveView(Contract):
-    """What the ward viewer draws. `shared` goes to every clinician of the ward, so it carries no
+    """What the ward viewer draws. `shared` goes to every clinician of the unit, so it carries no
     patient names; each patient's `view` goes only to that patient's clinicians."""
 
+    unit: UnitId | None = None  # null: the run's home unit
     shared: View
     patients: Annotated[list[PatientView], Field(max_length=200)]
 
@@ -301,6 +329,7 @@ class Action(Contract):
     sex: str | None = None
     bed: str | None = None
     context: str | None = None
+    unit: str | None = None  # admit_patient: where to place the patient
 
 
 class Actions(Contract):
@@ -342,6 +371,7 @@ class Command(Contract):
     patient_id: str | None
     clinician_id: str
     speed: int | None = None
+    unit: str | None = None  # the {ward} the clinician sent it from
 
 
 class Commands(Contract):

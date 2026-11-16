@@ -63,6 +63,7 @@ from biosentry.schemas import (
     QuestionDetail,
     QuestionItem,
     PatientStay,
+    WardUnit,
     PatientSummary,
     Provenance,
     ModelSignal,
@@ -211,6 +212,9 @@ def score_row() -> dict[str, Any]:
         "signal_quality": 94,
         "last_update_s": 4,
         "models": row_models(),
+        "unit": "W4",
+        "floor": 4,
+        "person": None,
     }
 
 
@@ -219,7 +223,7 @@ def unscored() -> dict[str, Any]:
     keys = (
         "id", "name", "age", "sex", "bed", "admitting_context", "trend", "mechanism",
         "supporting", "vitals", "vital_trends", "labs", "signal_quality",
-        "last_update_s", "synthetic",
+        "last_update_s", "synthetic", "unit", "floor", "person",
     )  # fmt: skip
     state = {key: row[key] for key in keys}
     state["admitted_at"] = "2026-09-03T04:00:00Z"
@@ -241,6 +245,10 @@ def abstained_row() -> dict[str, Any]:
         "reason": "No patch applied",
         "instruction": "Apply patch and verify signal",
         "synthetic": True,
+        "unit": "ER",
+        "floor": 0,
+        "person": None,
+        "news2_risk": None,
     }
 
 
@@ -346,8 +354,12 @@ _BUILDERS: dict[type[BaseModel], Any] = {
     RowModels: row_models,
     ScoreRow: score_row,
     AbstainedRow: abstained_row,
+    WardUnit: lambda: {"id": "ER", "name": "Emergency Room", "floor": 0, "kind": "shown", "patients": 3},
     WardResponse: lambda: {
         "ward": "4 East",
+        "name": "Ward 4 East",
+        "floor": 4,
+        "kind": "ranked",
         "clinician": "RN Dela Cruz",
         "shift": "day",
         "receiving_data": True,
@@ -392,6 +404,10 @@ _BUILDERS: dict[type[BaseModel], Any] = {
         "left_at": None,
         "outcome": None,
         "synthetic": True,
+        "unit": "W4",
+        "floor": 4,
+        "person": None,
+        "to_unit": None,
     },
     NewLabRun: lambda: {
         "kind": "compare",
@@ -478,6 +494,8 @@ _BUILDERS: dict[type[BaseModel], Any] = {
         "reason": None,
         "care": ["rn-reyes"],
         "synthetic": True,
+        "unit": "W4",
+        "floor": 4,
     },
     OverviewClinician: lambda: {"id": "rn-reyes", "role": "rn", "patients": 1},
     OverviewActivity: lambda: {
@@ -518,7 +536,7 @@ _BUILDERS: dict[type[BaseModel], Any] = {
         "clinicians": [],
         "activity": [],
     },
-    PatientSummary: lambda: {"id": "p-001", "name": "Santos, Maria", "bed": "4A", "ranked": True},
+    PatientSummary: lambda: {"id": "p-001", "name": "Santos, Maria", "bed": "4A", "ranked": True, "unit": "W4", "floor": 4},
     NurseVitalsInput: lambda: {"systolic": 120, "diastolic": 80},
     VitalsRecorded: lambda: {
         "patient_id": "p-004",

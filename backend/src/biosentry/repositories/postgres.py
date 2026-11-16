@@ -207,6 +207,8 @@ _PATIENT = (
     "admission",
     "story",
     "admitted_at",
+    "unit",
+    "person",
 )
 
 
@@ -226,12 +228,13 @@ def insert_patient(conn: Conn, run_id: int, patient_id: str, p: dict[str, Any]) 
     )
 
 
-def assign(conn: Conn, run_id: int, patient_id: str, *clinicians: str | None) -> None:
-    """Care assignments for these clinicians and, always, every charge nurse."""
+def assign(conn: Conn, run_id: int, patient_id: str, unit: str, *clinicians: str | None) -> None:
+    """Care assignments for these clinicians and, always, the charge nurses of the patient's unit."""
     conn.execute(
         "INSERT INTO care_assignment (run_id, patient_id, clinician_id)"
-        " SELECT %s, %s, id FROM clinician WHERE role = 'charge_rn' ON CONFLICT DO NOTHING",
-        (run_id, patient_id),
+        " SELECT %s, %s, id FROM clinician WHERE role = 'charge_rn' AND unit = %s"
+        " ON CONFLICT DO NOTHING",
+        (run_id, patient_id, unit),
     )
     with conn.cursor() as cur:
         cur.executemany(
@@ -252,7 +255,9 @@ def insert_run(
     last_batch_at: datetime | None,
     tier_status: list[dict[str, Any]],
     client_id: str | None = None,
+    units: list[dict[str, Any]] | None = None,
 ) -> int:
+    """`units`: id, name, floor, kind, in order; the first is `ward`. None: that one, ranked."""
     row = conn.execute(
         "INSERT INTO run (source, synthetic, seed, ward, origin, as_of, last_batch_at, tier_status,"
         " client_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
@@ -270,12 +275,24 @@ def insert_run(
     ).fetchone()
     assert row is not None
     run_id: int = row["id"]
+    with conn.cursor() as cur:
+        cur.executemany(
+            "INSERT INTO run_unit (run_id, id, position, name, floor, kind)"
+            " VALUES (%s, %s, %s, %s, %s, %s)",
+            [
+                (run_id, u["id"], i, u["name"], u["floor"], u["kind"])
+                for i, u in enumerate(units or [{"id": ward, "name": ward, "floor": None, "kind": "ranked"}])
+            ],
+        )
     return run_id
 
 
-def set_live_view(conn: Conn, run_id: int, view: dict[str, Any]) -> None:
-    """Replaces the run's live view (a JSON-ready dict)."""
-    conn.execute("UPDATE run SET live_view = %s WHERE id = %s", (Jsonb(view), run_id))
+def set_live_view(conn: Conn, run_id: int, unit: str, view: dict[str, Any]) -> None:
+    """Replaces the unit's live view (a JSON-ready dict)."""
+    conn.execute(
+        "UPDATE run_unit SET live_view = %s WHERE run_id = %s AND id = %s",
+        (Jsonb(view), run_id, unit),
+    )
 
 
 class PostgresStore:
@@ -284,13 +301,18 @@ class PostgresStore:
     def __init__(self, conn: Conn, clock: Callable[[], datetime]) -> None:
         # ponytail: the newest run is read once per request, so a write can land on the previous
         # run if a new one starts mid-request. Upgrade: re-check the newest id under lock_run.
-        run = conn.execute("SELECT * FROM run ORDER BY id DESC LIMIT 1").fetchone()
+        run = conn.execute(
+            "SELECT r.*, COALESCE((SELECT jsonb_agg(jsonb_build_object('id', u.id, 'name', u.name,"
+            " 'floor', u.floor, 'kind', u.kind) ORDER BY u.position) FROM run_unit u"
+            " WHERE u.run_id = r.id), '[]') AS units FROM run r ORDER BY r.id DESC LIMIT 1"
+        ).fetchone()
         if run is None:
             raise RuntimeError("the database has no run: seed it (python -m biosentry.db.seed)")
         self.conn = conn
         self.clock = clock
         self.run_id: int = run["id"]
-        self.ward: str = run["ward"]
+        self.ward: str = run["ward"]  # the home unit
+        self.units: dict[str, dict[str, Any]] = {u["id"]: u for u in run["units"]}  # in the run's order
         self.synthetic = bool(run["synthetic"])
         self.ended = bool(run["ended"])
         self.as_of: datetime = run["as_of"]
@@ -327,10 +349,13 @@ class PostgresStore:
         """Whether this clinician is an admin: the one place that rule is written."""
         return self.role_of(clinician_id) == ADMIN_ROLE
 
-    def on_ward(self) -> frozenset[str]:
-        """Every patient still on the ward, whoever is assigned. For the admin's read-only views."""
+    def on_ward(self, unit: str | None = None) -> frozenset[str]:
+        """Every patient still in the unit (None: in any), whoever is assigned. For the admin's
+        read-only views."""
         rows = self.conn.execute(
-            "SELECT id FROM patient WHERE run_id = %s AND left_at IS NULL", (self.run_id,)
+            "SELECT id FROM patient WHERE run_id = %s AND left_at IS NULL"
+            " AND (%s::text IS NULL OR unit = %s)",
+            (self.run_id, unit, unit),
         )
         return frozenset(r["id"] for r in rows)
 
@@ -346,14 +371,40 @@ class PostgresStore:
             out[r["patient_id"]].append(r["clinician_id"])
         return out
 
-    def clinicians(self) -> list[tuple[str, str]]:
-        """Every clinician but an admin, as (id, role), by id."""
-        # shortcut: one ward per database today, so every clinician belongs to it; scope by
-        # ward when clinicians carry one.
+    def clinicians(self, unit: str) -> list[tuple[str, str]]:
+        """Every clinician of the unit but an admin, as (id, role), by id."""
         rows = self.conn.execute(
-            "SELECT id, role FROM clinician WHERE role <> %s ORDER BY id", (ADMIN_ROLE,)
+            "SELECT id, role FROM clinician WHERE role <> %s AND unit = %s ORDER BY id",
+            (ADMIN_ROLE, unit),
         )
         return [(r["id"], r["role"]) for r in rows]
+
+    def unit_of(self, clinician_id: str) -> str | None:
+        """The clinician's own unit: the default unit of a patient they admit. Not a scope."""
+        row = self.conn.execute(
+            "SELECT unit FROM clinician WHERE id = %s", (clinician_id,)
+        ).fetchone()
+        return row["unit"] if row else None
+
+    def belongs(self, clinician_id: str, unit: str) -> bool:
+        """Whether the unit is this clinician's: their own, or one where they have a patient now.
+        The answers that hold a whole unit (live view, research, lab, sim commands) are for these."""
+        return self.unit_of(clinician_id) == unit or bool(self.assigned(clinician_id, unit=unit))
+
+    def unit_kind(self, patient_id: str) -> str | None:
+        """The kind of the unit this patient is in. None: no such patient in the run."""
+        row = self.conn.execute(
+            "SELECT unit FROM patient WHERE run_id = %s AND id = %s", (self.run_id, patient_id)
+        ).fetchone()
+        return self.units[row["unit"]]["kind"] if row else None
+
+    def counts(self, ids: frozenset[str]) -> dict[str, int]:
+        """How many of these patients are in each unit, for the units that have any."""
+        rows = self.conn.execute(
+            "SELECT unit, count(*) AS n FROM patient WHERE run_id = %s AND id = ANY(%s) GROUP BY unit",
+            (self.run_id, sorted(ids)),
+        )
+        return {r["unit"]: r["n"] for r in rows}
 
     def passphrase_hash(self, clinician_id: str) -> tuple[bool, str | None]:
         """Whether this clinician exists, and their stored hash (None: no passphrase is set)."""
@@ -362,14 +413,18 @@ class PostgresStore:
         ).fetchone()
         return (row is not None, row["passphrase_hash"] if row else None)
 
-    def assigned(self, clinician_id: str, *, including_left: bool = False) -> frozenset[str]:
-        """The patients under this clinician's care. Unknown id: nobody (fails closed). Someone who
-        has left the ward is out of every live view, and stays only in the stay history."""
+    def assigned(
+        self, clinician_id: str, *, including_left: bool = False, unit: str | None = None
+    ) -> frozenset[str]:
+        """The patients under this clinician's care, in one unit or (None) in any. Unknown id:
+        nobody (fails closed). Someone who has left the unit is out of every live view, and stays
+        only in the stay history."""
         rows = self.conn.execute(
             "SELECT a.patient_id FROM care_assignment a JOIN patient p"
             " ON p.run_id = a.run_id AND p.id = a.patient_id"
-            " WHERE a.run_id = %s AND a.clinician_id = %s AND (%s OR p.left_at IS NULL)",
-            (self.run_id, clinician_id, including_left),
+            " WHERE a.run_id = %s AND a.clinician_id = %s AND (%s OR p.left_at IS NULL)"
+            " AND (%s::text IS NULL OR p.unit = %s)",
+            (self.run_id, clinician_id, including_left, unit, unit),
         )
         return frozenset(r["patient_id"] for r in rows)
 
@@ -550,6 +605,9 @@ class PostgresStore:
                 ),
                 "synthetic": self.synthetic,
                 "admitted_at": p["admitted_at"] if p["admitted_at"] else None,
+                "unit": p["unit"],
+                "floor": self.units[p["unit"]]["floor"],
+                "person": p["person"],
             }
         )
 
@@ -629,15 +687,16 @@ class PostgresStore:
         ).fetchall()
         return [{**r, "at": r["at"]} for r in reversed(rows)]
 
-    def stays(self, ids: frozenset[str]) -> list[dict[str, Any]]:
+    def stays(self, ids: frozenset[str], unit: str) -> list[dict[str, Any]]:
         rows = self.conn.execute(
-            "SELECT id, name, bed, admitted_at, left_at, outcome FROM patient"
-            " WHERE run_id = %s AND id = ANY(%s) ORDER BY id",
-            (self.run_id, sorted(ids)),
+            "SELECT id, name, bed, admitted_at, left_at, outcome, unit, person, to_unit FROM patient"
+            " WHERE run_id = %s AND id = ANY(%s) AND unit = %s ORDER BY id",
+            (self.run_id, sorted(ids), unit),
         )
         return [
             {
                 **r,
+                "floor": self.units[unit]["floor"],
                 "admitted_at": r["admitted_at"] if r["admitted_at"] else None,
                 "left_at": r["left_at"] if r["left_at"] else None,
                 "synthetic": self.synthetic,
@@ -645,12 +704,12 @@ class PostgresStore:
             for r in rows
         ]
 
-    def live_view(self) -> dict[str, Any] | None:
-        """The view the sim last published for this run, unscoped. None: nothing published."""
+    def live_view(self, unit: str) -> dict[str, Any] | None:
+        """The view the sim last published for this unit, unscoped. None: nothing published."""
         row = self.conn.execute(
-            "SELECT live_view FROM run WHERE id = %s", (self.run_id,)
+            "SELECT live_view FROM run_unit WHERE run_id = %s AND id = %s", (self.run_id, unit)
         ).fetchone()
-        assert row is not None  # the run was read when this store was made
+        assert row is not None  # the caller checked the unit against `units`
         view: dict[str, Any] | None = row["live_view"]
         return view
 
@@ -668,20 +727,20 @@ class PostgresStore:
         numbers = [int(m[1]) for r in rows if (m := re.fullmatch(r"p-(\d+)", r["id"]))]
         return f"p-{max(numbers, default=0) + 1:03d}"
 
-    def bed_occupied(self, bed: str) -> bool:
-        """Whether a patient still in the ward has this bed. Call it after `next_patient_id`,
+    def bed_occupied(self, bed: str, unit: str) -> bool:
+        """Whether a patient still in the unit has this bed. Call it after `next_patient_id`,
         which holds the run's lock, so two admissions to one bed cannot both pass."""
         row = self.conn.execute(
-            "SELECT 1 FROM patient WHERE run_id = %s AND left_at IS NULL"
+            "SELECT 1 FROM patient WHERE run_id = %s AND left_at IS NULL AND unit = %s"
             " AND lower(btrim(bed)) = lower(%s) LIMIT 1",
-            (self.run_id, bed.strip()),
+            (self.run_id, unit, bed.strip()),
         ).fetchone()
         return row is not None
 
     def add_patient(self, patient_id: str, clinician_id: str, fields: dict[str, Any]) -> None:
         with self.tx():
             insert_patient(self.conn, self.run_id, patient_id, fields)
-            assign(self.conn, self.run_id, patient_id, clinician_id)
+            assign(self.conn, self.run_id, patient_id, fields["unit"], clinician_id)
 
     # --- notes ---------------------------------------------------------------------------------
 
@@ -757,22 +816,27 @@ class PostgresStore:
     # --- the feed the ward sim reads -----------------------------------------------------------
 
     def add_action(
-        self, kind: str, clinician_id: str, patient_id: str, data: dict[str, Any]
+        self,
+        kind: str,
+        clinician_id: str,
+        patient_id: str,
+        data: dict[str, Any],
+        unit: str | None = None,
     ) -> None:
         """Append to the feed. Call it first in the transaction of the write it describes: it takes
         the run's lock, so seq order is commit order and a reader's cursor never skips a row."""
         lock_run(self.conn, self.run_id)
         self.conn.execute(
-            "INSERT INTO clinician_action (run_id, kind, patient_id, clinician_id, at, data)"
-            " VALUES (%s, %s, %s, %s, %s, %s)",
-            (self.run_id, kind, patient_id, clinician_id, whole(self.now()), Jsonb(data)),
+            "INSERT INTO clinician_action (run_id, kind, patient_id, clinician_id, at, data, unit)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            (self.run_id, kind, patient_id, clinician_id, whole(self.now()), Jsonb(data), unit),
         )
 
     def actions(self, run_id: int, after: int) -> list[dict[str, Any]]:
         """The next 200 feed rows of a run after `after`, oldest first. The caller names the run
         (the one it checked under the lock), which is not always the one this store was made on."""
         rows = self.conn.execute(
-            "SELECT seq, kind, patient_id, clinician_id, data FROM clinician_action"
+            "SELECT seq, kind, patient_id, clinician_id, data, unit FROM clinician_action"
             " WHERE run_id = %s AND seq > %s ORDER BY seq LIMIT 200",
             (run_id, after),
         )
@@ -781,21 +845,21 @@ class PostgresStore:
     # --- the feed the ward sim reads for the viewer's commands ---------------------------------
 
     def add_command(
-        self, kind: str, clinician_id: str, patient_id: str | None, data: dict[str, Any]
+        self, kind: str, clinician_id: str, patient_id: str | None, data: dict[str, Any], unit: str
     ) -> None:
         """Append to the command feed. As `add_action`: it takes the run's lock, so seq order is
         commit order."""
         lock_run(self.conn, self.run_id)
         self.conn.execute(
-            "INSERT INTO sim_command (run_id, kind, patient_id, clinician_id, at, data)"
-            " VALUES (%s, %s, %s, %s, %s, %s)",
-            (self.run_id, kind, patient_id, clinician_id, whole(self.now()), Jsonb(data)),
+            "INSERT INTO sim_command (run_id, kind, patient_id, clinician_id, at, data, unit)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            (self.run_id, kind, patient_id, clinician_id, whole(self.now()), Jsonb(data), unit),
         )
 
     def commands(self, run_id: int, after: int) -> list[dict[str, Any]]:
         """The next 200 command rows of a run after `after`, oldest first (as `actions`)."""
         rows = self.conn.execute(
-            "SELECT seq, kind, patient_id, clinician_id, data FROM sim_command"
+            "SELECT seq, kind, patient_id, clinician_id, data, unit FROM sim_command"
             " WHERE run_id = %s AND seq > %s ORDER BY seq LIMIT 200",
             (run_id, after),
         )

@@ -80,6 +80,7 @@ from biosentry.schemas import (
     WardOverview,
     WardResearch,
     WardResponse,
+    WardUnit,
 )
 from biosentry.schemas.episodes import Episodes
 from biosentry.schemas.ingest import (
@@ -426,7 +427,7 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
         @app.get("/wards/{ward}/open-view", response_model=OpenWard)
         def open_view(ward: str, ctx: Ctx) -> OpenWard:
             """No credential is read here: the answer is the same for every caller."""
-            found = ctx.wards.open_ward() if ward == ctx.store.ward and ctx.store.synthetic else None
+            found = ctx.wards.open_ward(ward) if ward in ctx.store.units and ctx.store.synthetic else None
             outcome: Outcome = "ok" if found else "not_found"
             resource = ward if found else "-"  # the caller's path text is never stored
             since = ctx.store.clock() - ANONYMOUS_ROW_EVERY
@@ -438,29 +439,39 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
                 raise HTTPException(status_code=404)  # no detail: the same bytes as an unknown path
             return found
 
+    @app.get("/wards", response_model=list[WardUnit])
+    def list_wards(ctx: Ctx, who: Who) -> list[WardUnit]:
+        return ctx.wards.units(who)
+
     @app.get("/wards/{ward}/rows", response_model=WardResponse)
     def ward_rows(ward: str, ctx: Ctx, who: Who) -> WardResponse:
-        if ward != ctx.store.ward:
+        if ward not in ctx.store.units:
             ctx.audit.append(who, "view_ward", ward, "not_found")
             raise HTTPException(status_code=404, detail=NOT_FOUND)
-        return ctx.wards.ward(who)
+        return ctx.wards.ward(who, ward)
 
     @app.get("/wards/{ward}/stays", response_model=list[PatientStay])
     def ward_stays(ward: str, ctx: Ctx, who: Who) -> list[PatientStay]:
-        if ward != ctx.store.ward:
+        if ward not in ctx.store.units:
             ctx.audit.append(who, "view_stays", ward, "not_found")
             raise HTTPException(status_code=404, detail=NOT_FOUND)
-        return ctx.wards.stays(who)
+        return ctx.wards.stays(who, ward)
 
     @app.get("/wards/{ward}/overview", response_model=WardOverview)
     def ward_overview(ward: str, ctx: Ctx, who: Who) -> WardOverview:
         if not ctx.store.is_admin(who):  # on every call: the role is read from the database
             ctx.audit.append(who, "view_overview", ward, "denied")
             raise HTTPException(status_code=403, detail="Forbidden")
-        if ward != ctx.store.ward:
+        if ward not in ctx.store.units:
             ctx.audit.append(who, "view_overview", ward, "not_found")
             raise HTTPException(status_code=404, detail=NOT_FOUND)
-        return ctx.overview.overview(who)
+        return ctx.overview.overview(who, ward)
+
+    def member(ctx: Context, who: str, action: str, ward: str) -> None:
+        """An answer that holds a whole unit is for that unit's clinicians, not for another unit's."""
+        if not ctx.store.belongs(who, ward):
+            ctx.audit.append(who, action, ward, "denied")
+            raise HTTPException(status_code=403, detail="Forbidden")
 
     @app.get("/wards/{ward}/research", response_model=WardResearch)
     def ward_research(ward: str, ctx: Ctx, who: Who) -> WardResearch:
@@ -469,10 +480,11 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
         if not ctx.store.can_control(who):
             ctx.audit.append(who, "view_ward_research", ward, "denied")
             raise HTTPException(status_code=403, detail="Forbidden")
-        if ward != ctx.store.ward:
+        if ward not in ctx.store.units:
             ctx.audit.append(who, "view_ward_research", ward, "not_found")
             raise HTTPException(status_code=404, detail=NOT_FOUND)
-        return ctx.research.research(who)
+        member(ctx, who, "view_ward_research", ward)
+        return ctx.research.research(who, ward)
 
     @app.get("/wards/{ward}/live", response_model=LiveWard)
     def ward_live(ward: str, ctx: Ctx, who: Who) -> LiveWard:
@@ -482,36 +494,39 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
         if ctx.store.is_admin(who):
             ctx.audit.append(who, "view_live", ward, "denied")
             raise HTTPException(status_code=403, detail="Forbidden")
-        if ward != ctx.store.ward:
+        if ward not in ctx.store.units:
             ctx.audit.append(who, "view_live", ward, "not_found")
             raise HTTPException(status_code=404, detail=NOT_FOUND)
-        return ctx.wards.live(who)
+        member(ctx, who, "view_live", ward)
+        return ctx.wards.live(who, ward)
 
     @app.post("/wards/{ward}/sim/commands", status_code=204)
     def send_sim_command(ward: str, body: NewCommand, ctx: Ctx, who: Writer) -> Response:
-        if ward != ctx.store.ward:
+        if ward not in ctx.store.units:
             ctx.audit.append(who, "sim_command", ward, "not_found")
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         if not ctx.store.can_control(who):
             ctx.audit.append(who, "sim_command", ward, "denied")
             raise HTTPException(status_code=403, detail="Forbidden")
-        if not ingest.add_command(ctx.store, ctx.audit, who, body):
+        member(ctx, who, "sim_command", ward)
+        if not ingest.add_command(ctx.store, ctx.audit, who, body, ward):
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return Response(status_code=204)
 
     def lab_asker(ctx: Context, who: str, action: str, ward: str) -> None:
-        """Who may ask the lab: an md or a charge nurse, on their own ward."""
-        if ward != ctx.store.ward:
+        """Who may ask the lab: an md or a charge nurse, on a unit of their own."""
+        if ward not in ctx.store.units:
             ctx.audit.append(who, action, ward, "not_found")
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         if not ctx.store.can_control(who):
             ctx.audit.append(who, action, ward, "denied")
             raise HTTPException(status_code=403, detail="Forbidden")
+        member(ctx, who, action, ward)
 
     @app.post("/wards/{ward}/lab/runs", response_model=LabRunItem, status_code=201)
     def request_lab_run(ward: str, body: NewLabRun, ctx: Ctx, who: Writer) -> LabRunItem:
         lab_asker(ctx, who, "lab_request", ward)
-        made = lab.create(ctx.store, ctx.audit, who, body)
+        made = lab.create(ctx.store, ctx.audit, who, body, ward)
         if made is None:
             raise HTTPException(status_code=429, detail="Lab run limit reached")
         return made
@@ -519,7 +534,7 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
     @app.post("/wards/{ward}/lab/questions", response_model=QuestionItem, status_code=201)
     def ask_lab_question(ward: str, body: NewQuestion, ctx: Ctx, who: Writer) -> QuestionItem:
         lab_asker(ctx, who, "lab_question", ward)
-        made = lab.ask(ctx.store, ctx.audit, who, body)
+        made = lab.ask(ctx.store, ctx.audit, who, body, ward)
         if made is None:
             raise HTTPException(status_code=429, detail="Lab run limit reached")
         return made
@@ -529,22 +544,23 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
         if ctx.store.is_admin(who):
             ctx.audit.append(who, action, ward, "denied")
             raise HTTPException(status_code=403, detail="Forbidden")
-        if ward != ctx.store.ward:
+        if ward not in ctx.store.units:
             ctx.audit.append(who, action, ward, "not_found")
             raise HTTPException(status_code=404, detail=NOT_FOUND)
+        member(ctx, who, action, ward)
 
     @app.get("/wards/{ward}/lab/runs", response_model=list[LabRunItem])
     def lab_runs(ward: str, ctx: Ctx, who: Who) -> list[LabRunItem]:
         lab_reader(ctx, who, "view_lab_runs", ward)
         ctx.audit.append_view(who, "view_lab_runs", ward)
-        return lab.list_runs(ctx.store)
+        return lab.list_runs(ctx.store, ward)
 
     @app.get("/wards/{ward}/lab/runs/{lab_run_id}", response_model=LabRunDetail)
     def lab_run(ward: str, lab_run_id: str, ctx: Ctx, who: Who) -> LabRunDetail:
         lab_reader(ctx, who, "view_lab_run", ward)
         found = None
         if (run_id := row_id(lab_run_id)) is not None:
-            found = lab.get_run(ctx.store, run_id)
+            found = lab.get_run(ctx.store, run_id, ward)
         if found is None:  # malformed and unknown are one answer, and audited
             ctx.audit.append(who, "view_lab_run", ward, "not_found")
             raise HTTPException(status_code=404, detail=NOT_FOUND)
@@ -555,14 +571,14 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
     def lab_questions(ward: str, ctx: Ctx, who: Who) -> list[QuestionItem]:
         lab_reader(ctx, who, "view_lab_questions", ward)
         ctx.audit.append_view(who, "view_lab_questions", ward)  # the page reads it on a timer
-        return lab.list_questions(ctx.store)
+        return lab.list_questions(ctx.store, ward)
 
     @app.get("/wards/{ward}/lab/questions/{lab_run_id}", response_model=QuestionDetail)
     def lab_question(ward: str, lab_run_id: str, ctx: Ctx, who: Who) -> QuestionDetail:
         lab_reader(ctx, who, "view_lab_question", ward)
         found = None
         if (run_id := row_id(lab_run_id)) is not None:
-            found = lab.get_question(ctx.store, run_id)
+            found = lab.get_question(ctx.store, run_id, ward)
         if found is None:  # malformed and unknown are one answer, and audited
             ctx.audit.append(who, "view_lab_question", ward, "not_found")
             raise HTTPException(status_code=404, detail=NOT_FOUND)
