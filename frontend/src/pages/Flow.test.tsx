@@ -106,6 +106,17 @@ describe("Flow page", () => {
     expect(screen.getAllByRole("img", { name: "Cruz, Ana, Higher care" })).toHaveLength(1);
   });
 
+  it("labels a stay that ended in a transfer or a death", async () => {
+    api.getStays.mockResolvedValue([
+      stay({ id: "t", bed: "2B", admitted_at: iso(6), left_at: iso(2), outcome: "transferred" }),
+      stay({ id: "x", bed: "3A", admitted_at: iso(5), left_at: iso(1), outcome: "died" }),
+    ]);
+    show();
+    await screen.findByRole("heading", { name: "Recent movement" });
+    expect(screen.getAllByRole("img", { name: "Cruz, Ana, Transferred" })).toHaveLength(1);
+    expect(screen.getAllByRole("img", { name: "Cruz, Ana, Died" })).toHaveLength(1);
+  });
+
   it("counts the last day against the ward's time, not the browser's", async () => {
     api.getStays.mockResolvedValue(STAYS);
     show();

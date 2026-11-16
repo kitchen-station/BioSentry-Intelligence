@@ -7,7 +7,7 @@ import { bedRows, dayTicks, FLOW_DAYS, flowStats, formatStay, recentMoves } from
 import styles from "./Flow.module.css";
 
 const RECENT = 12;
-const OUTCOME = { discharged: "Discharged", higher_care: "Higher care" } as const;
+const OUTCOME = { discharged: "Discharged", higher_care: "Higher care", transferred: "Transferred", died: "Died" } as const;
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
