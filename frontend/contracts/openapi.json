@@ -115,6 +115,28 @@
           },
           "vital_history": {
             "$ref": "#/components/schemas/VitalHistoryFull"
+          },
+          "vital_trends": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VitalTrends"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "vitals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Vitals"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "required": [
@@ -234,6 +256,28 @@
             "anyOf": [
               {
                 "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "vital_trends": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VitalTrends"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "vitals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Vitals"
               },
               {
                 "type": "null"

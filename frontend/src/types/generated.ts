@@ -35,6 +35,10 @@ export interface components {
             /** @default null */
             readonly unit?: string | null;
             readonly vital_history: components["schemas"]["VitalHistoryFull"];
+            /** @default null */
+            readonly vital_trends?: components["schemas"]["VitalTrends"] | null;
+            /** @default null */
+            readonly vitals?: components["schemas"]["Vitals"] | null;
         };
         /**
          * AbstainedRow
@@ -60,6 +64,10 @@ export interface components {
             readonly synthetic: boolean;
             /** @default null */
             readonly unit?: string | null;
+            /** @default null */
+            readonly vital_trends?: components["schemas"]["VitalTrends"] | null;
+            /** @default null */
+            readonly vitals?: components["schemas"]["Vitals"] | null;
         };
         /**
          * Acknowledgement

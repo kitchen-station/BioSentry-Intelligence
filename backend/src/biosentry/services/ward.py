@@ -194,9 +194,11 @@ def unit_row(state: UnscoredPatient, unit: dict[str, Any]) -> AbstainedRow:
     tier_a = score_news2(inputs_from_vitals(state.vitals))
     risk = None if unit["kind"] == "unranked" or isinstance(tier_a, News2Abstained) else tier_a.risk.value
     verb = "shown, not ranked" if unit["kind"] == "shown" else "not ranked"
-    return abstained_row(
+    row = abstained_row(
         state, f"{unit['name']} is {verb}: NEWS2 is a ward score.", "No NEWS2 rank for this unit.", risk
     )
+    # The stored vitals, for a reader who may see the patient (the public views do not use this row).
+    return row.model_copy(update={"vitals": state.vitals, "vital_trends": state.vital_trends})
 
 
 # where a patient went is not shown
