@@ -2791,7 +2791,7 @@
           "score_note": {
             "anyOf": [
               {
-                "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]{1,300}$",
+                "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f\\u2028\\u2029]{1,300}$",
                 "type": "string"
               },
               {
@@ -5764,7 +5764,7 @@
           "score_note": {
             "anyOf": [
               {
-                "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]{1,300}$",
+                "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f\\u2028\\u2029]{1,300}$",
                 "type": "string"
               },
               {
@@ -5838,7 +5838,7 @@
           "score_note": {
             "anyOf": [
               {
-                "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]{1,300}$",
+                "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f\\u2028\\u2029]{1,300}$",
                 "type": "string"
               },
               {
