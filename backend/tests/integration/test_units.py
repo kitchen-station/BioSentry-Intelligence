@@ -243,7 +243,7 @@ def test_the_overview_of_a_unit_is_the_admins_and_names_that_unit_only(api: Api)
     assert (body["ward"], [(p["unit"], p["floor"], p["state"], p["score"]) for p in body["patients"]]) == (
         "ER", [("ER", 0, "not_ranked", None)]
     )
-    assert [c["id"] for c in body["clinicians"]] == ["cn-er"]
+    assert [c["id"] for c in body["clinicians"]] == ["cn-er", "md-sarmiento", "rn-guevarra", "rn-pangilinan"]
     assert get(api, "md-santos", "/wards/NOPE/overview").status_code == 403  # the admin check comes first
     assert get(api, ADMIN, "/wards/NOPE/overview").status_code == 404
     assert api.sql("SELECT clinician_id, outcome FROM audit_log WHERE action = 'view_overview' AND resource = 'NOPE' ORDER BY seq") == [

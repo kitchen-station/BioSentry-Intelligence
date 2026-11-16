@@ -512,7 +512,7 @@ _BUILDERS: dict[type[BaseModel], Any] = {
         "unit": "W4",
         "floor": 4,
     },
-    OverviewClinician: lambda: {"id": "rn-reyes", "role": "rn", "patients": 1},
+    OverviewClinician: lambda: {"id": "rn-reyes", "role": "rn", "patients": 1, "display_name": "Reyes", "unit": "W4", "floor": 4},
     OverviewActivity: lambda: {
         "clinician_id": "rn-reyes",
         "action": "view_ward",

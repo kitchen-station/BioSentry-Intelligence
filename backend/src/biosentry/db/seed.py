@@ -51,6 +51,10 @@ def _obs(patient_id: str, code: str, m: dict[str, Any]) -> Obs:
     return Obs(*common, num=float(value))
 
 
+# The surnames of the fixture's five (migration 0019 gives the same to a database that already has them).
+W4_NAMES = {"rn-manalo": "Manalo", "rn-delacruz": "de la Cruz", "rn-reyes": "Reyes", "md-santos": "Santos", "md-aquino": "Aquino"}
+
+
 def seed(conn: Conn, fixture: Path = DEFAULT_DATASET, dev_passphrase: bool = False) -> None:
     if conn.execute("SELECT 1 FROM run WHERE source = 'fixture'").fetchone():
         return
@@ -60,7 +64,7 @@ def seed(conn: Conn, fixture: Path = DEFAULT_DATASET, dev_passphrase: bool = Fal
     with transaction(conn):
         with conn.cursor() as cur:
             cur.executemany(
-                "INSERT INTO clinician (id, role, passphrase_hash, unit) VALUES (%s, %s, %s, %s)"
+                "INSERT INTO clinician (id, role, passphrase_hash, unit, display_name) VALUES (%s, %s, %s, %s, %s)"
                 " ON CONFLICT DO NOTHING",
                 [
                     (
@@ -68,6 +72,7 @@ def seed(conn: Conn, fixture: Path = DEFAULT_DATASET, dev_passphrase: bool = Fal
                         c["role"],
                         hash_passphrase(DEV_PASSPHRASE) if dev_passphrase else None,
                         None if c["role"] == "admin" else raw["ward"],
+                        W4_NAMES.get(cid),
                     )
                     for cid, c in raw["clinicians"].items()
                 ],
