@@ -9,14 +9,18 @@ The baseline window is the first 24 valid bins from admission when it is known, 
 stored bin when it is not (every patient present before the run), and from the oldest bin still
 kept once the server's 7-day prune or the 672-bin cap has dropped earlier ones: a long stay is
 baselined on mid-stay data. `baseline_from`, `anchored_at` and `admission_known` say which. `latest`
-is the latest 15-minute median bin, not a single reading."""
+is the latest 15-minute median bin, not a single reading.
+
+The fifth vital, `systolic_bp`, is charted, not streamed: its bins are built from the stored blood pressure readings
+(`PostgresStore.systolic_bins`), one more read per patient, and no live patch is needed for it. It feeds no rank and no
+reason: `scoring.drift` reads the device vitals only."""
 
 from datetime import timedelta
 
 from biosentry.core.audit import AuditLog
 from biosentry.domain.arbiter import NotRanked
 from biosentry.domain.computed import NotComputed
-from biosentry.domain.scoring.tier_b.baseline import DEFAULTS, VITALS, baseline_finding
+from biosentry.domain.scoring.tier_b.baseline import CHARTED, DEFAULTS, VITALS, baseline_finding
 from biosentry.repositories.postgres import PostgresStore
 from biosentry.schemas import UnscoredPatient
 from biosentry.schemas.baseline import (
@@ -33,7 +37,7 @@ from .scoring import BIN, MAX_BINS, counted, decide, grid  # noqa: F401 (re-expo
 from .ward import WardService
 
 ADMISSION_SLACK = timedelta(minutes=30)  # a window starting this close to admission is "at admission"
-ORDER: tuple[BaselineVital, ...] = ("heart_rate", "respiratory_rate", "spo2", "temperature")
+ORDER: tuple[BaselineVital, ...] = ("heart_rate", "respiratory_rate", "spo2", "temperature", "systolic_bp")
 
 
 class BaselineService:
@@ -69,14 +73,16 @@ class BaselineService:
         admitted_at = state.admitted_at
         vitals: list[BaselineComputed | BaselineForming | BaselineUnavailable] = []
         for vital in ORDER:
-            # Temperature has no full history in the patient read, so it has no baseline here.
-            points = getattr(state.vital_history, vital, None)
+            # Temperature has no full history in the patient read, so it has no baseline here. Systolic pressure is
+            # charted, not streamed: its bins come from the stored observations, and no patch has to be live for it.
+            charted = vital == "systolic_bp"
+            points = self._store.systolic_bins(patient_id) if charted else getattr(state.vital_history, vital, None)
             if points is None:
                 vitals.append(
                     BaselineUnavailable(vital=vital, status="unavailable", reason="no_history")
                 )
                 continue
-            if points and not counted(state, vital):  # the row's own rule: no flag, no panel
+            if points and not charted and not counted(state, vital):  # the row's own rule: no flag, no panel
                 vitals.append(
                     BaselineUnavailable(vital=vital, status="unavailable", reason="patch_not_live")
                 )
@@ -127,7 +133,7 @@ class BaselineService:
                     significant=finding.significant,
                     direction=finding.direction,
                     pathway=finding.pathway,
-                    unit=VITALS[vital].unit,
+                    unit=(VITALS.get(vital) or CHARTED[vital]).unit,
                 )
             )
         return BaselineResponse(

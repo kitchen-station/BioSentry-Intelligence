@@ -41,6 +41,15 @@ VITALS: Mapping[str, _Vital] = MappingProxyType({
 })
 
 
+# A charted vital: its 15-minute bins are built from stored observations (nurse or device), not from a device stream.
+# It is NOT in VITALS, so no model, no research sweep and no ranking reads it: the baseline panel shows it, nothing more.
+# shortcut: a fall is the flagged way (as for SpO2) and the floor is judgement; tune with the other floors in the B4 sweep.
+CHARTED: Mapping[str, _Vital] = MappingProxyType({
+    "systolic_bp": _Vital("Systolic blood pressure", "mmHg", -1, "circulatory"),
+})
+CHARTED_FLOOR = 5.0  # mmHg: the floor a charted vital takes when `params.floors` has none for it
+
+
 @dataclass(frozen=True, slots=True)
 class BaselineParams:
     # shortcut: 6 h window is judgement (24 h would leave the first day bare), tune in the B4 sweep
@@ -100,7 +109,7 @@ def baseline_finding(
     vital: str, bins: Sequence[float | None], params: BaselineParams = DEFAULTS
 ) -> tuple[Finding, Deviation] | NotComputed:
     """One vital's 15-min bins since admission (None = gap) -> finding, or why not."""
-    spec = VITALS.get(vital)
+    spec = VITALS.get(vital) or CHARTED.get(vital)
     if spec is None:
         raise ValueError("unknown vital")  # fixed text: never echo caller input into a log
     window = list(islice((x for x in bins if _valid(x)), params.window_bins))
@@ -111,7 +120,7 @@ def baseline_finding(
         return NotComputed("latest bin missing")
     median = statistics.median(window)
     mad = statistics.median([abs(x - median) for x in window])
-    spread = max(MAD_TO_SD * mad, params.floors[vital])
+    spread = max(MAD_TO_SD * mad, params.floors.get(vital, CHARTED_FLOOR))
 
     def z_of(x: float) -> float:
         return (x - median) / spread

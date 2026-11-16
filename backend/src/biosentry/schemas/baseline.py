@@ -8,7 +8,10 @@ stored, not a single reading. Everything else is derived: `baseline_median`, `de
 The window is the first 24 valid bins from admission when it is known (`admission_known`), from
 the first stored bin when it is not, and from the oldest bin still kept once the server's 7-day
 prune or the 672-bin cap has dropped earlier ones: a long stay is baselined on mid-stay data.
-`anchored_at` says which, per vital. `latest_age_s` is measured on the server's clock (the one
+`anchored_at` says which, per vital. `systolic_bp` is built differently from the other four: its 15-minute
+bins are the median of the charted `blood_pressure` systolic values (nurse or device) of each 15-minute set, so a
+ward that charts BP every few hours gives a baseline that forms slowly ("forming", never filled; I1). No stored
+value is changed and nothing is imputed (I2: each bin is a stored observation or a median of stored observations). `latest_age_s` is measured on the server's clock (the one
 `last_update_s` uses) from the END of the latest bin, so the page never uses its own clock."""
 
 from typing import Annotated, Final, Literal
@@ -18,7 +21,7 @@ from pydantic import AwareDatetime, Field
 from .base import Contract, Flag, NonNegInt, Num
 from .tiers import FindingDirection
 
-BaselineVital = Literal["heart_rate", "respiratory_rate", "spo2", "temperature"]
+BaselineVital = Literal["heart_rate", "respiratory_rate", "spo2", "temperature", "systolic_bp"]
 BASELINE_LABEL: Final = "Research finding. Synthetic, not validated. Breaks ties between equal NEWS2 totals below a trigger."
 # Fixed text only: no stored free text can reach this response, and each string is capped.
 Short = Annotated[str, Field(max_length=32)]
@@ -90,5 +93,5 @@ class BaselineResponse(Contract):
                 Field(discriminator="status"),
             ]
         ],
-        Field(max_length=4),
+        Field(max_length=5),
     ]

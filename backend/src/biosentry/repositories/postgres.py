@@ -15,6 +15,7 @@ served as stored; "now" is the run's `as_of`. Only `receiving_data` uses the wal
 import hashlib
 import re
 import secrets
+import statistics
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Iterator
 from contextlib import AbstractContextManager, contextmanager
@@ -635,6 +636,25 @@ class PostgresStore:
                 VitalHistory.model_construct(time=r["bin_at"], value=r["value"])
             )
         return dict(out)
+
+    def systolic_bins(self, patient_id: str) -> list[VitalHistory]:
+        """The charted systolic pressure of one patient as 15-minute bins, oldest first, for the own-baseline panel only
+        (it is in no other response, no score and no model). A bin holds the median of the stored `blood_pressure`
+        systolic values (nurse or device) taken in that 15-minute set, and its `time` is the END of the set, as for a
+        device bin. A set with no value has no row: a gap, never filled (I1). A row recorded as not measured has no value."""
+        sets: dict[int, list[float]] = defaultdict(list)
+        for r in self.conn.execute(
+            "SELECT observed_at, num FROM observation WHERE run_id = %s AND patient_id = %s"
+            " AND code = 'blood_pressure' AND absent_reason IS NULL AND num IS NOT NULL ORDER BY observed_at",
+            (self.run_id, patient_id),
+        ):
+            sets[int(r["observed_at"].timestamp()) // 900].append(r["num"])
+        return [
+            VitalHistory.model_construct(
+                time=datetime.fromtimestamp((n + 1) * 900, UTC), value=statistics.median(values)
+            )
+            for n, values in sorted(sets.items())
+        ]
 
     def observations_between(
         self, windows: Iterable[tuple[str, datetime, datetime]]

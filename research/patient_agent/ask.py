@@ -22,8 +22,10 @@ STALE_AGE_S = 1200
 NO_BASELINE = "The data for this patient holds no baseline at this time."
 FIXED = ("NEWS2", "SpO2", "15-minute")
 KINDS = ("own_baseline", "recent_change", "why_rank", "active_alerts")
-VITALS = ("heart_rate", "respiratory_rate", "spo2", "temperature")
-NAMES = {"heart_rate": "Heart rate", "respiratory_rate": "Respiratory rate", "spo2": "SpO2", "temperature": "Temperature"}
+VITALS = ("heart_rate", "respiratory_rate", "spo2", "temperature", "systolic_bp")
+NAMES = {"heart_rate": "Heart rate", "respiratory_rate": "Respiratory rate", "spo2": "SpO2", "temperature": "Temperature",
+         "systolic_bp": "Systolic blood pressure"}
+HISTORY = ("heart_rate", "respiratory_rate", "spo2")  # the vitals the vital history holds
 NUM = re.compile(r"-?[0-9]+(?:\.[0-9]+)?")
 _MARK = re.compile(r"(?m)^[0-9]{1,4}\. ")  # the number of a list line is not data
 MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
@@ -102,10 +104,10 @@ _VITAL = {
     "respiratory_rate": re.compile(r"\brr\b|resp(?:iratory)?[ -]?rate|breathing rate|\brespiration\b"),
     "spo2": re.compile(r"\bspo2\b|oxygen (?:saturation|level)|\bsats?\b|\bsaturation\b"),
     "temperature": re.compile(r"\btemp\b|\btemperature\b"),
+    "systolic_bp": re.compile(r"blood pressure|\bbp\b|\bsbp\b|systolic"),  # the baseline holds the systolic value only
 }
-_BP = re.compile(r"blood pressure|\bbp\b|systolic|diastolic")  # the baseline data holds no blood pressure: said so
 _ANY_VITAL = re.compile("|".join(rx.pattern for rx in _VITAL.values()))
-_NOT_LISTED = re.compile(r"consciousness|\bacvpu\b|\bavpu\b|\bgcs\b|glucose|\bweight\b|\burine\b")
+_NOT_LISTED = re.compile(r"diastolic|consciousness|\bacvpu\b|\bavpu\b|\bgcs\b|glucose|\bweight\b|\burine\b")
 _NAME = re.compile(r"\b[A-Z][a-z]+(?:'s)?\b")
 
 
@@ -187,9 +189,9 @@ def match(question: str) -> tuple[str | None, dict | str]:
     if re.search(r"[0-9]", plain):  # a number in the question is never taken
         return None, "none"
     if kind == "own_baseline":
-        if len(named) > 1 or _NOT_LISTED.search(t) or (_BP.search(t) and named):
+        if len(named) > 1 or _NOT_LISTED.search(t):
             return None, "none"
-        return kind, {"vital": "blood_pressure" if _BP.search(t) else named[0] if named else None}
+        return kind, {"vital": named[0] if named else None}
     return kind, {}
 
 
@@ -364,8 +366,6 @@ def _baseline(w: _Out, args: dict, base: object) -> list[str]:
     window = _int(_dict(_need(base, "params")).get("window_bins"))
     entries = _list(_need(base, "vitals"))
     out = []
-    if args["vital"] == "blood_pressure":
-        return ["The baseline data holds heart rate, respiratory rate, SpO2 and temperature only. It holds no blood pressure baseline."]
     for v in ([args["vital"]] if args["vital"] else VITALS):
         e = next((_dict(x) for x in entries if _dict(x).get("vital") == v), None)
         name = NAMES[v]
@@ -383,6 +383,9 @@ def _baseline(w: _Out, args: dict, base: object) -> list[str]:
                        f"It is the median of the first {w.n(window)} valid 15-minute values. The window starts {start}.")
             if e.get("baseline_from") is not None:
                 out[-1] += f" The first value of the window is the 15-minute set that starts at {w.t(e['baseline_from'])}."
+            if v == "systolic_bp":
+                out[-1] += (" These values are charted blood pressure readings, not a sensor stream: each one is the median of "
+                            "the systolic values charted in its 15-minute set.")
             latest, median = e.get("latest"), e.get("baseline_median")
             _num(latest), _num(median)
             rel = "above" if latest > median else "below" if latest < median else "the same as"
@@ -410,12 +413,15 @@ def _baseline(w: _Out, args: dict, base: object) -> list[str]:
 
 
 def _changes(w: _Out, args: dict, detail: dict) -> list[str]:
+    if args["vital"] == "systolic_bp":
+        return ["The vital history holds no blood pressure. It holds heart rate, respiratory rate and SpO2 only. "
+                "Ask about this patient's own baseline for the latest charted systolic blood pressure."]
     if args["vital"] == "temperature":
         return ["The vital history holds no temperature. It holds heart rate, respiratory rate and SpO2 only. "
                 "It holds no blood pressure or consciousness history."]
     hist, hours = _dict(_need(detail, "vital_history")), args["hours"]
     out = []
-    for v in ([args["vital"]] if args["vital"] else VITALS[:3]):
+    for v in ([args["vital"]] if args["vital"] else HISTORY):
         bins, prev = [], None
         for b in _list(_need(hist, v)):
             b = _dict(b)
@@ -509,7 +515,7 @@ def _roots(kind: str, args: dict, patient: dict) -> list:
             return []
         return [b["params"]["window_bins"], *[e for e in b["vitals"] if v is None or e.get("vital") == v]]
     if kind == "recent_change":
-        return [d["vital_history"][x] for x in ([v] if v else VITALS[:3]) if x != "temperature"]
+        return [d["vital_history"][x] for x in ([v] if v else HISTORY) if x in HISTORY]
     if kind == "why_rank":
         return [d["rank"], d["score"], d["supporting"], d["escalation_reasons"]]
     return [d["escalation_reasons"]]

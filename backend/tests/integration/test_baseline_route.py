@@ -179,6 +179,7 @@ def test_a_patient_with_no_bins_is_200_with_every_vital_forming_or_unavailable(a
         ("respiratory_rate", "forming"),
         ("spo2", "forming"),
         ("temperature", "unavailable"),
+        ("systolic_bp", "forming"),  # the one charted pressure of the fixture patient: 1 of 24
     ]
     assert {v.get("bins_valid") for v in response.json()["vitals"][:3]} == {0}
 
@@ -481,7 +482,7 @@ def test_the_response_carries_no_name_and_no_stored_text(api: Api) -> None:
     walk(response.json())
     fixed = {
         "s-1", BASELINE_LABEL, "computed", "forming", "unavailable", "heart_rate",
-        "respiratory_rate", "spo2", "temperature", "no_history", "latest_bin_missing",
+        "respiratory_rate", "spo2", "temperature", "systolic_bp", "mmHg", "no_history", "latest_bin_missing",
         "bpm", "/min", "%", "°C", "rising", "falling", "stable", "circulatory", "respiratory",
             "admission", "first_kept_bin",
     }  # fmt: skip
@@ -701,3 +702,80 @@ def test_a_ward_read_runs_the_same_statements_with_or_without_the_finding(
     assert reasons(api, "s-1") == []
     assert with_finding > 0
     assert with_finding == without
+
+
+# --- Systolic blood pressure: the fifth vital, built from charted values ------------------------------------------------
+
+
+def charted(pid: str, minutes: list[int], values: list[float], source: str = "nurse") -> list[dict[str, Any]]:
+    return [obs(pid, "blood_pressure", m, source, num=v, num2=70) for m, v in zip(minutes, values, strict=True)]
+
+
+def with_pressures(api: Api, observations: list[dict[str, Any]], **kw: Any) -> None:
+    """A calm patient whose charted pressures are exactly these (the fixture's one value is dropped)."""
+    made = calm("s-1", **kw)
+    made["observations"] = [o for o in made["observations"] if o["code"] != "blood_pressure"] + observations
+    start(api, patients=[made])
+
+
+def test_systolic_pressure_is_a_baseline_from_the_charted_values_with_its_own_unit_and_times(api: Api) -> None:
+    minutes = list(range(0, 27 * 15, 15))
+    with_pressures(api, charted("s-1", minutes, [120.0] * 24 + [90.0] * 3))
+    sbp = vitals(api)["systolic_bp"]
+    assert (sbp["status"], sbp["unit"], sbp["pathway"]) == ("computed", "mmHg", "circulatory")
+    assert (sbp["baseline_median"], sbp["latest"], sbp["delta"]) == (120.0, 90.0, -30.0)
+    assert sbp["baseline_from"] == served(api, 0)  # the START of the first set, as for a device vital
+    assert sbp["latest_at"] == served(api, 26 * 15)
+    assert (sbp["band_low"], sbp["band_high"]) == (110.0, 130.0)  # the floor of 5 mmHg: 120 -/+ 2 x 5
+    assert (sbp["direction"], sbp["run_bins"], sbp["significant"]) == ("falling", 3, True)  # a fall is the flagged way
+    assert sbp["since"] == served(api, 24 * 15)
+
+
+def test_a_rise_in_systolic_pressure_is_shown_and_not_flagged(api: Api) -> None:
+    with_pressures(api, charted("s-1", list(range(0, 27 * 15, 15)), [120.0] * 24 + [150.0] * 3))
+    sbp = vitals(api)["systolic_bp"]
+    assert (sbp["delta"], sbp["direction"], sbp["run_bins"], sbp["significant"]) == (30.0, "rising", 0, False)
+
+
+def test_two_values_in_one_15_minute_set_are_their_median_and_a_missing_set_is_a_gap(api: Api) -> None:
+    minutes = [m for i in range(30) for m in ((i * 15, i * 15 + 7) if i != 5 else ())]  # set 5 has no value
+    values = [v for i in range(30) for v in ((100.0, 140.0) if i != 5 else ())]
+    with_pressures(api, charted("s-1", minutes, values))
+    sbp = vitals(api)["systolic_bp"]
+    assert (sbp["status"], sbp["baseline_median"], sbp["latest"]) == ("computed", 120.0, 120.0)
+    assert (sbp["baseline_from"], sbp["latest_at"]) == (served(api, 0), served(api, 29 * 15))
+
+
+def test_a_systolic_value_that_was_not_measured_or_is_impossible_is_a_gap_never_filled(api: Api) -> None:
+    good = charted("s-1", list(range(0, 10 * 15, 15)), [120.0] * 10)
+    not_measured = [obs("s-1", "blood_pressure", 10 * 15, "nurse", absent_reason="refused")]  # no value: no set
+    impossible = charted("s-1", [11 * 15], [0.0])  # zero is no reading: a gap
+    newest = charted("s-1", [12 * 15], [120.0])  # the newest charted value is the one the patient read needs
+    with_pressures(api, [*good, *not_measured, *impossible, *newest])
+    assert vitals(api)["systolic_bp"] == {"vital": "systolic_bp", "status": "forming", "bins_valid": 11, "bins_needed": 24}
+
+
+def test_a_silent_patch_does_not_take_the_charted_pressure_baseline_away(api: Api) -> None:
+    made = calm("s-1", rows("s-1", "heart_rate", BASE))
+    made["observations"] = [o for o in made["observations"] if o["code"] != "blood_pressure"] + charted(
+        "s-1", list(range(0, 25 * 15, 15)), [120.0] * 25
+    )
+    start(api, patients=[made])
+    silent_for(api, 31)
+    panel = vitals(api)
+    assert panel["heart_rate"]["reason"] == "patch_not_live"  # a patch reading is what the device vitals need
+    assert panel["systolic_bp"]["status"] == "computed"  # a charted value has no patch behind it
+
+
+def test_the_charted_pressure_of_a_nurse_and_of_a_device_both_count(api: Api) -> None:
+    minutes = list(range(0, 24 * 15, 15))
+    mixed = charted("s-1", minutes[:12], [120.0] * 12) + charted("s-1", minutes[12:], [120.0] * 12, "device")
+    with_pressures(api, mixed)
+    assert vitals(api)["systolic_bp"]["status"] == "computed"
+
+
+def test_the_systolic_baseline_changes_no_score_no_rank_and_no_flag(api: Api) -> None:
+    flat = charted("s-1", list(range(0, 27 * 15, 15)), [120.0] * 24 + [60.0] * 3)  # a deep, long fall
+    with_pressures(api, flat)
+    assert vitals(api)["systolic_bp"]["significant"] is True
+    assert reasons(api, "s-1") == []  # the arbiter lists no reason for it

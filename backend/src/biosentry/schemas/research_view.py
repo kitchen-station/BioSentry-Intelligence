@@ -43,7 +43,7 @@ class ResearchRow(Contract):
                 BaselineComputed | BaselineFlagged | BaselineForming | BaselineUnavailable, Field(discriminator="status")
             ]
         ],
-        Field(max_length=4),
+        Field(max_length=5),
     ]
     models: RowModels
     alert: Annotated[AlertCounted | AlertUnavailable, Field(discriminator="status")]

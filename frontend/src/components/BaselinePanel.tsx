@@ -15,14 +15,16 @@ const NAMES: Record<string, string> = {
   respiratory_rate: "Respiratory rate",
   spo2: "SpO2",
   temperature: "Temperature",
+  systolic_bp: "Systolic blood pressure",
 };
 // The direction the detector flags for each vital (tier_b/baseline.py `bad`): a rise for heart
-// rate, respiratory rate and temperature, a fall for SpO2.
+// rate, respiratory rate and temperature, a fall for SpO2 and for systolic blood pressure.
 const FLAGS_RISE: Record<string, boolean> = {
   heart_rate: true,
   respiratory_rate: true,
   spo2: false,
   temperature: true,
+  systolic_bp: false,
 };
 export const REASONS: Record<string, string> = {
   no_history: "no history yet",

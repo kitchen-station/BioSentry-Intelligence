@@ -66,7 +66,7 @@ describe("BaselinePanel", () => {
     show(response([computed(), { vital: "respiratory_rate", status: "forming", bins_valid: 10, bins_needed: 24 }]));
     const region = screen.getByRole("region", { name: "Change from own baseline" });
     expect(within(region).getByRole("heading", { name: "Change from own baseline" })).toBeTruthy();
-    expect(items()).toHaveLength(4); // the two vitals that came back, and a line for each of the other two
+    expect(items()).toHaveLength(5); // the two vitals that came back, and a line for each of the other three
     expect(screen.getByRole("list").getAttribute("role")).toBe("list");
     const label = screen.getByText(LABEL);
     const list = screen.getByRole("list");
@@ -171,6 +171,13 @@ describe("BaselinePanel", () => {
     expect(text().includes("Stale · ")).toBe(stale);
     expect(items()[0].querySelector("[data-stale]") !== null).toBe(stale);
     expect(text()).toContain(`15-minute set ${when(at(30))} to ${formatClock(T0 - 15 * 60_000)}`);
+  });
+
+  it("says how old a charted systolic pressure is, and marks one hours old as stale", () => {
+    show(response([computed({ vital: "systolic_bp", unit: "mmHg", latest: 118, baseline_median: 120, delta: -2, z: -0.4, run_bins: 0, significant: false, latest_age_s: 3 * 3600 + 120 })]));
+    expect(text()).toContain("Systolic blood pressure");
+    expect(text()).toContain("Stale · 15-minute set");
+    expect(text()).toContain("ended 3 h ago");
   });
 
   it("words the age with the existing formatter", () => {
@@ -285,8 +292,8 @@ describe("BaselinePanel with a response of the wrong shape", () => {
 });
 
 describe("BaselinePanel: the flagged direction comes from the vital", () => {
-  const FLAGS = { heart_rate: "rise", respiratory_rate: "rise", temperature: "rise", spo2: "fall" } as const;
-  const UNITS = { heart_rate: "bpm", respiratory_rate: "/min", temperature: "°C", spo2: "%" } as const;
+  const FLAGS = { heart_rate: "rise", respiratory_rate: "rise", temperature: "rise", spo2: "fall", systolic_bp: "fall" } as const;
+  const UNITS = { heart_rate: "bpm", respiratory_rate: "/min", temperature: "°C", spo2: "%", systolic_bp: "mmHg" } as const;
 
   it.each(
     (Object.keys(FLAGS) as (keyof typeof FLAGS)[]).flatMap((vital) => [
@@ -336,6 +343,7 @@ describe("BaselinePanel: what is missing and what is malformed", () => {
       "Respiratory rate · no finding returned",
       "SpO2 · no finding returned",
       "Temperature · no finding returned",
+      "Systolic blood pressure · no finding returned",
     ]);
   });
 

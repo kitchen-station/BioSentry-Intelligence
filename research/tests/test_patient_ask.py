@@ -583,12 +583,35 @@ def test_c6_a_vital_not_in_the_list_is_refused(q):
 
 
 @pytest.mark.parametrize("q", ["what is her baseline blood pressure", "baseline bp", "baseline systolic",
-                               "how does the blood pressure compare with the baseline"])
-def test_the_baseline_data_has_no_blood_pressure_and_the_answer_says_so(q):
-    assert ask.match(q) == ("own_baseline", {"vital": "blood_pressure"})
-    out = run(q)
-    assert out["status"] == "answered" and out["numbers"] == []
-    assert "It holds no blood pressure baseline." in out["text"]
+                               "how does the blood pressure compare with the baseline", "Is her SBP below her usual?"])
+def test_systolic_blood_pressure_is_the_fifth_vital_and_its_answer_says_it_is_charted(q):
+    assert ask.match(q) == ("own_baseline", {"vital": "systolic_bp"})
+    entry = {**baseline_dict()["vitals"][0], "vital": "systolic_bp", "unit": "mmHg", "pathway": "circulatory"}
+    out = run(q, patient(baseline=baseline_dict([entry])))
+    assert out["status"] == "answered"
+    assert "Systolic blood pressure: this patient's own baseline is 72.5, with this unit:\n  \"mmHg\"" in out["text"]
+    assert "charted blood pressure readings, not a sensor stream" in out["text"]
+    assert "Systolic blood pressure: the data holds no baseline entry." in run(q)["text"]  # older data: said so
+
+
+@pytest.mark.parametrize("q", ["how does her blood pressure compare with the baseline of other patients",
+                               "is her BP higher than most women", "compare her systolic baseline with her sister",
+                               "blood pressure vs baseline of women", "is her baseline blood pressure normal for a man her age",
+                               "how does her bp compare to the ward"])
+def test_a_blood_pressure_question_that_compares_with_other_people_is_refused(q):
+    assert ask.match(q)[0] is None
+    assert run(q)["status"] == "refused"
+
+
+@pytest.mark.parametrize("q", ["diastolic baseline", "what is her baseline diastolic pressure"])
+def test_the_baseline_holds_no_diastolic_value(q):
+    assert ask.match(q) == (None, "none")
+
+
+def test_the_vital_history_holds_no_blood_pressure_and_the_change_answer_says_so():
+    out = run("what changed in the blood pressure in the last 6 hours")
+    assert out["args"] == {"vital": "systolic_bp", "hours": 6} and out["status"] == "answered" and out["numbers"] == []
+    assert "The vital history holds no blood pressure." in out["text"]
 
 
 # --- the baseline comparison, in the words a clinician types ----------------------------------------------------------
