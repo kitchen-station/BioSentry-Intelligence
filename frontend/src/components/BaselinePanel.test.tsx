@@ -10,14 +10,14 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { BaselineComputed, BaselineResponse } from "../types";
 import { BaselinePanel } from "./BaselinePanel";
 import type { BaselineState } from "./useBaseline";
-import { formatClock } from "./format";
+import { formatClock, formatDay } from "./format";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const LABEL = "Research finding. Synthetic, not validated. Breaks ties between equal NEWS2 totals below a trigger.";
 const T0 = Date.parse("2026-11-12T10:00:00Z");
 const at = (minutesAgo: number) => new Date(T0 - minutesAgo * 60_000).toISOString();
-const day = (iso: string) => new Date(iso).toLocaleDateString([], { day: "numeric", month: "short" });
+const day = (iso: string) => formatDay(Date.parse(iso)); // the ward's calendar, whatever zone the machine is in
 const when = (iso: string) => `${day(iso)} ${formatClock(Date.parse(iso))}`;
 
 const computed = (over: Partial<BaselineComputed> = {}): BaselineComputed => ({

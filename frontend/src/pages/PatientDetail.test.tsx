@@ -11,7 +11,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import synthetic from "../data/synthetic.json";
 import type { BaselineComputed, BaselineResponse, ClinicalNote, LabPanel, PatientDetail as Detail, Session, SessionRole } from "../types";
-import { formatClockSeconds } from "../components/format";
+import { formatClock, formatClockSeconds } from "../components/format";
 import { PatientDetail } from "./PatientDetail";
 
 // "Sep" or "Sept", whichever the runtime's en-GB gives: the clock uses the same call as the simulator.
@@ -143,7 +143,7 @@ describe("the header clock is ward time, as served", () => {
     });
     page("rn");
     await loaded();
-    const at = new Date("2026-09-03T06:45:00Z").toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const at = formatClock(Date.parse("2026-09-03T06:45:00Z")); // the ward's clock
     expect(screen.getAllByText(`Entered by a nurse at ${at}`).length).toBeGreaterThan(0);
   });
 });

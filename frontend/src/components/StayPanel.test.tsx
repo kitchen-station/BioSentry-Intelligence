@@ -27,6 +27,8 @@ const settle = () => act(async () => {});
 // Two clock days before "today" keep every time on another day, so every line carries its date.
 const T = (hhmm: string, d = "2026-01-05") => `${d}T${hhmm}:00Z`;
 const NOW = Date.now(); // ward time as served, passed in; the panel never reads the browser's clock for "today"
+// A moment on the ward's own clock (Manila, UTC+8), whatever zone the machine is in.
+const ward = (m: number, d: number, h: number, min = 0): string => new Date(Date.UTC(2026, m, d, h - 8, min)).toISOString();
 const clk = (iso: string) => formatClockDay(Date.parse(iso), NOW);
 const rng = (a: string, b: string) => `${clk(a)} to ${formatClock(Date.parse(b))}`; // both ends on one old day: the date once
 const run = (over: Partial<HistoryRun>): HistoryRun => ({
@@ -184,8 +186,8 @@ describe("the list", () => {
   });
 
   it("prints both dates when the ends of a run are on different days", async () => {
-    const a = new Date(2026, 0, 5, 23, 0).toISOString();
-    const b = new Date(2026, 0, 6, 1, 0).toISOString();
+    const a = ward(0, 5, 23, 0);
+    const b = ward(0, 6, 1, 0);
     api.getPatientHistory.mockResolvedValue(hist({ runs: [run({ start: a, end: b })] }));
     await open();
     expect(lines()[0].startsWith(`${clk(a)} to ${clk(b)} \u00b7`)).toBe(true);
@@ -346,8 +348,8 @@ describe("the strip", () => {
   });
 
   it("dates both ends when the span crosses midnight today", async () => {
-    const a = new Date(2026, 0, 5, 23, 0).toISOString();
-    api.getPatientHistory.mockResolvedValue(hist({ grid_from: a, grid_to: new Date(2026, 0, 6, 1, 0).toISOString() }));
+    const a = ward(0, 5, 23, 0);
+    api.getPatientHistory.mockResolvedValue(hist({ grid_from: a, grid_to: ward(0, 6, 1, 0) }));
     await open();
     expect(screen.getAllByText(/Jan/).length).toBe(2);
   });
@@ -492,8 +494,8 @@ describe("the simulated episode", () => {
   );
 
   it("prints both dates when the episode crosses midnight", async () => {
-    const start = new Date(2026, 0, 5, 23, 30).toISOString();
-    const full = new Date(2026, 0, 6, 0, 30).toISOString();
+    const start = ward(0, 5, 23, 30);
+    const full = ward(0, 6, 0, 30);
     api.getPatientHistory.mockResolvedValue(hist({ simulated_episode: { ...EP, start, full } }));
     await open();
     expect(lines()[0]).toBe(`Simulated deterioration (respiratory): began ${clk(start)}, fully in ${clk(full)}`);
