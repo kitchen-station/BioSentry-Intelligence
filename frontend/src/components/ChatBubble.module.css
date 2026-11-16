@@ -92,8 +92,7 @@
   color: var(--ink);
 }
 
-.link,
-.quiet {
+.link {
   margin-bottom: var(--sp-3);
   font-family: var(--font-sans);
   font-size: 13px;

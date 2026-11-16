@@ -136,17 +136,14 @@ describe("the panel", () => {
     expect(screen.queryByRole("link", { name: "Open as a page" })).toBeNull();
   });
 
-  it("says the chat is not connected, with no thread, where the build has none", async () => {
+  it("is not shown where the build has no chat", () => {
     api.hasLabQuestions = false;
     at("/ward");
-    await userEvent.click(bubble());
-    expect(screen.getByText("Getting ready: the chat is not connected in this demo.")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /^thread/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Ask" })).toBeNull();
     cleanup();
     api.hasPatientQuestions = false;
     at("/patient/p-001");
-    await userEvent.click(bubble());
-    expect(screen.getByText("Getting ready: the chat is not connected in this demo.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Ask" })).toBeNull();
   });
 });
 

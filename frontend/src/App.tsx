@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import type { Session } from "./types";
-import { restoreSession, clearSession, hasWardResearch } from "./api";
+import { restoreSession, clearSession, hasWardResearch, usesServer } from "./api";
 import { SignIn } from "./pages/SignIn";
 import { Ward } from "./pages/Ward";
 import { PatientDetail } from "./pages/PatientDetail";
@@ -88,7 +88,8 @@ export function App() {
   // The owner's rule: a clinician has no developer view. The research numbers and the pipeline open for an admin only.
   // The lab's own tools (simulated runs, a question for the research agent) open for those who can use them; a staff nurse cannot.
   // A physician or charge nurse sees them as "What-if runs" at /what-if; /lab is the administrator's "Simulation lab".
-  const developer = session?.role === "admin";
+  // The fixture build (the public demo: no server, no real clinician) opens them for every demo role, so a judge can read them.
+  const developer = session?.role === "admin" || !usesServer;
   const clinician = asksWard(session?.role); // the roles that may ask
   const toWard = <Navigate to="/ward" replace />;
 

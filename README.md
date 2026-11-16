@@ -68,10 +68,12 @@ flowchart LR
     models["Research models<br/>student, confidence check, reward policy"]
     db[("PostgreSQL 18<br/>append-only audit log")]
     web["Dashboard: React<br/>one ranked list per clinician"]
+    agent["Question workers<br/>a patient, or the simulated ward"]
   end
   subgraph huawei["Huawei AI and cloud"]
     ms["MindSpore 2.11<br/>trains the student"]
-    lite["MindSpore Lite<br/>model.ms for the edge"]
+    lite["MindSpore Lite<br/>converted and checked; edge runtime planned"]
+    nlp["MindNLP 0.5.1 on MindSpore 2.7<br/>LoRA-tunes the research agent"]
     ma["ModelArts<br/>training job"]
     obs["OBS<br/>model files, backups"]
     ecs["ECS<br/>hosts the server"]
@@ -84,19 +86,22 @@ flowchart LR
   models --> api
   ms -- "weights" --> models
   ms --> lite
+  agent -- "claims jobs" --> api
+  nlp -- "adapter, optional tuned mode" --> agent
   ma -.-> ms
   ma -.-> obs
   ecs -.-> server
   iot -.-> api
   classDef used fill:#fdecea,stroke:#c7000b,color:#000
   classDef planned fill:#ffffff,stroke:#c7000b,stroke-dasharray:5 4,color:#000
-  class ms,lite used
+  class ms,lite,nlp used
   class ma,obs,ecs,iot planned
 ```
 
 Red: Huawei technology in use today. MindSpore 2.11 trains the student, and MindSpore Lite converts it
-(`models/tier_c/student_vitals/lite.txt`: converted, 20 of 20 test rows match). Dashed: Huawei Cloud services
-planned and not running yet. The API runs the student from its exported weights (`models/`), scores NEWS2 on
+(`models/tier_c/student_vitals/lite.txt`: converted, 20 of 20 test rows match; nothing runs `model.ms` yet).
+MindNLP 0.5.1 on MindSpore 2.7 LoRA-tunes the model that the lab question worker can use
+(`research/agent_tuning/`, `deploy/compose.tuned.yaml`). Dashed: Huawei Cloud services planned and not running yet. The API runs the student from its exported weights (`models/`), scores NEWS2 on
 every read, and stores no score.
 
 ## Use it now
@@ -280,7 +285,9 @@ active one: the seeded fixture ward, or a simulated ward posted to `/sim/*`.
   acknowledgements, and ingest from the ward simulation.
 - The research models (synthetic, not validated): a distilled vitals student trained in MindSpore 2.11 and
   converted to MindSpore Lite, a split-conformal confidence check on it, and a reward-driven alerting policy.
-  The API loads them and a flag adds a reason to a row; a flag never moves a patient.
+  The API loads them and a flag adds a reason to a row; a flag never moves a patient. On held-out set 2 the
+  checked student shows a gain beyond chance and the reward policy a loss; the policy's flag is kept as a
+  research display and says so ([Results](#results)).
 - The baseline comparison: alerts per patient per shift and deteriorations caught, against NEWS2, on
   held-out simulated wards ([Results](#results)).
 
