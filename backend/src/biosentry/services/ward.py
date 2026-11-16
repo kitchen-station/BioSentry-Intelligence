@@ -11,6 +11,7 @@ record, including reads that find nothing.
 """
 
 import logging
+import re
 from typing import Any
 
 from pydantic import ValidationError
@@ -38,7 +39,15 @@ from biosentry.schemas import (
     WardResponse,
     WardUnit,
 )
-from biosentry.schemas.ingest import OPEN_BEDS_MAX, LiveWard, OpenBed, OpenSim, OpenWard
+from biosentry.schemas.ingest import (
+    BED_LABEL,
+    OPEN_BEDS_MAX,
+    LiveWard,
+    OpenBed,
+    OpenBedCard,
+    OpenSim,
+    OpenWard,
+)
 
 from .model_signals import POLICY_ID, STUDENT_ID, ModelSignals, ward_model_signals
 from .models import LoadedModels
@@ -398,6 +407,40 @@ class WardService:
             can_control=False,
             sim=open_sim(self._store.live_view(unit)),
             beds=sorted(shown, key=lambda b: (b.bed, b.rank or 0)),
+        )
+
+    def open_bed(self, unit: str, bed: str) -> OpenBedCard | None:
+        """One bed's card for a caller nobody identified. A ranked bed: its NEWS2 score and band,
+        the newest stored value of five vitals with time and source, and the trend word. Any other
+        bed: its state and the reason only. None: no such bed, or the stay has ended. Nothing
+        that names the patient is read into it, and no model runs. Writes no audit row: the
+        route does."""
+        pid = self._store.in_bed(unit, bed) if re.fullmatch(BED_LABEL, bed) else None
+        state = self._store.read(pid) if pid else None
+        if state is None:
+            return None
+        info = self._store.units[unit]
+        place = {"unit": unit, "floor": info["floor"], "kind": info["kind"], "bed": bed, "synthetic": True}
+        decision = decide(state) if info["kind"] == "ranked" else None
+        if not isinstance(decision, Ranked):
+            reason = unit_row(state, info).reason if decision is None else _reason(state, decision.reason)
+            return OpenBedCard(
+                **place, state="not_ranked", score=None, risk=None, reason=reason, vitals=None, trend=None
+            )
+        vitals: dict[str, Any] = {}
+        # All five are NEWS2 inputs: a ranked patient has each one stored.
+        for code in ("heart_rate", "respiratory_rate", "spo2", "temperature", "blood_pressure"):
+            m = getattr(state.vitals, code)
+            value = m.data.value.model_dump() if code == "blood_pressure" else {"value": m.data.value}
+            vitals[code] = {**value, "observed_at": m.provenance.observed_at, "source": m.provenance.source}
+        return OpenBedCard(
+            **place,
+            state="ranked",
+            score=decision.news2.total,
+            risk=decision.news2.risk.value,
+            reason=None,
+            vitals=vitals,
+            trend=state.trend,
         )
 
     def summaries(self, clinician_id: str) -> list[PatientSummary]:

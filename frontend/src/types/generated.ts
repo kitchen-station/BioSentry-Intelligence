@@ -549,12 +549,42 @@ export interface components {
             /** @enum {string} */
             readonly state: "ranked" | "not_ranked";
         };
+        /**
+         * OpenBedCard
+         * @description One occupied bed for anyone, with no sign-in (GET /wards/{ward}/open-view/beds/{bed}).
+         *     It holds no name, age, sex, context, note, lab, baseline, model flag, clinician or patient id.
+         *     A bed that is not ranked gives its state and the reason only.
+         */
+        readonly OpenBedCard: {
+            readonly bed: string;
+            readonly floor: number | null;
+            /** @enum {string} */
+            readonly kind: "ranked" | "shown" | "unranked";
+            readonly reason: string | null;
+            readonly risk: ("low" | "low_medium" | "medium" | "high") | null;
+            readonly score: number | null;
+            /** @enum {string} */
+            readonly state: "ranked" | "not_ranked";
+            /** @constant */
+            readonly synthetic: true;
+            readonly trend: components["schemas"]["Trend"] | null;
+            readonly unit: string;
+            readonly vitals: components["schemas"]["OpenVitals"] | null;
+        };
         /** OpenMove */
         readonly OpenMove: {
             readonly bed: string;
             /** @enum {string} */
             readonly kind: "in" | "out";
             readonly seq: number;
+        };
+        /** OpenPressure */
+        readonly OpenPressure: {
+            readonly diastolic: number;
+            /** Format: date-time */
+            readonly observed_at: string;
+            readonly source: components["schemas"]["ProvenanceSource"];
+            readonly systolic: number;
         };
         /** OpenSim */
         readonly OpenSim: {
@@ -582,6 +612,28 @@ export interface components {
             readonly walking: boolean;
             readonly x: number;
             readonly y: number;
+        };
+        /**
+         * OpenVital
+         * @description One stored vital on a bed card: the value, when it was observed and where it came from.
+         */
+        readonly OpenVital: {
+            /** Format: date-time */
+            readonly observed_at: string;
+            readonly source: components["schemas"]["ProvenanceSource"];
+            readonly value: number;
+        };
+        /**
+         * OpenVitals
+         * @description The newest stored value of each of the five. All five are NEWS2 inputs, and only a ranked
+         *     bed has a card with vitals, so each one is stored.
+         */
+        readonly OpenVitals: {
+            readonly blood_pressure: components["schemas"]["OpenPressure"];
+            readonly heart_rate: components["schemas"]["OpenVital"];
+            readonly respiratory_rate: components["schemas"]["OpenVital"];
+            readonly spo2: components["schemas"]["OpenVital"];
+            readonly temperature: components["schemas"]["OpenVital"];
         };
         /**
          * OpenWard
@@ -1285,9 +1337,13 @@ export type NumberMeasurement = components['schemas']['NumberMeasurement'];
 export type NumberPresent = components['schemas']['NumberPresent'];
 export type NurseVitalsInput = components['schemas']['NurseVitalsInput'];
 export type OpenBed = components['schemas']['OpenBed'];
+export type OpenBedCard = components['schemas']['OpenBedCard'];
 export type OpenMove = components['schemas']['OpenMove'];
+export type OpenPressure = components['schemas']['OpenPressure'];
 export type OpenSim = components['schemas']['OpenSim'];
 export type OpenStaff = components['schemas']['OpenStaff'];
+export type OpenVital = components['schemas']['OpenVital'];
+export type OpenVitals = components['schemas']['OpenVitals'];
 export type OpenWard = components['schemas']['OpenWard'];
 export type OverviewActivity = components['schemas']['OverviewActivity'];
 export type OverviewClinician = components['schemas']['OverviewClinician'];

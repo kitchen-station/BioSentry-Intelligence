@@ -116,12 +116,13 @@ def test_on_it_answers_with_no_header_and_the_same_bytes_with_any_credential(wat
 def test_on_the_route_table_gains_only_this_route_and_every_other_still_wants_a_token(watch: Api) -> None:
     off = create_app(replace(watch.settings, open_ward_view=False), clock=watch.wall)
     table = _route_table(watch.client.app)
-    assert sorted(set(table) - set(_route_table(off))) == [("GET", "/wards/{ward}/open-view")]
+    opened = ["/wards/{ward}/open-view", "/wards/{ward}/open-view/beds/{bed}"]
+    assert sorted(set(table) - set(_route_table(off))) == [("GET", path) for path in opened]
     assert set(_route_table(off)) <= set(table)
     cases = [{}, {"Authorization": "Basic abc"}, {"Authorization": "Bearer"}, {"Authorization": "Bearer rn-nobody"}]
     walked = 0
     for method, template in table:
-        if (method, template) in PUBLIC_ROUTES or template == "/wards/{ward}/open-view":
+        if (method, template) in PUBLIC_ROUTES or template in opened:
             continue
         for headers in cases:
             response = watch.client.request(

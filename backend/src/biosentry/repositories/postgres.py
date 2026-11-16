@@ -738,6 +738,16 @@ class PostgresStore:
         numbers = [int(m[1]) for r in rows if (m := re.fullmatch(r"p-(\d+)", r["id"]))]
         return f"p-{max(numbers, default=0) + 1:03d}"
 
+    def in_bed(self, unit: str, bed: str) -> str | None:
+        """The one patient still in the unit whose bed label is exactly this. None: no such bed,
+        or two patients share the label (the runner may send that): then nobody is picked."""
+        rows = self.conn.execute(
+            "SELECT id FROM patient WHERE run_id = %s AND unit = %s AND bed = %s"
+            " AND left_at IS NULL LIMIT 2",
+            (self.run_id, unit, bed),
+        ).fetchall()
+        return rows[0]["id"] if len(rows) == 1 else None
+
     def bed_occupied(self, bed: str, unit: str) -> bool:
         """Whether a patient still in the unit has this bed. Call it after `next_patient_id`,
         which holds the run's lock, so two admissions to one bed cannot both pass."""
