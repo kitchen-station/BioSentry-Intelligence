@@ -40,9 +40,23 @@ call it anyway). "Public mode" is the one supported way to let them use this API
   state keeps its saved speed, and a clinician who is an md or the charge nurse changes it from the viewer
   afterwards. `WARD_MODE` is `ward` (ward W4 alone, the default) or `hospital` (the whole hospital,
   every unit sent to the API); `WARD_SCENARIO` is the hospital a new hospital run starts (`typical`
-  unless set). Each mode keeps its own state file in `/state` (`ward-state.json`, `hospital-state.json`),
-  so a switch starts a new run and a switch back resumes the old ward. Take a backup first: the
-  hospital run needs API migration 0014, and an older API image cannot write patients after it.
+  unless set; `pitch`, `calm`, `surge`, `more-nurses` and `critical` are the others). `typical` is the typical hospital at
+  seed 101 with W4's 12 starting patients drawn from that seed (owner decision orch-h4). A hospital that was saved
+  continues as it is, whatever `WARD_SCENARIO` says. Each mode keeps its own state file in `/state`
+  (`ward-state.json`, `hospital-state.json`), so a switch starts a new run and a switch back resumes the old ward.
+  Take a backup first: the hospital run needs API migration 0014, and an older API image cannot write patients after it.
+  In `hospital` mode the runner sends W4 and, from the hospital vitals engine, every other unit's people as that unit's
+  patients (the ER as a `shown` unit, intensive care as `unranked`, the other wards as `ranked`). A move is a stay
+  ending as `transferred` and a new stay in the new unit; a death is a stay ending as `died`, shown in the history only
+  (owner decision orch-h5). The engine takes no orders: a dashboard action on another unit is not applied.
+  **The month loop.** A hospital run lasts one ward month (30 days of ward time). Then the runner ends the run and starts the
+  next seed in a new run, with the same scenario, and logs `Month ended at minute N: seed S closes, seed S+1 starts`. The
+  state file is written again only after the API has accepted the new run, and a runner that restarts on a month that is
+  over starts the next one at once. So a hospital server goes on for ever, one seed after another, and the API reads the
+  newest run.
+  **On the team server** the simulator runs in hospital mode (`WARD_MODE=hospital`). The compose default stays
+  `ward`. To switch, edit `WARD_MODE` in `deploy/.env` (`hospital` or `ward`; remove the line for `ward`) and run
+  `deploy/setup.sh`. Each mode resumes its own state file, so switching back continues the old ward.
 - `lab` is the lab worker: it runs the simulated compare runs a physician or the charge nurse asks for
   on the dashboard's Simulation lab page (without it a request waits, then fails). It is the same image
   as `sim` with another command (`node dist/lab/lab-worker.js`). It claims a request from the API with
@@ -78,7 +92,7 @@ call it anyway). "Public mode" is the one supported way to let them use this API
   64 MB. Capped at two CPUs and 1 GB (one question peaked near 210 MB).
 - The tuned model for `ask-lab` is optional and off: `deploy/compose.tuned.yaml` turns it on (see "The
   tuned model" below).
-- There is one ward. While the runner is live, a browser simulator started with the ingest key is
+- There is one hospital (or one ward). While the runner is live, a browser simulator started with the ingest key is
   **refused with 409** ("Another ward simulation is live"): use the ward on the server, not a second one.
   To run one from a browser anyway, stop the runner (`docker compose -f deploy/compose.yaml stop sim`);
   its run goes stale after 30 seconds without a batch.
@@ -88,7 +102,7 @@ call it anyway). "Public mode" is the one supported way to let them use this API
   around `ufw`'s rules, so the safety here is that two ports are bound to loopback and the third is not
   published at all. Do not edit `compose.yaml` to publish any of them, and open nothing but SSH in the
   provider's firewall (Tailscale needs no inbound port).
-- `BIOSENTRY_OPEN_WARD_VIEW=true` lets anyone who can open the address watch the ward simulator without signing in (bed colours, staff figures, no names); control still needs a sign-in. It is off unless set to `true`, it serves only a run marked synthetic, and the API logs a warning at start when it is on. Public mode (`compose.public.yaml`) does not read this value: it has its own line, `BIOSENTRY_PUBLIC_OPEN_WARD_VIEW` ("The public ward page", below), so this one can never open the ward to the internet by accident.
+- `BIOSENTRY_OPEN_WARD_VIEW=true` lets anyone who can open the address watch the ward simulator without signing in (the run's unit list, each unit's bed colours and staff figures, and a card for a picked bed, no names); control still needs a sign-in. It is off unless set to `true`, it serves only a run marked synthetic, and the API logs a warning at start when it is on. Public mode (`compose.public.yaml`) does not read this value: it has its own line, `BIOSENTRY_PUBLIC_OPEN_WARD_VIEW` ("The public ward page", below), so this one can never open the ward to the internet by accident.
 - Do not set it where the address is public (`tailscale funnel`, a public IP or a tunnel) unless you mean every person who can reach the page to see the ward. For a public address use the separate line.
 - A clinician still signs in with their own passphrase, on both pages. The API answers each one only for
   their own patients and writes an audit row for every view. Tailscale decides who can reach the address;
@@ -140,7 +154,12 @@ call it anyway). "Public mode" is the one supported way to let them use this API
    docker compose -f deploy/compose.yaml exec api python -m biosentry.db.passphrase rn-manalo
    ```
 
-   Repeat for `rn-delacruz`, `rn-reyes`, `md-santos`, `md-aquino`. Give each person theirs privately.
+   Repeat for `rn-delacruz`, `rn-reyes`, `md-santos`, `md-aquino`. Give each person theirs privately. A hospital run also
+   has one charge nurse for each other unit, added by migration 0014 with no passphrase: `cn-er`, `cn-icu`, `cn-med3a`,
+   `cn-med3b` and `cn-surg5a` (owner decision orch-h3). Set theirs the same way when someone is to sign in as one. An
+   admin who reads every unit (the ward simulator's "Hospital admin" view) is made from a shell on the server:
+   `docker compose -f deploy/compose.yaml exec api python -m biosentry.db.admin grant admin-<name>`, then the passphrase
+   command above for that id.
    Running it again for an id replaces that passphrase and signs that clinician out everywhere.
    (Piped input works too, for a script: `printf '%s\n' "$PASSPHRASE" | docker compose -f
    deploy/compose.yaml exec -T api python -m biosentry.db.passphrase rn-manalo`.)
@@ -313,8 +332,10 @@ the line missing, or `=false`, nothing changes. Public mode never reads the plai
 `BIOSENTRY_OPEN_WARD_VIEW`, so an old `true` there cannot open it. Run `deploy/setup.sh` again; it says
 in one line that the page is open. To close it: remove the line, run `deploy/setup.sh` again.
 
-What a visitor sees (`GET /api/wards/W4/open-view`, no credential read, the same for every caller). Only
-while the stored run is marked synthetic. Nothing else is in the answer:
+What a visitor sees. Three routes need no credential and answer the same for every caller, only while the stored run
+is marked synthetic: `GET /api/open-view` (the run's units: id, name, floor, kind, and nothing else, no count),
+`GET /api/wards/{unit}/open-view` (one unit's drawing) and `GET /api/wards/{unit}/open-view/beds/{bed}` (one bed's card).
+The drawing of a unit holds:
 
 - the ward's id, and the two flags `synthetic: true` and `can_control: false`;
 - for each occupied bed: its label, whether it is ranked, its rank and its NEWS2 band (low, low-medium,
@@ -324,13 +345,17 @@ while the stored run is marked synthetic. Nothing else is in the answer:
   whether it walks, and its stage. No name, no id, no task;
 - the last few bed moves: a number, a bed label, in or out.
 
-A visitor sees no patient name, id, age, vital sign, lab value, note or alert text, and cannot send a
-command: control still needs a sign-in. The data is synthetic; no real patient is in it. A bed's rank and
+A bed's card (owner decision orch-1) holds, for a ranked bed: the unit, its floor and kind, the bed label, the NEWS2 score
+and band, the trend, and the newest heart rate, respiratory rate, SpO2, temperature and blood pressure, each with the time
+it was observed and its source. For any other bed (a unit that is not ranked, or a bed that is not ranked) it holds the
+state and the reason only. A card never holds a name, age, sex, context, note, lab, baseline, model flag, clinician or
+patient id. A visitor sees no patient name, id, age, lab value, note or alert text, and cannot send a
+command: control still needs a sign-in. The only vital signs a visitor sees are on a ranked bed's card. The data is synthetic; no real patient is in it. A bed's rank and
 band do show how sick each bed is on the simulated ward.
 
 The call is allowed from the same two sites as every other call (`BIOSENTRY_CORS_ORIGINS`: the dashboard
-and the ward simulator on `pages.dev`). Anyone can still call it from a script. The view writes at most
-one audit row a minute, however many people watch.
+and the ward simulator on `pages.dev`). Anyone can still call it from a script. The views write at most
+one audit row a minute for each route and unit, however many people watch.
 
 ### What changes for an attacker
 
@@ -341,14 +366,15 @@ What protects it:
 
 - A passphrase of 12 or more characters for each clinician. No passphrase, no data.
 - Five wrong tries for a clinician lock that clinician's sign-in for 15 minutes. Every try is recorded.
-- A clinician sees only their own patients. An admin reads the ward overview and writes nothing.
+- A clinician sees only their own patients. An admin reads every unit, patients' names included, and writes nothing.
 - The ingest door (`/api/sim/*`) answers 404 from outside: nobody can write ward data or take a lab job.
 - The database, the API's own port, the ward runner, the lab worker and the two question workers are not
   reachable from outside.
 - A request body over 1 MB is refused, and a client that sends too slowly is dropped.
 - The data is synthetic. There is no real patient in it.
-- With the public ward page on, the one route that needs no sign-in is `GET /api/wards/{ward}/open-view`: it
-  answers a fixed, name-free drawing and writes at most one audit row a minute.
+- With the public ward page on, the routes that need no sign-in are `GET /api/open-view`, `GET /api/wards/{ward}/open-view`
+  and `GET /api/wards/{ward}/open-view/beds/{bed}`: they answer a fixed, name-free drawing, list and card, and write at
+  most one audit row a minute for each route and unit.
 
 What does not:
 

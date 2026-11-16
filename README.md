@@ -38,7 +38,7 @@ held-out set 2, and the owner dropped its flag (decision models-rl-5). A flag ne
 research models as plain files with their held-out results (`models/`), the code that trains them
 (`training/`), the research agent (`research/`) and the team deployment (`deploy/`). The
 API serves the committed synthetic ward (`frontend/src/data/synthetic.json`), seeded into the database,
-and takes a live ward from the ward simulation.
+and takes a live ward, or a whole hospital, from the ward simulation (see [The whole hospital](#the-whole-hospital)).
 
 ## Results
 
@@ -81,7 +81,7 @@ simulator makes the data and judges the alerts. The full tables and method are i
 ```mermaid
 flowchart LR
   subgraph ward["Ward"]
-    sim["Ward simulator<br/>stands in for patch and monitor"]
+    sim["Ward simulator, one ward or<br/>the whole hospital<br/>stands in for patch and monitor"]
     nurse["Nurse entry<br/>BP, consciousness, oxygen"]
   end
   subgraph server["BioSentry server, Docker Compose"]
@@ -143,7 +143,7 @@ BioSentry is deployed. You do not need to install anything to see it.
 | App | Address | What it is |
 |---|---|---|
 | Dashboard | <https://biosentry-dashboard.pages.dev> | The clinician's ranked list on a sample ward. Choose a clinician; any passphrase is accepted. |
-| Ward simulation | <https://biosentry-ward-sim.pages.dev> | The simulated hospital, and a read-only view of the team server's ward W4 (no names or ids). No sign-in to watch. |
+| Ward simulation | <https://biosentry-ward-sim.pages.dev> | The simulated hospital, and a read-only view of the team server's ward W4 (no names or ids). When the server runs a whole hospital, it draws the building, floor by floor, with a card for each bed in use. No sign-in to watch. |
 
 Both public sites deploy from `main` and show synthetic patients. The dashboard has no server behind it: it runs
 alone on a sample ward, and what you enter is gone on reload. Its research pages are open to every demo clinician
@@ -158,8 +158,65 @@ To run or change the code yourself, see [Run it yourself](#run-it-yourself-devel
 **Your own feed.** The API takes a ward's data through one door: the `/sim/*` routes, with an ingest key
 in the `X-Ingest-Key` header. The ward simulation is one sender; any system that posts the same shapes
 (a run, then batches of observations) reaches the same scoring, own-baseline tracking and ward list, with
-no change to the dashboard. Today the door accepts only data marked synthetic, and nothing here is
+no change to the dashboard. A run may list 1 to 12 units, and a patient may name its unit and the person it is (see
+[The whole hospital](#the-whole-hospital)). Today the door accepts only data marked synthetic, and nothing here is
 validated for clinical use; a feed of real patients would need that rule changed, and a validation first.
+
+## The whole hospital
+
+The API can hold a whole hospital, not only ward W4. All of this is synthetic.
+
+- **Units.** A run lists 1 to 12 units, each with an id, a name, a floor and a kind. A run that lists none is one unit,
+  ward W4. W4 is the home unit. A patient row is one stay in one unit.
+- **Kinds.** `ranked` units are scored: NEWS2, the own-baseline finding and the research model flag, and a rank within
+  the unit. A `shown` unit gets a NEWS2 band for a patient whose inputs are all there, and no rank and no score. An
+  `unranked` unit gets neither. The simulator sends the ER as `shown`, intensive care as `unranked`, and W4, Medicine 3A,
+  Medicine 3B and Surgery 5A as `ranked` (owner decisions orch-h1 and sim-lab-6). Today the ER is `shown`: a band and no
+  rank. Ranking the ER with NEWS2 as an aid, labelled, is decided (orch-h10) and in progress, not built yet. NEWS2 outside W4 is display only and changes no care
+  (orch-h2, sim-lab-7). Giving each floor its own department, and where each department's vitals
+  come from, is decided (orch-h7, orch-h8, orch-h9) and being built; this section describes only what the code shows today.
+  The floors are 0 (ER), 2 (intensive care), 4 (W4), 5 (Surgery 5A), 3 (Medicine
+  3A) and 1 (Medicine 3B).
+- **Transfers.** A move between units is the old stay ending as `transferred`, with the unit it went to, and a new stay of
+  the same person in the new unit. Stays of one person share a `person` id.
+- **Deaths.** A death is a stay ending as `died`. It shows in the unit's stay history and nowhere else: the patient leaves
+  every live view (orch-h5).
+- **Who sees what.** A clinician sees their own patients only, in any unit. Migration 0014 adds one charge nurse for each
+  other unit (`cn-er`, `cn-icu`, `cn-med3a`, `cn-med3b`, `cn-surg5a`), with no passphrase from the migration
+  (orch-h3). An answer that holds a whole unit (the live view, the research table, lab runs, sim commands) is for that
+  unit's own clinicians. A hospital admin reads every unit.
+- **Routes.** `GET /wards` lists the units with how many patients the caller may see. `GET /wards/{unit}/rows`, `.../stays`
+  and `.../overview` are per unit. The dashboard still asks for W4 only. The unit pages are read by the ward simulator's
+  "Hospital admin" view and by any client of the API.
+- **The runner.** The simulator's headless runner (`WARD_MODE`, `WARD_SCENARIO`) writes the hospital. In `hospital` mode it
+  sends W4 and its moves, and every other unit's people from the hospital vitals engine, as that unit's patients. A
+  dashboard action that names another unit is not applied: the engine takes no orders. The default `WARD_MODE` is `ward`
+  (W4 alone), so a server shows a hospital only when it is set to `hospital`.
+- **`WARD_SCENARIO`.** The hospital a new run starts. The default is `typical`: the typical hospital at seed 101, with W4's
+  12 starting patients drawn from that seed (orch-h4). `pitch` is the same hospital with the 12 hand-written pitch patients.
+  `calm`, `surge`, `more-nurses` and `critical` are the other named scenarios. A saved hospital continues as it is.
+- **The month loop.** A hospital run lasts one ward month (30 days). Then the run ends and the next seed starts in a new
+  run, with the same scenario and the next seed (the seed before it, plus one; `typical` starts at seed 101). The runner saves its state only once the API has accepted the
+  new run, and a runner that starts on a month that is over starts the next one at once. The state is in
+  `hospital-state.json`. A state file made in one mode is refused by the other.
+- **The public list and the bed card.** With `BIOSENTRY_OPEN_WARD_VIEW=true`, three routes need no sign-in:
+  `GET /open-view` lists the run's units (id, name, floor, kind), `GET /wards/{unit}/open-view` draws one unit's beds, and
+  `GET /wards/{unit}/open-view/beds/{bed}` is one bed's card. A ranked bed's card has its NEWS2 score and band, its trend,
+  and the newest heart rate, respiratory rate, SpO2, temperature and blood pressure, each with its time and source.
+  A ranked bed's card also has `history`: the last 12 hours of the five vitals (orch-1b).
+  Any other bed's card has its state and the reason only. A card holds no name, age, sex, context, note, lab, baseline,
+  model flag, clinician or patient id (owner decisions orch-1, orch-h6). All three serve a synthetic run only.
+- **Hospital admin (read-only).** Signed in as an admin, the ward simulator page lists every unit, each unit's patients with
+  names, NEWS2 and the five vitals, each unit's history, and one patient's page. It reads `GET /wards`, `/wards/{unit}/rows`,
+  `/wards/{unit}/stays` and `/patients/{id}`, and writes nothing (orch-h11).
+- **ER and intensive care vitals.** A NOT RANKED row of a `shown` or `unranked` unit carries the stored vitals and their
+  trends, for a signed-in reader who may see the patient: an admin, or the clinician assigned. It still has no score and
+  no rank. The public views never carry them, except a ranked bed's card above.
+- **Skip.** A clinician who may control the simulation (a physician or the charge nurse of that unit) can send the
+  command `skip` to `POST /wards/{unit}/sim/commands`, with `minutes` of 60, 360, 720 or 1440, to move the whole run ahead
+  by 1 hour, 6 hours, 12 hours or 1 day. The API accepts one skip at a time: a second gets 409 until the simulation has
+  fetched the first from the command feed. It also gets 409 when the run is not live. No page in this repository sends it
+  yet. The simulator's runner applies `skip`.
 
 ## Run it yourself (developers)
 
@@ -199,10 +256,11 @@ cannot sign in: set one with `make db-passphrase id=rn-manalo` (it prompts twice
 stdin; at least 12 characters; it writes to the database `BIOSENTRY_DATABASE_URL` names). A database
 seeded before passphrases existed has none either: `make db-reset` seeds it again.
 
-**Admin (ward overview).** An admin sees every bed and its state, who is assigned, each clinician's patient
+**Admin (ward overview).** An admin sees, for a unit (the dashboard asks for W4), every bed and its state, who is assigned, each clinician's patient
 count, and counts of each clinician's actions in the last 24 hours (by action and outcome; no patient and no
 time); the Overview shows no patient name. The admin also reads the ward list and each ranked patient's page, read
-only, with every patient on the ward whoever is assigned. The admin can read the notes of every patient on the
+only, with every patient on the ward whoever is assigned. The same admin reads every other unit through the unit routes
+(see [The whole hospital](#the-whole-hospital)). The admin can read the notes of every patient on the
 ward, a NOT RANKED one too (it has no page for anyone). Views are in the audit log (I7) under
 the admin's id and every write stays refused. This reverses the earlier rule that the admin saw no patient
 name. The role is granted only from a shell with database access, run from
@@ -232,15 +290,20 @@ replace its own run. A batch for a run that is no longer the newest also gets 40
 case) with 409 and writes nothing; a bed whose patient has left is free again.
 `GET /sim/runs/{id}/actions?after={seq}` (same key) tells the sim what clinicians did: one row per
 acknowledgement, vitals entry, note (never its text) or admission, at most 200 in `seq` order after the cursor.
-`POST /wards/W4/sim/commands` (bearer token; an md or the charge nurse, else 403; `GET /wards/W4/live` says
-`can_control`) queues one of `set_speed` (with `speed` 0, 1, 10 or 60), `reset`, or `inject_deterioration`,
-`start_arrhythmia`, `detach_patch`, `apply_patch` (with the caller's `patient_id`, else 404) for the sim, and
-answers 409 when the ward is not receiving data from a live sim run. `GET /sim/runs/{id}/commands?after={seq}`
+`POST /wards/{ward}/sim/commands` (bearer token; an md or the charge nurse of that unit, else 403; `GET /wards/{ward}/live`
+says `can_control`) queues one of `set_speed` (with `speed` 0, 1, 10 or 60), `reset`, `skip` (with `minutes` 60, 360, 720 or
+1440; the whole run moves ahead; one skip at a time, a second gets 409 until the sim has fetched the first), or
+`inject_deterioration`, `start_arrhythmia`, `detach_patch`, `apply_patch` (with the caller's `patient_id`, else 404) for
+the sim, and answers 409 when the ward is not receiving data from a live sim run. `GET /sim/runs/{id}/commands?after={seq}`
 (same key) hands them to the sim in the same way as the actions.
 `GET /patients/{id}/baseline` (bearer token, same visibility, 404 and audit as the patient route, action `view_baseline`)
-serves a research finding of how far each device vital sits from the patient's own baseline: derived,
-synthetic, not validated, the same finding the ward uses as a tie-break and a reason; it stores nothing.
-A vital whose live value is not from the patch, or whose patch has not sampled in the last 30 minutes,
+serves a research finding of how far each of five vitals sits from the patient's own baseline: derived,
+synthetic, not validated; it stores nothing. Heart rate, respiratory rate and SpO2 are the vitals the ward uses as a
+tie-break and a reason. Temperature is `unavailable` (`no_history`): the patient read keeps no temperature history. The
+fifth vital is systolic blood pressure (`systolic_bp`). It is charted, not streamed: its 15-minute bins are the median of
+the charted readings (nurse or device) in each set, so it needs no patch, and a ward that charts every few hours has a
+baseline that forms slowly, never filled. It is shown only: it feeds no rank and no reason.
+A device vital whose live value is not from the patch, or whose patch has not sampled in the last 30 minutes,
 is `unavailable` (`patch_not_live`) and flags nothing. The detector runs on its code defaults (k 2.0,
 p 3), not the k 4.0, p 8 the research sweep chose in `models/tier_b/baseline/params.json`.
 The baseline is the first 24
@@ -314,7 +377,8 @@ The four set-2 commands, with the confidence check, the reward policy and `resea
   every attempt. The token is kept in memory only, so a reload returns to sign-in. The public demo (no
   API) checks nothing and says so. It lands on the ward, marked as simulated patients until a hospital
   is connected. An administrator types their id under "Administration" (API builds only) and lands on the
-  Overview.
+  Overview. The dashboard shows ward W4. The other units' charge nurses (`cn-er`, `cn-icu`, `cn-med3a`, `cn-med3b`,
+  `cn-surg5a`) are added by migration 0014 with no passphrase. On a database that is not loopback, nobody can sign in as one until the owner sets a passphrase (`make db-passphrase id=cn-er`).
 - **Ward:** patients in priority order, each with its score and why. A patient the system
   cannot score is listed as NOT RANKED, with the reason and what to record to fix it. With the API it reads again every 5 seconds (every 2 seconds while the ward runs at 60x and the tab is in front; an administrator reads once and on Refresh); the demo reads every 15 seconds. The top bar shows the ward's clock and speed.
 - **Patient detail:** the score and what drives it, vitals and labs with where each value
@@ -349,8 +413,10 @@ active one: the seeded fixture ward, or a simulated ward posted to `/sim/*`.
   source, tier, time and quality (a value, or the reason there is none), 15-minute vital bins (a gap
   is NULL), notes (soft-deleted), acknowledgements, sessions (the token hashed, 12 hours), the
   audit log (ids and outcomes only, sign-in attempts included, never a passphrase; the database refuses UPDATE, DELETE, TRUNCATE and a repeated sequence number, but not a user who can drop its triggers or the table), and the
-  sim's event feed, and lab runs (`lab_run`): a clinician's request for a simulated run and its result. A patient row is one stay: `admitted_at` (NULL when the arrival is not known), `left_at`
-  and `outcome`. Someone who has left drops out of every live view and stays in the history.
+  sim's event feed, and lab runs (`lab_run`): a clinician's request for a simulated run and its result. A patient row is one stay: its unit, `admitted_at` (NULL when the arrival is not known), `left_at`, `outcome`
+  (`discharged`, `higher_care`, `transferred` with the unit it went to, or `died`) and the `person` it belongs to. A run
+  has 1 to 12 units (`run_unit`: id, name, floor, kind). Someone who has left drops out of every live view and stays in the
+  history. A death shows only there.
 - **Pruned:** when a sim batch moves its run into a new sim hour, that run's vital bins older than
   `BIOSENTRY_RETENTION_DAYS` days of sim time (7 when unset) are deleted, and so are its observations
   that old which a newer one of the same patient and code has replaced. The newest observation of each
@@ -369,6 +435,10 @@ active one: the seeded fixture ward, or a simulated ward posted to `/sim/*`.
 - The research models (synthetic, not validated): a distilled vitals student trained in MindSpore 2.11 and
   converted to MindSpore Lite, a split-conformal confidence check on it, and a reward-driven alerting policy.
   The API loads the student and its check, and a flag adds a reason to a row; the policy is not connected (decision models-rl-5), it stays a research result. A flag never moves a patient.
+- The whole hospital on the server: units, floors, kinds, transfers and deaths in the history, the public unit list and
+  bed card, the read-only hospital admin routes, ER and intensive care vitals for signed-in readers, and the `skip`
+  command (see [The whole hospital](#the-whole-hospital)). Own baseline: heart rate, respiratory rate and SpO2 give the
+  reason and the tie-break; systolic blood pressure is a fifth, shown-only vital of the baseline route.
 - The baseline comparison: alerts per patient per shift and deteriorations caught, against NEWS2, on
   held-out simulated wards ([Results](#results)).
 
@@ -409,7 +479,8 @@ applied to made-up patients.
   4. Missing required input: NOT RANKED, naming what is missing.
 
   The fixture data follows rules 1 and 4. Rule 2 runs only on stored history: no fixture or seeded
-  patient has a significant own-baseline change, so none shows a flag.
+  patient has a significant own-baseline change, so none shows a flag. Only a `ranked` unit is scored by the arbiter; a
+  `shown` unit gets a NEWS2 band and an `unranked` unit gets nothing.
 - **Ward view** must be filtered server-side to the signed-in clinician's patients, on every
   call. The API does this from its care assignments; the fixture provider stands in when there is no API.
 - **Look:** follows the studio brand book (foundation v1), kept quiet for a clinical surface.
@@ -436,10 +507,11 @@ applied to made-up patients.
   `BIOSENTRY_CORS_ORIGINS` (comma-separated) overrides the origins the dashboard may be served from; the
   local ones stay the default.
   `BIOSENTRY_OPEN_WARD_VIEW=true` (owner decision S-3; off when unset or `false`, any other word stops the
-  start) adds one route, `GET /wards/{ward}/open-view`, that shows anyone who can reach the API the ward
-  simulator's drawing with no sign-in: bed, rank and NEWS2 band, and staff figures, no names or ids. It serves
-  a synthetic run only, still needs a sign-in for control, and its views leave at most one audit row a
-  minute. It is allowed in production and logs a warning at start. On a public address (`deploy/compose.public.yaml`) the
+  start) adds three routes (see [The whole hospital](#the-whole-hospital)). `GET /wards/{ward}/open-view` shows anyone who
+  can reach the API the ward simulator's drawing of one unit with no sign-in: bed, rank and NEWS2 band, and staff figures,
+  no names or ids. `GET /open-view` lists the units. `GET /wards/{ward}/open-view/beds/{bed}` is one bed's card. They serve
+  a synthetic run only, still need a sign-in for control, and their views leave at most one audit row a
+  minute for each route and unit. The setting is allowed in production and logs a warning at start. On a public address (`deploy/compose.public.yaml`) the
   team's value is not read; the separate `BIOSENTRY_PUBLIC_OPEN_WARD_VIEW=true` opts in (`deploy/README.md`, "The
   public ward page", owner decision 2026-11-14).
 
@@ -458,7 +530,8 @@ offline for aggregate numbers only (`models/data/eicu-crd-demo/card.md`).
   with no name, bed, id, free text, note or lab (`backend/src/biosentry/schemas/lab.py`). The worker that
   answers it has no route to the internet, calls no outside model, and writes nothing.
 - **Sessions.** The dashboard keeps the token in memory only, and the server stores only its sha256.
-- **The public ward view** shows bed, rank and NEWS2 band, never a name or id, and only for a synthetic run.
+- **The public ward view** shows bed, rank and NEWS2 band, never a name or id, and only for a synthetic run. A ranked bed's
+  public card also shows its newest five vitals with time and source, still with no name or id.
 - **Retention.** A run's vital bins older than `BIOSENTRY_RETENTION_DAYS` (7 when unset) are deleted.
 
 **What a hospital would add before the first real patient.** None of this is built; most of it is organisation, not code.
