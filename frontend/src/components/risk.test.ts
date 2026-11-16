@@ -95,10 +95,9 @@ describe("an own-baseline drift reason", () => {
   });
 });
 
-describe("the two model reasons", () => {
+describe("the model reason", () => {
   const model = [
     { text: "Prediction model flag (synthetic, not validated)", rule: "prediction_model_flag" as const, pathway: null },
-    { text: "Alert policy flag (learned by reward; synthetic, not validated)", rule: "alert_policy_flag" as const, pathway: null },
   ];
   const withModel = (score: number) => ({ id: "a", score, escalation_reasons: model });
   const at = (iso: string) => ({ data: { present: true, value: 0 }, provenance: { observed_at: iso } });

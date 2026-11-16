@@ -39,9 +39,9 @@ export const PIPELINE: readonly Stage[] = [
     evidence: "models/tier_c/student_vitals/card.md, research/README.md, frontend/src/data/researchResults.ts",
   },
   {
-    id: "reward", name: "Alert policy learned by reward", state: "shown, does not change the ranking",
-    in: "Simulator trials and an alert rule of six numbers", out: "A reason line on the row when the rule alerts",
-    text: ["An alert rule of six numbers. Each generation tries 30 candidates and keeps a winner only if it also beats the current rule on a second batch of new simulator trials.", "Learned on synthetic trials, not validated. The API computes its state for each ranked patient: an alert adds a reason line to the row and changes no score, rank or order."],
+    id: "reward", name: "Alert policy learned by reward", state: "research only, offline",
+    in: "Simulator trials and an alert rule of six numbers", out: "A research result, not connected to the API",
+    text: ["An alert rule of six numbers. Each generation tries 30 candidates and keeps a winner only if it also beats the current rule on a second batch of new simulator trials.", "Learned on synthetic trials, not validated. On the second held-out set, added to NEWS2, it showed a loss. The owner dropped it as a flag, so the API does not compute it and no ward row shows it; it stays a research result."],
     evidence: "models/tier_b/reward_policy/card.md, research/README.md, frontend/src/data/researchResults.ts",
   },
   {

@@ -930,8 +930,7 @@
           "tier_c_raise",
           "tier_b_finding",
           "missing_input",
-          "prediction_model_flag",
-          "alert_policy_flag"
+          "prediction_model_flag"
         ],
         "title": "EscalationRule",
         "type": "string"
@@ -3982,16 +3981,12 @@
       "RowModels": {
         "additionalProperties": false,
         "properties": {
-          "alert_policy": {
-            "$ref": "#/components/schemas/ModelSignal"
-          },
           "prediction": {
             "$ref": "#/components/schemas/ModelSignal"
           }
         },
         "required": [
-          "prediction",
-          "alert_policy"
+          "prediction"
         ],
         "title": "RowModels",
         "type": "object"

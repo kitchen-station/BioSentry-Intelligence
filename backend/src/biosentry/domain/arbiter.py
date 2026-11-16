@@ -3,7 +3,7 @@
 v1 implements three rules; the others are typed, inert hooks (README, "Design rules"):
 
   1. Tier A threshold met -> escalate unconditionally.            LIVE
-  2. Tier C prediction flag and learned policy flag add a reason.  LIVE (a reason only, see below)
+  2. Tier C prediction flag adds a reason.                         LIVE (a reason only, see below)
   3. Tier B significant finding -> list it, attach the pathway.   LIVE (a tie-break, see below)
   4. Notes-layer concern or a "worried" pin -> raise, attach it.  inert (v2)
   5. Missing required input -> NOT RANKED, naming it. Never impute. LIVE
@@ -15,9 +15,9 @@ Rule 1 policy: NEWS2 chart 2 triggers. Any trigger (a single parameter at 3, a t
 a total of 7 or more) escalates; a total of 0-4 with no single 3 does not. Order within the
 ward is by trigger level, then NEWS2 total, then a Tier B flag, then patient id. The flag only
 orders patients with no trigger and an equal total: it never moves a patient past a NEWS2 difference
-and never sets `escalated`. The Tier C prediction flag (only when the confidence check says alert) and
-the learned policy flag (only when it alerts) each add one reason line after the others. They never set
-`escalated` or `flagged` and never touch the order: the arbiter receives their results, it never computes them.
+and never sets `escalated`. The Tier C prediction flag (only when the confidence check says alert)
+adds one reason line after the others, never sets `escalated` or `flagged` and never touches the order: the
+arbiter receives its result, it never computes it. The reward policy has no flag (owner decision models-rl-5).
 """
 
 from collections.abc import Iterable
@@ -60,8 +60,6 @@ _NAME = {
     "temperature": "temperature",
 }
 PREDICTION_FLAG = "Prediction model flag (synthetic, not validated)"
-# Held-out set 2 (models/held_out_2/analysis.txt) shows a loss for this policy: the text says so where it shows.
-POLICY_FLAG = "Alert policy flag (learned by reward; a loss on held-out set 2; synthetic, not validated)"
 _DEVICE_INSTRUCTION = "Check the patch is applied and the signal is verified, or enter the observations"
 _NO_DEVICE_INSTRUCTION = "Apply the patch and verify the signal, or enter the observations"
 
@@ -78,11 +76,6 @@ class TierBSignal:
 class TierCSignal:
     probability: Result[float]  # never adds a reason by itself
     check: Result[Check]  # only Computed(Check.ALERT) adds the prediction reason
-
-
-@dataclass(frozen=True, slots=True)
-class PolicySignal:
-    alert: Result[bool]  # only Computed(True) adds the policy reason
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,14 +147,12 @@ class WardRanking:
 
 def _inert(
     tier_c: TierCSignal | None,
-    policy: PolicySignal | None,
     notes: NotesSignal | None,
     worried: WorriedPin | None,
     guarantees: Guarantees | None,
 ) -> tuple[str, ...]:
     supplied = (
         ("rule_2_tier_c", tier_c),
-        ("learned_policy", policy),
         ("rule_4_notes", notes),
         ("rule_4_worried", worried),
         ("guarantees", guarantees),
@@ -205,17 +196,16 @@ def arbitrate(
     *,
     tier_b: TierBSignal | None = None,
     tier_c: TierCSignal | None = None,
-    policy: PolicySignal | None = None,
     notes: NotesSignal | None = None,
     worried: WorriedPin | None = None,
     guarantees: Guarantees | None = None,
 ) -> Decision:
-    """One patient's decision. Only `tier_a` and `tier_b` can change it; the two model hooks add a reason."""
+    """One patient's decision. Only `tier_a` and `tier_b` can change it; the model hook adds a reason."""
     if isinstance(tier_a, News2Abstained):
         reason, instruction = _not_ranked_text(tier_a.problems)
-        inert = _inert(tier_c, policy, notes, worried, guarantees)  # a NOT RANKED patient has no model flag
+        inert = _inert(tier_c, notes, worried, guarantees)  # a NOT RANKED patient has no model flag
         return NotRanked(patient_id, tier_a.problems, reason, instruction, inert)
-    inert = _inert(None, None, notes, worried, guarantees)  # the two model hooks are live below
+    inert = _inert(None, notes, worried, guarantees)  # the model hook is live below
 
     reasons: list[ArbiterReason] = []
     escalated = tier_a.risk in _ESCALATING
@@ -235,8 +225,6 @@ def arbitrate(
     flagged = any(r.rule is EscalationRule.tier_b_finding for r in reasons)  # before the model reasons
     if tier_c is not None and isinstance(tier_c.check, Computed) and tier_c.check.value is Check.ALERT:
         reasons.append(ArbiterReason(EscalationRule.prediction_model_flag, PREDICTION_FLAG))
-    if policy is not None and isinstance(policy.alert, Computed) and policy.alert.value is True:
-        reasons.append(ArbiterReason(EscalationRule.alert_policy_flag, POLICY_FLAG))
     return Ranked(patient_id, tier_a, escalated, tuple(reasons), inert, flagged)
 
 

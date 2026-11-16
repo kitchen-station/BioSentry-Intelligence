@@ -16,7 +16,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from biosentry.core.audit import AuditLog
-from biosentry.domain.arbiter import NotRanked, PolicySignal, Ranked, TierCSignal, rank_ward
+from biosentry.domain.arbiter import NotRanked, Ranked, TierCSignal, rank_ward
 from biosentry.domain.computed import Computed, NotComputed
 from biosentry.domain.scoring.tier_a import News2Score
 from biosentry.domain.scoring.tier_c.confidence import Check
@@ -39,7 +39,7 @@ from biosentry.schemas import (
 )
 from biosentry.schemas.ingest import OPEN_BEDS_MAX, LiveWard, OpenBed, OpenSim, OpenWard
 
-from .model_signals import POLICY_ID, STUDENT_ID, ModelSignals, ward_model_signals
+from .model_signals import STUDENT_ID, ModelSignals, ward_model_signals
 from .models import LoadedModels
 from .scoring import decide
 
@@ -78,14 +78,12 @@ def _log_once(reason: str) -> None:
         log.warning("model result not computed: %s", reason)
 
 
-def _flag_state(value: object) -> str:
-    if isinstance(value, Check):
-        return {Check.ALERT: "flag", Check.NOT_SURE: "not_sure", Check.QUIET: "no_flag"}[value]
-    return "flag" if value else "no_flag"
+def _flag_state(value: Check) -> str:
+    return {Check.ALERT: "flag", Check.NOT_SURE: "not_sure", Check.QUIET: "no_flag"}[value]
 
 
 def _signal(
-    result: Computed[Check] | Computed[bool] | NotComputed,
+    result: Computed[Check] | NotComputed,
     sig: ModelSignals,
     model_id: str,
     before: tuple[Computed[float] | NotComputed, ...] = (),
@@ -102,11 +100,8 @@ def _signal(
 
 
 def row_models(sig: ModelSignals) -> RowModels:
-    """The two states for a row: prediction needs the student and the check, the policy needs itself."""
-    return RowModels(
-        prediction=_signal(sig.check, sig, STUDENT_ID, (sig.probability,)),
-        alert_policy=_signal(sig.policy, sig, POLICY_ID),
-    )
+    """The state for a row: the prediction needs the student and the check."""
+    return RowModels(prediction=_signal(sig.check, sig, STUDENT_ID, (sig.probability,)))
 
 
 def score_row(
@@ -227,9 +222,9 @@ class WardService:
             _log_once(f"{MODEL_ERROR} ({type(e).__name__})")
             _LOGGED.add(MODEL_ERROR)  # the line above already says it, with the kind of error
             failed = NotComputed(MODEL_ERROR)
-            signals = {pid: ModelSignals(failed, failed, failed, {}) for pid in states}
+            signals = {pid: ModelSignals(failed, failed, {}) for pid in states}
         decisions = [
-            decide(s, TierCSignal(g.probability, g.check), PolicySignal(g.policy))
+            decide(s, TierCSignal(g.probability, g.check))
             for s, g in ((s, signals[s.id]) for s in states.values())
         ]
         ranking = rank_ward(decisions)

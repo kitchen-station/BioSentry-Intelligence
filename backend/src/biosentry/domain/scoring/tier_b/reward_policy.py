@@ -2,8 +2,9 @@
 research/reward_policy.py `Params`, `states` and research/reward_loop.py `load_policy`). Pure: the caller
 passes numbers and booleans, nothing here reads a database, a clock or a file.
 
-A flag from this policy adds a reason and changes no order (ruling 12). Research code: synthetic data only,
-not validated.
+Not connected: the policy flag was dropped (owner decision models-rl-5; a loss on held-out set 2). Only `NAMES` and
+`bin_z` are used, by the student's features. The rest stays as the tested port of the research code. Research code:
+synthetic data only, not validated.
 """
 
 import hashlib

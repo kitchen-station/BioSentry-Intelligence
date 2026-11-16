@@ -4189,13 +4189,6 @@
           "bin_start": null,
           "bin_end": null,
           "provenance": []
-        },
-        "alert_policy": {
-          "state": "not_computed",
-          "reason": "baseline forming",
-          "bin_start": null,
-          "bin_end": null,
-          "provenance": []
         }
       },
       "name": "Santos, Maria",
@@ -4669,13 +4662,6 @@
       "mechanism": "Sorted on NEWS2 (Tier A).",
       "models": {
         "prediction": {
-          "state": "not_computed",
-          "reason": "baseline forming",
-          "bin_start": null,
-          "bin_end": null,
-          "provenance": []
-        },
-        "alert_policy": {
           "state": "not_computed",
           "reason": "baseline forming",
           "bin_start": null,
@@ -5159,13 +5145,6 @@
           "bin_start": null,
           "bin_end": null,
           "provenance": []
-        },
-        "alert_policy": {
-          "state": "not_computed",
-          "reason": "baseline forming",
-          "bin_start": null,
-          "bin_end": null,
-          "provenance": []
         }
       },
       "name": "Villanueva, Jose",
@@ -5630,13 +5609,6 @@
           "bin_start": null,
           "bin_end": null,
           "provenance": []
-        },
-        "alert_policy": {
-          "state": "not_computed",
-          "reason": "baseline forming",
-          "bin_start": null,
-          "bin_end": null,
-          "provenance": []
         }
       },
       "name": "Bautista, Elena",
@@ -6087,13 +6059,6 @@
           "bin_start": null,
           "bin_end": null,
           "provenance": []
-        },
-        "alert_policy": {
-          "state": "not_computed",
-          "reason": "baseline forming",
-          "bin_start": null,
-          "bin_end": null,
-          "provenance": []
         }
       },
       "name": "Mendoza, Ana",
@@ -6524,13 +6489,6 @@
           "bin_start": null,
           "bin_end": null,
           "provenance": []
-        },
-        "alert_policy": {
-          "state": "not_computed",
-          "reason": "baseline forming",
-          "bin_start": null,
-          "bin_end": null,
-          "provenance": []
         }
       },
       "name": "Garcia, Roberto",
@@ -6956,13 +6914,6 @@
       "mechanism": "Sorted on NEWS2 (Tier A).",
       "models": {
         "prediction": {
-          "state": "not_computed",
-          "reason": "baseline forming",
-          "bin_start": null,
-          "bin_end": null,
-          "provenance": []
-        },
-        "alert_policy": {
           "state": "not_computed",
           "reason": "baseline forming",
           "bin_start": null,
@@ -7412,13 +7363,6 @@
           "bin_start": null,
           "bin_end": null,
           "provenance": []
-        },
-        "alert_policy": {
-          "state": "not_computed",
-          "reason": "baseline forming",
-          "bin_start": null,
-          "bin_end": null,
-          "provenance": []
         }
       },
       "name": "Aquino, Daniel",
@@ -7849,13 +7793,6 @@
           "bin_start": null,
           "bin_end": null,
           "provenance": []
-        },
-        "alert_policy": {
-          "state": "not_computed",
-          "reason": "latest bin not scored",
-          "bin_start": null,
-          "bin_end": null,
-          "provenance": []
         }
       },
       "name": "Tan, Lucinda",
@@ -8281,13 +8218,6 @@
       "mechanism": "Sorted on NEWS2 (Tier A).",
       "models": {
         "prediction": {
-          "state": "not_computed",
-          "reason": "baseline forming",
-          "bin_start": null,
-          "bin_end": null,
-          "provenance": []
-        },
-        "alert_policy": {
           "state": "not_computed",
           "reason": "baseline forming",
           "bin_start": null,

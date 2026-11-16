@@ -17,7 +17,6 @@ import pytest
 import biosentry
 from biosentry.core.config import DEFAULT_MODELS_DIR, Settings
 from biosentry.domain.computed import NotComputed
-from biosentry.domain.scoring.tier_b.reward_policy import Policy, digest
 from biosentry.domain.scoring.tier_c.confidence import Calibration
 from biosentry.domain.scoring.tier_c.plain_mlp import Plain
 from biosentry.services import models as m
@@ -25,7 +24,6 @@ from biosentry.services.models import (
     CALIBRATION,
     CALIBRATION_SIBLING,
     MANIFEST,
-    POLICY,
     STUDENT,
     FileProvenance,
     load_models,
@@ -37,9 +35,8 @@ NO_TEMP = (
     "tier_c/student_vitals/model_no_temp.json",
     "tier_c/confidence_check/calibration_no_temp.json",
     "tier_c/confidence_check/calibration_no_temp.json.sha256",
-    "tier_b/reward_policy/no_temperature/policy.json",
 )
-WIRED = (MANIFEST, STUDENT, CALIBRATION, CALIBRATION_SIBLING, POLICY)
+WIRED = (MANIFEST, STUDENT, CALIBRATION, CALIBRATION_SIBLING)
 LOGGER = "biosentry.services.models"
 
 
@@ -134,19 +131,8 @@ def change(rel: str, fn: Callable[[dict], None], sibling: bool = False) -> Calla
     return lambda r: edit(r, rel, fn, sibling=sibling)
 
 
-def resealed_policy(fn: Callable[[dict], None]) -> Callable[[Path], None]:
-    def go(r: Path) -> None:
-        def body(o: dict) -> None:
-            fn(o)
-            o.pop("sha256")
-            o["sha256"] = digest(o)
-        edit(r, POLICY, body)
-    return go
-
-
-S, C, P = "student", "calibration", "policy"
+S, C = "student", "calibration"
 OTHER_STUDENT = lambda r: put(r, STUDENT, (REAL / NO_TEMP[0]).read_bytes())  # noqa: E731
-OTHER_POLICY = lambda r: put(r, POLICY, (REAL / NO_TEMP[3]).read_bytes())  # noqa: E731
 
 # name: (how to break it, the file that is refused, the fixed reason in the log)
 CASES = {
@@ -194,33 +180,18 @@ CASES = {
     "calibration unknown key": (change(CALIBRATION, lambda o: o.update(extra=1), True), C,
                                 "calibration checks failed"),
     "calibration NaN": (text_swap(CALIBRATION, '"t": 0.006', '"t": NaN'), C, "not valid JSON"),
-    "policy missing": (remove(POLICY), P, "file missing"),
-    "policy over cap": (big(POLICY, m.MAX_POLICY_BYTES), P, "file over its size cap"),
-    "policy one changed byte": (flip(POLICY), P, "bytes differ from the manifest"),
-    "policy no record": (drop_record(POLICY), P, "no manifest record"),
-    "policy two records": (twice(POLICY), P, "two manifest records"),
-    "policy changed weight, old content sha256": (
-        change(POLICY, lambda o: o["params"]["weights"].update(heart_rate=9.0)), P, "policy checks failed"),
-    "policy wrong temperature flag": (resealed_policy(lambda o: o.update(temperature=False)), P,
-                                      "policy checks failed"),
-    "policy other file": (OTHER_POLICY, P, "policy checks failed"),
-    "policy NaN": (text_swap(POLICY, '"theta": 2.9776', '"theta": NaN'), P, "not valid JSON"),
     # A 400-digit integer is valid JSON, and math.isfinite raises OverflowError on it: refused, never raised.
     "student huge integer": (text_swap(STUDENT, '"threshold": 0.006', '"threshold": 1' + "0" * 400), S,
                              "student checks failed"),
     "calibration huge integer": (change(CALIBRATION, lambda o: o.update(t=10**400), True), C,
                                  "calibration checks failed"),
-    "policy huge integer": (resealed_policy(lambda o: o["params"].update(theta=10**400)), P,
-                            "policy checks failed"),
 }
 
 DISABLED = {
     S: ("student", "calibration"),  # q binds one student: without it the calibration cannot be checked
     C: ("calibration",),
-    P: ("policy",),
 }
-FIELDS = {"student": ("student", "student not loaded"), "calibration": ("calibration", "calibration not loaded"),
-          "policy": ("policy", "policy not loaded")}
+FIELDS = {"student": ("student", "student not loaded"), "calibration": ("calibration", "calibration not loaded")}
 
 
 def warnings(caplog: pytest.LogCaptureFixture) -> list[str]:
@@ -241,7 +212,7 @@ def check_case(loaded: m.LoadedModels, refused: str, lines: list[str], rel: str,
         expected = "student not loaded" if refused == S and which == "calibration" else words
         assert getattr(loaded, attr) == NotComputed(expected)
         assert getattr(loaded, attr + "_file") is None
-    for which in {"student", "calibration", "policy"} - set(DISABLED[refused]):
+    for which in {"student", "calibration"} - set(DISABLED[refused]):
         assert not isinstance(getattr(loaded, which), NotComputed)
         assert getattr(loaded, which + "_file") is not None
 
@@ -252,7 +223,7 @@ def test_a_refused_file_disables_only_what_needs_it(case: str, tmp_path: Path, c
     root = build(tmp_path)
     how(root)
     loaded, lines = attempt(root, caplog)
-    rel = {S: STUDENT, C: CALIBRATION, P: POLICY}[refused]
+    rel = {S: STUDENT, C: CALIBRATION}[refused]
     check_case(loaded, refused, lines, rel, reason)
 
 
@@ -283,14 +254,13 @@ MANIFEST_CASES = {
 
 
 @pytest.mark.parametrize("case", MANIFEST_CASES)
-def test_an_unusable_manifest_disables_all_three(case: str, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+def test_an_unusable_manifest_disables_both(case: str, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     root = build(tmp_path)
     MANIFEST_CASES[case](root)
     loaded, lines = attempt(root, caplog)
-    assert lines == [f"model file refused: {rel}: manifest not usable" for rel in (STUDENT, CALIBRATION, POLICY)]
+    assert lines == [f"model file refused: {rel}: manifest not usable" for rel in (STUDENT, CALIBRATION)]
     assert loaded.student == NotComputed("student not loaded") and loaded.calibration == NotComputed("student not loaded")
-    assert loaded.policy == NotComputed("policy not loaded")
-    assert (loaded.student_file, loaded.calibration_file, loaded.policy_file) == (None, None, None)
+    assert (loaded.student_file, loaded.calibration_file) == (None, None)
 
 
 def test_a_folder_that_cannot_be_resolved_does_not_raise(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
@@ -299,25 +269,24 @@ def test_a_folder_that_cannot_be_resolved_does_not_raise(tmp_path: Path, caplog:
     a.symlink_to(b)
     b.symlink_to(a)
     loaded, lines = attempt(a, caplog)
-    assert len(lines) == 3 and all(line.startswith("model file refused: ") for line in lines)
+    assert len(lines) == 2 and all(line.startswith("model file refused: ") for line in lines)
     assert (loaded.student, loaded.calibration) == (NotComputed("student not loaded"),) * 2
-    assert loaded.policy == NotComputed("policy not loaded")
 
 
 def test_a_missing_folder_does_not_raise(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     loaded, lines = attempt(tmp_path / "nowhere", caplog)
-    assert len(lines) == 3 and isinstance(loaded.policy, NotComputed)
+    assert len(lines) == 2 and isinstance(loaded.student, NotComputed)
 
 
 def test_every_file_missing_gives_one_line_for_each_file_that_was_read(tmp_path: Path,
                                                                        caplog: pytest.LogCaptureFixture) -> None:
     root = build(tmp_path)
-    for rel in (STUDENT, CALIBRATION, POLICY):
+    for rel in (STUDENT, CALIBRATION):
         remove(rel)(root)
     loaded, lines = attempt(root, caplog)
     # the calibration is not read once the student is refused, so it logs nothing of its own
-    assert lines == [f"model file refused: {rel}: file missing" for rel in (STUDENT, POLICY)]
-    assert loaded.student == NotComputed("student not loaded") and loaded.policy == NotComputed("policy not loaded")
+    assert lines == [f"model file refused: {STUDENT}: file missing"]
+    assert loaded.student == NotComputed("student not loaded")
 
 
 def test_a_bad_calibration_does_not_switch_to_the_no_temperature_files(
@@ -338,22 +307,20 @@ def test_a_bad_calibration_does_not_switch_to_the_no_temperature_files(
     assert opened and not [o for o in opened if "no_temp" in o]
 
 
-def test_the_real_models_folder_loads_all_three_with_the_manifests_provenance(caplog: pytest.LogCaptureFixture) -> None:
+def test_the_real_models_folder_loads_both_with_the_manifests_provenance(caplog: pytest.LogCaptureFixture) -> None:
     opened: list[str] = []
     real_open = Path.open
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(Path, "open", lambda self, *a, **k: (opened.append(self.name), real_open(self, *a, **k))[1])
         loaded, lines = attempt(REAL, caplog)
     assert lines == []
-    assert sorted(opened) == sorted(Path(r).name for r in (MANIFEST, STUDENT, CALIBRATION, CALIBRATION_SIBLING, POLICY))
+    assert sorted(opened) == sorted(Path(r).name for r in (MANIFEST, STUDENT, CALIBRATION, CALIBRATION_SIBLING))
     assert isinstance(loaded.student, Plain) and loaded.student.threshold == 0.006
     assert isinstance(loaded.calibration, Calibration) and loaded.calibration.q == 0.019854247570037842
-    assert isinstance(loaded.policy, Policy) and (loaded.policy.params.p, loaded.policy.params.theta) == (5, 2.9776)
     records = {r["path"]: r for r in json.loads((REAL / MANIFEST).read_text("utf-8"))["models"]}
     for rel, got, run_id in (
         (STUDENT, loaded.student_file, "m1-20261113-3d634f3"),
         (CALIBRATION, loaded.calibration_file, "m3-20261113-fbd39f2"),
-        (POLICY, loaded.policy_file, "m2-20261113"),
     ):
         rec = records[f"models/{rel}"]
         assert got == FileProvenance(rel, rec["sha256"], rec["run_id"]) and rec["run_id"] == run_id

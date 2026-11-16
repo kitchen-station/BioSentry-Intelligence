@@ -11,7 +11,6 @@ from biosentry.domain.arbiter import (
     Guarantees,
     NotesSignal,
     NotRanked,
-    PolicySignal,
     Ranked,
     TierBSignal,
     TierCSignal,
@@ -173,7 +172,6 @@ def inert_inputs() -> dict[str, Any]:
         "tier_c": TierCSignal(
             Computed(0.99, prov, Window(0.0, 60.0, 1.0)), Computed(Check.QUIET, prov, Window(0.0, 60.0, 1.0))
         ),
-        "policy": PolicySignal(Computed(False, prov, Window(0.0, 60.0, 1.0))),
         "notes": NotesSignal(True, "renal", "feels worse"),
         "worried": WorriedPin("rn-delacruz", "gut feeling"),
         "guarantees": Guarantees(False, True),
@@ -182,14 +180,13 @@ def inert_inputs() -> dict[str, Any]:
 
 NAMES = {
     "tier_c": "rule_2_tier_c",
-    "policy": "learned_policy",
     "notes": "rule_4_notes",
     "worried": "rule_4_worried",
     "guarantees": "guarantees",
 }
 
 
-# The two model hooks are live for a ranked patient (they add a reason, below); the rest stay inert.
+# The model hook is live for a ranked patient (they add a reason, below); the rest stay inert.
 STILL_INERT = {"notes", "worried", "guarantees"}
 STILL_INERT_ORDER = ("notes", "worried", "guarantees")
 
@@ -233,7 +230,6 @@ def test_a_not_computed_tier_contributes_nothing() -> None:
         "p-1",
         news2(),
         tier_c=TierCSignal(NotComputed("no_model_registered"), NotComputed("no_model_registered")),
-        policy=PolicySignal(NotComputed("no_policy")),
         tier_b=TierBSignal(NotComputed("baseline forming, 3 of 24 bins")),
     )
     assert isinstance(decision, Ranked)
