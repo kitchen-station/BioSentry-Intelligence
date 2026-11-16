@@ -31,7 +31,8 @@ The list is sorted by **NEWS2**, a published bedside early-warning score (Tier A
 who meets a NEWS2 trigger sits above one who does not. The own-baseline finding (Tier B) is listed as a
 reason and breaks ties between equal NEWS2 totals below a trigger; it never moves a patient past a NEWS2
 difference. Two research models can add a flag to a row as one more reason, labelled synthetic and not
-validated. A flag never moves a patient on the list.
+validated: the student with its confidence check, and the reward-learned policy (the policy flag stays only under
+decision models-rl-5, after held-out set 2). A flag never moves a patient on the list.
 
 **What is here.** The dashboard (`frontend/`) and a slim API (`backend/`: FastAPI over PostgreSQL); the
 research models as plain files with their held-out results (`models/`), the code that trains them
@@ -41,19 +42,38 @@ and takes a live ward from the ward simulation.
 
 ## Results
 
-On held-out simulated wards, the distilled MindSpore model catches more deteriorations than NEWS2 at the same
-alert burden, and spends less than half as long alerting.
+Two held-out sets of simulated wards. **Held-out set 2 is the large one** (400 trials, 37,062 patients, 1,743 deterioration
+episodes). It was read once, with its analysis written before the read, and it is the result to quote. Set 1 is the small
+first set (20 trials, 91 episodes).
 
-| Alerting rule | Alerts per patient per 12-hour shift (95% interval) | Deteriorations with an alert in time | Time in alert |
+Set 2, the rules alone:
+
+| Alerting rule | Alerts per patient per 12-hour shift (95% interval) | Deteriorations with a new alert in time | Time in alert |
 |---|---|---|---|
-| NEWS2 chart trigger | 0.414 (0.395 to 0.434) | 36% (33 of 91) | 15.8% |
-| NEWS2 total of 5 or more | 0.340 (0.322 to 0.357) | 40% (36 of 91) | 12.0% |
-| **Distilled student (MindSpore 2.11)** | **0.413 (0.394 to 0.430)** | **56% (51 of 91)** | **6.4%** |
+| NEWS2 chart trigger | 0.415 (0.411 to 0.420) | 49.0% (854 of 1,743) | 16.6% |
+| NEWS2 total of 5 or more | 0.347 (0.343 to 0.351) | 52.9% (922 of 1,743) | 12.6% |
+| **Distilled student (MindSpore 2.11)** | **0.425 (0.420 to 0.429)** | **60.1% (1,048 of 1,743)** | **6.5%** |
 
-20 held-out 30-day trials of the ward simulator, 1,873 patients, 91 deterioration episodes, patient-level
-bootstrap intervals. Every row was re-scored with the backend's NEWS2 with 0 mismatches. **These are not
-clinical results:** the same simulator makes the data and judges the alerts. The full table, method and other
-rules are in [`models/tier_c/student_vitals/held_out.txt`](models/tier_c/student_vitals/held_out.txt).
+The student, on its own, alerts about as often as NEWS2, in more deteriorations, and for much less time. That is not the
+test that was written before the read. The pre-registered test asks whether a model **added to NEWS2** gains more than the
+extra alerts give by chance (gain in excess over chance, trials as the unit, 98.33% interval):
+
+| Added to NEWS2 | Gain over chance | Alerts against NEWS2 | Verdict |
+|---|---|---|---|
+| student | -0.040 (-0.054 to -0.025) | 1.254 times | **a loss is shown** |
+| student with the confidence check | +0.018 (+0.008 to +0.029) | 1.048 times | a gain beyond chance is shown (small) |
+| reward-learned policy | -0.013 (-0.0245 to -0.0001) | 1.131 times | **a loss is shown** (at the edge) |
+
+So the student does not add to NEWS2 beyond chance, and the reward policy does not either; only the student with the
+confidence check shows a small gain. On the small set 1 (91 episodes) the student alone alerted in 56% of deteriorations
+(51 of 91) against 36% for NEWS2 (33 of 91) at the same alerts, and no gain beyond chance was shown for any model added
+to NEWS2; that set was too small to tell these apart.
+
+Every row was re-scored with the backend's NEWS2 with 0 mismatches. **These are not clinical results:** the same
+simulator makes the data and judges the alerts. The full tables and method are in
+[`models/tier_c/student_vitals/held_out_2.txt`](models/tier_c/student_vitals/held_out_2.txt) (set 2) and
+[`models/held_out_2/analysis.txt`](models/held_out_2/analysis.txt) (the pre-registered analysis); set 1 is in
+[`models/tier_c/student_vitals/held_out.txt`](models/tier_c/student_vitals/held_out.txt).
 
 ## Architecture
 
@@ -280,7 +300,7 @@ active one: the seeded fixture ward, or a simulated ward posted to `/sim/*`.
   acknowledgements, and ingest from the ward simulation.
 - The research models (synthetic, not validated): a distilled vitals student trained in MindSpore 2.11 and
   converted to MindSpore Lite, a split-conformal confidence check on it, and a reward-driven alerting policy.
-  The API loads them and a flag adds a reason to a row; a flag never moves a patient.
+  The API loads them and a flag adds a reason to a row (the policy flag under decision models-rl-5); a flag never moves a patient.
 - The baseline comparison: alerts per patient per shift and deteriorations caught, against NEWS2, on
   held-out simulated wards ([Results](#results)).
 
