@@ -16,6 +16,8 @@ class OverviewPatient(Contract):
     reason: str | None  # the arbiter's NOT RANKED reason: names missing inputs, no values
     care: list[str]  # clinician ids assigned, sorted; includes the charge nurse
     synthetic: Flag
+    unit: str | None = None  # optional so a client from before units still validates
+    floor: int | None = None
 
 
 class OverviewClinician(Contract):

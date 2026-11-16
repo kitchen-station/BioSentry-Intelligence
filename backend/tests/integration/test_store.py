@@ -189,10 +189,11 @@ def test_a_seeded_database_reproduces_the_fixture(api: Api, who: str) -> None:
     ward = api.ward(who)
     mine = set(CLINICIANS[who])
     expected = [bare(r) for r in DATA["ranked"] if r["id"] in mine]  # the fixture is in rank order
-    assert [{**r, "rank": i} for i, r in enumerate(expected, 1)] == ward["ranked"]
+    unit = {"unit": "W4", "floor": None, "person": None}  # the fixture's one unit: its ward
+    assert [{**r, **unit, "rank": i} for i, r in enumerate(expected, 1)] == ward["ranked"]
     shown = ward["abstained"]
     assert all(a.pop("last_seen") for a in shown)  # the stored values: tested where they are made
-    assert [a for a in DATA["abstained"] if a["id"] in mine] == shown
+    assert [{**a, **unit, "news2_risk": None} for a in DATA["abstained"] if a["id"] in mine] == shown
     assert ward["receiving_data"] is True
     assert [r["escalation_reasons"] for r in ward["ranked"]] == [
         r["escalation_reasons"] for r in expected
@@ -219,9 +220,9 @@ def test_the_fixture_detail_pages_are_reproduced(api: Api) -> None:
 
 
 def test_notes_and_clinicians_are_seeded(api: Api) -> None:
-    assert {r["id"]: r["role"] for r in api.sql("SELECT * FROM clinician")} == {
+    assert {r["id"]: r["role"] for r in api.sql("SELECT * FROM clinician WHERE id NOT LIKE 'cn-%%'")} == {
         c: e["role"] for c, e in DATA["clinicians"].items()
-    }
+    }  # the migration adds the other units' charge nurses (cn-...)
     shown = api.client.get("/patients/p-001/notes", headers=api.as_("rn-manalo")).json()
     assert {n["id"] for n in shown} == {
         n["id"] for n in DATA["notes"] if n["patient_id"] == "p-001"
@@ -899,7 +900,7 @@ def test_two_processes_starting_at_once_set_up_the_database_once(blank_database_
         runs = conn.execute("SELECT count(*) AS n FROM run WHERE source = 'fixture'").fetchone()
         clinicians = conn.execute("SELECT count(*) AS n FROM clinician").fetchone()
     assert runs == {"n": 1}
-    assert clinicians == {"n": len(CLINICIANS)}
+    assert clinicians == {"n": len(CLINICIANS) + 5}  # and the migration's five charge nurses
 
 
 # --- Boundaries: input PostgreSQL cannot store, and where a reset may run -----------------------
@@ -939,7 +940,7 @@ def test_reset_refuses_when_the_connection_made_is_not_to_loopback_and_drops_not
         reset(database_url)
     with connect(database_url) as conn:
         assert conn.execute("SELECT count(*) AS n FROM run").fetchone() == {"n": 1}
-        assert conn.execute("SELECT count(*) AS n FROM clinician").fetchone() == {"n": 5}
+        assert conn.execute("SELECT count(*) AS n FROM clinician").fetchone() == {"n": 10}
 
 
 def test_reset_on_loopback_rebuilds_from_the_seed(database_url: str) -> None:
@@ -1638,7 +1639,7 @@ def test_a_live_view_needs_the_ingest_key_and_the_newest_run(api: Api) -> None:
     start(api, client_id="client-b")
     refused = api.post(f"/sim/runs/{old}/view", view("s-1"))
     assert (refused.status_code, refused.json()) == (409, {"detail": REPLACED})
-    assert api.sql("SELECT count(*) AS n FROM run WHERE live_view IS NOT NULL") == [{"n": 0}]
+    assert api.sql("SELECT count(*) AS n FROM run_unit WHERE live_view IS NOT NULL") == [{"n": 0}]
     assert api.sql("SELECT * FROM audit_log WHERE action LIKE 'view%%'") == []
 
 
@@ -1691,7 +1692,7 @@ NOTE = {"author": "a", "role": "RN", "content": "SECRET-NOTE-TEXT"}
 NOT_APPLICABLE = dict.fromkeys(
     ("score", "systolic", "diastolic", "acvpu", "on_oxygen", "spo2_scale")
     + ("heart_rate", "respiratory_rate", "spo2", "temperature")
-    + ("name", "age", "sex", "bed", "context")
+    + ("name", "age", "sex", "bed", "context", "unit")
 )
 
 
@@ -1729,9 +1730,9 @@ def test_each_clinician_write_puts_one_row_on_the_feed(api: Api) -> None:
         {"kind": "record_vitals", "patient_id": "s-1", **every},
         {"kind": "record_vitals", "patient_id": "s-1", "on_oxygen": False},
         {"kind": "add_note", "patient_id": "s-1"},
-        {"kind": "admit_patient", "patient_id": "p-001", **admitted}
+        {"kind": "admit_patient", "patient_id": "p-001", **admitted, "unit": "W4"}
         | {"systolic": 118, "diastolic": 76, "acvpu": "C"},
-        {"kind": "admit_patient", "patient_id": "p-002", **admitted, "bed": "4B"},
+        {"kind": "admit_patient", "patient_id": "p-002", **admitted, "bed": "4B", "unit": "W4"},
     ]
     rows = response.json()["actions"]
     seqs = [r.pop("seq") for r in rows]
@@ -1889,7 +1890,8 @@ def test_a_command_goes_on_the_feed_in_order_with_what_it_says_and_who_sent_it(a
         ("set_speed", None, "rn-manalo", 0),
     ]  # fmt: skip
     assert rows == [
-        {"kind": k, "patient_id": p, "clinician_id": c, "speed": v} for k, p, c, v in expected
+        {"kind": k, "patient_id": p, "clinician_id": c, "speed": v, "unit": "W4"}
+        for k, p, c, v in expected
     ]
     later = sent(api, run_id, after=seqs[3])
     assert [r["seq"] for r in later] == seqs[4:]

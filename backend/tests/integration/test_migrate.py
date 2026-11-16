@@ -179,7 +179,7 @@ def test_a_compare_run_from_before_the_patient_question_survives_with_the_new_co
             )
         )
         before = conn.execute("SELECT id, state, mode, report, report_text FROM lab_run ORDER BY id").fetchall()
-        assert migrate(conn) == ["0011_patient_question", "0012_sim_episode", "0013_lab_question"]
+        assert migrate(conn) == ["0011_patient_question", "0012_sim_episode", "0013_lab_question", "0014_hospital_units"]
         after = conn.execute("SELECT * FROM lab_run ORDER BY id").fetchall()
         names = {
             r["conname"]
@@ -222,10 +222,99 @@ def test_a_compare_run_and_a_patient_question_survive_the_general_question_migra
             " 'patient_question', 'q', 1, 'p-1', '{}', repeat('a', 64), 'queued')"
         )
         before = conn.execute("SELECT * FROM lab_run ORDER BY id").fetchall()
-        assert migrate(conn) == ["0013_lab_question"]
+        assert migrate(conn) == ["0013_lab_question", "0014_hospital_units"]
         assert conn.execute("SELECT * FROM lab_run ORDER BY id").fetchall() == before
         conn.execute(
             "INSERT INTO lab_run (ward, requested_by, requested_at, kind, question, state)"
             " VALUES ('W4', 'md-old', now(), 'question', 'q', 'queued')"
         )
     assert [r["kind"] for r in before] == ["compare", "patient_question"]
+
+
+def test_a_ward_from_before_units_becomes_one_ranked_unit_with_every_row_kept(
+    blank_database_url: str, tmp_path: Path
+) -> None:
+    for path in migrations():
+        if path.stem < "0014":
+            shutil.copy(path, tmp_path)
+    with connect(blank_database_url) as conn:
+        migrate(conn, tmp_path)
+        conn.execute("INSERT INTO clinician (id, role) VALUES ('rn-old', 'rn'), ('md-old', 'md'), ('admin-old', 'admin')")
+        conn.execute(
+            "INSERT INTO run (source, synthetic, ward, origin, as_of, tier_status, live_view)"
+            " VALUES ('synthetic', true, 'W4', now(), now(), '[]', '{\"shared\": {\"n\": 1}, \"patients\": []}')"
+        )
+        conn.execute(
+            "INSERT INTO patient (run_id, id, name, bed, admitting_context, mechanism, supporting, trend,"
+            " left_at, outcome) VALUES (1, 'p-1', 'n', 'b', 'a', 'm', '', 'stable', now(), 'higher_care'),"
+            " (1, 'p-2', 'n', 'c', 'a', 'm', '', 'stable', NULL, NULL)"
+        )
+        conn.execute("INSERT INTO care_assignment (run_id, patient_id, clinician_id) VALUES (1, 'p-1', 'rn-old')")
+        conn.execute(
+            "INSERT INTO sim_command (run_id, kind, patient_id, clinician_id, at, data)"
+            " VALUES (1, 'set_speed', NULL, 'md-old', now(), '{\"speed\": 1}')"
+        )
+        assert migrate(conn) == ["0014_hospital_units"]
+        assert conn.execute("SELECT id, position, name, floor, kind, live_view FROM run_unit").fetchall() == [
+            {"id": "W4", "position": 0, "name": "W4", "floor": None, "kind": "ranked",
+             "live_view": {"shared": {"n": 1}, "patients": []}}
+        ]  # fmt: skip
+        assert conn.execute("SELECT id, unit, person, to_unit, outcome FROM patient ORDER BY id").fetchall() == [
+            {"id": "p-1", "unit": "W4", "person": None, "to_unit": None, "outcome": "higher_care"},
+            {"id": "p-2", "unit": "W4", "person": None, "to_unit": None, "outcome": None},
+        ]
+        assert conn.execute("SELECT count(*) AS n FROM care_assignment").fetchone() == {"n": 1}
+        assert conn.execute("SELECT unit FROM sim_command").fetchall() == [{"unit": None}]
+        units = {r["id"]: r for r in conn.execute("SELECT id, role, unit, passphrase_hash FROM clinician")}
+        assert (units["rn-old"]["unit"], units["md-old"]["unit"], units["admin-old"]["unit"]) == ("W4", "W4", None)
+        charge = {i: r for i, r in units.items() if i.startswith("cn-")}
+        assert {i: (r["role"], r["unit"], r["passphrase_hash"]) for i, r in charge.items()} == {
+            "cn-er": ("charge_rn", "ER", None), "cn-icu": ("charge_rn", "ICU", None),
+            "cn-med3a": ("charge_rn", "MED3A", None), "cn-med3b": ("charge_rn", "MED3B", None),
+            "cn-surg5a": ("charge_rn", "SURG5A", None),
+        }  # fmt: skip
+        assert migrate(conn) == []
+
+
+def _refused(conn: psycopg.Connection[Any], statement: str, error: type[psycopg.Error]) -> None:
+    with pytest.raises(error):
+        with conn.transaction():
+            conn.execute(statement)
+
+
+def test_the_unit_constraints_hold_in_the_database(blank_database_url: str) -> None:
+    ensure(blank_database_url)
+    with connect(blank_database_url) as conn:
+        conn.execute(
+            "INSERT INTO run_unit (run_id, id, position, name, floor, kind)"
+            " VALUES (1, 'ER', 1, 'Emergency Room', 0, 'shown'), (1, 'ICU', 2, 'Intensive Care', 2, 'unranked')"
+        )
+        patient = (
+            "INSERT INTO patient (run_id, id, name, bed, admitting_context, mechanism, supporting, trend,"
+            " unit, left_at, outcome, to_unit, person) VALUES (1, 'x-1', 'n', 'b', 'a', 'm', '', 'stable', {})"
+        )
+        conn.execute(patient.format("'ER', now(), 'transferred', 'ICU', 'h-1'"))
+        conn.execute(patient.format("'ER', now(), 'died', NULL, NULL").replace("'x-1'", "'x-2'"))
+        for values, error in (
+            ("'NOPE', NULL, NULL, NULL, NULL", psycopg.errors.ForeignKeyViolation),
+            ("'ER', now(), 'transferred', NULL, NULL", psycopg.errors.CheckViolation),  # a transfer names its unit
+            ("'ER', now(), 'discharged', 'ICU', NULL", psycopg.errors.CheckViolation),  # only a transfer does
+            ("'ER', now(), 'transferred', 'ER', NULL", psycopg.errors.CheckViolation),  # not to its own unit
+            ("'ER', now(), 'transferred', 'NOPE', NULL", psycopg.errors.ForeignKeyViolation),
+            ("'ER', now(), 'buried', NULL, NULL", psycopg.errors.CheckViolation),
+            ("'ER', NULL, NULL, NULL, ''", psycopg.errors.CheckViolation),
+            ("NULL, NULL, NULL, NULL, NULL", psycopg.errors.NotNullViolation),
+        ):
+            _refused(conn, patient.format(values).replace("'x-1'", "'x-3'"), error)
+        unit = "INSERT INTO run_unit (run_id, id, position, name, floor, kind) VALUES (1, {})"
+        for values, error in (
+            ("'ER', 3, 'again', 1, 'ranked'", psycopg.errors.UniqueViolation),  # a unit id once per run
+            ("'X1', 2, 'same place', 1, 'ranked'", psycopg.errors.UniqueViolation),  # a position once per run
+            ("'X1', 12, 'too far', 1, 'ranked'", psycopg.errors.CheckViolation),
+            ("'-x', 3, 'bad id', 1, 'ranked'", psycopg.errors.CheckViolation),
+            ("'X1', 3, '', 1, 'ranked'", psycopg.errors.CheckViolation),
+            ("'X1', 3, 'high', 201, 'ranked'", psycopg.errors.CheckViolation),
+            ("'X1', 3, 'low', -6, 'ranked'", psycopg.errors.CheckViolation),
+            ("'X1', 3, 'kind', 1, 'morgue'", psycopg.errors.CheckViolation),
+        ):
+            _refused(conn, unit.format(values), error)

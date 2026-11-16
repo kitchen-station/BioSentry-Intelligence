@@ -4,12 +4,14 @@ from typing import Annotated, Literal
 
 from pydantic import AwareDatetime, Field
 
-from .base import Age, Contract, Flag, NonNegNum, Percent
+from .base import Age, Contract, Flag, NonNegInt, NonNegNum, Percent
 from .clinical import LabPanel, VitalHistoryFull, Vitals, VitalTrends
 from .common import Provenance, Tier, Trend
 from .tiers import EscalationReason, TierStatus
 
 
+UnitKind = Literal["ranked", "shown", "unranked"]
+Risk = Literal["low", "low_medium", "medium", "high"]
 ModelState = Literal["flag", "no_flag", "not_sure", "not_computed"]
 
 
@@ -53,6 +55,10 @@ class ScoreRow(Contract):
     signal_quality: Percent | None  # null when none is stored (served as stored, never invented)
     last_update_s: NonNegNum | None
     models: RowModels
+    # Optional so a client built before units still validates; every answer sets all three.
+    unit: str | None = None
+    floor: int | None = None  # the unit's floor, null when not known
+    person: str | None = None  # the same for every stay of one person, null when the stay stands alone
 
 
 class AbstainedRow(Contract):
@@ -67,11 +73,25 @@ class AbstainedRow(Contract):
     reason: str
     instruction: str
     synthetic: Flag
+    unit: str | None = None
+    floor: int | None = None
+    person: str | None = None
+    news2_risk: Risk | None = None  # a unit that is shown gives the NEWS2 band, never a score or a rank
     # The last stored value of each vital, whatever its age, each with its own source and time (I2).
     # Shown so a patient whose signal stopped does not look empty. It is never read by the score,
     # the arbiter or the rank: the patient stays NOT RANKED (I1, I4). Optional on the wire only so
     # an older answer still parses; the server always sends it.
     last_seen: Vitals | None = None
+
+
+class WardUnit(Contract):
+    """One unit of the run (GET /wards): `patients` is how many the caller may see in it now."""
+
+    id: str
+    name: str
+    floor: int | None
+    kind: UnitKind
+    patients: NonNegInt
 
 
 class AbstainedDetail(AbstainedRow):
@@ -84,6 +104,9 @@ class AbstainedDetail(AbstainedRow):
 
 class WardResponse(Contract):
     ward: str
+    name: str | None = None  # the unit's name, floor and kind: optional as the row fields above
+    floor: int | None = None
+    kind: UnitKind | None = None
     clinician: str
     shift: str
     receiving_data: Flag
@@ -109,7 +132,7 @@ class PatientDetail(ScoreRow):
     now: AwareDatetime  # ward time this answer was computed at: every age and due time on the page is measured against it
 
 
-StayOutcome = Literal["discharged", "higher_care"]
+StayOutcome = Literal["discharged", "higher_care", "transferred", "died"]
 
 
 class PatientStay(Contract):
@@ -123,6 +146,10 @@ class PatientStay(Contract):
     left_at: AwareDatetime | None  # None: still on the ward
     outcome: StayOutcome | None
     synthetic: Flag
+    unit: str | None = None
+    floor: int | None = None
+    person: str | None = None
+    to_unit: str | None = None  # the unit a transferred patient went to
 
 
 class PatientSummary(Contract):
@@ -132,6 +159,8 @@ class PatientSummary(Contract):
     name: str
     bed: str
     ranked: Flag
+    unit: str
+    floor: int | None
 
 
 class UnscoredPatient(Contract):
@@ -159,4 +188,7 @@ class UnscoredPatient(Contract):
     last_update_s: NonNegNum | None
     synthetic: Flag
     admitted_at: AwareDatetime | None  # None: the arrival is not known (I1)
+    unit: str
+    floor: int | None
+    person: str | None
     last_seen: Vitals | None = None  # the newest stored value of each vital: shown on a NOT RANKED row only
