@@ -406,7 +406,9 @@ class WardService:
         ids = self._store.on_ward(unit)
         if len(ids) > OPEN_BEDS_MAX:
             return None
-        states = [s for s in (self._store.read(pid, False) for pid in sorted(ids)) if s is not None]
+        # The ranking uses each patient's own-baseline findings, which are built from the whole stored
+        # history: a ranked unit is read whole (None: by the unit), the others need only the last bins.
+        states = [s for s in (self._store.read(pid, None) for pid in sorted(ids)) if s is not None]
         bed = {s.id: s.bed for s in states}
         if self._store.units[unit]["kind"] == "ranked":
             ranking = rank_ward(decide(s) for s in states)
