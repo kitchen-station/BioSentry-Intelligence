@@ -16,7 +16,7 @@ from biosentry.services import ward as ward_module
 
 URL = "/wards/W4/open-view/beds/4A"
 TEMPLATE = "/wards/{ward}/open-view/beds/{bed}"
-TOP = {"unit", "floor", "kind", "bed", "synthetic", "state", "score", "risk", "reason", "vitals", "trend"}
+TOP = {"unit", "floor", "kind", "bed", "synthetic", "state", "score", "risk", "reason", "vitals", "trend", "history"}
 FIVE = {"heart_rate", "respiratory_rate", "spo2", "temperature", "blood_pressure"}
 MARKED = {"name": "NAME-MARK", "context": "CONTEXT-MARK", "story": "STORY-MARK", "person": "PERSON-MARK"}
 
@@ -138,7 +138,7 @@ def test_a_bed_that_is_not_ranked_gives_its_state_and_the_reason_only(watch: Api
     [own] = watch.ward("rn-delacruz")["abstained"]
     assert body == {
         "unit": "W4", "floor": 4, "kind": "ranked", "bed": "4B", "synthetic": True, "state": "not_ranked",
-        "score": None, "risk": None, "reason": own["reason"], "vitals": None, "trend": None,
+        "score": None, "risk": None, "reason": own["reason"], "vitals": None, "trend": None, "history": None,
     }  # fmt: skip
     assert own["reason"] and "ABSENT-MARK" not in own["reason"]
 
@@ -156,7 +156,7 @@ def test_a_bed_of_a_unit_that_is_not_ranked_gives_no_vital_no_score_and_no_band(
     hospital(watch)  # both patients have every NEWS2 input stored
     assert card(watch, unit, bed) == {
         "unit": unit, "floor": floor, "kind": kind, "bed": bed, "synthetic": True, "state": "not_ranked",
-        "score": None, "risk": None, "reason": reason, "vitals": None, "trend": None,
+        "score": None, "risk": None, "reason": reason, "vitals": None, "trend": None, "history": None,
     }  # fmt: skip
 
 

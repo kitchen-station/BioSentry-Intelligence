@@ -332,6 +332,39 @@ class OpenVitals(Contract):
     blood_pressure: OpenPressure
 
 
+HISTORY_HOURS = 12  # of ward time, ending at the ward's clock
+HISTORY_POINTS = HISTORY_HOURS * 4 + 1  # 15-minute bins in the window, one more for a bin on the edge
+
+
+class OpenPoint(Contract):
+    """One 15-minute value of a device vital on a bed card. `value` is null for a gap (I1): never
+    zero, never filled. No name, id or score is on a point."""
+
+    time: AwareDatetime  # the end of the bin
+    value: Num | None
+    source: ProvenanceSource
+
+
+class OpenPressurePoint(Contract):
+    """One charted blood pressure (it is not binned): the reading, its time and who charted it."""
+
+    time: AwareDatetime
+    systolic: Annotated[int, Field(strict=True, gt=0)]
+    diastolic: Annotated[int, Field(strict=True, gt=0)]
+    source: ProvenanceSource
+
+
+class OpenHistory(Contract):
+    """The last 12 hours of the five vitals of a ranked bed, oldest first, at most 49 points each."""
+
+    hours: Literal[12]
+    heart_rate: Annotated[list[OpenPoint], Field(max_length=HISTORY_POINTS)]
+    respiratory_rate: Annotated[list[OpenPoint], Field(max_length=HISTORY_POINTS)]
+    spo2: Annotated[list[OpenPoint], Field(max_length=HISTORY_POINTS)]
+    temperature: Annotated[list[OpenPoint], Field(max_length=HISTORY_POINTS)]
+    blood_pressure: Annotated[list[OpenPressurePoint], Field(max_length=HISTORY_POINTS)]
+
+
 class OpenBedCard(Contract):
     """One occupied bed for anyone, with no sign-in (GET /wards/{ward}/open-view/beds/{bed}).
     It holds no name, age, sex, context, note, lab, baseline, model flag, clinician or patient id.
@@ -348,6 +381,7 @@ class OpenBedCard(Contract):
     reason: str | None  # why it is not ranked, a bed that is not ranked only
     vitals: OpenVitals | None  # a ranked bed only
     trend: Trend | None  # a ranked bed only
+    history: OpenHistory | None  # a ranked bed only: the last 12 hours of the five vitals
 
 
 class OpenUnit(Contract):

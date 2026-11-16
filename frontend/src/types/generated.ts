@@ -566,6 +566,7 @@ export interface components {
         readonly OpenBedCard: {
             readonly bed: string;
             readonly floor: number | null;
+            readonly history: components["schemas"]["OpenHistory"] | null;
             /** @enum {string} */
             readonly kind: "ranked" | "shown" | "unranked";
             readonly reason: string | null;
@@ -579,12 +580,36 @@ export interface components {
             readonly unit: string;
             readonly vitals: components["schemas"]["OpenVitals"] | null;
         };
+        /**
+         * OpenHistory
+         * @description The last 12 hours of the five vitals of a ranked bed, oldest first, at most 49 points each.
+         */
+        readonly OpenHistory: {
+            readonly blood_pressure: readonly components["schemas"]["OpenPressurePoint"][];
+            readonly heart_rate: readonly components["schemas"]["OpenPoint"][];
+            /** @constant */
+            readonly hours: 12;
+            readonly respiratory_rate: readonly components["schemas"]["OpenPoint"][];
+            readonly spo2: readonly components["schemas"]["OpenPoint"][];
+            readonly temperature: readonly components["schemas"]["OpenPoint"][];
+        };
         /** OpenMove */
         readonly OpenMove: {
             readonly bed: string;
             /** @enum {string} */
             readonly kind: "in" | "out";
             readonly seq: number;
+        };
+        /**
+         * OpenPoint
+         * @description One 15-minute value of a device vital on a bed card. `value` is null for a gap (I1): never
+         *     zero, never filled. No name, id or score is on a point.
+         */
+        readonly OpenPoint: {
+            readonly source: components["schemas"]["ProvenanceSource"];
+            /** Format: date-time */
+            readonly time: string;
+            readonly value: number | null;
         };
         /** OpenPressure */
         readonly OpenPressure: {
@@ -593,6 +618,17 @@ export interface components {
             readonly observed_at: string;
             readonly source: components["schemas"]["ProvenanceSource"];
             readonly systolic: number;
+        };
+        /**
+         * OpenPressurePoint
+         * @description One charted blood pressure (it is not binned): the reading, its time and who charted it.
+         */
+        readonly OpenPressurePoint: {
+            readonly diastolic: number;
+            readonly source: components["schemas"]["ProvenanceSource"];
+            readonly systolic: number;
+            /** Format: date-time */
+            readonly time: string;
         };
         /** OpenSim */
         readonly OpenSim: {
@@ -1365,8 +1401,11 @@ export type NumberPresent = components['schemas']['NumberPresent'];
 export type NurseVitalsInput = components['schemas']['NurseVitalsInput'];
 export type OpenBed = components['schemas']['OpenBed'];
 export type OpenBedCard = components['schemas']['OpenBedCard'];
+export type OpenHistory = components['schemas']['OpenHistory'];
 export type OpenMove = components['schemas']['OpenMove'];
+export type OpenPoint = components['schemas']['OpenPoint'];
 export type OpenPressure = components['schemas']['OpenPressure'];
+export type OpenPressurePoint = components['schemas']['OpenPressurePoint'];
 export type OpenSim = components['schemas']['OpenSim'];
 export type OpenStaff = components['schemas']['OpenStaff'];
 export type OpenUnit = components['schemas']['OpenUnit'];
