@@ -210,7 +210,8 @@ alerts). Of the episodes the student detects in any bin, 120 (96 not cut short) 
 - `evaluate` refuses a second held-out run while `heldout.txt` exists. That is a guard by procedure: deleting the file
   removes it. The same held-out seeds were used earlier for earlier models of this project; by procedure this check
   was read on them once. Held-out was not used to choose anything.
-- The API runs it as part of the prediction model flag; it is not in the rank. On a live ward the page and the row never claim coverage (INTEGRATION.md, ruling 4).
+- The API runs it as part of the prediction model flag; it is not in the rank.
+- Stays longer than 7 days get no flag: the admission baseline is no longer stored, and scoring the last 7 days instead was measured on training trials to change which bins alert (of 1,819 student alerts with the admission baseline, 1,060 remain), so that rule was never evaluated. The reason shown is "stay past 7 days: admission baseline not kept". On a live ward the page and the row never claim coverage (INTEGRATION.md, ruling 4).
 
 ## Reproduce
 

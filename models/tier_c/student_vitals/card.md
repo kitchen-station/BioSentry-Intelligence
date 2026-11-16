@@ -323,7 +323,7 @@ validation section above.
   against validation 0.018699).
 - `shortcut`: the image has no system libgomp; the venv links the copy shipped in the scikit-learn wheel. On a normal
   machine install `libgomp1`. The new lock was not re-audited with pip-audit.
-- Not run on a small ARM board or a ward hub. The API runs it (with the confidence check) as a flag only; it is not in the rank. NEWS2 is never changed.
+- Not run on a small ARM board or a ward hub. The API runs it (with the confidence check) as a flag only; it is not in the rank. NEWS2 is never changed. Stays longer than 7 days get no flag: the admission baseline is no longer stored, and scoring the last 7 days instead was measured on training trials to change which bins alert (of 1,819 student alerts with the admission baseline, 1,060 remain), so that rule was never evaluated. The reason shown is "stay past 7 days: admission baseline not kept".
 
 ## Reproduce
 
