@@ -5,7 +5,7 @@
 | id | `tier_b/reward_policy` (and `tier_b/reward_policy/no_temperature`) |
 | files | `policy.json` (the incumbent); `rounds/round-1/` and `rounds/round-2/` (`gen-NN.json`, `policy.json`); `no_temperature/` (`generations/gen-00.json` to `gen-04.json`, `policy.json`); `experiments.jsonl` (the ledger); `held_out.txt` (the held-out output, verbatim) |
 | code | `research/reward_policy.py` (policy, reward), `research/reward_loop.py` (inner loop, outer loop, held-out run) |
-| status | learned on synthetic trials, not validated. Not wired to the API, the rank or the arbiter |
+| status | learned on synthetic trials, not validated. Research result. The API can run it as an "Alert policy flag" reason (a flag only, never in the rank); whether that stays connected is under decision models-rl-5, because held-out set 2 shows a loss for NEWS2 plus the policy |
 | intended use | research. Tier A (NEWS2) is never changed or learned |
 
 Earlier ward-v1 and B6 results are in git history before this change.
@@ -54,7 +54,7 @@ Earlier ward-v1 and B6 results are in git history before this change.
 ## A person signs off before anything changes
 
 The loop only writes files on a branch. Nothing reaches main or the product without a reviewed
-pull request. The policy is not wired to the API, the rank or the arbiter.
+pull request. The policy is in the rank in no way. The API can run it as a flag only (owner decision M-1), and that is under decision models-rl-5 after held-out set 2.
 
 ## Data and seed schedule
 
@@ -295,7 +295,7 @@ no-temperature policy are in the held-out file.
 - Excess is capped at 1 minus chance. Compare excess only between rows with similar chance.
 - Weights and theta share a common scale: all can be multiplied by one factor without changing
   what fires. The search does not use that.
-- Not wired to the API, the rank or the arbiter. NEWS2 is never changed.
+- Not in the rank. The API can run it as a flag only, under decision models-rl-5. NEWS2 is never changed.
 
 ## Huawei note
 

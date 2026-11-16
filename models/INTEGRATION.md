@@ -1,9 +1,28 @@
 # Wiring the three research models into the arbiter: a hand-off
 
-This file says how to RUN the shipped files. It wires nothing. The wiring slice can follow it without asking
+This file says how to RUN the shipped files. It was written as a hand-off before the wiring, and the wiring has since landed: see "Status" below. The wiring slice could follow it without asking
 the models session anything. Where this file and the code disagree, the code is right; the files named here are
 the sources of truth. The wiring choices are settled by the rulings at the end of this file; every section below
 already follows them.
+
+## Status (2026-11-16)
+What runs on the server today, read from the code (`backend/src/biosentry/api/app.py` loads the files once at start with
+`services/models.py`; `services/model_signals.py` computes the signals; `services/ward.py` passes them to the arbiter in
+`domain/arbiter.py`):
+- **Prediction model flag.** The student with the confidence check. It adds the reason "Prediction model flag (synthetic,
+  not validated)" only when the check says "alert"; "not sure" shows no flag.
+- **Alert policy flag.** The reward policy adds "Alert policy flag (learned by reward; synthetic, not validated)". This
+  stays connected only under owner decision models-rl-5 (drop or keep, after held-out set 2 showed a loss for NEWS2 plus
+  the policy). Read every statement below about the policy flag as "under decision models-rl-5".
+- **Own-baseline finding.** Runs as a reason and a tie-break, on its code defaults (k 2.0, p 3), not on the research
+  `params.json` (k 4.0, p 8).
+- A flag never moves a patient and never lowers a NEWS2 trigger. NEWS2 is unchanged.
+- Everything else here is the hand-off as written. Where a sentence says the wiring slice "will", "adds" or that a hook is
+  "inert", the wiring is done unless the code says otherwise; the code is right. I did not re-check each ruling against
+  the wired code in this pass.
+- Research results: held-out set 2 (400 trials, 1,743 episodes) is the result to quote, set 1 (91 episodes) is the small
+  first set. Added to NEWS2, the student is a loss (-0.040), the student with the check a small gain (+0.018, 1.048 times
+  the alerts), the reward policy a loss (-0.0127, at the edge). See the three cards and `models/held_out_2/analysis.txt`.
 
 ## 1. Scope and status
 
@@ -27,7 +46,7 @@ says which, from what the backend stores, never from a held-out row. Both varian
   sets `escalated` and the only model-free input to the order.
 - Fixed rules (owner decision M-2): a model may flag and never outranks or lowers a NEWS2 trigger; `not_sure`
   shows as no flag and is recorded; a missing or bad model file means not computed, never a default.
-- Today every one of these hooks is inert in `backend/src/biosentry/domain/arbiter.py`: the arbiter accepts it,
+- Before the wiring every one of these hooks was inert in `backend/src/biosentry/domain/arbiter.py`: the arbiter accepts it,
   records its name in `Ranked.inert` or `NotRanked.inert`, and changes nothing. The wiring slice makes the
   student and the policy add a reason (a flag) to a ranked row, and nothing else (rulings 3, 11, 12).
 

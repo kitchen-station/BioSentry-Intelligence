@@ -7,7 +7,7 @@
 | code | `research/confidence.py` (`calibrate`, `evaluate`) |
 | model | the student `tier_c/student_vitals` (`model.onnx`, `model_no_temp.onnx`) and its threshold t, unchanged |
 | run log | `training/runs/confidence_check/m3-20261113-fbd39f2.json` |
-| status | calibrated on synthetic trials; held-out ward-v2 seeds 11-30 scored once on 2026-11-13; not validated, not wired to the API, the rank or the arbiter |
+| status | calibrated on synthetic trials; held-out ward-v2 seeds 11-30 scored once on 2026-11-13; not validated. The API runs it with the student: a "Prediction model flag" shows only when the check supports the alert, and "not sure" shows no flag. Held-out set 2 (400 trials) is the result to quote |
 | intended use | research. Tier A (NEWS2) is never changed or learned |
 
 Held-out ward-v2 seeds 11-30 were scored once, on 2026-11-13. The outputs are `heldout.txt` and `heldout.json` (format
@@ -210,7 +210,7 @@ alerts). Of the episodes the student detects in any bin, 120 (96 not cut short) 
 - `evaluate` refuses a second held-out run while `heldout.txt` exists. That is a guard by procedure: deleting the file
   removes it. The same held-out seeds were used earlier for earlier models of this project; by procedure this check
   was read on them once. Held-out was not used to choose anything.
-- Not wired to the API, the rank or the arbiter.
+- The API runs it as part of the prediction model flag; it is not in the rank. On a live ward the page and the row never claim coverage (INTEGRATION.md, ruling 4).
 
 ## Reproduce
 
