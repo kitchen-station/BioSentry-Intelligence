@@ -41,19 +41,38 @@ and takes a live ward from the ward simulation.
 
 ## Results
 
-On held-out simulated wards, the distilled MindSpore model catches more deteriorations than NEWS2 at the same
-alert burden, and spends less than half as long alerting.
+Two held-out sets of simulated wards. Set 2 is twenty times larger, and its analysis was written down before it
+was read ([research/README.md](research/README.md#held-out-set-2-declared-before-it-is-read)).
 
-| Alerting rule | Alerts per patient per 12-hour shift (95% interval) | Deteriorations with an alert in time | Time in alert |
-|---|---|---|---|
-| NEWS2 chart trigger | 0.414 (0.395 to 0.434) | 36% (33 of 91) | 15.8% |
-| NEWS2 total of 5 or more | 0.340 (0.322 to 0.357) | 40% (36 of 91) | 12.0% |
-| **Distilled student (MindSpore 2.11)** | **0.413 (0.394 to 0.430)** | **56% (51 of 91)** | **6.4%** |
+- **Holds on both sets.** At about NEWS2's alert burden, the distilled MindSpore student fires a new alert in
+  more deterioration windows than NEWS2 (set 1: 56% against 36%; set 2: 60.1% against 49.0%), and it is in
+  alert about 40% as often.
+- **Does not hold.** Count an alert that was already open when the deterioration began, and on set 2 NEWS2 is
+  alerting in more windows than the student (76.7% against 73.2%).
+- **The declared test (set 2).** Each model was added to NEWS2 ("NEWS2 or the model") and compared with NEWS2
+  alone, by alerting in excess of chance, with a 98.33% interval for the three comparisons. The student with
+  its confidence check shows **a gain beyond chance**: +0.018 (+0.008 to +0.029), for 4.8% more alerts. It
+  also moves the median warning from 46.6 to 71.5 minutes before the deterioration is fully in. The student
+  without the check shows a loss: -0.040 (-0.054 to -0.025), for 25% more alerts. The reward policy also shows
+  a loss: -0.013 (-0.025 to -0.0001). The API runs the checked student, and the policy's flag says it showed a loss.
 
-20 held-out 30-day trials of the ward simulator, 1,873 patients, 91 deterioration episodes, patient-level
-bootstrap intervals. Every row was re-scored with the backend's NEWS2 with 0 mismatches. **These are not
-clinical results:** the same simulator makes the data and judges the alerts. The full table, method and other
-rules are in [`models/tier_c/student_vitals/held_out.txt`](models/tier_c/student_vitals/held_out.txt).
+| Alerting rule | Alerts per patient per 12-hour shift (95% interval) | New alert in the window | Alerting in any bin of the window | Time in alert |
+|---|---|---|---|---|
+| **Set 1:** 20 trials, 1,873 patients, 91 episodes | | | | |
+| NEWS2 chart trigger | 0.414 (0.395 to 0.434) | 36% (33 of 91) | 63% (57 of 91) | 15.8% |
+| NEWS2 total of 5 or more | 0.340 (0.322 to 0.357) | 40% (36 of 91) | 57% (52 of 91) | 12.0% |
+| **Distilled student (MindSpore 2.11)** | **0.413 (0.394 to 0.430)** | **56% (51 of 91)** | **67% (61 of 91)** | **6.4%** |
+| **Set 2:** 400 trials, 37,062 patients, 1,743 episodes | | | | |
+| NEWS2 chart trigger | 0.415 (0.411 to 0.420) | 49.0% (854) | 76.7% (1,337) | 16.6% |
+| NEWS2 total of 5 or more | 0.347 (0.343 to 0.351) | 52.9% (922) | 72.1% (1,256) | 12.6% |
+| **Distilled student (MindSpore 2.11)** | **0.425 (0.420 to 0.429)** | **60.1% (1,048)** | **73.2% (1,276)** | **6.5%** |
+
+Held-out 30-day trials of the ward simulator, with patient-level bootstrap intervals; the declared test resamples
+trials. Every row was re-scored with the backend's NEWS2 with 0 mismatches. **These are not clinical results:**
+the same simulator makes the data and judges the alerts. Full tables: set 1 in
+[`models/tier_c/student_vitals/held_out.txt`](models/tier_c/student_vitals/held_out.txt), set 2 in
+[`held_out_2.txt`](models/tier_c/student_vitals/held_out_2.txt), and the declared test in
+[`models/held_out_2/analysis.txt`](models/held_out_2/analysis.txt).
 
 ## Architecture
 
