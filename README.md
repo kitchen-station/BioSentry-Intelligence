@@ -130,10 +130,11 @@ BioSentry is deployed. You do not need to install anything to see it.
 | App | Address | What it is |
 |---|---|---|
 | Dashboard | <https://biosentry-dashboard.pages.dev> | The clinician's ranked list on a sample ward. Choose a clinician; any passphrase is accepted. |
-| Ward simulation | <https://biosentry-ward-sim.pages.dev> | The simulated hospital that feeds the dashboard. No sign-in. |
+| Ward simulation | <https://biosentry-ward-sim.pages.dev> | The simulated hospital, and a read-only view of the team server's ward W4 (no names or ids). No sign-in to watch. |
 
-Both public sites deploy from `main` and show synthetic patients. They have no server behind them, so each
-runs alone on sample data and what you enter is gone on reload.
+Both public sites deploy from `main` and show synthetic patients. The dashboard has no server behind it: it runs
+alone on a sample ward, and what you enter is gone on reload. Its research pages are open to every demo clinician
+(<https://biosentry-dashboard.pages.dev/lab/research>).
 
 The connected version (the simulation writes to one API and the dashboard reads the same ward, live) runs on
 the team's server. It is private to the team: a clinician signs in with their own passphrase. Ask the team for
