@@ -29,12 +29,11 @@ from biosentry.repositories.postgres import (
     upsert_bins,
     whole,
 )
-from biosentry.schemas.ingest import Batch, Bin, LiveView, NewCommand, NewRun, NewRunPatient
+from biosentry.schemas.ingest import HOME, Batch, Bin, LiveView, NewCommand, NewRun, NewRunPatient
 from biosentry.schemas.ingest import Obs as IngestObs
 
 from .patients import ConflictError, RejectedError
 
-WARD = "W4"
 MECHANISM = "Sorted on NEWS2 (Tier A). Live from the ward simulation."
 TIER_STATUS = [{"tier": "A", "label": "NEWS2", "live": True}]
 
@@ -69,8 +68,14 @@ def _check_clinicians(conn: Conn, patients: Iterable[NewRunPatient]) -> None:
 
 
 def _add_patient(
-    conn: Conn, run_id: int, origin: datetime, p: NewRunPatient, admitted_at: datetime | None
+    conn: Conn,
+    run_id: int,
+    origin: datetime,
+    p: NewRunPatient,
+    admitted_at: datetime | None,
+    home: str,
 ) -> None:
+    unit = p.unit or home
     device = [o.minute for o in p.observations if o.source == "device" and o.absent_reason is None]
     insert_patient(
         conn,
@@ -89,9 +94,11 @@ def _add_patient(
             "story": p.story,
             "last_sample_at": _at(origin, max(device)) if device else None,
             "admitted_at": admitted_at,
+            "unit": unit,
+            "person": p.person,
         },
     )
-    assign(conn, run_id, p.id, p.rn, p.md)
+    assign(conn, run_id, p.id, unit, p.rn, p.md)
     insert_observations(
         conn, run_id, True, [_obs(origin, o) for o in p.observations], ignore=True
     )
@@ -101,6 +108,7 @@ def _add_patient(
 def start_run(conn: Conn, body: NewRun, clock: Callable[[], datetime]) -> int:
     _check_clinicians(conn, body.patients)
     origin = body.origin
+    units = [u.model_dump() for u in body.units or [HOME]]
     with transaction(conn):
         # Runs are created under the setup lock (as the fixture is), so two registrations take
         # turns and the second sees the first. Then the newest run's lock: a batch in flight on it
@@ -118,15 +126,16 @@ def start_run(conn: Conn, body: NewRun, clock: Callable[[], datetime]) -> int:
             conn,
             source=body.source,
             seed=body.seed,
-            ward=WARD,
+            ward=units[0]["id"],
             origin=origin,
             as_of=origin,
             last_batch_at=clock(),  # a new run is live from creation
             tier_status=TIER_STATUS,
             client_id=body.client_id,
+            units=units,
         )
         for p in body.patients:
-            _add_patient(conn, run_id, origin, p, None)
+            _add_patient(conn, run_id, origin, p, None, units[0]["id"])
     return run_id
 
 
@@ -156,13 +165,17 @@ def add_batch(
             return False
         origin = run["origin"]
         members = {
-            r["id"] for r in conn.execute("SELECT id FROM patient WHERE run_id = %s", (run_id,))
+            r["id"]: r["unit"]
+            for r in conn.execute("SELECT id, unit FROM patient WHERE run_id = %s", (run_id,))
         }
+        units = {r["id"] for r in conn.execute("SELECT id FROM run_unit WHERE run_id = %s", (run_id,))}
         _check_clinicians(conn, body.admissions)
+        if any(a.unit not in (None, *units) for a in body.admissions):
+            raise RejectedError("a patient's unit is a unit of the run")
         for a in body.admissions:
             if a.id not in members:  # a retried batch adds nobody twice
-                _add_patient(conn, run_id, origin, a, whole(_at(origin, a.minute)))
-                members.add(a.id)
+                _add_patient(conn, run_id, origin, a, whole(_at(origin, a.minute)), run["ward"])
+                members[a.id] = a.unit or run["ward"]
         named = {
             *(d.patient_id for d in body.departures),
             *(p.id for p in body.patients),
@@ -170,8 +183,11 @@ def add_batch(
             *(b.patient_id for b in body.bins),
             *(e.patient_id for e in body.events if e.patient_id is not None),
         }
-        if named - members:
+        if named - members.keys():
             raise RejectedError("a patient is not in this run")
+        for d in body.departures:
+            if d.to_unit is not None and (d.to_unit not in units or d.to_unit == members[d.patient_id]):
+                raise RejectedError("to_unit is another unit of the run")
         for p in body.patients:
             sample = None if p.last_sample_minute is None else _at(origin, p.last_sample_minute)
             conn.execute(
@@ -189,9 +205,9 @@ def add_batch(
         upsert_bins(conn, run_id, [_bin(origin, b) for b in body.bins])
         for d in body.departures:
             conn.execute(
-                "UPDATE patient SET left_at = %s, outcome = %s"
+                "UPDATE patient SET left_at = %s, outcome = %s, to_unit = %s"
                 " WHERE run_id = %s AND id = %s AND left_at IS NULL",
-                (whole(_at(origin, d.minute)), d.outcome, run_id, d.patient_id),
+                (whole(_at(origin, d.minute)), d.outcome, d.to_unit, run_id, d.patient_id),
             )
         row = conn.execute(
             "SELECT COALESCE(MAX(seq), 0) AS last FROM sim_event WHERE run_id = %s", (run_id,)
@@ -251,11 +267,20 @@ def add_batch(
 
 
 def set_view(conn: Conn, run_id: int, body: LiveView) -> bool:
-    """Replaces the run's live view. False when there is no such run."""
+    """Replaces the unit's live view. False when there is no such run."""
     with transaction(conn):
-        if _locked_newest(conn, run_id) is None:
+        run = _locked_newest(conn, run_id)
+        if run is None:
             return False
-        set_live_view(conn, run_id, body.model_dump())
+        unit = body.unit or run["ward"]
+        exists = conn.execute(
+            "SELECT 1 FROM run_unit WHERE run_id = %s AND id = %s", (run_id, unit)
+        ).fetchone()
+        if exists is None:
+            raise RejectedError("the view names a unit of the run")
+        # An entry for a patient who is not in this unit is stored and never served: the read
+        # keeps only the caller's own patients of the unit.
+        set_live_view(conn, run_id, unit, body.model_dump(exclude={"unit"}))
     return True
 
 
@@ -275,13 +300,16 @@ def commands(store: PostgresStore, run_id: int, after: int) -> list[dict[str, An
         return store.commands(run_id, after)
 
 
-def add_command(store: PostgresStore, audit: AuditLog, who: str, body: NewCommand) -> bool:
-    """Queue a command for the sim. False when the patient is not the caller's. A ward that is not
+def add_command(
+    store: PostgresStore, audit: AuditLog, who: str, body: NewCommand, ward: str
+) -> bool:
+    """Queue a command for the sim, sent from the unit `ward`. False when the patient is not the
+    caller's, or not in that unit. A ward that is not
     receiving data from a live sim run (the fixture, or a run that stopped) is a ConflictError:
     nothing would read the command. So is a run that a newer one has replaced since this request
     began: the run is judged again under its lock, where the write is."""
-    resource = body.patient_id or store.ward
-    if body.patient_id is not None and body.patient_id not in store.assigned(who):
+    resource = body.patient_id or ward
+    if body.patient_id is not None and body.patient_id not in store.assigned(who, unit=ward):
         audit.append(who, "sim_command", resource, "not_found")
         return False
     data = {} if body.speed is None else {"speed": body.speed}
@@ -291,7 +319,7 @@ def add_command(store: PostgresStore, audit: AuditLog, who: str, body: NewComman
             assert run is not None  # the store was made on it
             if not is_live(run["last_batch_at"], run["ended"], store.clock()):
                 raise ConflictError("The ward is not receiving data from a running simulation")
-            store.add_command(body.kind, who, body.patient_id, data)
+            store.add_command(body.kind, who, body.patient_id, data, ward)
     except ConflictError:  # audited after the rollback, or the row would go with it
         audit.append(who, "sim_command", resource, "rejected")
         raise

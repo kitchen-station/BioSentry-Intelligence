@@ -53,9 +53,9 @@ class OverviewService:
         self._audit = audit
         self._wards = wards
 
-    def overview(self, admin_id: str) -> WardOverview:
+    def overview(self, admin_id: str, unit: str) -> WardOverview:
         store = self._store
-        ids = store.on_ward()
+        ids = store.on_ward(unit)
         ranked, abstained = self._wards.compute(ids)
         care = store.care(ids)
         now = store.clock()
@@ -63,24 +63,24 @@ class OverviewService:
             *(
                 OverviewPatient(
                     bed=r.bed, state="ranked", score=r.score, reason=None,
-                    care=care[r.id], synthetic=r.synthetic,
+                    care=care[r.id], synthetic=r.synthetic, unit=r.unit, floor=r.floor,
                 )
                 for r in ranked
             ),
             *(
                 OverviewPatient(
                     bed=a.bed, state="not_ranked", score=None, reason=a.reason,
-                    care=care[a.id], synthetic=a.synthetic,
+                    care=care[a.id], synthetic=a.synthetic, unit=a.unit, floor=a.floor,
                 )
                 for a in abstained
             ),
         ]
         counts = [c for p in patients for c in p.care]
-        view = store.live_view()
+        view = store.live_view(unit)
         activity = self._audit.recent(now - ACTIVITY_WINDOW)
-        self._audit.append(admin_id, "view_overview", store.ward, "ok")
+        self._audit.append(admin_id, "view_overview", unit, "ok")
         return WardOverview(
-            ward=store.ward,
+            ward=unit,
             as_of=_iso(store.now()),  # ward time; `now` (the wall clock) only bounds the audit window
             receiving_data=store.receiving_data(),
             synthetic=store.synthetic,
@@ -88,7 +88,7 @@ class OverviewService:
             patients=patients,
             clinicians=[
                 OverviewClinician(id=i, role=role, patients=counts.count(i))
-                for i, role in store.clinicians()
+                for i, role in store.clinicians(unit)
             ],
             activity=[OverviewActivity(**r) for r in activity],
         )

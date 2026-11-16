@@ -138,7 +138,7 @@ class PatientAskService:
                     "run": store.run_id,
                     "pid": patient_id,
                     "day": now - timedelta(hours=24),
-                    "ward": store.ward,
+                    "ward": found.unit,
                 },
             ).fetchone()
             assert counts is not None
@@ -154,7 +154,7 @@ class PatientAskService:
                     " patient_id, context, context_sha256, state)"
                     " VALUES (%s, %s, %s, 'patient_question', %s, %s, %s, %s, %s, 'queued')"
                     " RETURNING *",
-                    (store.ward, who, now, body.question, store.run_id, patient_id, text, sha),
+                    (found.unit, who, now, body.question, store.run_id, patient_id, text, sha),
                 ).fetchone()
                 assert row is not None
         if row is None:  # audited after the transaction, so the expiry above is kept either way

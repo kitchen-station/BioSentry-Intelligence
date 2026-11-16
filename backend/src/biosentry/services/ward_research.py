@@ -44,9 +44,12 @@ class WardResearchService:
         self._baselines = baselines
         self._alert = alert
 
-    def research(self, clinician_id: str) -> WardResearch:
-        mine = self._wards.visible(clinician_id)
-        ranked, abstained, states = self._wards.view(self._store.on_ward())  # the ward's own rank, whole ward
+    def research(self, clinician_id: str, unit: str) -> WardResearch:
+        mine = self._wards.visible(clinician_id, unit)
+        # the unit's own rank, whole unit; a unit that is not ranked has no rows at all
+        ranked, abstained, states = self._wards.view(self._store.on_ward(unit))
+        if self._store.units[unit]["kind"] != "ranked":
+            abstained = []
         rows = []
         for r in ranked:
             state = states[r.id]
@@ -73,9 +76,9 @@ class WardResearchService:
                     baseline=vitals, models=r.models, alert=alert,
                 )
             )  # fmt: skip
-        self._audit.append(clinician_id, "view_ward_research", self._store.ward, "ok")
+        self._audit.append(clinician_id, "view_ward_research", unit, "ok")
         return WardResearch(
-            ward=self._store.ward, now=self._store.now(), synthetic=True, label=RESEARCH_LABEL, ranked=rows,
+            ward=unit, now=self._store.now(), synthetic=True, label=RESEARCH_LABEL, ranked=rows,
             abstained=[
                 ResearchAbstained(
                     bed=a.bed, assigned=a.id in mine, id=a.id if a.id in mine else None,

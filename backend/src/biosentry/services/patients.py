@@ -128,6 +128,9 @@ class PatientService:
     def acknowledge(self, clinician_id: str, patient_id: str, score: int) -> bool:
         if not self._visible(clinician_id, patient_id, "acknowledge"):
             return False
+        if self._store.unit_kind(patient_id) != "ranked":  # no score exists there to acknowledge
+            self._audit.append(clinician_id, "acknowledge", patient_id, "not_found")
+            return False
         with self._store.tx():
             self._store.add_action("acknowledge", clinician_id, patient_id, {"score": score})
             self._store.acknowledge(clinician_id, patient_id, score)
@@ -174,10 +177,13 @@ class PatientService:
                 raise
         store = self._store
         now = store.now()
+        unit = form.unit or store.unit_of(clinician_id)
         try:
             with store.tx():
+                if unit not in store.units:
+                    raise ConflictError(f"{unit} is not a unit of this run")
                 patient_id = store.next_patient_id()  # takes the run lock: the check below holds
-                if store.bed_occupied(form.bed):
+                if store.bed_occupied(form.bed, unit):
                     raise ConflictError(f"Bed {form.bed} is occupied")
                 store.add_patient(
                     patient_id,
@@ -193,6 +199,7 @@ class PatientService:
                         "trend": "insufficient",
                         "admission": {"admitted_at": iso(now), "admitted_by": clinician_id},
                         "admitted_at": whole(now),
+                        "unit": unit,
                     },
                 )
 
@@ -233,7 +240,7 @@ class PatientService:
                     action |= {"systolic": bp.systolic, "diastolic": bp.diastolic}
                 if form.initial_avpu is not None:
                     action["acvpu"] = form.initial_avpu.value
-                store.add_action("admit_patient", clinician_id, patient_id, action)
+                store.add_action("admit_patient", clinician_id, patient_id, action, unit)
         except ConflictError:  # audited after the rollback, or the row would go with it
             self._audit.append(clinician_id, "admit_patient", "-", "rejected")
             raise

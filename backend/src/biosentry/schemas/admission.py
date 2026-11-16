@@ -16,6 +16,7 @@ from .clinical import PartialLabInput
 from .common import Acvpu
 
 PHILHEALTH_PIN = r"^\d{2}-\d{9}-\d$"  # 2-9-1
+UNIT_ID = r"^[A-Za-z0-9][A-Za-z0-9_-]{0,19}$"
 BLOOD_PRESSURE_TEXT = r"^\d{2,3}/\d{2,3}$"  # nurse-typed at the form; split once at admit
 
 Positive = Annotated[float, Field(strict=True, allow_inf_nan=False, gt=0)]
@@ -71,6 +72,7 @@ class AdmitPatientInput(CamelContract):
     # Initial vitals (nurse-entered)
     initial_bp: Annotated[str, Field(pattern=BLOOD_PRESSURE_TEXT)] | None = None
     initial_avpu: Acvpu | None = None
+    unit: Annotated[str, Field(pattern=UNIT_ID)] | None = None  # null: the caller's own unit
 
 
 class PartialAdmitPatientInput(CamelContract):
