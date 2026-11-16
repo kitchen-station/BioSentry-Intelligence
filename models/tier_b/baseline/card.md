@@ -5,8 +5,8 @@
 | id | `tier_b/baseline` |
 | tier | B (unsupervised per patient; no labels, no learned weights, no artifact) |
 | code | `backend/src/biosentry/domain/scoring/tier_b/baseline.py` |
-| status | implemented, synthetic, not validated. The API scores it on read: a significant finding is listed as a reason and breaks ties between equal NEWS2 totals below a trigger (arbiter rule 3) |
-| intended use | research. It breaks ties only: it never moves a patient past a NEWS2 difference, never alerts and never looks at NEWS2 |
+| status | implemented, synthetic, not validated. The API runs an own-baseline finding as a reason and a tie-break below a NEWS2 trigger, on its code defaults (k 2.0, p 3), not on the k 4.0, p 8 in `params.json`; it never moves a patient past a NEWS2 difference |
+| intended use | research, display only. It never ranks, never alerts and never looks at NEWS2 |
 
 ## What it is
 

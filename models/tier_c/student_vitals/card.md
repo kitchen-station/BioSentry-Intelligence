@@ -5,7 +5,7 @@
 | id | `tier_c/student_vitals` (variants `all` and `no_temp`) |
 | files | `model.onnx` (5,334 bytes), `model_no_temp.onnx` (2,382), `model.mindir` (11,539), `model_no_temp.mindir` (8,706), `model.ms` (6,688), `model_no_temp.ms` (3,744), `model.json` (34,949), `model_no_temp.json` (14,903), `metadata.json`, `exports.json`, `timing.json`, `lite.txt`, `convert_lite.sh`, `held_out.txt`, `held_out.json` |
 | code | `research/student.py`, `research/train_student.py`, `research/evaluate_student.py`, `research/export_plain.py`, `research/plain_student.py` |
-| status | trained on synthetic trials; held-out ward-v2 seeds 11-30 scored once on 2026-11-13; not validated. The API runs `model.json` only through the confidence check: its flag adds a reason to a ward row and never moves a patient |
+| status | trained on synthetic trials; held-out ward-v2 seeds 11-30 scored once on 2026-11-13; not validated. The API runs it: with the confidence check it adds a "Prediction model flag" reason to a ward row, never moves a patient and never lowers a NEWS2 trigger. Held-out set 2 (400 trials) is the result to quote; set 1 (91 episodes) is the small first set |
 | framework | MindSpore 2.11.0 (CPU, GRAPH_MODE, one thread) |
 | intended use | research. Tier A (NEWS2) is never changed or learned |
 
@@ -323,7 +323,7 @@ validation section above.
   against validation 0.018699).
 - `shortcut`: the image has no system libgomp; the venv links the copy shipped in the scikit-learn wheel. On a normal
   machine install `libgomp1`. The new lock was not re-audited with pip-audit.
-- Not run on a small ARM board or a ward hub. Not wired to the API, the rank or the arbiter.
+- Not run on a small ARM board or a ward hub. The API runs it (with the confidence check) as a flag only; it is not in the rank. NEWS2 is never changed.
 
 ## Reproduce
 
