@@ -82,6 +82,11 @@ class AbstainedRow(Contract):
     # the arbiter or the rank: the patient stays NOT RANKED (I1, I4). Optional on the wire only so
     # an older answer still parses; the server always sends it.
     last_seen: Vitals | None = None
+    # A patient of a unit that is shown or unranked (ER, ICU): the same vitals and trends a ranked
+    # row has, for a signed-in reader who may see the patient. Still no score, no rank (I4). Null on
+    # every other NOT RANKED row.
+    vitals: Vitals | None = None
+    vital_trends: VitalTrends | None = None
 
 
 class WardUnit(Contract):
