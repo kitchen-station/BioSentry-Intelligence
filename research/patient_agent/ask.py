@@ -15,6 +15,10 @@ MAX_NODES = 200_000
 MAX_LIST = 2000
 LAST = "Synthetic data. Not validated. Not advice on treatment."
 FIRST = "For this patient only:"
+OWN = "this patient's own baseline"
+# The page calls a latest value stale after one missed 15-minute bin on top of its stale threshold, counted from the end
+# of the bin: frontend/src/components/BaselinePanel.tsx, STALE_AGE_S = 15 x 60 + 300.
+STALE_AGE_S = 1200
 NO_BASELINE = "The data for this patient holds no baseline at this time."
 FIXED = ("NEWS2", "SpO2", "15-minute")
 KINDS = ("own_baseline", "recent_change", "why_rank", "active_alerts")
@@ -35,7 +39,7 @@ REFUSALS = {
                "earlier alerts." + _NOT_ANSWERED,
     "followed": "The data this agent gets holds no alert history and no NEWS2 over time, so it cannot say whether an "
                 "alert was followed by a deterioration." + _NOT_ANSWERED,
-    "none": "I can answer four things about this patient's own data: (1) the patient's own baseline for a vital; "
+    "none": "I can answer four things about this patient's own data: (1) the patient's own baseline for a vital, and how the latest value compares with it; "
             "(2) what changed in the vital history in the last hours; (3) why the patient has this rank; "
             "(4) which alerts are active." + _NOT_ANSWERED,
 }
@@ -51,7 +55,8 @@ _TREAT = re.compile(
     r"fine|shall|help me|icu|mg|what do i do|what to do|what can i do|next steps?|what now|ok to|safe to|do i need|need to|"
     r"call(?:ed|ing)?|rapid response|escalate|needs?|bolus|hold|wean\w*|dapat|gamot|bigyan)\b|\bis\b.{0,40}\bok(?:ay)?\b")
 _OTHER = re.compile(
-    r"\b(others?|another|beds?|everyone|everybody|all patients|patients?|the ward|wards?|who else|compare\w*|versus|vs|"
+    r"\b(others?|another|beds?|everyone|everybody|all patients|patients?|the ward|wards?|who else|population|averages?|avg|"
+    r"peers?|similar|"
     r"units?|floors?|departments?|rooms?|next door|the rest|neighbou?rs?|mr|mrs|ms|miss|dr|roommates?|"
     r"across the hall|halls?|hallway|corner|bays?|case ?loads?|cases|my list|across my|teammates?|colleagues?|"
     r"pts|rm|wings?|cohorts?|teams?|ladies|gentlemen|guys?|him and her)\b"
@@ -59,12 +64,25 @@ _OTHER = re.compile(
 # "this patients baseline" is a possessive typed without its apostrophe: "this" is never plural.
 # "my patients", "our patients" and "the patients" stay plural and are refused.
 _OWN = re.compile(r"\bthis patient(?:'s|s)?\b|\b(the|my|our) patient(?:'s)?\b")
+# A comparison is allowed only against this patient's own baseline or usual value ("compare the pulse with her baseline",
+# "higher than usual"). Any other target ("with most women", "than the norm", "vs the previous stay") is refused.
+_CMP_OWN = re.compile(r"\b(?:with|to|against|versus|vs|than|from|relative to)\s+(?:(?:this patient(?:'s|s)?|her|his|their|the|own|a)\s+)*"
+                      r"(?:baseline|usual)\b")
+_CMP = re.compile(r"\b(?:versus|vs|than|against|relative|compar\w*.*\b(?:with|to))\b")
+# After "baseline", "usual" or "normal" a "of/for/from ..." may name only this patient or a vital ("the baseline for heart
+# rate"). Anything else ("of most women", "for a marathon runner", "from the last admission") is another target.
+_TARGET = re.compile(r"\b(?:baseline|usual|normal)\s+(?:of|for|from|among|amongst|across|per|between|like)\b(.*)")
+_TARGET_OK = re.compile(r"\b(?:the|a|an|her|his|their|this|patient(?:'s|s)?|own|today|now|currently|please|and|or|"
+                        r"values?|reading|readings|level|rate|one)\b")
+_OWN_NORMAL = re.compile(r"\b(?:her|his|their|own|patient(?:'s|s)?)\s+(?:own\s+)?normal\b"
+                         r"|\bnormal\b[^?.!]*\bfor (?:this patient|the patient|her|him|them|his|their)\b")
 _PRED = re.compile(r"\b(will|won't|predict\w*|going to|chance|likely|prognosis|surviv\w*|die|dies|forecast\w*|expect\w*|"
                    r"tomorrow|soon|future|anticipat\w*|downhill|worse|worsen\w*|next (?:few )?hours?|deteriorating)\b")
 _COND = (r"sepsis|septic|pneumonia|hypox\w*|tachy\w*|brady\w*|fever|pyrexia|shock|copd|infection|delirium|aki|diabetes|"
          r"hypertension|hypotension|stroke|heart failure|arrhythmia|anaemia|anemia")
 _OUTSIDE = re.compile(rf"\b({_COND}|defin\w*|guidelines?|explain\w*|meaning|mean|means|normal range|reference range|"
-                      r"healthy|typical\w*|in general|generally|textbook|usually|adults?|children|child|person|people|humans?)\b")
+                      r"healthy|typical\w*|in general|generally|textbook|usually|adults?|children|child|person|people|humans?|"
+                      r"age|aged|norms?|standard|benchmark|reference|danger\w*|safe|limits?|zone|abnormal|worrying|concerning|alarming)\b")
 _FOLLOWED = re.compile(r"\b(alerts?|alarms?|news2|flag\w*)\b.{0,40}\b(follow\w*|led to|lead to|preced\w*|before|after)\b"
                        r".{0,40}\b(deteriorat\w*|worse\w*|collaps\w*|declin\w*)\b|\bdeteriorat\w*.{0,40}\b(alerts?|alarms?)\b")
 _HIST = re.compile(
@@ -80,13 +98,14 @@ _KIND = {
 PHRASES = {"own_baseline": "this patient's own baseline", "recent_change": "what changed in this patient's vital history",
            "why_rank": "why this patient has this rank", "active_alerts": "which alerts are active for this patient"}
 _VITAL = {
-    "heart_rate": re.compile(r"\bhr\b|heart[ -]?rate|\bpulse\b"),
+    "heart_rate": re.compile(r"\bhr\b|heart[ -]?rate|heart ?beat|\bpulse\b"),
     "respiratory_rate": re.compile(r"\brr\b|resp(?:iratory)?[ -]?rate|breathing rate|\brespiration\b"),
-    "spo2": re.compile(r"\bspo2\b|oxygen saturation|\bsats?\b|\bsaturation\b"),
+    "spo2": re.compile(r"\bspo2\b|oxygen (?:saturation|level)|\bsats?\b|\bsaturation\b"),
     "temperature": re.compile(r"\btemp\b|\btemperature\b"),
 }
-_NOT_LISTED = re.compile(r"blood pressure|\bbp\b|systolic|diastolic|consciousness|\bacvpu\b|\bavpu\b|\bgcs\b|glucose|"
-                         r"\bweight\b|\burine\b")
+_BP = re.compile(r"blood pressure|\bbp\b|systolic|diastolic")  # the baseline data holds no blood pressure: said so
+_ANY_VITAL = re.compile("|".join(rx.pattern for rx in _VITAL.values()))
+_NOT_LISTED = re.compile(r"consciousness|\bacvpu\b|\bavpu\b|\bgcs\b|glucose|\bweight\b|\burine\b")
 _NAME = re.compile(r"\b[A-Z][a-z]+(?:'s)?\b")
 
 
@@ -107,6 +126,8 @@ def _refusal(question: object) -> str | None:
     if not question.isascii():  # a look-alike letter or a zero-width character can hide a word
         return "injection"
     t = re.sub(r"(?<=\b[a-z])[-.](?=[a-z]\b)", "", question.lower())  # "w-a-r-d" is "ward"
+    if re.search(r"pulse[ -]?pressure", t):  # not the pulse, and the data holds no such value
+        return "none"
     if _INJECT.search(t) or _ALWAYS.search(t) or _ORDER.search(t):
         return "injection"
     if _TREAT.search(t):
@@ -115,6 +136,13 @@ def _refusal(question: object) -> str | None:
     if _OTHER.search(_OWN.sub(" ", t)) or any(m.start() > 0 and not re.search(r"[.?!]\s+$", question[:m.start()])
                                                         for m in _NAME.finditer(question)):
         return "other_patient"
+    if _CMP.search(_CMP_OWN.sub(" ", t)):
+        return "other_patient"
+    m = _TARGET.search(t)
+    if m and re.search(r"[a-z]", _TARGET_OK.sub(" ", _ANY_VITAL.sub(" ", m.group(1)))):
+        return "other_patient"
+    if re.search(r"\bnormal\b", _OWN_NORMAL.sub(" ", t)):  # "what is a normal heart rate" asks about people, not this patient
+        return "outside"
     if _FOLLOWED.search(t):
         return "followed"
     if _PRED.search(t):
@@ -148,6 +176,8 @@ def match(question: str) -> tuple[str | None, dict | str]:
         return None, key
     t = _norm(question).lower()
     kinds = [k for k, rx in _KIND.items() if rx.search(t)]
+    if kinds == ["own_baseline", "recent_change"] and not re.search(r"\bhours?\b|\brecent\w*", t):
+        kinds = ["own_baseline"]  # "has the pulse changed from her baseline?" asks about the baseline
     if len(kinds) != 1:
         return None, "none"
     plain, kind, named = _plain(t), kinds[0], _named(t)
@@ -157,8 +187,9 @@ def match(question: str) -> tuple[str | None, dict | str]:
     if re.search(r"[0-9]", plain):  # a number in the question is never taken
         return None, "none"
     if kind == "own_baseline":
-        return (kind, {"vital": named[0] if named else None}) if len(named) < 2 and not _NOT_LISTED.search(t) \
-            else (None, "none")
+        if len(named) > 1 or _NOT_LISTED.search(t) or (_BP.search(t) and named):
+            return None, "none"
+        return kind, {"vital": "blood_pressure" if _BP.search(t) else named[0] if named else None}
     return kind, {}
 
 
@@ -316,29 +347,55 @@ UNAVAILABLE = {"no_history": "the data holds no history for this vital.",
                "patch_not_live": "the patch is not live."}
 
 
+def _age(w: _Out, e: dict) -> str:
+    """How old the latest value is, counted by the server from the end of its 15-minute set. Older than the page's
+    own limit: said so, with no number from outside the data."""
+    age = e.get("latest_age_s")
+    if age is None:  # older data
+        return ""
+    age = _int(age, 0)
+    return (f" That set ended {w.n(age)} seconds ago, on the server's clock."
+            + (" It is stale: it is older than the limit that the page uses for a current value. Do not read it as a "
+               "value from today." if age > STALE_AGE_S else ""))
+
+
 def _baseline(w: _Out, args: dict, base: object) -> list[str]:
     base = _dict(base)
     window = _int(_dict(_need(base, "params")).get("window_bins"))
     entries = _list(_need(base, "vitals"))
     out = []
+    if args["vital"] == "blood_pressure":
+        return ["The baseline data holds heart rate, respiratory rate, SpO2 and temperature only. It holds no blood pressure baseline."]
     for v in ([args["vital"]] if args["vital"] else VITALS):
         e = next((_dict(x) for x in entries if _dict(x).get("vital") == v), None)
         name = NAMES[v]
         if e is None:
             out.append(f"{name}: the data holds no baseline entry.")
         elif e.get("status") == "forming":
-            out.append(f"{name}: the baseline is still forming: {w.n(_int(e.get('bins_valid')))} of "
+            out.append(f"{name}: {OWN} is still forming: {w.n(_int(e.get('bins_valid')))} of "
                        f"{w.n(_int(e.get('bins_needed')))} values.")
         elif e.get("status") == "unavailable":
-            out.append(f"{name}: no baseline, because {UNAVAILABLE[_word(e.get('reason'), tuple(UNAVAILABLE))]}")
+            out.append(f"{name}: no own baseline, because {UNAVAILABLE[_word(e.get('reason'), tuple(UNAVAILABLE))]}")
         elif e.get("status") == "computed":
             start = ("at admission" if _word(e.get("anchored_at"), ("admission", "first_kept_bin")) == "admission"
                      else "at the first value the system kept, not at admission")
-            out.append(f"{name}: the baseline is {w.n(e.get('baseline_median'))}, with this unit:\n{w.q(e.get('unit'))}\n"
+            out.append(f"{name}: {OWN} is {w.n(e.get('baseline_median'))}, with this unit:\n{w.q(e.get('unit'))}\n"
                        f"It is the median of the first {w.n(window)} valid 15-minute values. The window starts {start}.")
-            out.append(f"The latest stored value is {w.n(e.get('latest'))}. It is the median of the 15-minute set that starts at "
-                       f"{w.t(e.get('latest_at'))}. "
+            if e.get("baseline_from") is not None:
+                out[-1] += f" The first value of the window is the 15-minute set that starts at {w.t(e['baseline_from'])}."
+            latest, median = e.get("latest"), e.get("baseline_median")
+            _num(latest), _num(median)
+            rel = "above" if latest > median else "below" if latest < median else "the same as"
+            out.append(f"The latest stored value is {w.n(latest)}. It is the median of the 15-minute set that starts at "
+                       f"{w.t(e.get('latest_at'))}.{_age(w, e)} The latest value is {rel} the baseline. "
                        f"The difference from the baseline is {w.n(e.get('delta'))}. The z value is {w.n(e.get('z'))}.")
+            low, high = e.get("band_low"), e.get("band_high")  # added later to the data: absent in older data
+            if low is not None or high is not None:
+                _num(low), _num(high)
+                if low > high:
+                    raise Bad
+                where = "inside" if low <= latest <= high else "outside"
+                out.append(f"The baseline band runs from {w.n(low)} to {w.n(high)}. The latest value is {where} the band.")
             if type(e.get("significant")) is not bool:
                 raise Bad
             direction = e.get("direction")
