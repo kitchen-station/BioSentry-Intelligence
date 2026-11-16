@@ -614,6 +614,26 @@ export interface components {
             readonly y: number;
         };
         /**
+         * OpenUnit
+         * @description One unit of the run, as anyone may read it: no count, no clinician, no person.
+         */
+        readonly OpenUnit: {
+            readonly floor: number | null;
+            readonly id: string;
+            /** @enum {string} */
+            readonly kind: "ranked" | "shown" | "unranked";
+            readonly name: string;
+        };
+        /**
+         * OpenUnits
+         * @description The run's units in order, with no sign-in (GET /open-view): what the public page lists.
+         */
+        readonly OpenUnits: {
+            /** @constant */
+            readonly synthetic: true;
+            readonly units: readonly components["schemas"]["OpenUnit"][];
+        };
+        /**
          * OpenVital
          * @description One stored vital on a bed card: the value, when it was observed and where it came from.
          */
@@ -1342,6 +1362,8 @@ export type OpenMove = components['schemas']['OpenMove'];
 export type OpenPressure = components['schemas']['OpenPressure'];
 export type OpenSim = components['schemas']['OpenSim'];
 export type OpenStaff = components['schemas']['OpenStaff'];
+export type OpenUnit = components['schemas']['OpenUnit'];
+export type OpenUnits = components['schemas']['OpenUnits'];
 export type OpenVital = components['schemas']['OpenVital'];
 export type OpenVitals = components['schemas']['OpenVitals'];
 export type OpenWard = components['schemas']['OpenWard'];

@@ -44,7 +44,7 @@ from .common import (
     Trend,
 )
 from .history import HistoryEvent, HistoryProvenance, HistoryRun, PatientHistory, SimulatedEpisode
-from .ingest import LiveWard, OpenBed, OpenBedCard, OpenMove, OpenSim, OpenStaff, OpenWard
+from .ingest import LiveWard, OpenBed, OpenBedCard, OpenMove, OpenSim, OpenStaff, OpenUnit, OpenUnits, OpenWard
 from .lab import (
     LabRunDetail,
     LabRunItem,
@@ -156,6 +156,7 @@ CONTRACT_MODELS: tuple[type[BaseModel], ...] = (
     LiveWard,
     OpenWard,
     OpenBedCard,
+    OpenUnits,
     OverviewPatient,
     OverviewClinician,
     OverviewActivity,
@@ -235,6 +236,8 @@ __all__ = [
     "OpenMove",
     "OpenSim",
     "OpenStaff",
+    "OpenUnit",
+    "OpenUnits",
     "OpenWard",
     "NurseVitalsInput",
     "OverviewActivity",

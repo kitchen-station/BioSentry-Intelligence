@@ -41,6 +41,7 @@ from biosentry.schemas import (
     LabRunItem,
     LiveWard,
     OpenBedCard,
+    OpenUnits,
     OpenWard,
     OverviewActivity,
     OverviewClinician,
@@ -555,6 +556,10 @@ _BUILDERS: dict[type[BaseModel], Any] = {
             "blood_pressure": {"systolic": 118, "diastolic": 76, "observed_at": "2026-09-03T06:00:00Z", "source": "nurse"},
         },
         "trend": "rising",
+    },
+    OpenUnits: lambda: {
+        "synthetic": True,
+        "units": [{"id": "ER", "name": "Emergency Room", "floor": 0, "kind": "shown"}],
     },
     WardOverview: lambda: {
         "ward": "W4",
