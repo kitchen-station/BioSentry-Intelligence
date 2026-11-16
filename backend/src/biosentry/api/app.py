@@ -64,6 +64,7 @@ from biosentry.schemas import (
     NewPatientQuestion,
     NewQuestion,
     NurseVitalsInput,
+    OpenBedCard,
     OpenUnits,
     OpenWard,
     PartialLabInput,
@@ -114,6 +115,7 @@ SIGN_IN_WINDOW = timedelta(minutes=15)
 # is still refused; only the row is limited.
 ANONYMOUS_ROW_EVERY = timedelta(minutes=1)
 OPEN_VIEW_ACTION = "view_open_ward"
+OPEN_BED_ACTION = "view_open_bed"
 OPEN_UNITS = "*"  # the audit resource of the open unit list: no unit id can be this
 OPEN_VIEW_WARNING = (
     "BIOSENTRY_OPEN_WARD_VIEW is on: GET /wards/{ward}/open-view shows the ward to anyone who can"
@@ -450,6 +452,22 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
             # that instant; upgrade: an advisory lock as in sign_in, if that ever matters.
             if not ctx.audit.count(OPEN_VIEW_ACTION, resource, outcome, since):
                 ctx.audit.append(None, OPEN_VIEW_ACTION, resource, outcome)
+            if found is None:
+                raise HTTPException(status_code=404)  # no detail: the same bytes as an unknown path
+            return found
+
+        @app.get("/wards/{ward}/open-view/beds/{bed}", response_model=OpenBedCard)
+        def open_bed(ward: str, bed: str, ctx: Ctx) -> OpenBedCard:
+            """One bed's card. No credential is read here: the answer is the same for every caller."""
+            known = ward in ctx.store.units and ctx.store.synthetic
+            found = ctx.wards.open_bed(ward, bed) if known else None
+            outcome: Outcome = "ok" if found else "not_found"
+            # The unit, never the bed or a patient: the row cannot say whose card was read, and a
+            # caller who walks every bed writes one row a minute for each unit, not for each bed.
+            resource = ward if found else "-"
+            since = ctx.store.clock() - ANONYMOUS_ROW_EVERY
+            if not ctx.audit.count(OPEN_BED_ACTION, resource, outcome, since):  # as open_view above
+                ctx.audit.append(None, OPEN_BED_ACTION, resource, outcome)
             if found is None:
                 raise HTTPException(status_code=404)  # no detail: the same bytes as an unknown path
             return found

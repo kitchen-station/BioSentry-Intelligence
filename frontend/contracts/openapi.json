@@ -2266,6 +2266,121 @@
         "title": "OpenBed",
         "type": "object"
       },
+      "OpenBedCard": {
+        "additionalProperties": false,
+        "description": "One occupied bed for anyone, with no sign-in (GET /wards/{ward}/open-view/beds/{bed}).\nIt holds no name, age, sex, context, note, lab, baseline, model flag, clinician or patient id.\nA bed that is not ranked gives its state and the reason only.",
+        "properties": {
+          "bed": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._-]{0,19}$",
+            "type": "string"
+          },
+          "floor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "enum": [
+              "ranked",
+              "shown",
+              "unranked"
+            ],
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "risk": {
+            "anyOf": [
+              {
+                "enum": [
+                  "low",
+                  "low_medium",
+                  "medium",
+                  "high"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maximum": 20,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "enum": [
+              "ranked",
+              "not_ranked"
+            ],
+            "type": "string"
+          },
+          "synthetic": {
+            "const": true,
+            "type": "boolean"
+          },
+          "trend": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Trend"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unit": {
+            "type": "string"
+          },
+          "vitals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OpenVitals"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "unit",
+          "floor",
+          "kind",
+          "bed",
+          "synthetic",
+          "state",
+          "score",
+          "risk",
+          "reason",
+          "vitals",
+          "trend"
+        ],
+        "title": "OpenBedCard",
+        "type": "object"
+      },
       "OpenMove": {
         "additionalProperties": false,
         "properties": {
@@ -2292,6 +2407,34 @@
           "kind"
         ],
         "title": "OpenMove",
+        "type": "object"
+      },
+      "OpenPressure": {
+        "additionalProperties": false,
+        "properties": {
+          "diastolic": {
+            "exclusiveMinimum": 0,
+            "type": "integer"
+          },
+          "observed_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ProvenanceSource"
+          },
+          "systolic": {
+            "exclusiveMinimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "systolic",
+          "diastolic",
+          "observed_at",
+          "source"
+        ],
+        "title": "OpenPressure",
         "type": "object"
       },
       "OpenSim": {
@@ -2471,6 +2614,59 @@
           "units"
         ],
         "title": "OpenUnits",
+        "type": "object"
+      },
+      "OpenVital": {
+        "additionalProperties": false,
+        "description": "One stored vital on a bed card: the value, when it was observed and where it came from.",
+        "properties": {
+          "observed_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ProvenanceSource"
+          },
+          "value": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "value",
+          "observed_at",
+          "source"
+        ],
+        "title": "OpenVital",
+        "type": "object"
+      },
+      "OpenVitals": {
+        "additionalProperties": false,
+        "description": "The newest stored value of each of the five. All five are NEWS2 inputs, and only a ranked\nbed has a card with vitals, so each one is stored.",
+        "properties": {
+          "blood_pressure": {
+            "$ref": "#/components/schemas/OpenPressure"
+          },
+          "heart_rate": {
+            "$ref": "#/components/schemas/OpenVital"
+          },
+          "respiratory_rate": {
+            "$ref": "#/components/schemas/OpenVital"
+          },
+          "spo2": {
+            "$ref": "#/components/schemas/OpenVital"
+          },
+          "temperature": {
+            "$ref": "#/components/schemas/OpenVital"
+          }
+        },
+        "required": [
+          "heart_rate",
+          "respiratory_rate",
+          "spo2",
+          "temperature",
+          "blood_pressure"
+        ],
+        "title": "OpenVitals",
         "type": "object"
       },
       "OpenWard": {

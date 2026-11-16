@@ -40,6 +40,7 @@ from biosentry.schemas import (
     LabRunDetail,
     LabRunItem,
     LiveWard,
+    OpenBedCard,
     OpenUnits,
     OpenWard,
     OverviewActivity,
@@ -536,6 +537,25 @@ _BUILDERS: dict[type[BaseModel], Any] = {
         "speed": 10,
         "ended": False,
         "counts": {"received": 5, "rejected": 1, "abstained": 2},
+    },
+    OpenBedCard: lambda: {
+        "unit": "W4",
+        "floor": 4,
+        "kind": "ranked",
+        "bed": "4A",
+        "synthetic": True,
+        "state": "ranked",
+        "score": 7,
+        "risk": "high",
+        "reason": None,
+        "vitals": {
+            **{
+                k: {"value": 97, "observed_at": "2026-09-03T06:30:00Z", "source": "device"}
+                for k in ("heart_rate", "respiratory_rate", "spo2", "temperature")
+            },
+            "blood_pressure": {"systolic": 118, "diastolic": 76, "observed_at": "2026-09-03T06:00:00Z", "source": "nurse"},
+        },
+        "trend": "rising",
     },
     OpenUnits: lambda: {
         "synthetic": True,

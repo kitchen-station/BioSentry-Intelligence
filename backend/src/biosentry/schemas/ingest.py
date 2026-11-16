@@ -306,6 +306,50 @@ class OpenWard(Contract):
     beds: Annotated[list[OpenBed], Field(max_length=OPEN_BEDS_MAX)]
 
 
+class OpenVital(Contract):
+    """One stored vital on a bed card: the value, when it was observed and where it came from."""
+
+    value: Num
+    observed_at: AwareDatetime
+    source: ProvenanceSource
+
+
+class OpenPressure(Contract):
+    systolic: Annotated[int, Field(strict=True, gt=0)]
+    diastolic: Annotated[int, Field(strict=True, gt=0)]
+    observed_at: AwareDatetime
+    source: ProvenanceSource
+
+
+class OpenVitals(Contract):
+    """The newest stored value of each of the five. All five are NEWS2 inputs, and only a ranked
+    bed has a card with vitals, so each one is stored."""
+
+    heart_rate: OpenVital
+    respiratory_rate: OpenVital
+    spo2: OpenVital
+    temperature: OpenVital
+    blood_pressure: OpenPressure
+
+
+class OpenBedCard(Contract):
+    """One occupied bed for anyone, with no sign-in (GET /wards/{ward}/open-view/beds/{bed}).
+    It holds no name, age, sex, context, note, lab, baseline, model flag, clinician or patient id.
+    A bed that is not ranked gives its state and the reason only."""
+
+    unit: str
+    floor: int | None  # None: not known
+    kind: Literal["ranked", "shown", "unranked"]
+    bed: Bed
+    synthetic: Literal[True]
+    state: Literal["ranked", "not_ranked"]
+    score: Annotated[int, Field(strict=True, ge=0, le=20)] | None  # NEWS2, a ranked bed only
+    risk: Literal["low", "low_medium", "medium", "high"] | None  # its band, a ranked bed only
+    reason: str | None  # why it is not ranked, a bed that is not ranked only
+    vitals: OpenVitals | None  # a ranked bed only
+    trend: Trend | None  # a ranked bed only
+
+
 class OpenUnit(Contract):
     """One unit of the run, as anyone may read it: no count, no clinician, no person."""
 
