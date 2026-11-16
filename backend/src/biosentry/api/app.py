@@ -64,6 +64,7 @@ from biosentry.schemas import (
     NewPatientQuestion,
     NewQuestion,
     NurseVitalsInput,
+    OpenUnits,
     OpenWard,
     PartialLabInput,
     PatientDetail,
@@ -113,6 +114,7 @@ SIGN_IN_WINDOW = timedelta(minutes=15)
 # is still refused; only the row is limited.
 ANONYMOUS_ROW_EVERY = timedelta(minutes=1)
 OPEN_VIEW_ACTION = "view_open_ward"
+OPEN_UNITS = "*"  # the audit resource of the open unit list: no unit id can be this
 OPEN_VIEW_WARNING = (
     "BIOSENTRY_OPEN_WARD_VIEW is on: GET /wards/{ward}/open-view shows the ward to anyone who can"
     " reach this API, without sign-in. Never use it on a public address."
@@ -424,6 +426,18 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
         return SessionToken(token=token, role=SessionRole(role))
 
     if settings.open_ward_view:  # off: the route does not exist, so the framework's own 404 answers
+
+        @app.get("/open-view", response_model=OpenUnits)
+        def open_units(ctx: Ctx) -> OpenUnits:
+            """The run's units, so a page with no sign-in can list them. No credential is read:
+            the answer is the same for every caller. No count, no clinician, no person."""
+            outcome: Outcome = "ok" if ctx.store.synthetic else "not_found"
+            since = ctx.store.clock() - ANONYMOUS_ROW_EVERY
+            if not ctx.audit.count(OPEN_VIEW_ACTION, OPEN_UNITS, outcome, since):  # as open_view below
+                ctx.audit.append(None, OPEN_VIEW_ACTION, OPEN_UNITS, outcome)
+            if outcome != "ok":
+                raise HTTPException(status_code=404)  # no detail: the same bytes as an unknown path
+            return OpenUnits(synthetic=True, units=list(ctx.store.units.values()))
 
         @app.get("/wards/{ward}/open-view", response_model=OpenWard)
         def open_view(ward: str, ctx: Ctx) -> OpenWard:
