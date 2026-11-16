@@ -40,7 +40,7 @@ describe("ResearchModels", () => {
     ["latest bin not scored", "the last 15-minute set gave no NEWS2 score"],
     ["earlier bin not stored", "an earlier 15-minute set cannot be rebuilt"],
     ["a vital is not counted", "the patch is not streaming, or a value was typed"],
-    ["stay past 672 bins", "the stay is longer than 7 days"],
+    ["stay past 7 days: admission baseline not kept", "the stay is longer than 7 days, so its admission baseline is no longer stored"],
     ["no stored bins", "no 15-minute set is stored yet"],
     ["vital series not on one grid", "the stored sets do not line up"],
     ["impossible value in a lag or baseline bin", "a stored value is not possible"],
