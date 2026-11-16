@@ -1,8 +1,8 @@
 """Ward rows, abstained rows and the API response envelopes."""
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import AwareDatetime, Field
+from pydantic import AwareDatetime, Field, model_validator
 
 from .base import Age, Contract, Flag, NonNegInt, NonNegNum, Percent
 from .clinical import LabPanel, VitalHistoryFull, Vitals, VitalTrends
@@ -87,6 +87,15 @@ class AbstainedRow(Contract):
     # every other NOT RANKED row.
     vitals: Vitals | None = None
     vital_trends: VitalTrends | None = None
+    # The kind of the row's unit. The rule above is held here, not only where the row is made: a row
+    # that carries `vitals` or `vital_trends` must say its unit is shown or unranked, or it cannot be built.
+    unit_kind: UnitKind | None = None
+
+    @model_validator(mode="after")
+    def _vitals_only_of_a_shown_or_unranked_unit(self) -> Self:
+        if (self.vitals is not None or self.vital_trends is not None) and self.unit_kind not in ("shown", "unranked"):
+            raise ValueError("vitals and vital_trends belong to a row of a shown or unranked unit")
+        return self
 
 
 class WardUnit(Contract):

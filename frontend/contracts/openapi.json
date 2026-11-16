@@ -113,6 +113,22 @@
             ],
             "default": null
           },
+          "unit_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ranked",
+                  "shown",
+                  "unranked"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "vital_history": {
             "$ref": "#/components/schemas/VitalHistoryFull"
           },
@@ -255,6 +271,22 @@
           "unit": {
             "anyOf": [
               {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "unit_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ranked",
+                  "shown",
+                  "unranked"
+                ],
                 "type": "string"
               },
               {

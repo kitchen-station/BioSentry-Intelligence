@@ -168,7 +168,12 @@ def _reason(state: UnscoredPatient, reason: str) -> str:
 
 
 def abstained_row(
-    state: UnscoredPatient, reason: str, instruction: str, news2_risk: str | None = None
+    state: UnscoredPatient,
+    reason: str,
+    instruction: str,
+    news2_risk: str | None = None,
+    unit_kind: str | None = None,
+    with_vitals: bool = False,
 ) -> AbstainedRow:
     return AbstainedRow(
         id=state.id,
@@ -185,6 +190,9 @@ def abstained_row(
         person=state.person,
         news2_risk=news2_risk,  # type: ignore[arg-type]
         last_seen=state.last_seen,
+        unit_kind=unit_kind,  # type: ignore[arg-type]
+        vitals=state.vitals if with_vitals else None,
+        vital_trends=state.vital_trends if with_vitals else None,
     )
 
 
@@ -194,11 +202,16 @@ def unit_row(state: UnscoredPatient, unit: dict[str, Any]) -> AbstainedRow:
     tier_a = score_news2(inputs_from_vitals(state.vitals))
     risk = None if unit["kind"] == "unranked" or isinstance(tier_a, News2Abstained) else tier_a.risk.value
     verb = "shown, not ranked" if unit["kind"] == "shown" else "not ranked"
-    row = abstained_row(
-        state, f"{unit['name']} is {verb}: NEWS2 is a ward score.", "No NEWS2 rank for this unit.", risk
+    # The stored vitals go with the row, for a reader who may see the patient (the public views do
+    # not use this row). The schema refuses them on a row whose unit is not shown or unranked.
+    return abstained_row(
+        state,
+        f"{unit['name']} is {verb}: NEWS2 is a ward score.",
+        "No NEWS2 rank for this unit.",
+        risk,
+        unit["kind"],
+        with_vitals=True,
     )
-    # The stored vitals, for a reader who may see the patient (the public views do not use this row).
-    return row.model_copy(update={"vitals": state.vitals, "vital_trends": state.vital_trends})
 
 
 # where a patient went is not shown
@@ -274,7 +287,12 @@ class WardService:
                 for rank, d in ranking.ranked
             ]
             abstained += [
-                abstained_row(states[d.patient_id], _reason(states[d.patient_id], d.reason), d.instruction)
+                abstained_row(
+                    states[d.patient_id],
+                    _reason(states[d.patient_id], d.reason),
+                    d.instruction,
+                    unit_kind=units[unit]["kind"],
+                )
                 for d in ranking.not_ranked
             ]
         abstained += [unit_row(s, units[s.unit]) for s in every.values() if s.id not in states]
