@@ -24,7 +24,7 @@ MAX_BINS = 7 * 24 * 4  # 672: 7 days of 15-minute bins
 # zero-fill looks like, so it is a gap.
 _PHYSICAL_MAX = 1000.0
 _SPO2_MAX = 100.0
-_ZERO_IS_NOT_A_READING = frozenset({"spo2", "temperature"})
+_ZERO_IS_NOT_A_READING = frozenset({"spo2", "temperature", "systolic_bp"})
 
 
 def possible(vital: str, value: float | None) -> float | None:

@@ -575,7 +575,8 @@
               "heart_rate",
               "respiratory_rate",
               "spo2",
-              "temperature"
+              "temperature",
+              "systolic_bp"
             ],
             "type": "string"
           },
@@ -632,7 +633,8 @@
               "heart_rate",
               "respiratory_rate",
               "spo2",
-              "temperature"
+              "temperature",
+              "systolic_bp"
             ],
             "type": "string"
           }
@@ -666,7 +668,8 @@
               "heart_rate",
               "respiratory_rate",
               "spo2",
-              "temperature"
+              "temperature",
+              "systolic_bp"
             ],
             "type": "string"
           }
@@ -714,7 +717,7 @@
                 }
               ]
             },
-            "maxItems": 4,
+            "maxItems": 5,
             "type": "array"
           }
         },
@@ -749,7 +752,8 @@
               "heart_rate",
               "respiratory_rate",
               "spo2",
-              "temperature"
+              "temperature",
+              "systolic_bp"
             ],
             "type": "string"
           }
@@ -3915,7 +3919,7 @@
                 }
               ]
             },
-            "maxItems": 4,
+            "maxItems": 5,
             "type": "array"
           },
           "bed": {

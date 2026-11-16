@@ -17,8 +17,9 @@ data unusable: the job ends `failed` and no answer goes out. The agent never gue
   "Is her pulse higher than her usual?", "Has the SpO2 changed from the baseline?". The answer says whether the latest value is
   above, below or the same as the baseline, and, when the data holds `band_low` and `band_high`, inside or outside the band, with
   the window start, the latest value's time and the unit. A forming baseline is said to be forming and is not compared. The
-  baseline data holds four vitals: a question about blood pressure gets one fixed sentence that says there is no blood pressure
-  baseline. "Compare" with another patient, the ward, a population or an average is still refused.
+  baseline data holds five vitals. The fifth, systolic blood pressure ("blood pressure", "BP", "SBP", "systolic"), is built
+  from charted readings, and the answer says so; there is no diastolic baseline, and the vital history holds no blood pressure.
+  "Compare" with another patient, the ward, a population or an average is still refused.
 - `own_baseline`: "What is this patient's baseline for heart rate?" A ranked patient whose data holds a null
   baseline gets one fixed sentence: the data holds no baseline at this time.
 - `recent_change`: "What changed in the last 6 hours?" or "What changed in SpO2 in the last 3 hours?" (first, latest,

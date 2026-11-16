@@ -154,7 +154,7 @@ export interface components {
             readonly status: "computed";
             readonly unit: string;
             /** @enum {string} */
-            readonly vital: "heart_rate" | "respiratory_rate" | "spo2" | "temperature";
+            readonly vital: "heart_rate" | "respiratory_rate" | "spo2" | "temperature" | "systolic_bp";
             readonly z: number;
         };
         /**
@@ -167,7 +167,7 @@ export interface components {
             /** @constant */
             readonly status: "flag_only";
             /** @enum {string} */
-            readonly vital: "heart_rate" | "respiratory_rate" | "spo2" | "temperature";
+            readonly vital: "heart_rate" | "respiratory_rate" | "spo2" | "temperature" | "systolic_bp";
         };
         /** BaselineForming */
         readonly BaselineForming: {
@@ -176,7 +176,7 @@ export interface components {
             /** @constant */
             readonly status: "forming";
             /** @enum {string} */
-            readonly vital: "heart_rate" | "respiratory_rate" | "spo2" | "temperature";
+            readonly vital: "heart_rate" | "respiratory_rate" | "spo2" | "temperature" | "systolic_bp";
         };
         /** BaselineResponse */
         readonly BaselineResponse: {
@@ -195,7 +195,7 @@ export interface components {
             /** @constant */
             readonly status: "unavailable";
             /** @enum {string} */
-            readonly vital: "heart_rate" | "respiratory_rate" | "spo2" | "temperature";
+            readonly vital: "heart_rate" | "respiratory_rate" | "spo2" | "temperature" | "systolic_bp";
         };
         /**
          * BaselineUsed

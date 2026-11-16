@@ -200,6 +200,21 @@ def test_a_bool_is_not_a_reading_and_counts_as_a_gap() -> None:
     )
 
 
+def test_systolic_pressure_is_a_charted_vital_with_its_own_floor_a_fall_is_flagged_and_it_is_no_device_vital() -> None:
+    assert "systolic_bp" not in VITALS  # the models and the sweeps read VITALS: this one is for the panel only
+    flat = [120.0] * 24
+    low, dev = found("systolic_bp", flat + [114.0] * 3)  # the floor is 5 mmHg: 114 is z -1.2, under k
+    assert (dev.spread, low.significant, low.pathway) == (5.0, False, "circulatory")
+    fall, dev = found("systolic_bp", flat + [108.0] * 3)  # z -2.4 for three bins
+    assert fall.significant and fall.direction is FindingDirection.falling and dev.run_bins == 3
+    rise, _ = found("systolic_bp", flat + [140.0] * 3)  # a rise is shown and not flagged
+    assert not rise.significant and rise.direction is FindingDirection.rising
+    assert "mmHg" in fall.value
+    custom = BaselineParams(floors={"heart_rate": 2.0, "respiratory_rate": 1.0, "spo2": 1.0, "temperature": 0.1, "systolic_bp": 10.0})
+    got = baseline_finding("systolic_bp", flat + [114.0] * 3, custom)
+    assert not isinstance(got, NotComputed) and got[1].spread == 10.0  # a floor in the params wins
+
+
 def test_unknown_vital_is_refused_without_echoing_it() -> None:
     with pytest.raises(ValueError, match="^unknown vital$"):
         baseline_finding("<script>", [70.0] * 30)

@@ -21,6 +21,11 @@ One vital's 15-minute values since admission, oldest first, `None` for a gap. Vi
 rate (bpm), respiratory rate (/min), SpO2 (%), temperature (°C). Integers are readings. A
 non-finite value (NaN, infinity) or a bool is treated as a gap. An unknown vital is refused. Gaps are skipped, never filled, and are never evidence either way.
 
+A fifth vital, `systolic_bp` (mmHg), is charted, not streamed: the service builds its 15-minute values from the stored blood pressure
+readings (the median of the systolic values in each 15-minute set; a set with no value is a gap). It is not in the device vitals the models and the
+sweeps read, it never feeds a rank or an alert reason, and the same detector runs on it: a fall of the latest value is the flagged way, the floor is
+5 mmHg (judgement, `shortcut:` in code, until B4 tunes it).
+
 ## Outputs
 
 A `Finding` (id `baseline/<vital>`, direction, `significant`, pathway: circulatory for heart
