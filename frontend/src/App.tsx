@@ -153,6 +153,7 @@ export function App() {
       />
       <Route path="/research" element={session ? <Navigate to="/lab/research" replace /> : <ToSignIn gone={gone} />} />
       <Route path="/pipeline" element={session ? <Navigate to="/lab/pipeline" replace /> : <ToSignIn gone={gone} />} />
+      <Route path="*" element={<Navigate to={session ? "/ward" : "/"} replace />} />
     </Routes>
     {session && <ChatBubble session={session} onSignOut={signOut} />}
     </>
