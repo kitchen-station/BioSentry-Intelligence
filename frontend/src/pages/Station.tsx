@@ -154,7 +154,7 @@ function AdmitForm() {
     <form className={styles.form} onSubmit={handleSubmit}>
       <p className={styles.formTitle}>Admit patient</p>
       <p className={styles.formSub}>
-        New patients start NOT RANKED.
+        New patients start NOT RANKED. This is a synthetic ward: never enter a real patient's details.
       </p>
 
       {result && (

@@ -2,33 +2,38 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { PatientStay } from "../types";
 import { getStays, getWard, usesServer } from "../api";
-import { hasWardNow, syncWardNow, useWardNow } from "../components/wardNow";
+import { formatClock, formatDay } from "../components/format";
+import { syncWardNow, useWardNow } from "../components/wardNow";
 import { bedRows, dayTicks, FLOW_DAYS, flowStats, formatStay, recentMoves } from "./flowMath";
 import styles from "./Flow.module.css";
 
 const RECENT = 12;
 const OUTCOME = { discharged: "Discharged", higher_care: "Higher care", transferred: "Transferred", died: "Died" } as const;
 
-const when = (iso: string) =>
-  new Date(iso).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-const day = (ms: number) => new Date(ms).toLocaleDateString([], { day: "numeric", month: "short" });
+const when = (iso: string) => `${formatDay(Date.parse(iso))}, ${formatClock(Date.parse(iso))}`;
+const day = formatDay;
 const status = (stay: PatientStay) => (stay.outcome ? OUTCOME[stay.outcome] : "On the ward");
 
 /** The Station's admin view of who came and went. Scoped by the server, like the ward. */
 export function FlowSection() {
   const [stays, setStays] = useState<PatientStay[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [, render] = useState(0); // a ward read that lands after the stays moves the page's time
   const now = useWardNow(); // ward time from the newest ward or patient read
   const pollMs = usesServer ? 5_000 : 15_000; // the API changes as the simulator runs; the fixture never does
 
   useEffect(() => {
-    // The stays carry no time of their own: with no ward read yet, the ward is read for its time.
+    // The stays carry no time of their own: the ward is read for its time at every refresh, so at 10x or
+    // 60x a new stay never starts after the page's clock (a negative length).
     const refresh = () =>
       Promise.all([
-        hasWardNow() ? undefined : getWard().then((w) => syncWardNow(w.now)),
+        getWard().then((w) => syncWardNow(w.now, !usesServer)),
         getStays().then(setStays),
       ]).then(
-        () => setFailed(false),
+        () => {
+          setFailed(false);
+          render((n) => n + 1);
+        },
         () => setFailed(true),
       );
     void refresh();

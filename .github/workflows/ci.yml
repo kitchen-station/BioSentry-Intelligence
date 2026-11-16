@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}  # pushes to main never cancel each other
   cancel-in-progress: true
 
 # Job ids and `name:` values are the required-check names. Branch protection
@@ -81,7 +81,7 @@ jobs:
   backend:
     name: backend
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     # The same PostgreSQL as compose.yaml (keep the digest in step). The password is for this
     # throwaway CI container only.
     services:

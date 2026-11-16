@@ -171,6 +171,10 @@ def test_rank_and_alerts_exact_text():
         "These alert reasons are active:\n"
         '1. Rule: NEWS2 threshold\n  "NEWS2 total 5 reached the trigger."\n'
         '2. Rule: finding\n  "Heart rate 40 over baseline."\n   Pathway:\n  "cardiac"\n') + tail("why this patient has this rank")
+    flags = [{"rule": "prediction_model_flag", "text": "Model flag.", "pathway": None},
+             {"rule": "alert_policy_flag", "text": "Policy flag.", "pathway": None}]
+    text = run("which alerts are active", patient(detail=detail_dict(escalation_reasons=flags)))["text"]
+    assert '1. Rule: prediction model flag\n  "Model flag."\n2. Rule: alert policy flag\n  "Policy flag."\n' in text
     d = detail_dict(escalation_reasons=[])
     assert run("which alerts are active", patient(detail=d))["text"] == FIRST + (
         "No alert reason is active for this patient now.\nThe data holds no history of earlier alerts.\n"

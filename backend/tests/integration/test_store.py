@@ -191,7 +191,9 @@ def test_a_seeded_database_reproduces_the_fixture(api: Api, who: str) -> None:
     expected = [bare(r) for r in DATA["ranked"] if r["id"] in mine]  # the fixture is in rank order
     unit = {"unit": "W4", "floor": None, "person": None}  # the fixture's one unit: its ward
     assert [{**r, **unit, "rank": i} for i, r in enumerate(expected, 1)] == ward["ranked"]
-    assert [{**a, **unit, "news2_risk": None} for a in DATA["abstained"] if a["id"] in mine] == ward["abstained"]
+    shown = ward["abstained"]
+    assert all(a.pop("last_seen") for a in shown)  # the stored values: tested where they are made
+    assert [{**a, **unit, "news2_risk": None} for a in DATA["abstained"] if a["id"] in mine] == shown
     assert ward["receiving_data"] is True
     assert [r["escalation_reasons"] for r in ward["ranked"]] == [
         r["escalation_reasons"] for r in expected

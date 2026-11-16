@@ -94,11 +94,7 @@ describe("a refused request", () => {
     expect(failure).toMatchObject({ status: 422, body: { detail: "no" } });
   });
 
-  // KNOWN BUG (client.ts, the !res.ok branch): res.json() consumes the body before it fails, so
-  // the res.text() fallback throws "Body is unusable" and a non-JSON refusal (a proxy's 502 page)
-  // surfaces as a TypeError, not an ApiError. Remove `.fails` when it is fixed (read text once,
-  // then try JSON.parse).
-  it.fails("is an ApiError carrying the text when the body is not JSON", async () => {
+  it("is an ApiError carrying the text when the body is not JSON", async () => {
     fetchMock.mockResolvedValue(new Response("<html>Bad gateway</html>", { status: 502 }));
     const failure = await deleteRequest("/x").catch((e: unknown) => e);
     expect(failure).toBeInstanceOf(ApiError);

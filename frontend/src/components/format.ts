@@ -27,9 +27,24 @@ export function formatAge(seconds: number): string {
   return `${Math.floor(seconds / 3600)} h ago`;
 }
 
-/** "07:40": wall-clock hour and minute, for due times and last-update stamps. */
+// shortcut: the ward's zone is fixed to the simulator's own (Manila); the server sends no zone. Upgrade: read it from the ward when it does.
+export const WARD_TZ = "Asia/Manila";
+
+export const dayKey = (ms: number): string => new Date(ms).toLocaleDateString("en-CA", { timeZone: WARD_TZ });
+
+/** "07:40": the ward's own hour and minute, for due times and last-update stamps. */
 export function formatClock(ms: number): string {
-  return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", timeZone: WARD_TZ });
+}
+
+/** "07:40:05": the same with seconds. */
+export function formatClockSeconds(ms: number): string {
+  return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: WARD_TZ });
+}
+
+/** "4 Sep": the ward's calendar day. */
+export function formatDay(ms: number): string {
+  return new Date(ms).toLocaleDateString([], { day: "numeric", month: "short", timeZone: WARD_TZ });
 }
 
 /**
@@ -37,9 +52,7 @@ export function formatClock(ms: number): string {
  * consciousness do not expire, so an old entry must not read as today's.
  */
 export function enteredByNurse(ms: number, now: number): string {
-  const day = new Date(ms).toDateString() === new Date(now).toDateString()
-    ? ""
-    : `, ${new Date(ms).toLocaleDateString([], { day: "numeric", month: "short" })}`;
+  const day = dayKey(ms) === dayKey(now) ? "" : `, ${formatDay(ms)}`;
   return `Entered by a nurse at ${formatClock(ms)}${day}`;
 }
 
@@ -101,6 +114,6 @@ export function formatSimClock(sim: SimStatus): string {
 
 /** "22:15" for today, "13 Nov, 22:15" for another day (the same day check and locale as enteredByNurse). A `now` of 0 always gives the date. */
 export function formatClockDay(ms: number, now: number): string {
-  if (new Date(ms).toDateString() === new Date(now).toDateString()) return formatClock(ms);
-  return `${new Date(ms).toLocaleDateString([], { day: "numeric", month: "short" })}, ${formatClock(ms)}`;
+  if (dayKey(ms) === dayKey(now)) return formatClock(ms);
+  return `${formatDay(ms)}, ${formatClock(ms)}`;
 }

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
-import { forgetWardNow, hasWardNow, syncWardNow, useWardNow } from "./wardNow";
+import { forgetWardNow, since, syncWardNow, useWardNow, wardNowMs } from "./wardNow";
 
 const SERVED = "2026-09-03T07:00:00Z";
 
@@ -16,31 +16,35 @@ describe("ward time", () => {
     vi.useRealTimers();
   });
 
-  it("is 0 before any read, and the server's time plus what has passed after one", () => {
-    expect(hasWardNow()).toBe(false);
+  it("is 0 before any read, and the server's time after one", () => {
     const { result } = renderHook(() => useWardNow());
     expect(result.current).toBe(0);
     syncWardNow(SERVED);
-    expect(hasWardNow()).toBe(true);
+    expect(wardNowMs()).toBe(Date.parse(SERVED));
+  });
+
+  it("does not move by the browser's seconds: only a read moves it", () => {
+    syncWardNow(SERVED);
+    act(() => void vi.advanceTimersByTime(60_000));
+    expect(wardNowMs()).toBe(Date.parse(SERVED)); // a paused ward, or a fast one, is not the browser's pace
+    syncWardNow("2026-09-03T07:10:00Z");
+    expect(wardNowMs()).toBe(Date.parse("2026-09-03T07:10:00Z"));
+  });
+
+  it("steps with the browser's seconds in the demo with no server, where the ward's time is the browser's clock", () => {
+    syncWardNow(SERVED, true);
+    const { result } = renderHook(() => useWardNow());
     act(() => void vi.advanceTimersByTime(5000));
     expect(result.current).toBe(Date.parse(SERVED) + 5000);
+    syncWardNow(SERVED);
+    act(() => void vi.advanceTimersByTime(5000));
+    expect(wardNowMs()).toBe(Date.parse(SERVED)); // a server's read ends it
   });
 
-  it("never runs backward when the server serves the same time again (a seeded ward)", () => {
+  it("prints the ward's time for a failure, and the browser's only before any read", () => {
+    const marker = Date.parse("2030-01-01T12:00:00Z");
+    expect(since(marker)).toBe(marker);
     syncWardNow(SERVED);
-    const { result } = renderHook(() => useWardNow());
-    act(() => void vi.advanceTimersByTime(5000));
-    syncWardNow(SERVED);
-    act(() => void vi.advanceTimersByTime(1000));
-    expect(result.current).toBe(Date.parse(SERVED) + 6000);
-  });
-
-  it("moves to a newer served time", () => {
-    syncWardNow(SERVED);
-    const { result } = renderHook(() => useWardNow());
-    act(() => void vi.advanceTimersByTime(5000));
-    syncWardNow("2026-09-03T07:10:00Z");
-    act(() => void vi.advanceTimersByTime(1000));
-    expect(result.current).toBe(Date.parse("2026-09-03T07:10:00Z") + 1000);
+    expect(since(marker)).toBe(Date.parse(SERVED));
   });
 });

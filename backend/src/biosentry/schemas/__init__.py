@@ -78,6 +78,7 @@ from .records import (
 )
 from .research_view import AlertCounted, AlertUnavailable, ResearchAbstained, ResearchRow, WardResearch
 from .rows import (
+    AbstainedDetail,
     AbstainedRow,
     ModelSignal,
     RowModels,
@@ -127,6 +128,7 @@ CONTRACT_MODELS: tuple[type[BaseModel], ...] = (
     RowModels,
     ScoreRow,
     AbstainedRow,
+    AbstainedDetail,
     WardResponse,
     WardUnit,
     TierAScore,
@@ -188,6 +190,7 @@ INPUT_MODELS: frozenset[type[BaseModel]] = frozenset(
 __all__ = [
     "CONTRACT_MODELS",
     "INPUT_MODELS",
+    "AbstainedDetail",
     "AbstainedRow",
     "Acknowledgement",
     "Acvpu",

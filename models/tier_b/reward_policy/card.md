@@ -296,6 +296,7 @@ no-temperature policy are in the held-out file.
 - Weights and theta share a common scale: all can be multiplied by one factor without changing
   what fires. The search does not use that.
 - Not in the rank. The API can run it as a flag only, under decision models-rl-5. NEWS2 is never changed.
+- Stays longer than 7 days get no flag: the admission baseline is no longer stored, and scoring the last 7 days instead was measured on training trials to change which bins alert (of 1,819 student alerts with the admission baseline, 1,060 remain), so that rule was never evaluated. The reason shown is "stay past 7 days: admission baseline not kept".
 
 ## Huawei note
 

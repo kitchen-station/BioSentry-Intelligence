@@ -78,6 +78,11 @@ class AbstainedRow(Contract):
     floor: int | None = None
     person: str | None = None
     news2_risk: Risk | None = None  # a unit that is shown gives the NEWS2 band, never a score or a rank
+    # The last stored value of each vital, whatever its age, each with its own source and time (I2).
+    # Shown so a patient whose signal stopped does not look empty. It is never read by the score,
+    # the arbiter or the rank: the patient stays NOT RANKED (I1, I4). Optional on the wire only so
+    # an older answer still parses; the server always sends it.
+    last_seen: Vitals | None = None
 
 
 class WardUnit(Contract):
@@ -88,6 +93,14 @@ class WardUnit(Contract):
     floor: int | None
     kind: UnitKind
     patients: NonNegInt
+
+
+class AbstainedDetail(AbstainedRow):
+    """GET /patients/{id} for a patient who is NOT RANKED: the row and the stored history. No
+    score, rank or breakdown exists to explain."""
+
+    vital_history: VitalHistoryFull
+    now: AwareDatetime  # ward time this answer was computed at: ages are measured against it
 
 
 class WardResponse(Contract):
@@ -179,3 +192,4 @@ class UnscoredPatient(Contract):
     unit: str
     floor: int | None
     person: str | None
+    last_seen: Vitals | None = None  # the newest stored value of each vital: shown on a NOT RANKED row only

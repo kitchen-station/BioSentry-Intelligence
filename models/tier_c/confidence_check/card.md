@@ -14,7 +14,9 @@ Held-out ward-v2 seeds 11-30 were scored once, on 2026-11-13. The outputs are `h
 `biosentry-held-out/1`, full precision). The pre-registered target was MET for both variants, inside the simulator.
 Staying quiet removed about 6 in 10 of the student's alerting bins. The checked rule is not alerting in 8 of the 61
 episodes the student was alerting in (`no_temp`: 9 of 62). Added to NEWS2, the checked student alerts in 6 more of 91
-episode windows at 1.06 times NEWS2's alerts; no gain beyond chance is shown.
+episode windows at 1.06 times NEWS2's alerts; no gain beyond chance is shown. On held-out set 2 (400 trials, analysis
+declared before reading) the same comparison shows a gain beyond chance: +0.018, 98.33% interval +0.008 to +0.029, at
+1.048 times NEWS2's alerts (`models/held_out_2/analysis.txt`).
 
 ## What the pitch line says and what is true now
 
@@ -210,7 +212,8 @@ alerts). Of the episodes the student detects in any bin, 120 (96 not cut short) 
 - `evaluate` refuses a second held-out run while `heldout.txt` exists. That is a guard by procedure: deleting the file
   removes it. The same held-out seeds were used earlier for earlier models of this project; by procedure this check
   was read on them once. Held-out was not used to choose anything.
-- The API runs it as part of the prediction model flag; it is not in the rank. On a live ward the page and the row never claim coverage (INTEGRATION.md, ruling 4).
+- The API runs it as part of the prediction model flag; it is not in the rank.
+- Stays longer than 7 days get no flag: the admission baseline is no longer stored, and scoring the last 7 days instead was measured on training trials to change which bins alert (of 1,819 student alerts with the admission baseline, 1,060 remain), so that rule was never evaluated. The reason shown is "stay past 7 days: admission baseline not kept". On a live ward the page and the row never claim coverage (INTEGRATION.md, ruling 4).
 
 ## Reproduce
 

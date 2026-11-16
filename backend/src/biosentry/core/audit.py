@@ -39,6 +39,9 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+AUDIT_LIMIT = 500  # GET /audit: the caller's newest rows, oldest first
+
+
 @dataclass(frozen=True, slots=True)
 class AuditRecord:
     seq: int
@@ -105,12 +108,12 @@ class AuditLog:
         assert row is not None
         return int(row["n"])
 
-    def records(self, clinician_id: str | None = None) -> tuple[AuditRecord, ...]:
-        """Every record, oldest first; or only this clinician's."""
-        rows = self._conn.execute(
-            "SELECT * FROM audit_log WHERE %(who)s::text IS NULL OR clinician_id = %(who)s"
-            " ORDER BY seq",
-            {"who": clinician_id},
+    def records(self, clinician_id: str | None = None, limit: int | None = None) -> tuple[AuditRecord, ...]:
+        """Every record, oldest first; or only this clinician's; with `limit`, only the newest that many."""
+        rows = self._conn.execute(  # LIMIT NULL is no limit
+            "SELECT * FROM (SELECT * FROM audit_log WHERE %(who)s::text IS NULL OR clinician_id = %(who)s"
+            " ORDER BY seq DESC LIMIT %(n)s) AS newest ORDER BY seq",
+            {"who": clinician_id, "n": limit},
         )
         return tuple(
             AuditRecord(
@@ -126,7 +129,10 @@ class AuditLog:
         )
 
     def for_clinician(self, clinician_id: str) -> tuple[AuditRecord, ...]:
-        return self.records(clinician_id)
+        # The log only grows, so GET /audit reads the newest rows only, never the whole trail.
+        # ponytail: no (clinician_id, seq) index: a clinician with few rows scans the table backwards
+        # for them; add the index if GET /audit shows in the latency.
+        return self.records(clinician_id, AUDIT_LIMIT)
 
     def recent(self, since: datetime) -> list[dict[str, Any]]:
         """What nurses and physicians did after `since`, as counts per clinician, action and

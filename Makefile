@@ -1,5 +1,5 @@
 .PHONY: web-install web-dev web-build web-typecheck web-lint web-test check \
-        api-install api-dev api-test db-up db-down db-migrate db-reset db-passphrase contract
+        api-install api-dev api-test research-test db-up db-down db-migrate db-reset db-passphrase contract
 
 FRONTEND := frontend
 BACKEND := backend
@@ -66,4 +66,8 @@ contract:
 	cd $(BACKEND) && uv run python -m biosentry.schemas.openapi --out ../$(FRONTEND)/contracts/openapi.json
 	cd $(FRONTEND)/contracts && npm ci && npm run generate
 
-check: web-typecheck web-lint web-test api-test
+# The suite CI's research job runs (research/tests; research/tests_ml needs the research venv).
+research-test:
+	cd $(BACKEND) && PYTHONPATH=src:.. uv run python -m pytest -q -p no:cacheprovider ../research/tests
+
+check: web-typecheck web-lint web-test api-test research-test

@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 from samples import admit_input  # isort: skip
 from test_api import VALID_BODIES
+from test_open_view import shared
 from test_overview import ADMIN, add_admin, write
 from test_store import Api, api, batch, new_run, obs, sim_patient, start  # noqa: F401 (api: fixture)
 
@@ -189,8 +190,11 @@ def test_an_unranked_unit_never_gives_a_band_a_score_or_a_rank_in_any_answer(api
     [row] = body["abstained"]
     assert (row["id"], row["news2_risk"]) == ("i-1", None)
     assert row["reason"] == "Intensive Care is not ranked: NEWS2 is a ward score."
-    for who, pid in (("cn-icu", "i-1"), ("cn-er", "e-1")):
-        for path in ("", "/baseline", "/history"):
+    for who, pid, band in (("cn-icu", "i-1", None), ("cn-er", "e-1", "high")):
+        page = get(api, who, f"/patients/{pid}").json()  # the NOT RANKED page: the row and the stored history
+        assert not {"score", "rank", "tier_breakdown", "models", "escalation"} & page.keys()
+        assert (page["id"], page["news2_risk"], "vital_history" in page) == (pid, band, True)
+        for path in ("/baseline", "/history"):
             assert get(api, who, f"/patients/{pid}{path}").status_code == 404
         [line] = get(api, who, "/patients").json()
         assert (line["id"], line["ranked"]) == (pid, False)
@@ -221,6 +225,11 @@ def test_the_open_view_of_a_unit_that_is_not_ranked_shows_every_bed_as_not_ranke
     assert beds["ER"]["beds"] == [{"bed": "E1", "state": "not_ranked", "rank": None, "risk": None}]
     assert beds["ICU"]["beds"] == [{"bed": "I1", "state": "not_ranked", "rank": None, "risk": None}]
     assert beds["ICU"]["ward"] == "ICU"
+    # a move out is "out" whatever the ending: where a patient went is not shown
+    moves = [{"bed": "E1", "kind": kind, "seq": i} for i, kind in enumerate(("transferred", "died", "in"), 1)]
+    run_id = api.sql("SELECT max(id) AS id FROM run")[0]["id"]
+    assert api.post(f"/sim/runs/{run_id}/view", {"unit": "ER", "shared": shared(moves=moves), "patients": []}).status_code == 204
+    assert [m["kind"] for m in api.client.get("/wards/ER/open-view").json()["sim"]["moves"]] == ["out", "out", "in"]
     assert api.client.get("/wards/NOPE/open-view").status_code == 404
     assert api.sql("SELECT resource, outcome FROM audit_log WHERE action = 'view_open_ward' AND outcome = 'not_found'") == [
         {"resource": "-", "outcome": "not_found"}

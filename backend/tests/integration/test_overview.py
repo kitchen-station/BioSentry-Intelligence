@@ -597,7 +597,8 @@ def test_reads_of_an_unknown_a_left_and_an_unranked_patient_are_the_same_404(api
     write(api, "UPDATE patient SET left_at = %s, outcome = 'discharged' WHERE id = 'p-002'", NOW)
     for template in ("/patients/{patient_id}", "/patients/{patient_id}/baseline", "/patients/{patient_id}/history"):
         seen = set()
-        for pid in ("p-zzz", "p-002", "p-004"):  # unknown, left, NOT RANKED (no detail page)
+        # unknown, left, NOT RANKED (no baseline or history to explain; the patient page reads it)
+        for pid in ("p-zzz", "p-002") + (() if template == "/patients/{patient_id}" else ("p-004",)):
             seq = _last_seq(api)
             response = api.client.get(template.format(patient_id=pid), headers=headers)
             assert [r[2:] for r in _rows_since(api, seq)] == [
@@ -605,6 +606,10 @@ def test_reads_of_an_unknown_a_left_and_an_unranked_patient_are_the_same_404(api
             ]
             seen.add((response.status_code, response.text))
         assert len(seen) == 1 and next(iter(seen))[0] == 404, template
+    seq = _last_seq(api)
+    page = api.client.get("/patients/p-004", headers=headers)  # NOT RANKED: the row and its stored history
+    assert page.status_code == 200 and "score" not in page.json()
+    assert [r[2:] for r in _rows_since(api, seq)] == [("view_patient", "p-004", "ok")]
     seen = set()
     for pid in ("p-zzz", "p-002"):  # notes: a NOT RANKED patient is on the ward, so is readable
         seq = _last_seq(api)

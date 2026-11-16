@@ -141,7 +141,7 @@ unchanged. No flag is shown for a not-computed signal.
 | An input vector of the wrong length, or a non-finite or bool feature, at score time | `NotComputed(<fixed reason>)` for that bin | `NotComputed(<same reason>)` | unaffected |
 | A NOT RANKED bin (ruling 2) | `NotComputed("not ranked")` | `NotComputed("not ranked")` | `NotComputed("not ranked")` |
 | Baseline still forming (ruling 10) | `NotComputed("baseline forming")` | `NotComputed("baseline forming")` | `NotComputed("baseline forming")` |
-| Stay past 672 bins (ruling 7) | `NotComputed("stay past 672 bins")` | same | same |
+| Stay past 672 bins, 7 days (ruling 7) | `NotComputed("stay past 7 days: admission baseline not kept")` | same | same |
 | An earlier bin's scored status cannot be rebuilt from stored inputs (ruling 6) | unaffected | unaffected | `NotComputed("earlier bin not stored")` |
 
 - Load failures are found once, at start: one warning line per failed file with the file and the reason. The load
@@ -664,7 +664,7 @@ Every row: order unchanged, and NEWS2's `escalated` and reasons exactly as NEWS2
 | scored | formed | p < t or `not_sure` | alerting | `Computed(p)`, `Computed("quiet")` or `Computed("not_sure")` | `Computed(True)` | False | "Alert policy flag (learned by reward; synthetic, not validated)" | unchanged |
 | scored | formed | p > q, `alert` | alerting | `Computed(p)`, `Computed("alert")` | `Computed(True)` | False | both flags | unchanged |
 | scored | formed | any | earlier bin's scored status cannot be rebuilt | as computed | `NotComputed("earlier bin not stored")` | False | prediction flag only, if `alert` | unchanged |
-| scored | stay past 672 bins | none | none | `NotComputed("stay past 672 bins")`, same | `NotComputed("stay past 672 bins")` | False | none | unchanged |
+| scored | stay past 672 bins | none | none | `NotComputed("stay past 7 days: admission baseline not kept")`, same | `NotComputed("stay past 7 days: admission baseline not kept")` | False | none | unchanged |
 
 The own-baseline finding (`TierBSignal`) keeps its own reason and its tie-break exactly as today. The invariant the
 script promises (ruling 12): no single model can push a patient up the list. A flag adds a reason and changes no
@@ -733,7 +733,7 @@ the two that rulings 16 and 17 settle as stated in their rows:
 
 | Case | Why they differ | Product result |
 |---|---|---|
-| A stay past 672 bins | `grid()` keeps the newest 672 slots, so the baseline anchor would move; research uses the whole stay | not computed |
+| A stay past 672 bins | `grid()` keeps the newest 672 slots, so the baseline anchor would move; research uses the whole stay. Measured on training trials (2026-11-16, 50 stays over 7 days of 298): scoring the last 672 bins instead alters the student's alerts (of 1,819 bins that alert with the admission baseline, 1,060 still alert; the checked alerts go from 282 to 399). That rule was never evaluated, so it is not run | not computed, reason "stay past 7 days: admission baseline not kept" |
 | A physically impossible device value (ruling 16) | `possible()` makes it a gap in `grid()`; research keeps the stored value | in the current bin: NOT RANKED anyway (`possible()` uses NEWS2's own bounds for these vitals). In an earlier bin: a missing value; the baseline skips it as `baseline_finding` does; the student is not computed only when it is one of its two lag bins (t-4, t-16). Where it falls in the baseline window the baseline differs from research by design. Simulator data has no such value, so no evaluated number changes |
 | An earlier bin scored on a nurse-typed device vital (ruling 17) | the 12-hour rule (`NURSE_VALID`) concerns only nurse-typed device vitals, and such a value is not in the stored bins, so the bin cannot be rebuilt; research has the row's value | that bin is not rebuilt and the policy is not computed there (the dashboard session's stated handling). The difference only removes flags. Blood pressure, consciousness, oxygen and SpO2 scale are rebuilt as newest at or before the bin's end, no age limit: the research rule, no difference |
 | A stale patch or a nurse-typed live value | `counted()` is False; research has no such rule | not computed |
