@@ -41,10 +41,13 @@ from biosentry.schemas import (
 )
 from biosentry.schemas.ingest import (
     BED_LABEL,
+    HISTORY_HOURS,
+    HISTORY_POINTS,
     OPEN_BEDS_MAX,
     LiveWard,
     OpenBed,
     OpenBedCard,
+    OpenHistory,
     OpenSim,
     OpenWard,
 )
@@ -426,7 +429,8 @@ class WardService:
 
     def open_bed(self, unit: str, bed: str) -> OpenBedCard | None:
         """One bed's card for a caller nobody identified. A ranked bed: its NEWS2 score and band,
-        the newest stored value of five vitals with time and source, and the trend word. Any other
+        the newest stored value of five vitals with time and source, the last 12 hours of the five
+        (15-minute values, gaps kept, no id or score on a point), and the trend word. Any other
         bed: its state and the reason only. None: no such bed, or the stay has ended. Nothing
         that names the patient is read into it, and no model runs. Writes no audit row: the
         route does."""
@@ -440,7 +444,7 @@ class WardService:
         if not isinstance(decision, Ranked):
             reason = unit_row(state, info).reason if decision is None else _reason(state, decision.reason)
             return OpenBedCard(
-                **place, state="not_ranked", score=None, risk=None, reason=reason, vitals=None, trend=None
+                **place, state="not_ranked", score=None, risk=None, reason=reason, vitals=None, trend=None, history=None
             )
         vitals: dict[str, Any] = {}
         # All five are NEWS2 inputs: a ranked patient has each one stored.
@@ -456,6 +460,7 @@ class WardService:
             reason=None,
             vitals=vitals,
             trend=state.trend,
+            history=OpenHistory(hours=HISTORY_HOURS, **self._store.open_history(state.id, HISTORY_HOURS, HISTORY_POINTS)),
         )
 
     def summaries(self, clinician_id: str) -> list[PatientSummary]:

@@ -2364,6 +2364,16 @@
               }
             ]
           },
+          "history": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OpenHistory"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "kind": {
             "enum": [
               "ranked",
@@ -2456,9 +2466,65 @@
           "risk",
           "reason",
           "vitals",
-          "trend"
+          "trend",
+          "history"
         ],
         "title": "OpenBedCard",
+        "type": "object"
+      },
+      "OpenHistory": {
+        "additionalProperties": false,
+        "description": "The last 12 hours of the five vitals of a ranked bed, oldest first, at most 49 points each.",
+        "properties": {
+          "blood_pressure": {
+            "items": {
+              "$ref": "#/components/schemas/OpenPressurePoint"
+            },
+            "maxItems": 49,
+            "type": "array"
+          },
+          "heart_rate": {
+            "items": {
+              "$ref": "#/components/schemas/OpenPoint"
+            },
+            "maxItems": 49,
+            "type": "array"
+          },
+          "hours": {
+            "const": 12,
+            "type": "integer"
+          },
+          "respiratory_rate": {
+            "items": {
+              "$ref": "#/components/schemas/OpenPoint"
+            },
+            "maxItems": 49,
+            "type": "array"
+          },
+          "spo2": {
+            "items": {
+              "$ref": "#/components/schemas/OpenPoint"
+            },
+            "maxItems": 49,
+            "type": "array"
+          },
+          "temperature": {
+            "items": {
+              "$ref": "#/components/schemas/OpenPoint"
+            },
+            "maxItems": 49,
+            "type": "array"
+          }
+        },
+        "required": [
+          "hours",
+          "heart_rate",
+          "respiratory_rate",
+          "spo2",
+          "temperature",
+          "blood_pressure"
+        ],
+        "title": "OpenHistory",
         "type": "object"
       },
       "OpenMove": {
@@ -2489,6 +2555,36 @@
         "title": "OpenMove",
         "type": "object"
       },
+      "OpenPoint": {
+        "additionalProperties": false,
+        "description": "One 15-minute value of a device vital on a bed card. `value` is null for a gap (I1): never\nzero, never filled. No name, id or score is on a point.",
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/ProvenanceSource"
+          },
+          "time": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "time",
+          "value",
+          "source"
+        ],
+        "title": "OpenPoint",
+        "type": "object"
+      },
       "OpenPressure": {
         "additionalProperties": false,
         "properties": {
@@ -2515,6 +2611,35 @@
           "source"
         ],
         "title": "OpenPressure",
+        "type": "object"
+      },
+      "OpenPressurePoint": {
+        "additionalProperties": false,
+        "description": "One charted blood pressure (it is not binned): the reading, its time and who charted it.",
+        "properties": {
+          "diastolic": {
+            "exclusiveMinimum": 0,
+            "type": "integer"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ProvenanceSource"
+          },
+          "systolic": {
+            "exclusiveMinimum": 0,
+            "type": "integer"
+          },
+          "time": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "time",
+          "systolic",
+          "diastolic",
+          "source"
+        ],
+        "title": "OpenPressurePoint",
         "type": "object"
       },
       "OpenSim": {
