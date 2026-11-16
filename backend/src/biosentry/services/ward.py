@@ -22,6 +22,7 @@ from biosentry.domain.scoring.tier_a import News2Score
 from biosentry.domain.scoring.tier_c.confidence import Check
 from biosentry.repositories.postgres import OUT_OF_DATE, PostgresStore, whole
 from biosentry.schemas import (
+    AbstainedDetail,
     AbstainedRow,
     PatientDetail,
     PatientStay,
@@ -169,6 +170,7 @@ def abstained_row(state: UnscoredPatient, decision: NotRanked) -> AbstainedRow:
         reason=_reason(state, decision.reason),
         instruction=decision.instruction,
         synthetic=state.synthetic,
+        last_seen=state.last_seen,
     )
 
 
@@ -263,8 +265,9 @@ class WardService:
 
     def detail_or_abstained(
         self, clinician_id: str, patient_id: str
-    ) -> PatientDetail | AbstainedRow | None:
-        """The patient's detail, or the NOT RANKED row, or None when the caller may not see them.
+    ) -> PatientDetail | AbstainedDetail | None:
+        """The patient's detail, or the NOT RANKED row with the stored history, or None when the
+        caller may not see them.
         Writes no audit row: the caller audits."""
         visible = self.visible(clinician_id)
         if patient_id not in visible:
@@ -272,7 +275,12 @@ class WardService:
         ranked, abstained, states = self.view(visible)
         row = next((r for r in ranked if r.id == patient_id), None)
         if row is None:
-            return next((a for a in abstained if a.id == patient_id), None)
+            held = next((a for a in abstained if a.id == patient_id), None)
+            return held and AbstainedDetail(
+                **held.model_dump(),
+                vital_history=states[patient_id].vital_history,
+                now=whole(self._store.now()),
+            )
         state = states[patient_id]
         breakdown = TierBreakdown(
             tier_a=TierAScore(score=row.score, label=f"NEWS2 = {row.score}"),
@@ -284,10 +292,13 @@ class WardService:
             now=whole(self._store.now()),
         )
 
-    def patient(self, clinician_id: str, patient_id: str) -> PatientDetail | None:
+    def patient(
+        self, clinician_id: str, patient_id: str
+    ) -> PatientDetail | AbstainedDetail | None:
+        """The page's read. A NOT RANKED patient gets the row and the stored history (no score to
+        explain); a missing patient and one who is not the caller's look identical (None)."""
         found = self.detail_or_abstained(clinician_id, patient_id)
-        if not isinstance(found, PatientDetail):
-            # Missing, not-yours and NOT RANKED (no score to explain) look identical.
+        if found is None:
             self._audit.append(clinician_id, "view_patient", patient_id, "not_found")
             return None
         self._audit.append_view(clinician_id, "view_patient", patient_id)

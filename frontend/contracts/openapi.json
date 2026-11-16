@@ -1,6 +1,88 @@
 {
   "components": {
     "schemas": {
+      "AbstainedDetail": {
+        "additionalProperties": false,
+        "description": "GET /patients/{id} for a patient who is NOT RANKED: the row and the stored history. No\nscore, rank or breakdown exists to explain.",
+        "properties": {
+          "admitting_context": {
+            "type": "string"
+          },
+          "age": {
+            "anyOf": [
+              {
+                "maximum": 150,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bed": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "instruction": {
+            "type": "string"
+          },
+          "last_seen": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Vitals"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "name": {
+            "type": "string"
+          },
+          "now": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "sex": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "synthetic": {
+            "type": "boolean"
+          },
+          "vital_history": {
+            "$ref": "#/components/schemas/VitalHistoryFull"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "age",
+          "sex",
+          "bed",
+          "admitting_context",
+          "reason",
+          "instruction",
+          "synthetic",
+          "vital_history",
+          "now"
+        ],
+        "title": "AbstainedDetail",
+        "type": "object"
+      },
       "AbstainedRow": {
         "additionalProperties": false,
         "description": "NOT RANKED is a first-class row (I4): a reason and an instruction, no score, no rank.",
@@ -28,6 +110,17 @@
           },
           "instruction": {
             "type": "string"
+          },
+          "last_seen": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Vitals"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           },
           "name": {
             "type": "string"
@@ -4342,6 +4435,17 @@
           },
           "labs": {
             "$ref": "#/components/schemas/LabPanel"
+          },
+          "last_seen": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Vitals"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           },
           "last_update_s": {
             "anyOf": [

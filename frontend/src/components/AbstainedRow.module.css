@@ -73,6 +73,13 @@
   margin-top: 2px;
 }
 
+.seen {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--label);
+  margin-top: var(--sp-1);
+}
+
 .action {
   font-family: var(--font-sans);
   font-size: 12px;

@@ -8,6 +8,27 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * AbstainedDetail
+         * @description GET /patients/{id} for a patient who is NOT RANKED: the row and the stored history. No
+         *     score, rank or breakdown exists to explain.
+         */
+        readonly AbstainedDetail: {
+            readonly admitting_context: string;
+            readonly age: number | null;
+            readonly bed: string;
+            readonly id: string;
+            readonly instruction: string;
+            /** @default null */
+            readonly last_seen?: components["schemas"]["Vitals"] | null;
+            readonly name: string;
+            /** Format: date-time */
+            readonly now: string;
+            readonly reason: string;
+            readonly sex: string | null;
+            readonly synthetic: boolean;
+            readonly vital_history: components["schemas"]["VitalHistoryFull"];
+        };
+        /**
          * AbstainedRow
          * @description NOT RANKED is a first-class row (I4): a reason and an instruction, no score, no rank.
          */
@@ -17,6 +38,8 @@ export interface components {
             readonly bed: string;
             readonly id: string;
             readonly instruction: string;
+            /** @default null */
+            readonly last_seen?: components["schemas"]["Vitals"] | null;
             readonly name: string;
             readonly reason: string;
             readonly sex: string | null;
@@ -1038,6 +1061,8 @@ export interface components {
             readonly bed: string;
             readonly id: string;
             readonly labs: components["schemas"]["LabPanel"];
+            /** @default null */
+            readonly last_seen?: components["schemas"]["Vitals"] | null;
             readonly last_update_s: number | null;
             readonly mechanism: string;
             readonly name: string;
@@ -1149,6 +1174,7 @@ export interface components {
     headers: never;
     pathItems: never;
 }
+export type AbstainedDetail = components['schemas']['AbstainedDetail'];
 export type AbstainedRow = components['schemas']['AbstainedRow'];
 export type Acknowledgement = components['schemas']['Acknowledgement'];
 export type Acvpu = components['schemas']['Acvpu'];

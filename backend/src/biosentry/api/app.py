@@ -49,6 +49,7 @@ from biosentry.db.passphrase import Busy, verify
 from biosentry.db.seed import ensure
 from biosentry.repositories.postgres import Conn, PostgresStore, connect
 from biosentry.schemas import (
+    AbstainedDetail,
     AbstainedRow,
     Acknowledgement,
     AdmitPatientInput,
@@ -573,8 +574,8 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
     def list_patients(ctx: Ctx, who: Who) -> list[PatientSummary]:
         return ctx.wards.summaries(who)
 
-    @app.get("/patients/{patient_id}", response_model=PatientDetail)
-    def get_patient(patient_id: str, ctx: Ctx, who: Who) -> PatientDetail:
+    @app.get("/patients/{patient_id}", response_model=PatientDetail | AbstainedDetail)
+    def get_patient(patient_id: str, ctx: Ctx, who: Who) -> PatientDetail | AbstainedDetail:
         found = ctx.wards.patient(who, patient_id)
         if found is None:
             raise HTTPException(status_code=404, detail=NOT_FOUND)
