@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 from test_overview import ADMIN, add_admin, write
 from test_store import Api, api  # noqa: F401 (api: fixture)
-from test_units import PATIENTS, UNITS, get, hospital, stay
+from test_units import PATIENTS, UNITS, get, hospital, send, stay
 
 from biosentry.db.passphrase import hash_passphrase
 from biosentry.db.seed import DEV_PASSPHRASE
@@ -140,3 +140,38 @@ def test_a_database_that_already_had_the_five_gets_their_names_and_a_new_one_nev
         "src/biosentry/db/migrations/0019_staff_per_floor.sql").read_text(encoding="utf-8"), count=1)
     write(api, ran)
     assert people(api)["cn-er"]["display_name"] == "Own Name"  # only a null name is filled
+
+
+def test_the_answers_that_hold_a_whole_unit_refuse_another_units_new_staff(api: Api) -> None:
+    hospital(api)
+    give_passphrase(api, *ALL_NEW)  # a test of the API, so these people may sign in
+    for who in ("md-sarmiento", "rn-pangilinan", "cn-er"):  # ER people ask for MED3A and ICU
+        for unit in ("MED3A", "ICU"):
+            for path in ("live", "research", "lab/runs", "lab/questions"):
+                assert get(api, who, f"/wards/{unit}/{path}").status_code == 403, (who, unit, path)
+            assert send(api, who, f"/wards/{unit}/sim/commands", {"kind": "set_speed", "speed": 10}).status_code == 403
+    assert get(api, "md-hizon", "/wards/ER/live").status_code == 403  # a MED3A physician asks for the ER
+    assert get(api, "md-hizon", "/wards/ER/research").status_code == 403
+    assert get(api, "rn-pascual", "/wards/ER/live").status_code == 403
+    assert get(api, "md-sarmiento", "/wards/ER/live").status_code == 200  # their own unit
+    assert get(api, "rn-pangilinan", "/wards/ER/research").status_code == 403  # a staff nurse: never the research view
+    assert api.sql("SELECT count(*) AS n FROM sim_command") == [{"n": 0}]
+
+
+def test_who_may_send_whole_run_commands_is_pinned_as_the_code_does_today(api: Api) -> None:
+    # Pinned, not endorsed: the unit only gates which clinicians reach the route (`belongs`); a command applies
+    # to the whole shared run. A new unit's physician or charge nurse can set the speed, skip and reset it.
+    # Owner decision orch-s2 may narrow this to rn-manalo and md-santos: that change must change this test.
+    hospital(api)
+    give_passphrase(api, *ALL_NEW)
+    set_speed = {"kind": "set_speed", "speed": 10}
+    for who, unit in (("md-sarmiento", "ER"), ("cn-er", "ER"), ("md-ocampo", "ICU"), ("md-santos", "W4"), ("rn-manalo", "W4")):
+        assert send(api, who, f"/wards/{unit}/sim/commands", set_speed).status_code == 204, who
+        assert send(api, who, f"/wards/{unit}/sim/commands", {"kind": "reset"}).status_code == 204, who
+    assert send(api, "md-sarmiento", "/wards/ER/sim/commands", {"kind": "skip", "minutes": 60}).status_code == 204
+    for who, unit in (("rn-pangilinan", "ER"), ("rn-guevarra", "ER"), ("rn-abad", "ICU"), ("md-ocampo", "ER"), ("md-sarmiento", "W4")):
+        assert send(api, who, f"/wards/{unit}/sim/commands", set_speed).status_code == 403, who
+        assert send(api, who, f"/wards/{unit}/sim/commands", {"kind": "reset"}).status_code == 403, who
+    admin = add_admin(api)
+    assert api.client.post("/wards/ER/sim/commands", json=set_speed, headers=admin).status_code == 403
+    assert api.sql("SELECT count(*) AS n FROM sim_command") == [{"n": 11}]

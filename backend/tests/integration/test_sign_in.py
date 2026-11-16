@@ -353,7 +353,8 @@ def test_seeding_over_a_loopback_connection_gives_every_clinician_the_dev_passph
     ensure(blank_database_url)
     everyone = _hashes(blank_database_url)
     stored = {i: h for i, h in everyone.items() if h is not None}
-    assert len(stored) == 5 and len(everyone) == 25  # the 20 the migrations add (charge nurses, floor staff) have none and all(verify(DEV_PASSPHRASE, h) for h in stored.values())
+    assert len(stored) == 5 and len(everyone) == 25 and all(verify(DEV_PASSPHRASE, h) for h in stored.values())
+    # the 20 people the migrations add (charge nurses, floor staff) have no passphrase
     assert len(set(stored.values())) == 5  # each with a salt of its own
     assert {h for i, h in _hashes(blank_database_url).items() if i.startswith("cn-")} == {None}  # the migration's: none
 
