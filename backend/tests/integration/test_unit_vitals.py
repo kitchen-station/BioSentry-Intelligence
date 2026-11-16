@@ -26,7 +26,7 @@ def test_the_same_vitals_and_trends_a_ranked_row_has_are_on_a_shown_or_unranked_
         assert row["vitals"]["heart_rate"]["provenance"]["observed_at"]
 
 
-def test_an_admin_reads_every_unit_and_a_charge_nurse_reads_only_her_own(api: Api) -> None:
+def test_an_admin_reads_every_unit_and_a_charge_nurse_reads_only_their_own(api: Api) -> None:
     hospital(api)
     add_admin(api)
     for unit, pid in (("ER", "e-1"), ("ICU", "i-1")):
