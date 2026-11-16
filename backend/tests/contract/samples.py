@@ -559,6 +559,11 @@ _BUILDERS: dict[type[BaseModel], Any] = {
             "blood_pressure": {"systolic": 118, "diastolic": 76, "observed_at": "2026-09-03T06:00:00Z", "source": "nurse"},
         },
         "trend": "rising",
+        "history": {
+            "hours": 12,
+            **{k: [{"time": "2026-09-03T06:30:00Z", "value": None, "source": "device"}] for k in ("heart_rate", "respiratory_rate", "spo2", "temperature")},
+            "blood_pressure": [{"time": "2026-09-03T06:00:00Z", "systolic": 118, "diastolic": 76, "source": "nurse"}],
+        },
     },
     OpenUnits: lambda: {
         "synthetic": True,
