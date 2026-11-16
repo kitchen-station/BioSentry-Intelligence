@@ -24,6 +24,9 @@ class OverviewClinician(Contract):
     id: str
     role: SessionRole
     patients: int  # patients on the ward assigned to this clinician
+    display_name: str | None = None  # the surname the pages show
+    unit: str | None = None
+    floor: int | None = None  # the floor of the unit in this run
 
 
 class OverviewActivity(Contract):

@@ -732,9 +732,15 @@ export interface components {
         };
         /** OverviewClinician */
         readonly OverviewClinician: {
+            /** @default null */
+            readonly display_name?: string | null;
+            /** @default null */
+            readonly floor?: number | null;
             readonly id: string;
             readonly patients: number;
             readonly role: components["schemas"]["SessionRole"];
+            /** @default null */
+            readonly unit?: string | null;
         };
         /** OverviewPatient */
         readonly OverviewPatient: {

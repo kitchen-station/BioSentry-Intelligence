@@ -220,9 +220,9 @@ def test_the_fixture_detail_pages_are_reproduced(api: Api) -> None:
 
 
 def test_notes_and_clinicians_are_seeded(api: Api) -> None:
-    assert {r["id"]: r["role"] for r in api.sql("SELECT * FROM clinician WHERE id NOT LIKE 'cn-%%'")} == {
+    assert {r["id"]: r["role"] for r in api.sql("SELECT * FROM clinician") if r["id"] in DATA["clinicians"]} == {
         c: e["role"] for c, e in DATA["clinicians"].items()
-    }  # the migration adds the other units' charge nurses (cn-...)
+    }  # the migrations add the other units' charge nurses and each floor's staff
     shown = api.client.get("/patients/p-001/notes", headers=api.as_("rn-manalo")).json()
     assert {n["id"] for n in shown} == {
         n["id"] for n in DATA["notes"] if n["patient_id"] == "p-001"
@@ -900,7 +900,7 @@ def test_two_processes_starting_at_once_set_up_the_database_once(blank_database_
         runs = conn.execute("SELECT count(*) AS n FROM run WHERE source = 'fixture'").fetchone()
         clinicians = conn.execute("SELECT count(*) AS n FROM clinician").fetchone()
     assert runs == {"n": 1}
-    assert clinicians == {"n": len(CLINICIANS) + 5}  # and the migration's five charge nurses
+    assert clinicians == {"n": len(CLINICIANS) + 20}  # and the migrations' five charge nurses and 15 floor staff
 
 
 # --- Boundaries: input PostgreSQL cannot store, and where a reset may run -----------------------
@@ -940,7 +940,7 @@ def test_reset_refuses_when_the_connection_made_is_not_to_loopback_and_drops_not
         reset(database_url)
     with connect(database_url) as conn:
         assert conn.execute("SELECT count(*) AS n FROM run").fetchone() == {"n": 1}
-        assert conn.execute("SELECT count(*) AS n FROM clinician").fetchone() == {"n": 10}
+        assert conn.execute("SELECT count(*) AS n FROM clinician").fetchone() == {"n": 25}
 
 
 def test_reset_on_loopback_rebuilds_from_the_seed(database_url: str) -> None:

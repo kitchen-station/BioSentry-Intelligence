@@ -372,13 +372,23 @@ class PostgresStore:
             out[r["patient_id"]].append(r["clinician_id"])
         return out
 
-    def clinicians(self, unit: str) -> list[tuple[str, str]]:
-        """Every clinician of the unit but an admin, as (id, role), by id."""
+    def clinicians(self, unit: str) -> list[tuple[str, str, str | None]]:
+        """Every clinician of the unit but an admin, as (id, role, display name), by id."""
         rows = self.conn.execute(
-            "SELECT id, role FROM clinician WHERE role <> %s AND unit = %s ORDER BY id",
+            "SELECT id, role, display_name FROM clinician WHERE role <> %s AND unit = %s ORDER BY id",
             (ADMIN_ROLE, unit),
         )
-        return [(r["id"], r["role"]) for r in rows]
+        return [(r["id"], r["role"], r["display_name"]) for r in rows]
+
+    def profile(self, clinician_id: str) -> tuple[str | None, str | None, int | None]:
+        """What a page labels a person with: (display name, unit, floor of that unit in this run). Labels
+        only: the unit and the floor widen nothing (a scope is the patients assigned, never the unit)."""
+        row = self.conn.execute(
+            "SELECT display_name, unit FROM clinician WHERE id = %s", (clinician_id,)
+        ).fetchone()
+        assert row is not None  # asked for a clinician who has just signed in
+        unit = self.units.get(row["unit"])
+        return row["display_name"], row["unit"], unit["floor"] if unit else None
 
     def unit_of(self, clinician_id: str) -> str | None:
         """The clinician's own unit: the default unit of a patient they admit. Not a scope."""

@@ -28,6 +28,7 @@ OPTIONAL_OUTPUT_FIELDS = {
     ("OpenUnit", "score_note"),
     *(("PatientStay", f) for f in ("unit", "floor", "person", "to_unit")),
     *(("OverviewPatient", f) for f in ("unit", "floor")),
+    *((m, f) for m in ("OverviewClinician", "SessionToken") for f in ("display_name", "unit", "floor")),
 }
 
 IDS = [m.__name__ for m in CONTRACT_MODELS]

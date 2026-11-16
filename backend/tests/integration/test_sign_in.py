@@ -188,7 +188,7 @@ def test_a_locked_id_and_an_anonymous_caller_each_leave_one_audit_row_a_minute(
 
 def test_the_right_passphrase_gets_a_token_that_works(server: Server) -> None:
     response = server.sign_in("rn-manalo")
-    assert response.status_code == 200 and set(response.json()) == {"token", "role"}
+    assert response.status_code == 200 and set(response.json()) == {"token", "role", "display_name", "unit", "floor"}
     headers = {"Authorization": f"Bearer {response.json()['token']}"}
     assert server.client.get("/patients", headers=headers).status_code == 200
 
@@ -351,8 +351,10 @@ def test_seeding_over_a_loopback_connection_gives_every_clinician_the_dev_passph
     with connect(blank_database_url) as conn:
         assert is_loopback(conn.info)  # judged on the established connection
     ensure(blank_database_url)
-    stored = {i: h for i, h in _hashes(blank_database_url).items() if not i.startswith("cn-")}
-    assert len(stored) == 5 and all(verify(DEV_PASSPHRASE, h) for h in stored.values())
+    everyone = _hashes(blank_database_url)
+    stored = {i: h for i, h in everyone.items() if h is not None}
+    assert len(stored) == 5 and len(everyone) == 25 and all(verify(DEV_PASSPHRASE, h) for h in stored.values())
+    # the 20 people the migrations add (charge nurses, floor staff) have no passphrase
     assert len(set(stored.values())) == 5  # each with a salt of its own
     assert {h for i, h in _hashes(blank_database_url).items() if i.startswith("cn-")} == {None}  # the migration's: none
 

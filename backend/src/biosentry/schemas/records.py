@@ -50,6 +50,10 @@ class SessionRequest(Contract):
 class SessionToken(Contract):
     token: str
     role: SessionRole
+    # What a page labels the person with ("Surname - Role - Unit"). Labels only: they widen no scope. An admin has none.
+    display_name: str | None = None
+    unit: str | None = None
+    floor: int | None = None
 
 
 class Acknowledgement(Contract):

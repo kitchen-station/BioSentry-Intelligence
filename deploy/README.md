@@ -177,6 +177,27 @@ Updating: `git pull && deploy/setup.sh` (it updates the simulator checkout too).
 question worker's log line holds a job id and a state, never a question or an answer. A change to the dashboard or the
 simulator reaches the team the same way: that command rebuilds the pages on the server.
 
+## People on each floor
+
+Every floor has its own labelled staff: one charge nurse, two staff nurses and one physician (W4 has its five).
+All of them are synthetic. A person's scope is the patients assigned to them, never their floor: a staff nurse sees
+their own patients, a physician their own list, a charge nurse the whole unit (the API assigns every patient of a unit to its charge nurse), an admin every unit read-only. The pages label a person "Surname, role, unit"
+from `display_name`, `role`, `unit` and `floor` (the sign-in answer and the admin overview carry them).
+
+| Unit | Charge nurse | Staff nurses | Physician |
+|---|---|---|---|
+| W4 | `rn-manalo` (Manalo) | `rn-delacruz` (de la Cruz), `rn-reyes` (Reyes) | `md-santos` (Santos), `md-aquino` (Aquino) |
+| ER | `cn-er` (Dizon) | `rn-pangilinan` (Pangilinan), `rn-guevarra` (Guevarra) | `md-sarmiento` (Sarmiento) |
+| ICU | `cn-icu` (Macaraeg) | `rn-abad` (Abad), `rn-lacson` (Lacson) | `md-ocampo` (Ocampo) |
+| MED3A | `cn-med3a` (Navarro) | `rn-pascual` (Pascual), `rn-domingo` (Domingo) | `md-hizon` (Hizon) |
+| MED3B | `cn-med3b` (Gonzales) | `rn-salazar` (Salazar), `rn-tolentino` (Tolentino) | `md-evangelista` (Evangelista) |
+| SURG5A | `cn-surg5a` (Valdez) | `rn-ilagan` (Ilagan), `rn-cabrera` (Cabrera) | `md-estrada` (Estrada) |
+
+Migration 0019 adds the fifteen people outside W4 and every `display_name`. **None has a passphrase**, so nobody can
+sign in as one until you set it, only for the ids you want to sign in as. On a development machine:
+`make db-passphrase id=<id>` (for example `make db-passphrase id=rn-pangilinan`). On the server, from step 7 above:
+`docker compose -f deploy/compose.yaml exec api python -m biosentry.db.passphrase <id>`.
+
 ## The tuned model (optional)
 
 Without this step `ask-lab` answers by keyword rules only. With it the rules still answer first, and

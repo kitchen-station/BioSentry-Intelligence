@@ -104,7 +104,7 @@ def test_production_never_seeds_the_dev_passphrase_even_on_loopback(
     seed.ensure(blank_database_url, production=True)
     with connect(blank_database_url, production=False) as conn:
         hashes = conn.execute("SELECT passphrase_hash FROM clinician").fetchall()
-    assert len(hashes) == 10 and {h["passphrase_hash"] for h in hashes} == {None}  # with the five charge nurses of the migration
+    assert len(hashes) == 25 and {h["passphrase_hash"] for h in hashes} == {None}  # with the 20 people the migrations add (charge nurses, floor staff)
 
 
 def test_an_app_started_in_a_production_process_seeds_no_dev_passphrase_and_none_signs_in(

@@ -440,7 +440,8 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
             raise HTTPException(status_code=401, detail="Sign-in failed")
         role = ctx.store.role_of(body.clinician_id)
         assert role is not None  # a token exists only for a known clinician
-        return SessionToken(token=token, role=SessionRole(role))
+        name, unit, floor = ctx.store.profile(body.clinician_id)
+        return SessionToken(token=token, role=SessionRole(role), display_name=name, unit=unit, floor=floor)
 
     if settings.open_ward_view:  # off: the route does not exist, so the framework's own 404 answers
 

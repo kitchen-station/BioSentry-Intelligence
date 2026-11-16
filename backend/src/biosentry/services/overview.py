@@ -78,6 +78,7 @@ class OverviewService:
         counts = [c for p in patients for c in p.care]
         view = store.live_view(unit)
         activity = self._audit.recent(now - ACTIVITY_WINDOW)
+        floor = store.units[unit]["floor"] if unit in store.units else None
         self._audit.append(admin_id, "view_overview", unit, "ok")
         return WardOverview(
             ward=unit,
@@ -87,8 +88,10 @@ class OverviewService:
             sim=_sim_status(view),
             patients=patients,
             clinicians=[
-                OverviewClinician(id=i, role=role, patients=counts.count(i))
-                for i, role in store.clinicians(unit)
+                OverviewClinician(
+                    id=i, role=role, patients=counts.count(i), display_name=name, unit=unit, floor=floor
+                )
+                for i, role, name in store.clinicians(unit)
             ],
             activity=[OverviewActivity(**r) for r in activity],
         )
