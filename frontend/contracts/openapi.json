@@ -2787,6 +2787,18 @@
           },
           "name": {
             "type": "string"
+          },
+          "score_note": {
+            "anyOf": [
+              {
+                "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]{1,300}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "required": [
@@ -5749,6 +5761,18 @@
           "receiving_data": {
             "type": "boolean"
           },
+          "score_note": {
+            "anyOf": [
+              {
+                "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]{1,300}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "shift": {
             "type": "string"
           },
@@ -5810,6 +5834,18 @@
           "patients": {
             "minimum": 0,
             "type": "integer"
+          },
+          "score_note": {
+            "anyOf": [
+              {
+                "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]{1,300}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "required": [

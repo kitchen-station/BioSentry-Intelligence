@@ -21,6 +21,8 @@ Percent = Annotated[float, Field(strict=True, allow_inf_nan=False, ge=0, le=100)
 NonNegInt = Annotated[int, Field(strict=True, ge=0)]
 Flag = Annotated[bool, Field(strict=True)]
 Age = Annotated[int, Field(strict=True, ge=0, le=150)]
+# One printable line that says how to read a unit's NEWS2 (the run sends it; the table checks the same).
+ScoreNote = Annotated[str, Field(pattern=r"^[^\x00-\x1f\x7f-\x9f]{1,300}$")]
 # Free text a clinician types. Bounded, so one request cannot store a megabyte in a field.
 Line = Annotated[str, Field(max_length=200)]
 Text = Annotated[str, Field(max_length=4000)]

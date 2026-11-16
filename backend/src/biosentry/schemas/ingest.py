@@ -16,7 +16,7 @@ from typing import Annotated, Any, Literal, Self
 from pydantic import AfterValidator, AwareDatetime, Field, JsonValue, field_validator, model_validator
 
 from .admission import UNIT_ID
-from .base import Age, Contract, Flag, Num, Percent
+from .base import Age, Contract, Flag, Num, Percent, ScoreNote
 from .clinical import LabPanel
 from .common import ProvenanceSource, QualityLevel, Trend
 
@@ -128,11 +128,13 @@ class Departure(Contract):
         return self
 
 
+
 class NewUnit(Contract):
     id: UnitId
     name: Annotated[str, Field(min_length=1, max_length=60)]
     floor: Annotated[int, Field(strict=True, ge=-5, le=200)] | None
     kind: Literal["ranked", "shown", "unranked"]
+    score_note: ScoreNote | None = None  # how to read this unit's NEWS2, served with the unit
 
 
 HOME = NewUnit(id="W4", name="Ward W4", floor=None, kind="ranked")
@@ -391,6 +393,7 @@ class OpenUnit(Contract):
     name: str
     floor: int | None  # None: not known
     kind: Literal["ranked", "shown", "unranked"]
+    score_note: ScoreNote | None = None  # how to read this unit's NEWS2, when the run says
 
 
 class OpenUnits(Contract):

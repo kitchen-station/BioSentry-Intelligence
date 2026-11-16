@@ -483,7 +483,7 @@ def test_an_old_run_of_one_unit_answers_that_one_unit_with_exactly_the_contracts
     start(watch)  # a body with no units: one ranked unit, W4
     assert get(watch, UNITS_URL).json() == {
         "synthetic": True,
-        "units": [{"id": "W4", "name": "Ward W4", "floor": None, "kind": "ranked"}],
+        "units": [{"id": "W4", "name": "Ward W4", "floor": None, "kind": "ranked", "score_note": None}],
     }
 
 
@@ -495,7 +495,7 @@ def test_the_unit_list_is_the_runs_units_in_order_and_holds_no_count_and_no_pers
     made = watch.post("/sim/runs", {**new_run(patients=patients), "units": HOSPITAL})
     assert made.status_code == 201, made.text
     response = get(watch, UNITS_URL)
-    assert response.json() == {"synthetic": True, "units": HOSPITAL}
+    assert response.json() == {"synthetic": True, "units": [{**u, "score_note": None} for u in HOSPITAL]}
     for mark in ("MARK", "cn-er", "rn-delacruz", "md-santos", "patients", "clinician"):
         assert mark not in response.text, mark
 

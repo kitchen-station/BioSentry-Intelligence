@@ -23,7 +23,9 @@ OPTIONAL_OUTPUT_FIELDS = {
     # Units (hospital-units): a client and a fixture from before units omit them.
     *((m, f) for m in ("ScoreRow", "PatientDetail") for f in ("unit", "floor", "person")),
     *((m, f) for m in ("AbstainedRow", "AbstainedDetail") for f in ("unit", "floor", "person", "news2_risk")),
-    *(("WardResponse", f) for f in ("name", "floor", "kind")),
+    *(("WardResponse", f) for f in ("name", "floor", "kind", "score_note")),
+    ("WardUnit", "score_note"),  # a unit with no note, and a client from before it
+    ("OpenUnit", "score_note"),
     *(("PatientStay", f) for f in ("unit", "floor", "person", "to_unit")),
     *(("OverviewPatient", f) for f in ("unit", "floor")),
 }

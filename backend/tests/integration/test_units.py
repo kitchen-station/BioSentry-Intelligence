@@ -86,7 +86,7 @@ def test_a_body_with_no_units_is_one_ranked_unit_w4(api: Api) -> None:
     ]
     assert api.sql("SELECT unit, person FROM patient WHERE id = 's-1'") == [{"unit": "W4", "person": None}]
     [unit] = get(api, "rn-delacruz", "/wards").json()
-    assert unit == {"id": "W4", "name": "Ward W4", "floor": None, "kind": "ranked", "patients": 1}
+    assert unit == {"id": "W4", "name": "Ward W4", "floor": None, "kind": "ranked", "patients": 1, "score_note": None}
 
 
 def test_wards_lists_the_units_in_order_with_the_callers_own_counts(api: Api) -> None:
