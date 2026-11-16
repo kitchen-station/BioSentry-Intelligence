@@ -28,7 +28,6 @@ class ModelSignal(Contract):
 
 class RowModels(Contract):
     prediction: ModelSignal
-    alert_policy: ModelSignal
 
 
 class ScoreRow(Contract):

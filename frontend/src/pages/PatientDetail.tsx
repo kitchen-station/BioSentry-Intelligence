@@ -65,7 +65,7 @@ const LAB_ROWS = [
 
 type Drawer = "notes" | "charts" | null;
 
-const MODEL_RULES = new Set<string>(["prediction_model_flag", "alert_policy_flag"]);
+const MODEL_RULES = new Set<string>(["prediction_model_flag"]);
 
 const ROLE_LABEL: Record<SessionRole, string> = { rn: "RN", charge_rn: "Charge RN", md: "MD", admin: "Admin" };
 

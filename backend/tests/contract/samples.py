@@ -188,7 +188,7 @@ def model_signal() -> dict[str, Any]:
 
 
 def row_models() -> dict[str, Any]:
-    return {"prediction": model_signal(), "alert_policy": model_signal()}
+    return {"prediction": model_signal()}
 
 
 def score_row() -> dict[str, Any]:

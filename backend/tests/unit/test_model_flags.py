@@ -20,9 +20,7 @@ from biosentry.domain import arbiter
 from biosentry.domain.arbiter import (
     _LEVEL,
     PREDICTION_FLAG,
-    POLICY_FLAG,
     NotRanked,
-    PolicySignal,
     Ranked,
     TierBSignal,
     TierCSignal,
@@ -40,10 +38,9 @@ from biosentry.services.ward import _flag_state, row_models
 
 STUDENT = Provenance.model_validate(model_provenance("C", ms.STUDENT_ID))
 CHECK = Provenance.model_validate(model_provenance("C", ms.CHECK_ID))
-POLICY = Provenance.model_validate(model_provenance("B", ms.POLICY_ID))
 WINDOW = Window(0.0, 900.0, 1.0)
 BIN_END = datetime(2026, 1, 1, 12, tzinfo=UTC)
-MODEL_TEXTS = (PREDICTION_FLAG, POLICY_FLAG)
+MODEL_TEXTS = (PREDICTION_FLAG,)
 
 
 def got(value: Any, prov: Provenance = STUDENT) -> Computed[Any]:
@@ -53,12 +50,7 @@ def got(value: Any, prov: Provenance = STUDENT) -> Computed[Any]:
 NONE = NotComputed("not computed")
 PROBABILITIES = (got(0.0), got(0.5), got(1.0), NONE)
 CHECKS = (got(Check.ALERT, CHECK), got(Check.NOT_SURE, CHECK), got(Check.QUIET, CHECK), NONE)
-POLICIES = (got(True, POLICY), got(False, POLICY), NONE)
-INPUTS = list(itertools.product(PROBABILITIES, CHECKS, POLICIES))  # every combination the models can give
-
-
-def signals(p: Any, c: Any, a: Any) -> tuple[TierCSignal, PolicySignal]:
-    return TierCSignal(p, c), PolicySignal(a)
+INPUTS = list(itertools.product(PROBABILITIES, CHECKS))  # every combination the models can give
 
 
 def reachable() -> dict[tuple[int, int], Any]:
@@ -87,17 +79,16 @@ def test_t1a_no_model_input_changes_the_sort_key() -> None:
         base = arbitrate(name, kinds[kind], tier_b=tier_b)
         assert isinstance(base, Ranked)
         plain[(kind, flag, name)] = base
-        for p, c, a in INPUTS:
-            tier_c, policy = signals(p, c, a)
-            decision = arbitrate(name, kinds[kind], tier_b=tier_b, tier_c=tier_c, policy=policy)
+        for p, c in INPUTS:
+            decision = arbitrate(name, kinds[kind], tier_b=tier_b, tier_c=TierCSignal(p, c))
             assert isinstance(decision, Ranked)
             assert decision.sort_key == base.sort_key
             assert (decision.news2, decision.escalated, decision.flagged) == (base.news2, base.escalated, base.flagged)
-    # Two patients, one with every flag and one with none: the order is the plain order, both ways.
-    everything = signals(got(1.0), got(Check.ALERT, CHECK), got(True, POLICY))
+    # Two patients, one with the flag and one with none: the order is the plain order, both ways.
+    everything = TierCSignal(got(1.0), got(Check.ALERT, CHECK))
     for (k1, base1), (k2, base2) in itertools.product(plain.items(), plain.items()):
         one = arbitrate(k1[2], kinds[k1[0]], tier_b=TierBSignal((ta.drifting(),)) if k1[1] else None,
-                        tier_c=everything[0], policy=everything[1])  # fmt: skip
+                        tier_c=everything)  # fmt: skip
         assert isinstance(one, Ranked)
         assert (one.sort_key < base2.sort_key) == (base1.sort_key < base2.sort_key)
 
@@ -128,9 +119,8 @@ def wards(seed: int, count: int = 40) -> list[list[tuple[str, Any, Any]]]:
 def decisions(ward: list[tuple[str, Any, Any]], mode: str, rng: random.Random) -> list[Any]:
     out = []
     for pid, result, tier_b in ward:
-        p, c, a = rng.choice(INPUTS) if mode == "on" else (NONE, NONE, NONE)
-        tier_c, policy = signals(p, c, a)
-        out.append(arbitrate(pid, result, tier_b=tier_b, tier_c=tier_c, policy=policy))
+        p, c = rng.choice(INPUTS) if mode == "on" else (NONE, NONE)
+        out.append(arbitrate(pid, result, tier_b=tier_b, tier_c=TierCSignal(p, c)))
     return out
 
 
@@ -169,15 +159,15 @@ RANKING_TESTS = (
 )
 
 
-def test_t1f_every_ranking_test_of_the_arbiter_holds_with_both_flags_on_every_patient(
+def test_t1f_every_ranking_test_of_the_arbiter_holds_with_the_flag_on_every_patient(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    flags = signals(got(1.0), got(Check.ALERT, CHECK), got(True, POLICY))
+    flag = TierCSignal(got(1.0), got(Check.ALERT, CHECK))
     real = arbiter.arbitrate
     seen: list[Any] = []
 
     def flagged(patient_id: str, tier_a: Any, **hooks: Any) -> Any:
-        decision = real(patient_id, tier_a, **hooks, **({"tier_c": flags[0], "policy": flags[1]}))
+        decision = real(patient_id, tier_a, **hooks, **({"tier_c": flag}))
         seen.append((real(patient_id, tier_a, **hooks), decision))
         return decision
 
@@ -202,77 +192,67 @@ def test_t2a_the_prediction_reason_is_there_if_and_only_if_the_check_says_alert(
         assert isinstance(decision, Ranked)
         alert = isinstance(c, Computed) and c.value is Check.ALERT
         assert (PREDICTION_FLAG in [r.text for r in decision.reasons]) is alert
-        assert not [r for r in decision.reasons if r.rule is EscalationRule.alert_policy_flag]
-    for a in POLICIES:
-        decision = arbitrate("p-1", ta.news2(), policy=PolicySignal(a))
-        assert isinstance(decision, Ranked)
-        assert (POLICY_FLAG in [r.text for r in decision.reasons]) is (isinstance(a, Computed) and a.value is True)
+    assert {m.value for m in EscalationRule} == {"tier_a_threshold", "tier_c_raise", "tier_b_finding", "missing_input", "prediction_model_flag"}  # no policy rule
 
 
-def test_the_two_reasons_come_after_the_others_and_carry_their_own_rules() -> None:
+def test_the_reason_comes_after_the_others_and_carries_its_own_rule() -> None:
     decision = arbitrate("p-1", ta.news2(heart_rate=35), tier_b=TierBSignal((ta.drifting(),)),
-                         tier_c=TierCSignal(got(1.0), got(Check.ALERT, CHECK)), policy=PolicySignal(got(True, POLICY)))  # fmt: skip
+                         tier_c=TierCSignal(got(1.0), got(Check.ALERT, CHECK)))  # fmt: skip
     assert isinstance(decision, Ranked)
-    assert [r.rule for r in decision.reasons][-2:] == [EscalationRule.prediction_model_flag, EscalationRule.alert_policy_flag]
-    assert decision.reasons[-3].rule is EscalationRule.tier_b_finding
+    assert decision.reasons[-1].rule is EscalationRule.prediction_model_flag
+    assert decision.reasons[-2].rule is EscalationRule.tier_b_finding
     assert decision.flagged and decision.escalated  # from the finding and the trigger, not from a model
     assert decision.inert == ()
 
 
 def test_a_flag_alone_sets_neither_escalated_nor_flagged() -> None:
-    decision = arbitrate("p-1", ta.news2(), tier_c=TierCSignal(got(1.0), got(Check.ALERT, CHECK)),
-                         policy=PolicySignal(got(True, POLICY)))  # fmt: skip
+    decision = arbitrate("p-1", ta.news2(), tier_c=TierCSignal(got(1.0), got(Check.ALERT, CHECK)))
     assert isinstance(decision, Ranked)
     assert (decision.escalated, decision.flagged) == (False, False)
     assert [r.text for r in decision.reasons] == list(MODEL_TEXTS)
 
 
-def response(p: Any, c: Any, a: Any) -> ModelSignals:
+def response(p: Any, c: Any) -> ModelSignals:
     """What C1 gives for a result: a Computed value has its provenance entry (the bin)."""
     found = {}
-    for model_id, results in ((ms.STUDENT_ID, (p, c)), (ms.POLICY_ID, (a,))):
-        if any(isinstance(r, Computed) for r in results):
-            found[model_id] = ModelProvenance(model_id, "all", "x", "ab" * 32, "m1", 1, BIN_END.replace(hour=11, minute=45), BIN_END)
-    return ModelSignals(p, c, a, found)
+    if any(isinstance(r, Computed) for r in (p, c)):
+        found[ms.STUDENT_ID] = ModelProvenance(ms.STUDENT_ID, "all", "x", "ab" * 32, "m1", 1, BIN_END.replace(hour=11, minute=45), BIN_END)
+    return ModelSignals(p, c, found)
 
 
 def test_t2d_the_state_is_flag_if_and_only_if_the_reason_is_in_the_row() -> None:
-    reached = [(p, c, a) for p, c, a in INPUTS if isinstance(c, NotComputed) or isinstance(p, Computed)]  # C1 never gives a check without p
+    reached = [(p, c) for p, c in INPUTS if isinstance(c, NotComputed) or isinstance(p, Computed)]  # C1 never gives a check without p
     assert reached
     seen = set()
-    for p, c, a in reached:
-        decision = arbitrate("p-1", ta.news2(), tier_c=TierCSignal(p, c), policy=PolicySignal(a))
+    for p, c in reached:
+        decision = arbitrate("p-1", ta.news2(), tier_c=TierCSignal(p, c))
         assert isinstance(decision, Ranked)
         texts = [r.text for r in decision.escalation_reasons()]
-        models = row_models(response(p, c, a))
+        models = row_models(response(p, c))
         assert (models.prediction.state == "flag") is (PREDICTION_FLAG in texts)
-        assert (models.alert_policy.state == "flag") is (POLICY_FLAG in texts)
-        seen |= {models.prediction.state, models.alert_policy.state}
+        seen.add(models.prediction.state)
     assert seen == {"flag", "no_flag", "not_sure", "not_computed"}
 
 
 def test_the_state_and_the_fields_of_each_result() -> None:
-    quiet = row_models(response(got(0.001), got(Check.QUIET, CHECK), got(False, POLICY)))
-    assert (quiet.prediction.state, quiet.alert_policy.state) == ("no_flag", "no_flag")
-    unsure = row_models(response(got(0.01), got(Check.NOT_SURE, CHECK), got(True, POLICY)))
-    assert (unsure.prediction.state, unsure.alert_policy.state) == ("not_sure", "flag")
+    quiet = row_models(response(got(0.001), got(Check.QUIET, CHECK)))
+    assert quiet.prediction.state == "no_flag"
+    unsure = row_models(response(got(0.01), got(Check.NOT_SURE, CHECK)))
+    assert unsure.prediction.state == "not_sure"
     one = unsure.prediction
     assert (one.reason, one.bin_end, [p.model_id for p in one.provenance]) == (None, BIN_END, [ms.STUDENT_ID, ms.CHECK_ID])
     assert one.bin_start == BIN_END.replace(hour=11, minute=45)
-    assert [p.model_id for p in unsure.alert_policy.provenance] == [ms.POLICY_ID]
-    assert unsure.alert_policy.provenance[0].tier.value == "B"
     # The student computes but the calibration does not: the prediction is not computed, with the check's reason.
-    no_cal = row_models(response(got(1.0), NotComputed(loader.NO_CALIBRATION), got(False, POLICY)))
+    no_cal = row_models(response(got(1.0), NotComputed(loader.NO_CALIBRATION)))
     assert no_cal.prediction.state == "not_computed" and no_cal.prediction.reason == loader.NO_CALIBRATION
     assert (no_cal.prediction.bin_start, no_cal.prediction.bin_end, no_cal.prediction.provenance) == (None, None, [])
-    assert no_cal.alert_policy.state == "no_flag"
     assert "probability" not in no_cal.model_dump_json() and "1.0" not in no_cal.prediction.model_dump_json()
 
 
 def test_the_not_sure_state_adds_no_reason_and_is_not_no_flag() -> None:
     decision = arbitrate("p-1", ta.news2(), tier_c=TierCSignal(got(0.01), got(Check.NOT_SURE, CHECK)))
     assert isinstance(decision, Ranked) and decision.reasons == ()
-    state = row_models(response(got(0.01), got(Check.NOT_SURE, CHECK), NONE)).prediction.state
+    state = row_models(response(got(0.01), got(Check.NOT_SURE, CHECK))).prediction.state
     assert state == "not_sure" != "no_flag"
 
 
@@ -281,7 +261,7 @@ def test_the_not_sure_state_adds_no_reason_and_is_not_no_flag() -> None:
 
 def our_strings() -> list[str]:
     fixed = [v for k, v in vars(ms).items() if k.isupper() and isinstance(v, str) and " " in v]
-    loaded = [loader.NO_STUDENT, loader.NO_CALIBRATION, loader.NO_POLICY]
+    loaded = [loader.NO_STUDENT, loader.NO_CALIBRATION]
     return [*MODEL_TEXTS, *fixed, *loaded]
 
 
@@ -325,4 +305,3 @@ def test_the_three_file_fields_are_served_only_for_a_model_value() -> None:
 def test_every_value_of_the_check_has_its_state() -> None:
     """A value added to the check later must get a state here first, or a ward read would fail."""
     assert {c: _flag_state(c) for c in Check} == {Check.ALERT: "flag", Check.NOT_SURE: "not_sure", Check.QUIET: "no_flag"}
-    assert (_flag_state(True), _flag_state(False)) == ("flag", "no_flag")

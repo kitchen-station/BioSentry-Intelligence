@@ -270,7 +270,7 @@ export interface components {
          * EscalationRule
          * @enum {string}
          */
-        readonly EscalationRule: "tier_a_threshold" | "tier_c_raise" | "tier_b_finding" | "missing_input" | "prediction_model_flag" | "alert_policy_flag";
+        readonly EscalationRule: "tier_a_threshold" | "tier_c_raise" | "tier_b_finding" | "missing_input" | "prediction_model_flag";
         /**
          * FindingDirection
          * @enum {string}
@@ -984,7 +984,6 @@ export interface components {
         };
         /** RowModels */
         readonly RowModels: {
-            readonly alert_policy: components["schemas"]["ModelSignal"];
             readonly prediction: components["schemas"]["ModelSignal"];
         };
         /**

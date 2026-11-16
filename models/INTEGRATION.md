@@ -11,9 +11,11 @@ What runs on the server today, read from the code (`backend/src/biosentry/api/ap
 `domain/arbiter.py`):
 - **Prediction model flag.** The student with the confidence check. It adds the reason "Prediction model flag (synthetic,
   not validated)" only when the check says "alert"; "not sure" shows no flag.
-- **Alert policy flag.** The reward policy adds "Alert policy flag (learned by reward; synthetic, not validated)". This
-  stays connected only under owner decision models-rl-5 (drop or keep, after held-out set 2 showed a loss for NEWS2 plus
-  the policy). Read every statement below about the policy flag as "under decision models-rl-5".
+- **Alert policy flag: dropped.** The owner decision models-rl-5 (2026-11-16) dropped it, after held-out set 2 showed a
+  loss for NEWS2 plus the policy. The server does not load `policy.json`, does not compute the policy, and sends no
+  `alert_policy` field and no `alert_policy_flag` rule. The policy stays a research result (card, Research page). Read
+  every statement below about the policy flag, `PolicySignal` and `NotComputed("policy not loaded")` as the design
+  record of what was built and then removed; the code is right. The prediction model flag is the only model flag.
 - **Own-baseline finding.** Runs as a reason and a tie-break, on its code defaults (k 2.0, p 3), not on the research
   `params.json` (k 4.0, p 8).
 - A flag never moves a patient and never lowers a NEWS2 trigger. NEWS2 is unchanged.
@@ -48,11 +50,12 @@ says which, from what the backend stores, never from a held-out row. Both varian
   shows as no flag and is recorded; a missing or bad model file means not computed, never a default.
 - Before the wiring every one of these hooks was inert in `backend/src/biosentry/domain/arbiter.py`: the arbiter accepts it,
   records its name in `Ranked.inert` or `NotRanked.inert`, and changes nothing. The wiring slice makes the
-  student and the policy add a reason (a flag) to a ranked row, and nothing else (rulings 3, 11, 12).
+  student adds a reason (a flag) to a ranked row, and nothing else (rulings 3, 11, 12). The policy flag it also made was
+  dropped later (models-rl-5).
 
 ## 2. The chosen path: in-process, inside the API (owner decision H-1)
 
-When connected, the student, the reward policy and the confidence check run INSIDE the API process on the team
+When connected, the student and the confidence check (and, until models-rl-5 dropped it, the reward policy) run INSIDE the API process on the team
 server. There is no model service and no network call per score. No Huawei Cloud account is needed for it. No new
 backend dependency is added. Every later section describes this path.
 
@@ -443,10 +446,11 @@ class TierCSignal:
 
 ## 5. The reward policy (`PolicySignal`)
 
-The policy IS connected, as a flag (owner decision M-1). It can add a reason to a ward row; it never outranks or
-lowers a NEWS2 trigger; it changes no order (ruling 12). The row says what it is: "Alert policy flag (learned by
-reward; synthetic, not validated)" (ruling 11). Its measured result (no gain beyond chance is shown) stays in
-the card and on the Analytics page.
+DROPPED (owner decision models-rl-5, 2026-11-16): the policy is not connected. The server does not load it or
+compute it, and no row shows it. This section and sections 5.1 to 5.3 are the design record of the flag that was built
+(owner decision M-1) and removed, after held-out set 2 showed a loss for NEWS2 plus the policy (-0.0127, at the edge).
+The text below says "is connected" and "adds a reason" as it was written; the code does neither. The result stays in
+the card and on the Research page.
 
 ### 5.1 The six numbers
 
@@ -628,18 +632,18 @@ As the code is (`arbitrate`):
    of 7 or more). Reasons from NEWS2 only.
 3. Rule 3: each significant `TierBSignal` finding adds a reason (`EscalationRule.tier_b_finding`) and sets
    `flagged`. `flagged` orders only patients with no trigger and an equal total; it never sets `escalated`.
-4. Rule 2 (`TierCSignal`), the learned policy (`PolicySignal`), rule 4 and `Guarantees`: inert. Supplying one (any
-   non-None value, `NotComputed` included) only adds its name (`rule_2_tier_c`, `learned_policy`, `guarantees`) to
-   `inert`.
+4. Rule 2 (`TierCSignal`), rule 4 and `Guarantees`: inert on a NOT RANKED patient. Supplying one (any non-None value,
+   `NotComputed` included) only adds its name (`rule_2_tier_c`, `guarantees`) to `inert`. (`PolicySignal` and the name
+   `learned_policy` are gone: models-rl-5.)
 5. Ward order (`Ranked.sort_key`): trigger level, then NEWS2 total, then the Tier B flag (below a trigger only), then
    patient id.
 
 What the wiring adds (rulings 3, 11, 12), and nothing more:
 
 - On a `Ranked` decision, `TierCSignal.check == Computed("alert")` appends one `ArbiterReason` with the text
-  "Prediction model flag (synthetic, not validated)"; `PolicySignal.alert == Computed(True)` appends one with the
-  text "Alert policy flag (learned by reward; synthetic, not validated)".
-- Neither sets `escalated` or `flagged`, and neither enters `sort_key`. The order is unchanged.
+  "Prediction model flag (synthetic, not validated)". (`PolicySignal.alert == Computed(True)` appended a second one,
+  "Alert policy flag ...", until models-rl-5 dropped it.)
+- It does not set `escalated` or `flagged`, and does not enter `sort_key`. The order is unchanged.
 - The `rule` value of those reasons: `EscalationRule` (`schemas/tiers.py`) today has `tier_a_threshold`,
   `tier_c_raise`, `tier_b_finding` and `missing_input`. The wiring slice adds two new members, one for each flag
   (names its own); `tier_c_raise` is not reused. It corrects the arbiter's module docstring, which still says
@@ -957,7 +961,7 @@ Owner decisions:
 - H-1: when connected, the prediction model, the alert policy and the confidence check run inside the API process
   on the team server; no model service, no network call per score, no Huawei Cloud account for it, no new backend
   dependency.
-- M-1: the alert policy IS connected, as a flag; it can add a reason to a ward row, never outranks or lowers a
+- M-1 (superseded by models-rl-5, which dropped the policy flag): the alert policy was connected as a flag; it could add a reason to a ward row, never outranks or lowers a
   NEWS2 trigger, and the row says what it is (learned by reward, synthetic, not validated).
 - M-2: the wiring decisions are delegated to the orchestrator inside fixed rules, and each choice is written down.
 

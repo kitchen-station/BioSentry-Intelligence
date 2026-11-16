@@ -554,19 +554,17 @@ describe("PatientDetail own-baseline reason and patch display", () => {
     expect(screen.getByText("(circulatory)")).toBeTruthy();
   });
 
-  it("lists the two model reasons apart, as research with the rank unchanged, and adds no response line", async () => {
+  it("lists the model reason apart, as research with the rank unchanged, and adds no response line", async () => {
     api.getPatient.mockResolvedValue({
       ...base,
       score: 2,
       escalation_reasons: [
         { rule: "prediction_model_flag", text: "Prediction model flag (synthetic, not validated)", pathway: null },
-        { rule: "alert_policy_flag", text: "Alert policy flag (learned by reward; synthetic, not validated)", pathway: null },
       ],
     } as Detail);
     page();
     await loaded();
     expect(screen.getByText("Prediction model flag (synthetic, not validated)")).toBeTruthy();
-    expect(screen.getByText("Alert policy flag (learned by reward; synthetic, not validated)")).toBeTruthy();
     expect(screen.queryByText(/^Not a NEWS2 trigger/)).toBeNull();
     // Only model lines: the patient is where NEWS2 puts them, and the page still says so.
     expect(screen.getByText("Sorted on NEWS2 only")).toBeTruthy();
@@ -954,7 +952,7 @@ describe("PatientDetail prediction models panel", () => {
     page("admin");
     await loaded();
     const region = screen.getByRole("region", { name: "Prediction models" });
-    expect(within(region).getAllByText(/No result: the patient's own baseline is still forming/)).toHaveLength(2);
+    expect(within(region).getAllByText(/No result: the patient's own baseline is still forming/)).toHaveLength(1);
     expect(screen.getByText("Prediction models · rank unchanged")).toBeTruthy();
   });
 

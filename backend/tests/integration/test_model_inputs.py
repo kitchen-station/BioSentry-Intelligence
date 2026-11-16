@@ -143,19 +143,19 @@ def test_the_service_on_a_posted_run(api: Api) -> None:
     got = ward_model_signals(store, states, MODELS)
     assert len(counting.sql) == 2  # two statements for the whole set
     ok = got["q-1"]
-    assert isinstance(ok.probability, Computed) and isinstance(ok.check, Computed) and ok.policy == Computed(False, ok.policy.provenance, ok.policy.window)  # type: ignore[union-attr]
+    assert isinstance(ok.probability, Computed) and isinstance(ok.check, Computed)
     assert ok.provenance["tier_c/student_vitals"].sim_run_id == store.run_id
     assert ok.provenance["tier_c/student_vitals"].bin_end == ms.bin_window(ok.probability.provenance.observed_at)[1]
     assert ok.probability.provenance.computed_at == RUN0  # ward time, the calendar of observed_at; the wall clock is months on
-    assert (got["q-2"].probability, got["q-2"].policy) == (NotComputed(ms.NOT_RANKED),) * 2
-    assert (got["q-3"].probability, got["q-3"].check, got["q-3"].policy) == (NotComputed(ms.FORMING),) * 3
-    assert (got["q-4"].probability, got["q-4"].check, got["q-4"].policy) == (NotComputed(ms.NOT_COUNTED),) * 3
+    assert (got["q-2"].probability, got["q-2"].check) == (NotComputed(ms.NOT_RANKED),) * 2
+    assert (got["q-3"].probability, got["q-3"].check) == (NotComputed(ms.FORMING),) * 2
+    assert (got["q-4"].probability, got["q-4"].check) == (NotComputed(ms.NOT_COUNTED),) * 2
     assert got["q-5"].probability == NotComputed(ms.NO_BINS)  # live and ranked, but nothing stored yet
     counting.sql.clear()
     assert set(ward_model_signals(store, {k: states[k] for k in ("q-2", "q-4")}, MODELS)) == {"q-2", "q-4"}
     assert counting.sql == []  # NOT RANKED and not counted patients cost no model query
     only = ward_model_signals(store, {"q-3": states["q-3"]}, MODELS)
-    assert only["q-3"].policy == NotComputed(ms.FORMING)
+    assert only["q-3"].check == NotComputed(ms.FORMING)
 
 
 def test_the_reference_stay_replayed_through_the_ingest_routes_gives_the_files_last_bin(api: Api) -> None:
@@ -184,7 +184,6 @@ def test_the_reference_stay_replayed_through_the_ingest_routes_gives_the_files_l
     assert api.post(f"/sim/runs/{run_id}/batch", body).status_code == 204
     store, states = read(api, pid)
     got = ward_model_signals(store, states, MODELS)[pid]
-    ref, pol = last["student"]["all"], last["policy"]["all"]
+    ref = last["student"]["all"]
     assert isinstance(got.probability, Computed) and isinstance(got.check, Computed)
     assert abs(got.probability.value - ref["p"]) <= 1e-12 and got.check.value == ref["check"]
-    assert isinstance(got.policy, Computed) and got.policy.value == pol["alerting"]

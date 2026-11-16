@@ -43,7 +43,7 @@ def detail_dict(**over):
                    "blood_pressure": absent("bp"), "consciousness": absent("c"), "supplemental_o2": absent("o"),
                    "spo2_scale": absent("s")},
         "vital_trends": {"heart_rate": [120], "respiratory_rate": [18], "spo2": [95], "temperature": [37.2]},
-        "labs": LABS, "sort_tier": "A", "tier_status": [], "models": {"prediction": NO_MODEL, "alert_policy": NO_MODEL},
+        "labs": LABS, "sort_tier": "A", "tier_status": [], "models": {"prediction": NO_MODEL},
         "escalation_reasons": [{"rule": "tier_a_threshold", "text": "NEWS2 total 5 reached the trigger.", "pathway": None},
                                {"rule": "tier_b_finding", "text": "Heart rate 40 over baseline.", "pathway": "cardiac"}],
         "synthetic": True, "signal_quality": 90, "last_update_s": 12,

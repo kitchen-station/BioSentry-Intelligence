@@ -74,7 +74,7 @@ class Provenance(Contract):
     model_id: str | None
     synthetic: Flag
     quality: QualityLevel
-    # Only a model value (tier B policy, tier C student or check) carries these three; all null elsewhere.
+    # Only a model value (tier C student or check) carries these three; all null elsewhere.
     variant: str | None = None
     file_sha256: Annotated[str | None, Field(pattern=r"^[0-9a-f]{64}$")] = None
     run_id: str | None = None  # the manifest record's run id
