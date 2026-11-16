@@ -54,7 +54,7 @@ call it anyway). "Public mode" is the one supported way to let them use this API
   state file is written again only after the API has accepted the new run, and a runner that restarts on a month that is
   over starts the next one at once. So a hospital server goes on for ever, one seed after another, and the API reads the
   newest run.
-  **On the team server** `WARD_MODE=hospital` is set in `deploy/.env` (since 16 November 2026). The compose default stays
+  **On the team server** the simulator runs in hospital mode (`WARD_MODE=hospital`). The compose default stays
   `ward`. To switch, edit `WARD_MODE` in `deploy/.env` (`hospital` or `ward`; remove the line for `ward`) and run
   `deploy/setup.sh`. Each mode resumes its own state file, so switching back continues the old ward.
 - `lab` is the lab worker: it runs the simulated compare runs a physician or the charge nurse asks for

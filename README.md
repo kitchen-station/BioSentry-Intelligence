@@ -203,8 +203,8 @@ The API can hold a whole hospital, not only ward W4. All of this is synthetic.
   `GET /open-view` lists the run's units (id, name, floor, kind), `GET /wards/{unit}/open-view` draws one unit's beds, and
   `GET /wards/{unit}/open-view/beds/{bed}` is one bed's card. A ranked bed's card has its NEWS2 score and band, its trend,
   and the newest heart rate, respiratory rate, SpO2, temperature and blood pressure, each with its time and source.
-  Any other bed's card has its state and the reason only. A short history of the last 12 hours on the card is decided
-  (orch-1b) and in progress (open PR 95, not merged); the card does not have it today. A card holds no name, age, sex, context, note, lab, baseline,
+  A ranked bed's card also has `history`: the last 12 hours of the five vitals (orch-1b).
+  Any other bed's card has its state and the reason only. A card holds no name, age, sex, context, note, lab, baseline,
   model flag, clinician or patient id (owner decisions orch-1, orch-h6). All three serve a synthetic run only.
 - **Hospital admin (read-only).** Signed in as an admin, the ward simulator page lists every unit, each unit's patients with
   names, NEWS2 and the five vitals, each unit's history, and one patient's page. It reads `GET /wards`, `/wards/{unit}/rows`,
@@ -216,7 +216,7 @@ The API can hold a whole hospital, not only ward W4. All of this is synthetic.
   command `skip` to `POST /wards/{unit}/sim/commands`, with `minutes` of 60, 360, 720 or 1440, to move the whole run ahead
   by 1 hour, 6 hours, 12 hours or 1 day. The API accepts one skip at a time: a second gets 409 until the simulation has
   fetched the first from the command feed. It also gets 409 when the run is not live. No page in this repository sends it
-  yet, and the simulator's command handler does not list `skip` as of its commit `581378c`.
+  yet. The simulator's runner applies `skip`.
 
 ## Run it yourself (developers)
 
