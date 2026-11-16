@@ -671,6 +671,8 @@ export interface components {
             /** @enum {string} */
             readonly kind: "ranked" | "shown" | "unranked";
             readonly name: string;
+            /** @default null */
+            readonly score_note?: string | null;
         };
         /**
          * OpenUnits
@@ -1334,6 +1336,8 @@ export interface components {
             readonly now: string;
             readonly ranked: readonly components["schemas"]["ScoreRow"][];
             readonly receiving_data: boolean;
+            /** @default null */
+            readonly score_note?: string | null;
             readonly shift: string;
             readonly sort_tier: components["schemas"]["Tier"];
             readonly tier_status: readonly components["schemas"]["TierStatus"][];
@@ -1350,6 +1354,8 @@ export interface components {
             readonly kind: "ranked" | "shown" | "unranked";
             readonly name: string;
             readonly patients: number;
+            /** @default null */
+            readonly score_note?: string | null;
         };
     };
     responses: never;

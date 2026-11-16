@@ -323,6 +323,7 @@ class WardService:
             name=info["name"],
             floor=info["floor"],
             kind=info["kind"],
+            score_note=info["score_note"],
             clinician=clinician_id,
             shift=SHIFT,
             receiving_data=self._store.receiving_data(),
