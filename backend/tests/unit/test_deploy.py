@@ -130,7 +130,10 @@ def test_the_ward_simulator_publishes_nothing_and_waits_for_a_healthy_api() -> N
     assert "BIOSENTRY_API_URL: http://api:8000" in sim  # through the API, never the database
     assert "BIOSENTRY_INGEST_KEY: ${BIOSENTRY_INGEST_KEY:?set BIOSENTRY_INGEST_KEY in deploy/.env}" in sim
     assert "WARD_SPEED: ${WARD_SPEED:-1}" in sim
-    assert "WARD_STATE_FILE: /state/ward-state.json" in sim
+    # ward mode unless deploy/.env says hospital; one state file per mode, both in the simstate volume
+    assert "WARD_MODE: ${WARD_MODE:-ward}" in sim
+    assert "WARD_SCENARIO: ${WARD_SCENARIO:-typical}" in sim
+    assert "WARD_STATE_FILE: /state/${WARD_MODE:-ward}-state.json" in sim
     assert sim[sim.index("volumes:") + 1] == "- simstate:/state"
     assert not any("POSTGRES" in ln or "DATABASE" in ln for ln in sim)
 

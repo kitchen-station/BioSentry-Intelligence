@@ -85,8 +85,15 @@ services:
       # on anything else. A ward it resumes from its saved state keeps the speed it was saved at; a
       # clinician who may (an md or the charge nurse) changes it from the viewer afterwards.
       WARD_SPEED: ${WARD_SPEED:-1}
-      # Where it keeps its state across restarts (the simstate volume).
-      WARD_STATE_FILE: /state/ward-state.json
+      # ward (default): ward W4 alone. hospital: the whole hospital, every unit sent to the API
+      # (the simulator's README, WARD_MODE). Set WARD_MODE=hospital in deploy/.env to switch.
+      WARD_MODE: ${WARD_MODE:-ward}
+      # Hospital mode only: the hospital a new run starts (typical by default, decision orch-h4).
+      WARD_SCENARIO: ${WARD_SCENARIO:-typical}
+      # Where it keeps its state across restarts (the simstate volume). One file per mode: the runner
+      # refuses a state file made in the other mode, so the switch starts a new hospital and keeps the
+      # old ward's file for a switch back.
+      WARD_STATE_FILE: /state/${WARD_MODE:-ward}-state.json
     volumes:
       - simstate:/state
 

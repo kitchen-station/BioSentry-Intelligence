@@ -38,7 +38,11 @@ call it anyway). "Public mode" is the one supported way to let them use this API
   `simstate`, mounted at `/state`. `WARD_SPEED` is the speed a new ward starts at, in simulated seconds per
   second: 1, 10 or 60, 1 unless set (the runner exits on anything else). A ward resumed from its saved
   state keeps its saved speed, and a clinician who is an md or the charge nurse changes it from the viewer
-  afterwards.
+  afterwards. `WARD_MODE` is `ward` (ward W4 alone, the default) or `hospital` (the whole hospital,
+  every unit sent to the API); `WARD_SCENARIO` is the hospital a new hospital run starts (`typical`
+  unless set). Each mode keeps its own state file in `/state` (`ward-state.json`, `hospital-state.json`),
+  so a switch starts a new run and a switch back resumes the old ward. Take a backup first: the
+  hospital run needs API migration 0014, and an older API image cannot write patients after it.
 - `lab` is the lab worker: it runs the simulated compare runs a physician or the charge nurse asks for
   on the dashboard's Simulation lab page (without it a request waits, then fails). It is the same image
   as `sim` with another command (`node dist/lab/lab-worker.js`). It claims a request from the API with
