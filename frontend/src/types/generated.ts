@@ -584,6 +584,26 @@ export interface components {
             readonly y: number;
         };
         /**
+         * OpenUnit
+         * @description One unit of the run, as anyone may read it: no count, no clinician, no person.
+         */
+        readonly OpenUnit: {
+            readonly floor: number | null;
+            readonly id: string;
+            /** @enum {string} */
+            readonly kind: "ranked" | "shown" | "unranked";
+            readonly name: string;
+        };
+        /**
+         * OpenUnits
+         * @description The run's units in order, with no sign-in (GET /open-view): what the public page lists.
+         */
+        readonly OpenUnits: {
+            /** @constant */
+            readonly synthetic: true;
+            readonly units: readonly components["schemas"]["OpenUnit"][];
+        };
+        /**
          * OpenWard
          * @description What anyone may watch with no sign-in (GET /wards/{ward}/open-view).
          */
@@ -1288,6 +1308,8 @@ export type OpenBed = components['schemas']['OpenBed'];
 export type OpenMove = components['schemas']['OpenMove'];
 export type OpenSim = components['schemas']['OpenSim'];
 export type OpenStaff = components['schemas']['OpenStaff'];
+export type OpenUnit = components['schemas']['OpenUnit'];
+export type OpenUnits = components['schemas']['OpenUnits'];
 export type OpenWard = components['schemas']['OpenWard'];
 export type OverviewActivity = components['schemas']['OverviewActivity'];
 export type OverviewClinician = components['schemas']['OverviewClinician'];

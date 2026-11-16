@@ -306,6 +306,22 @@ class OpenWard(Contract):
     beds: Annotated[list[OpenBed], Field(max_length=OPEN_BEDS_MAX)]
 
 
+class OpenUnit(Contract):
+    """One unit of the run, as anyone may read it: no count, no clinician, no person."""
+
+    id: str
+    name: str
+    floor: int | None  # None: not known
+    kind: Literal["ranked", "shown", "unranked"]
+
+
+class OpenUnits(Contract):
+    """The run's units in order, with no sign-in (GET /open-view): what the public page lists."""
+
+    synthetic: Literal[True]
+    units: Annotated[list[OpenUnit], Field(max_length=12)]
+
+
 class Action(Contract):
     """One successful clinician write, as the ward sim learns of it. A field that does not apply
     to the kind is null. A note's text is never here."""

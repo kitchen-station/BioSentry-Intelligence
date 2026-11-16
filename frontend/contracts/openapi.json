@@ -2413,6 +2413,67 @@
         "title": "OpenStaff",
         "type": "object"
       },
+      "OpenUnit": {
+        "additionalProperties": false,
+        "description": "One unit of the run, as anyone may read it: no count, no clinician, no person.",
+        "properties": {
+          "floor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "ranked",
+              "shown",
+              "unranked"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "floor",
+          "kind"
+        ],
+        "title": "OpenUnit",
+        "type": "object"
+      },
+      "OpenUnits": {
+        "additionalProperties": false,
+        "description": "The run's units in order, with no sign-in (GET /open-view): what the public page lists.",
+        "properties": {
+          "synthetic": {
+            "const": true,
+            "type": "boolean"
+          },
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/OpenUnit"
+            },
+            "maxItems": 12,
+            "type": "array"
+          }
+        },
+        "required": [
+          "synthetic",
+          "units"
+        ],
+        "title": "OpenUnits",
+        "type": "object"
+      },
       "OpenWard": {
         "additionalProperties": false,
         "description": "What anyone may watch with no sign-in (GET /wards/{ward}/open-view).",

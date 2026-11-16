@@ -40,6 +40,7 @@ from biosentry.schemas import (
     LabRunDetail,
     LabRunItem,
     LiveWard,
+    OpenUnits,
     OpenWard,
     OverviewActivity,
     OverviewClinician,
@@ -535,6 +536,10 @@ _BUILDERS: dict[type[BaseModel], Any] = {
         "speed": 10,
         "ended": False,
         "counts": {"received": 5, "rejected": 1, "abstained": 2},
+    },
+    OpenUnits: lambda: {
+        "synthetic": True,
+        "units": [{"id": "ER", "name": "Emergency Room", "floor": 0, "kind": "shown"}],
     },
     WardOverview: lambda: {
         "ward": "W4",
