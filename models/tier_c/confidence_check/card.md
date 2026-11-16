@@ -7,7 +7,7 @@
 | code | `research/confidence.py` (`calibrate`, `evaluate`) |
 | model | the student `tier_c/student_vitals` (`model.onnx`, `model_no_temp.onnx`) and its threshold t, unchanged |
 | run log | `training/runs/confidence_check/m3-20261113-fbd39f2.json` |
-| status | calibrated on synthetic trials; held-out ward-v2 seeds 11-30 scored once on 2026-11-13; not validated, not wired to the API, the rank or the arbiter |
+| status | calibrated on synthetic trials; held-out ward-v2 seeds 11-30 scored once on 2026-11-13; not validated. The API loads `calibration.json`: when it says alert, the prediction-model flag adds a reason to a ward row and never moves a patient. Held-out set 2 shows a gain beyond chance (`models/held_out_2/analysis.txt`) |
 | intended use | research. Tier A (NEWS2) is never changed or learned |
 
 Held-out ward-v2 seeds 11-30 were scored once, on 2026-11-13. The outputs are `heldout.txt` and `heldout.json` (format

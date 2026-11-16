@@ -5,7 +5,7 @@
 | id | `tier_c/student_vitals` (variants `all` and `no_temp`) |
 | files | `model.onnx` (5,334 bytes), `model_no_temp.onnx` (2,382), `model.mindir` (11,539), `model_no_temp.mindir` (8,706), `model.ms` (6,688), `model_no_temp.ms` (3,744), `model.json` (34,949), `model_no_temp.json` (14,903), `metadata.json`, `exports.json`, `timing.json`, `lite.txt`, `convert_lite.sh`, `held_out.txt`, `held_out.json` |
 | code | `research/student.py`, `research/train_student.py`, `research/evaluate_student.py`, `research/export_plain.py`, `research/plain_student.py` |
-| status | trained on synthetic trials; held-out ward-v2 seeds 11-30 scored once on 2026-11-13; not validated, not wired to the API, the rank or the arbiter |
+| status | trained on synthetic trials; held-out ward-v2 seeds 11-30 scored once on 2026-11-13; not validated. The API runs `model.json` only through the confidence check: its flag adds a reason to a ward row and never moves a patient |
 | framework | MindSpore 2.11.0 (CPU, GRAPH_MODE, one thread) |
 | intended use | research. Tier A (NEWS2) is never changed or learned |
 

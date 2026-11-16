@@ -3,7 +3,7 @@
 `load_models(models_dir)` never raises and never falls back: a refused file gives `NotComputed` with a fixed
 reason, one WARNING line at load (the path inside `models_dir` and the fixed reason, never the file's
 contents), and the models that do not need that file still load. Only the with-temperature files are read:
-the `no_temp` files are never opened, whatever fails. Nothing calls this yet; the load result is fixed for
+the `no_temp` files are never opened, whatever fails. `create_app` calls it once at start; the load result is fixed for
 the life of the process. Research models: synthetic data only, not validated.
 
 What each refused file disables:

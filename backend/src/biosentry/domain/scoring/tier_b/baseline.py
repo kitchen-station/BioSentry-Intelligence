@@ -6,7 +6,7 @@ absorbed into "normal". A gap (None or a non-finite value) is skipped, never fil
 breaks a run: it is never evidence either way (I1). A run may reach back into the baseline
 window itself: a deviation inside the first hours is still a deviation from the patient's own
 start. Re-anchoring after a patch is re-applied is not done here; the caller slices `bins`. Never looks at NEWS2, never ranks, never
-alerts; not wired to the arbiter. Synthetic, not validated.
+alerts: the arbiter lists a significant finding as a reason and breaks ties with it (arbiter rule 3). Synthetic, not validated.
 """
 
 import math

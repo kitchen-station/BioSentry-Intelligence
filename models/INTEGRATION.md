@@ -1,5 +1,11 @@
 # Wiring the three research models into the arbiter: a hand-off
 
+**Status, 2026-11-16: built.** The API loads the three files once at start (`backend/src/biosentry/services/models.py`,
+called from `create_app`), the API image ships them (`Dockerfile`, `.dockerignore`), and the arbiter adds the
+prediction-model and policy flags (`backend/src/biosentry/domain/arbiter.py`). Below, "today", "inert" and "yet"
+describe the code before the wiring. The verdicts quoted here are held-out set 1; set 2 is in
+`models/held_out_2/analysis.txt`.
+
 This file says how to RUN the shipped files. It wires nothing. The wiring slice can follow it without asking
 the models session anything. Where this file and the code disagree, the code is right; the files named here are
 the sources of truth. The wiring choices are settled by the rulings at the end of this file; every section below

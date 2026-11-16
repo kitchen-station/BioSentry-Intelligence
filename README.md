@@ -313,7 +313,7 @@ applied to made-up patients.
 - **I4** Abstention is an output: NOT RANKED is a row with a reason and an instruction.
 - **I5** No training on BioSentry patients: local data calibrates and validates only.
 - **I6** The synthetic flag propagates: every fixture record says `synthetic: true`.
-- **I7** Privacy (RA 10173): one screen per clinician, their patients only, audit on every view. A repeated read of the same page by the same clinician is recorded at most once a minute; the first read, every write, and every refusal or not-found answer to a signed-in clinician are always recorded (the owner's decision for the automatic refresh).
+- **I7** Privacy (the technical safeguards of RA 10173; see [Privacy](#privacy)): one screen per clinician, their patients only, audit on every view. A repeated read of the same page by the same clinician is recorded at most once a minute; the first read, every write, and every refusal or not-found answer to a signed-in clinician are always recorded (the owner's decision for the automatic refresh).
 - **I8** Transport: BLE to a gateway, then Wi-Fi or 4G to the cloud. NB-IoT is excluded.
 
 ## Design rules
@@ -361,6 +361,37 @@ applied to made-up patients.
   minute. It is allowed in production and logs a warning at start. On a public address (`deploy/compose.public.yaml`) the
   team's value is not read; the separate `BIOSENTRY_PUBLIC_OPEN_WARD_VIEW=true` opts in (`deploy/README.md`, "The
   public ward page", owner decision 2026-11-14).
+
+## Privacy
+
+No real patient's data is in this repository or on the team server. The database refuses a run whose
+`synthetic` flag is false (I6), and the one real dataset, the open, de-identified eICU-CRD demo, is used
+offline for aggregate numbers only (`models/data/eicu-crd-demo/card.md`).
+
+**What the code enforces now:** the technical safeguards that the Data Privacy Act of 2012 (RA 10173) asks for.
+
+- **Need to know.** A clinician's list holds their assigned patients only. A patient they may not see answers
+  the same 404 as one that does not exist.
+- **Accountability.** Every view, write and refusal leaves an audit row, and audit rows cannot be deleted (I7).
+- **Least data to the agents.** A question about a patient freezes an allow-listed copy of that patient's data,
+  with no name, bed, id, free text, note or lab (`backend/src/biosentry/schemas/lab.py`). The worker that
+  answers it has no route to the internet, calls no outside model, and writes nothing.
+- **Sessions.** The dashboard keeps the token in memory only, and the server stores only its sha256.
+- **The public ward view** shows bed, rank and NEWS2 band, never a name or id, and only for a synthetic run.
+- **Retention.** A run's vital bins older than `BIOSENTRY_RETENTION_DAYS` (7 when unset) are deleted.
+
+**What a hospital would add before the first real patient.** None of this is built; most of it is organisation, not code.
+
+- A Data Protection Officer, a privacy impact assessment, and registration with the National Privacy Commission.
+- A lawful basis and a notice for processing health data, which is sensitive personal information, and a
+  way for patients to see and correct what is held about them.
+- Breach notification to the Commission within 72 hours.
+- **Data kept in the Philippines.** The server and its backups would run on Huawei Cloud ECS and OBS in the
+  AP-Manila region, with OBS server-side encryption for the backups. Today `deploy/backup.sh` writes
+  unencrypted dumps beside the database. Training stays on synthetic data (I5), so no patient record has to
+  leave the country to train on ModelArts.
+- An identity provider in place of per-clinician passphrases. Sign-out would also end the session on the
+  server; today a token lasts until it expires, up to 12 hours.
 
 ## Licence
 

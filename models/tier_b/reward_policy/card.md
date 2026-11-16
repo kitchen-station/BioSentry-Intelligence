@@ -5,7 +5,7 @@
 | id | `tier_b/reward_policy` (and `tier_b/reward_policy/no_temperature`) |
 | files | `policy.json` (the incumbent); `rounds/round-1/` and `rounds/round-2/` (`gen-NN.json`, `policy.json`); `no_temperature/` (`generations/gen-00.json` to `gen-04.json`, `policy.json`); `experiments.jsonl` (the ledger); `held_out.txt` (the held-out output, verbatim) |
 | code | `research/reward_policy.py` (policy, reward), `research/reward_loop.py` (inner loop, outer loop, held-out run) |
-| status | learned on synthetic trials, not validated. Not wired to the API, the rank or the arbiter |
+| status | learned on synthetic trials, not validated. The API loads `policy.json`: its flag adds a reason to a ward row and never moves a patient. Held-out set 2 shows a loss (`models/held_out_2/analysis.txt`) |
 | intended use | research. Tier A (NEWS2) is never changed or learned |
 
 Earlier ward-v1 and B6 results are in git history before this change.
@@ -54,7 +54,7 @@ Earlier ward-v1 and B6 results are in git history before this change.
 ## A person signs off before anything changes
 
 The loop only writes files on a branch. Nothing reaches main or the product without a reviewed
-pull request. The policy is not wired to the API, the rank or the arbiter.
+pull request. The API reads only the committed `policy.json`, and only to add a flag.
 
 ## Data and seed schedule
 

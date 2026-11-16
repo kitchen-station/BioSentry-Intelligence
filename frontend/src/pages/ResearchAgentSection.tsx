@@ -31,7 +31,7 @@ export function ResearchAgentSection({ data = RESEARCH_AGENT }: { data?: AgentEx
           {questions.map((q) => (
             <li key={q.id}>
               <p>&ldquo;{q.question}&rdquo;</p>
-              <p>{q.askedAt ? `Asked ${q.askedAt}` : "Time not recorded in the transcript"}</p>
+              <p>{q.askedAt ? `Asked ${q.askedAt}` : "Time not recorded"}</p>
               <p>{q.status === "answered" ? "Answered" : "Refused, nothing was run"}</p>
               {q.answer.map((line) => (
                 <p key={line}>{line}</p>
