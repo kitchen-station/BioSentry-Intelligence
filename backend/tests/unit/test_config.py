@@ -177,3 +177,18 @@ def test_any_other_word_for_the_open_ward_view_stops_the_start(given: str) -> No
 def test_production_starts_with_the_open_ward_view_on() -> None:
     settings = Settings.from_env({**PRODUCTION, "BIOSENTRY_OPEN_WARD_VIEW": "true"})
     assert (settings.env, settings.open_ward_view) == ("production", True)
+
+
+@pytest.mark.parametrize(
+    ("given", "expected"), [(None, 0.0), ("", 0.0), (" ", 0.0), ("0", 0.0), ("3", 3.0), (" 0.5 ", 0.5), ("60", 60.0)]
+)
+def test_the_view_cache_is_off_unless_seconds_are_set(given: str | None, expected: float) -> None:
+    env = {} if given is None else {"BIOSENTRY_VIEW_CACHE_SECONDS": given}
+    assert Settings.from_env(env).view_cache_seconds == expected
+
+
+@pytest.mark.parametrize("given", ["abc", "-1", "60.1", "61", "nan", "inf", "3s", "1,5"])
+def test_any_other_cache_time_stops_the_start(given: str) -> None:
+    with pytest.raises(ConfigError) as refused:
+        Settings.from_env({"BIOSENTRY_VIEW_CACHE_SECONDS": given})
+    assert str(refused.value) == "BIOSENTRY_VIEW_CACHE_SECONDS must be a number from 0 to 60"
