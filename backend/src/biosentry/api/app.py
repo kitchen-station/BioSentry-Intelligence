@@ -44,6 +44,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from biosentry.core.audit import AuditLog, Clock, Outcome, utc_now
+from biosentry.core.cache import TtlCache
 from biosentry.core.config import Settings, restricted
 from biosentry.db.passphrase import Busy, verify
 from biosentry.db.seed import ensure
@@ -273,12 +274,16 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
     ensure(settings.database_url, settings.dataset, production)
     models = load_models(settings.models_dir)  # once; a refused file is "not computed" and one warning
 
+    # Answers kept for a few seconds (BIOSENTRY_VIEW_CACHE_SECONDS; off when 0). Their age comes from the same
+    # wall clock as everything else, so a test can move it.
+    cache = TtlCache(settings.view_cache_seconds, lambda: clock().timestamp())
+
     def open_ctx() -> Context:
         conn = connect(settings.database_url, production)
         try:  # a connection that cannot become a Context (no run, say) is not left open
             store = PostgresStore(conn, clock)
             audit = AuditLog(conn, clock, store.role_of)
-            wards = WardService(store, audit, models)
+            wards = WardService(store, audit, models, cache)
             baselines = BaselineService(store, audit, wards)
             history = HistoryService(store, audit, wards)
             return Context(
@@ -337,6 +342,15 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
     async def no_store(request: Request, call_next):  # type: ignore[no-untyped-def]
         response = await call_next(request)
         response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @app.middleware("http")
+    async def forget_on_write(request: Request, call_next):  # type: ignore[no-untyped-def]
+        """Any request that is not a plain read may have changed what a view shows (its commit is done
+        when the handler returns): the kept answers go, and a read that was still being built is not kept."""
+        response = await call_next(request)
+        if request.method not in ("GET", "HEAD", "OPTIONS"):
+            cache.clear()
         return response
 
     @app.exception_handler(ingest.ConflictError)

@@ -51,6 +51,9 @@ services:
       # colours, staff figures, no names). Empty or `false` is off, and the route then does not exist.
       # Never `true` on a public address: compose.public.yaml forces it off and setup.sh refuses both.
       BIOSENTRY_OPEN_WARD_VIEW: ${BIOSENTRY_OPEN_WARD_VIEW:-}
+      # Seconds a computed ward view may be served again (3 here; 0 turns the cache off). The sim writes once a
+      # ward minute (about 6 s at 10x), so an answer is never older than the sim's own step.
+      BIOSENTRY_VIEW_CACHE_SECONDS: ${BIOSENTRY_VIEW_CACHE_SECONDS:-3}
     ports:
       # Loopback only. API_PORT moves the host side when 8000 is taken (a second stack on one machine).
       - "127.0.0.1:${API_PORT:-8000}:8000"

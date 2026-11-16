@@ -10,6 +10,9 @@
     BIOSENTRY_MODELS_DIR     the folder holding the model files and manifest.json; the repository's
                              `models/` when unset (a checkout, and /app/models in the image, which are
                              the same rule: the folder three levels above the package)
+    BIOSENTRY_VIEW_CACHE_SECONDS  seconds a computed ward view or public open view may be served again
+                             (a whole or decimal number from 0 to 60; off, 0, when unset). Any write
+                             this process handles empties it; a write by another process is seen after this long.
     BIOSENTRY_OPEN_WARD_VIEW true: GET /wards/{ward}/open-view shows the ward to anyone, without sign-in
                              (bed bands, no names or ids; a synthetic run only). Off when unset or
                              `false`; any other word stops the start. Allowed in production, with a warning.
@@ -35,6 +38,7 @@ DEFAULT_DATASET = _REPO_ROOT / "frontend" / "src" / "data" / "synthetic.json"
 DEFAULT_MODELS_DIR = _REPO_ROOT / "models"  # /app/models in the image, where the package sits at /app/backend/src
 # The dev database from compose.yaml (loopback only, dev-only password).
 DEV_DATABASE_PASSWORD = "biosentry-dev-only"
+MAX_VIEW_CACHE_SECONDS = 60
 DEFAULT_DATABASE_URL = f"postgresql://biosentry:{DEV_DATABASE_PASSWORD}@127.0.0.1:5432/biosentry"
 # The dashboard (5173, 5174) and the ward sim (5180, 5181), on either spelling of loopback.
 DEFAULT_CORS_ORIGINS = tuple(
@@ -82,8 +86,11 @@ class Settings:
     retention_days: int = 7
     models_dir: Path = DEFAULT_MODELS_DIR
     open_ward_view: bool = False
+    view_cache_seconds: float = 0.0
 
     def __post_init__(self) -> None:
+        if not 0 <= self.view_cache_seconds <= MAX_VIEW_CACHE_SECONDS:
+            raise ConfigError(f"BIOSENTRY_VIEW_CACHE_SECONDS must be a number from 0 to {MAX_VIEW_CACHE_SECONDS}")
         if not 1 <= self.retention_days <= MAX_RETENTION_DAYS:
             raise ConfigError(
                 f"BIOSENTRY_RETENTION_DAYS must be a whole number from 1 to {MAX_RETENTION_DAYS}"
@@ -115,6 +122,10 @@ class Settings:
             retention_days = int(source.get("BIOSENTRY_RETENTION_DAYS", "").strip() or 7)
         except ValueError:
             retention_days = 0  # refused below, by the one message
+        try:
+            cache_seconds = float(source.get("BIOSENTRY_VIEW_CACHE_SECONDS", "").strip() or 0)
+        except ValueError:
+            cache_seconds = -1.0  # refused above, by the one message
         view = source.get("BIOSENTRY_OPEN_WARD_VIEW", "").strip().lower()
         if view not in ("", "true", "false"):  # never read as off: a typo would hide the choice
             raise ConfigError("BIOSENTRY_OPEN_WARD_VIEW must be true or false")
@@ -126,4 +137,5 @@ class Settings:
             retention_days=retention_days,
             models_dir=Path(source.get("BIOSENTRY_MODELS_DIR", "").strip() or DEFAULT_MODELS_DIR),
             open_ward_view=view == "true",
+            view_cache_seconds=cache_seconds,
         )

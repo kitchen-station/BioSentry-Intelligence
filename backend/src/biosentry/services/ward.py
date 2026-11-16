@@ -12,11 +12,14 @@ record, including reads that find nothing.
 
 import logging
 import re
+import time
+from collections.abc import Callable
 from typing import Any
 
 from pydantic import ValidationError
 
 from biosentry.core.audit import AuditLog
+from biosentry.core.cache import MISSING, TtlCache, ViewCache
 from biosentry.domain.arbiter import Ranked, TierCSignal, rank_ward
 from biosentry.domain.computed import Computed, NotComputed
 from biosentry.domain.scoring.tier_a import News2Abstained, News2Score, inputs_from_vitals, score_news2
@@ -248,10 +251,29 @@ def open_sim(view: dict[str, Any] | None) -> OpenSim | None:
 
 
 class WardService:
-    def __init__(self, store: PostgresStore, audit: AuditLog, models: LoadedModels) -> None:
+    def __init__(
+        self, store: PostgresStore, audit: AuditLog, models: LoadedModels, cache: ViewCache | None = None
+    ) -> None:
         self._store = store
         self._audit = audit
         self._models = models  # loaded once at start
+        self._cache = cache or TtlCache(0.0, time.time)  # no cache: nothing is kept
+
+    def _key(self, *parts: object) -> tuple[object, ...]:
+        """What an answer depends on besides its own parts: the run and its ward clock. A sim batch moves
+        `as_of` and `last_batch_at`, so it ends every answer built on the old data, whichever process took it."""
+        s = self._store
+        return (s.run_id, s.as_of, s.last_batch_at, *parts)
+
+    def _cached(self, key: tuple[object, ...], build: Callable[[], Any]) -> Any:
+        """The kept answer for `key`, else `build()`, kept unless a write came in meanwhile."""
+        found = self._cache.get(key)
+        if found is not MISSING:
+            return found
+        version = self._cache.version()
+        built = build()
+        self._cache.put(key, built, version)
+        return built
 
     def visible(self, clinician_id: str, unit: str | None = None) -> frozenset[str]:
         # An admin reads every patient on the ward; every write is refused earlier by `Writer`.
@@ -261,6 +283,17 @@ class WardService:
         return self._store.assigned(clinician_id, unit=unit)
 
     def view(
+        self, ids: frozenset[str], whole_history: str | None = None
+    ) -> tuple[list[ScoreRow], list[AbstainedRow], dict[str, UnscoredPatient]]:
+        """`_view`, kept for a few seconds. The key holds the exact set of patients: the reader's scope is
+        applied (by `visible`) before this is called, so a reader gets only an answer built for the very
+        same set, and an answer is never shared across scopes."""
+        ranked, abstained, states = self._cached(
+            self._key("view", ids, whole_history), lambda: self._view(ids, whole_history)
+        )
+        return list(ranked), list(abstained), dict(states)  # the caller's own containers; the rows are frozen
+
+    def _view(
         self, ids: frozenset[str], whole_history: str | None = None
     ) -> tuple[list[ScoreRow], list[AbstainedRow], dict[str, UnscoredPatient]]:
         """Rows ranked relative to this set, and the state each row was built from. The whole stored
@@ -399,6 +432,11 @@ class WardService:
         )
 
     def open_ward(self, unit: str) -> OpenWard | None:
+        """`_open_ward`, kept for a few seconds: the answer is the same for everyone."""
+        found: OpenWard | None = self._cached(self._key("open_ward", unit), lambda: self._open_ward(unit))
+        return found
+
+    def _open_ward(self, unit: str) -> OpenWard | None:
         """The unit for a caller nobody identified: bed, rank and NEWS2 band only, from the unit's
         own scoring, and the simulator's figures. None when the unit holds too many patients.
         No model runs, so no model state can reach it; the ranking does not depend on one. A unit
@@ -431,6 +469,11 @@ class WardService:
         )
 
     def open_bed(self, unit: str, bed: str) -> OpenBedCard | None:
+        """`_open_bed`, kept for a few seconds (and "no such bed" with it): the same for everyone."""
+        found: OpenBedCard | None = self._cached(self._key("open_bed", unit, bed), lambda: self._open_bed(unit, bed))
+        return found
+
+    def _open_bed(self, unit: str, bed: str) -> OpenBedCard | None:
         """One bed's card for a caller nobody identified. A ranked bed: its NEWS2 score and band,
         the newest stored value of five vitals with time and source, the last 12 hours of the five
         (15-minute values, gaps kept, no id or score on a point), and the trend word. Any other
