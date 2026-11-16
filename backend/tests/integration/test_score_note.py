@@ -5,6 +5,7 @@ kind `ranked` is ranked like any ward, so its patients have a history and a base
 from typing import Any
 
 import pytest
+from psycopg.errors import CheckViolation
 from test_open_view import watch  # noqa: F401 (watch: the API with the setting on)
 from test_overview import write
 from test_store import Api, api, new_run  # noqa: F401 (api: fixture)
@@ -45,7 +46,7 @@ def test_a_run_with_no_note_serves_null_and_a_run_of_one_unit_still_starts(api: 
 
 @pytest.mark.parametrize(
     "note",
-    ["", "x" * 301, "two\nlines", "tab\there", "nul\x00", "bell\x07", "c1\x85", 7, ["a"], {"a": 1}],
+    ["", "x" * 301, "two\nlines", "tab\there", "nul\x00", "bell\x07", "c1\x85", "c1\x80", "c1\x9f", "line\u2028sep", "para\u2029sep", "del\x7f", 7, ["a"], {"a": 1}],
 )
 def test_a_note_that_is_not_one_printable_line_of_300_characters_or_less_is_422(api: Api, note: Any) -> None:
     units = [{**u, "score_note": note} if u["id"] == "ER" else u for u in UNITS]
@@ -70,3 +71,17 @@ def test_a_ranked_er_ranks_its_patient_and_its_history_and_baseline_answer_like_
     for path in ("/history", "/baseline"):
         assert get(api, "cn-er", f"/patients/e-1{path}").status_code == 200, path
     assert get(api, "cn-icu", "/patients/e-1/history").status_code == 404  # another unit's nurse: nothing
+
+
+@pytest.mark.parametrize("note", ["x\x80", "x\x85", "x\x9f", "x\x7f", "x\x1f", "x\u2028", "x\u2029", "", "x" * 301])
+def test_the_table_refuses_the_same_notes_whatever_the_database_locale(api: Api, note: str) -> None:
+    assert run(api, UNITS).status_code == 201
+    with pytest.raises(CheckViolation):
+        write(api, "UPDATE run_unit SET score_note = %s WHERE id = 'ER'", note)
+
+
+@pytest.mark.parametrize("note", ["é\u00a0·—", "x" * 300, "\u00a0", "\u2027\u202a"])
+def test_the_table_keeps_printable_text_next_to_the_refused_ranges(api: Api, note: str) -> None:
+    assert run(api, UNITS).status_code == 201
+    write(api, "UPDATE run_unit SET score_note = %s WHERE id = 'ER'", note)
+    assert api.sql("SELECT score_note FROM run_unit WHERE id = 'ER'") == [{"score_note": note}]
