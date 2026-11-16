@@ -68,6 +68,19 @@ class AbstainedRow(Contract):
     reason: str
     instruction: str
     synthetic: Flag
+    # The last stored value of each vital, whatever its age, each with its own source and time (I2).
+    # Shown so a patient whose signal stopped does not look empty. It is never read by the score,
+    # the arbiter or the rank: the patient stays NOT RANKED (I1, I4). Optional on the wire only so
+    # an older answer still parses; the server always sends it.
+    last_seen: Vitals | None = None
+
+
+class AbstainedDetail(AbstainedRow):
+    """GET /patients/{id} for a patient who is NOT RANKED: the row and the stored history. No
+    score, rank or breakdown exists to explain."""
+
+    vital_history: VitalHistoryFull
+    now: AwareDatetime  # ward time this answer was computed at: ages are measured against it
 
 
 class WardResponse(Contract):

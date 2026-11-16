@@ -116,9 +116,12 @@ export const httpProvider: ApiProvider = {
 
   async getPatient(id: string): Promise<PatientDetail | null> {
     // The server answers 404 for a patient that does not exist and for one that is not the
-    // caller's, identically. The page treats both as "not found".
+    // caller's, identically. The page treats both as "not found". A NOT RANKED patient now
+    // answers with the row and the stored history, which this page does not draw yet: it keeps
+    // its old answer for that patient (null) until a page for it exists.
     try {
-      return await fetchJson<PatientDetail>(`/patients/${id}`);
+      const body = await fetchJson<PatientDetail | { reason: string }>(`/patients/${id}`);
+      return "reason" in body ? null : body;
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) return null;
       throw error;

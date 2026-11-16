@@ -12,6 +12,8 @@ from samples import sample
 # Optional-by-design string fields on output models (TS `detail?:` / `pathway?:`). A Provenance names its
 # model file only for a model value, so the three fields are null (and may be left out) for every other source.
 OPTIONAL_OUTPUT_FIELDS = {
+    ("AbstainedDetail", "last_seen"),  # inherited from the row
+    ("AbstainedRow", "last_seen"),
     ("EscalationReason", "pathway"),
     ("Provenance", "variant"),
     ("Provenance", "file_sha256"),

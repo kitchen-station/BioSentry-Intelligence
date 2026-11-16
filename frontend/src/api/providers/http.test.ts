@@ -30,6 +30,11 @@ describe("httpProvider.getPatient", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("/patients/p-001");
   });
 
+  it("returns null for a NOT RANKED patient: the page has no view of one yet", async () => {
+    fetchMock.mockResolvedValue(reply(200, { id: "p-005", reason: "No device data" }));
+    await expect(httpProvider.getPatient("p-005")).resolves.toBeNull();
+  });
+
   it("returns null on 404 (missing and not-yours look the same)", async () => {
     fetchMock.mockResolvedValue(reply(404, { detail: "Not found" }));
     await expect(httpProvider.getPatient("p-999")).resolves.toBeNull();

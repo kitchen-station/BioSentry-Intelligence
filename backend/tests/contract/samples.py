@@ -16,6 +16,7 @@ from biosentry.schemas import (
     ResearchRow,
     WardResearch,
     CONTRACT_MODELS,
+    AbstainedDetail,
     AbstainedRow,
     Acknowledgement,
     AcvpuMeasurement,
@@ -241,6 +242,7 @@ def abstained_row() -> dict[str, Any]:
         "reason": "No patch applied",
         "instruction": "Apply patch and verify signal",
         "synthetic": True,
+        "last_seen": vitals(),
     }
 
 
@@ -346,6 +348,14 @@ _BUILDERS: dict[type[BaseModel], Any] = {
     RowModels: row_models,
     ScoreRow: score_row,
     AbstainedRow: abstained_row,
+    AbstainedDetail: lambda: {
+        **abstained_row(),
+        "vital_history": {
+            k: [{"time": "2026-09-03T06:30:00Z", "value": 97}]
+            for k in ("heart_rate", "respiratory_rate", "spo2")
+        },
+        "now": "2026-09-03T07:00:00Z",
+    },
     WardResponse: lambda: {
         "ward": "4 East",
         "clinician": "RN Dela Cruz",

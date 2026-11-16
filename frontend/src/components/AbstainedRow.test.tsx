@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { AbstainedRow as AbstainedRowType } from "../types";
 import { AbstainedRow } from "./AbstainedRow";
+import { forgetWardNow, syncWardNow } from "./wardNow";
 
 const row: AbstainedRowType = {
   id: "p-004",
@@ -36,5 +37,44 @@ describe("a NOT RANKED row", () => {
     expect(out).toContain("Record vitals");
     expect(out).toContain('aria-expanded="false"');
     expect(out).not.toContain("<form"); // the form is opened by the nurse, not rendered up front
+  });
+});
+
+describe("the last stored values of a NOT RANKED row", () => {
+  const seen = (value: object, observed_at: string, source = "device") => ({
+    data: { present: true, value },
+    provenance: { source, tier: null, observed_at, computed_at: null, model_id: null, synthetic: true, quality: "ok" },
+  });
+  const gap = { data: { present: false, reason: "not_recorded" }, provenance: seen({}, "2026-09-03T05:00:00Z").provenance };
+  const last_seen = {
+    heart_rate: seen(88 as unknown as object, "2026-09-03T05:00:00Z"),
+    respiratory_rate: gap,
+    spo2: gap,
+    temperature: gap,
+    blood_pressure: seen({ systolic: 120, diastolic: 80 }, "2026-09-03T04:30:00Z", "nurse"),
+    consciousness: gap,
+    supplemental_o2: gap,
+    spo2_scale: gap,
+  } as unknown as AbstainedRowType["last_seen"];
+
+  it("shows each value with its source and its age against the ward's time", () => {
+    syncWardNow("2026-09-03T07:00:00Z");
+    const out = renderToStaticMarkup(<AbstainedRow row={{ ...row, last_seen }} />);
+    expect(out).toContain("HR 88 (device, 2 h ago,");
+    expect(out).toContain("BP 120/80 (nurse, 2 h ago,");
+    expect(out).not.toContain("RR");
+    forgetWardNow();
+  });
+
+  it("gives the time alone before the ward's time is known", () => {
+    forgetWardNow();
+    const out = renderToStaticMarkup(<AbstainedRow row={{ ...row, last_seen }} />);
+    expect(out).toMatch(/HR 88 \(device, \d\d:\d\d/); // the clock follows the source at once: no age yet
+  });
+
+  it("says no value is stored when none is, and shows nothing when the row has no last_seen", () => {
+    const none = { ...last_seen, heart_rate: gap, blood_pressure: gap } as unknown as AbstainedRowType["last_seen"];
+    expect(renderToStaticMarkup(<AbstainedRow row={{ ...row, last_seen: none }} />)).toContain("no value stored");
+    expect(renderToStaticMarkup(<AbstainedRow row={row} />)).not.toContain("Last seen");
   });
 });

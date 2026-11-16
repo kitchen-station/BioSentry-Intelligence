@@ -2,7 +2,7 @@
 
 import json
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +18,7 @@ from biosentry.domain.arbiter import arbitrate, rank_ward
 from biosentry.domain.scoring.tier_a import inputs_from_vitals, score_news2
 from biosentry.repositories.postgres import Obs
 from biosentry.schemas import (
+    AbstainedDetail,
     AbstainedRow,
     PatientDetail,
     ScoreRow,
@@ -437,7 +438,59 @@ def test_a_ranked_patient_who_loses_an_input_becomes_not_ranked(
     assert "p-002" not in {r.id for r in ward.ranked}
     row = next(a for a in ward.abstained if a.id == "p-002")
     assert row.reason == "Systolic BP missing"
-    assert client.get("/patients/p-002", headers=as_("rn-manalo")).status_code == 404
+    detail = client.get("/patients/p-002", headers=as_("rn-manalo"))
+    assert detail.status_code == 200  # NOT RANKED opens: the page shows the row and the stored history
+    assert "score" not in detail.json() and "rank" not in detail.json()
+    # The missing entry hides no stored value: the last BP stays on view, with its own source and time.
+    seen = row.last_seen
+    assert seen is not None and isinstance(seen.blood_pressure.data, BloodPressurePresent)
+    assert seen.blood_pressure.provenance.observed_at < store.now()
+
+
+def test_a_not_ranked_patient_opens_for_the_assigned_clinician_only(
+    app_and_client: tuple[Any, TestClient],
+) -> None:
+    _, client = app_and_client
+    mine = client.get("/patients/p-005", headers=as_("rn-manalo"))
+    assert mine.status_code == 200
+    body = AbstainedDetail.model_validate(mine.json())
+    assert body.id == "p-005" and body.reason == "No device data" and body.last_seen is not None
+    assert body.vital_history.heart_rate
+    assert client.get("/patients/p-005", headers=as_("md-aquino")).status_code == 404
+    assert [(r.action, r.resource, r.outcome) for r in trail(app_and_client, "rn-manalo")] == [
+        ("view_patient", "p-005", "ok")
+    ]
+    assert [(r.action, r.outcome) for r in trail(app_and_client, "md-aquino")] == [
+        ("view_patient", "not_found")
+    ]
+
+
+def test_the_last_seen_values_are_stored_values_with_their_own_provenance_and_nothing_more(
+    app_and_client: tuple[Any, TestClient],
+) -> None:
+    _, client = app_and_client
+    store = ctx(app_and_client).store
+    old = store.now() - timedelta(hours=2)
+    store.record(
+        [
+            Obs("p-005", "heart_rate", old, "device", num=88.0),
+            Obs("p-005", "heart_rate", store.now(), "device", "missing", absent_reason="no_signal"),
+        ]
+    )
+    row = next(
+        a
+        for a in WardResponse.model_validate(
+            client.get("/wards/W4/rows", headers=as_("rn-manalo")).json()
+        ).abstained
+        if a.id == "p-005"
+    )
+    seen = row.last_seen
+    assert seen is not None
+    assert seen.heart_rate.data.model_dump() == {"present": True, "value": 88}  # the older value, not the gap
+    assert seen.heart_rate.provenance.observed_at == old
+    assert seen.heart_rate.provenance.source.value == "device"
+    assert seen.respiratory_rate.data.present is False  # nothing stored: missing stays missing (I1)
+    assert row.reason == "No device data"  # still NOT RANKED: nothing was carried into the score
 
 
 # --- Writes ------------------------------------------------------------------------------

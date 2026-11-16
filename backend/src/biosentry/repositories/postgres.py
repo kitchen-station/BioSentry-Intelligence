@@ -480,6 +480,21 @@ class PostgresStore:
         assert other is not None
         return other
 
+    def last_seen(self, patient_id: str) -> dict[str, Any]:
+        """The newest stored value of each vital, whatever its age or source, each as a measurement
+        with its own provenance. For display only: it feeds no score, rank or reason (I1, I4). A
+        vital with no stored value is the usual missing measurement."""
+        rows = {
+            r["code"]: r
+            for r in self.conn.execute(
+                "SELECT DISTINCT ON (code) * FROM observation WHERE run_id = %s AND patient_id = %s"
+                " AND absent_reason IS NULL AND code = ANY(%s)"
+                " ORDER BY code, observed_at DESC, id DESC",
+                (self.run_id, patient_id, list(VITALS)),
+            )
+        }
+        return {v: self._measurement(v, rows.get(v)) for v in VITALS}
+
     def read(self, patient_id: str) -> UnscoredPatient | None:
         # ponytail: the reads below are not one snapshot, so a batch landing mid-read can mix two
         # sim minutes in one patient. Upgrade: a read transaction (BEGIN) around each request.
