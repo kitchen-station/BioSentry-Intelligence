@@ -4,7 +4,7 @@ from typing import Annotated, Literal, Self
 
 from pydantic import AwareDatetime, Field, model_validator
 
-from .base import Age, Contract, Flag, NonNegInt, NonNegNum, Percent
+from .base import Age, Contract, Flag, NonNegInt, NonNegNum, Percent, ScoreNote
 from .clinical import LabPanel, VitalHistoryFull, Vitals, VitalTrends
 from .common import Provenance, Tier, Trend
 from .tiers import EscalationReason, TierStatus
@@ -106,6 +106,7 @@ class WardUnit(Contract):
     floor: int | None
     kind: UnitKind
     patients: NonNegInt
+    score_note: ScoreNote | None = None  # how to read this unit's NEWS2, when the run says
 
 
 class AbstainedDetail(AbstainedRow):
@@ -121,6 +122,7 @@ class WardResponse(Contract):
     name: str | None = None  # the unit's name, floor and kind: optional as the row fields above
     floor: int | None = None
     kind: UnitKind | None = None
+    score_note: ScoreNote | None = None  # the unit's note on how to read its NEWS2
     clinician: str
     shift: str
     receiving_data: Flag

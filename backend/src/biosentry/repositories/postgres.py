@@ -278,10 +278,10 @@ def insert_run(
     run_id: int = row["id"]
     with conn.cursor() as cur:
         cur.executemany(
-            "INSERT INTO run_unit (run_id, id, position, name, floor, kind)"
-            " VALUES (%s, %s, %s, %s, %s, %s)",
+            "INSERT INTO run_unit (run_id, id, position, name, floor, kind, score_note)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s)",
             [
-                (run_id, u["id"], i, u["name"], u["floor"], u["kind"])
+                (run_id, u["id"], i, u["name"], u["floor"], u["kind"], u.get("score_note"))
                 for i, u in enumerate(units or [{"id": ward, "name": ward, "floor": None, "kind": "ranked"}])
             ],
         )
@@ -304,7 +304,7 @@ class PostgresStore:
         # run if a new one starts mid-request. Upgrade: re-check the newest id under lock_run.
         run = conn.execute(
             "SELECT r.*, COALESCE((SELECT jsonb_agg(jsonb_build_object('id', u.id, 'name', u.name,"
-            " 'floor', u.floor, 'kind', u.kind) ORDER BY u.position) FROM run_unit u"
+            " 'floor', u.floor, 'kind', u.kind, 'score_note', u.score_note) ORDER BY u.position) FROM run_unit u"
             " WHERE u.run_id = r.id), '[]') AS units FROM run r ORDER BY r.id DESC LIMIT 1"
         ).fetchone()
         if run is None:
