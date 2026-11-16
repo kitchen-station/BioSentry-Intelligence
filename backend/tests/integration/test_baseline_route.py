@@ -369,13 +369,12 @@ def test_a_not_ranked_patient_gets_the_patient_routes_404_and_one_audit_row(api:
     start(api, patients=[{**patient(bins=rows("s-1", "heart_rate", BASE)), "observations": nurse_only}])
     assert [a["id"] for a in api.ward("rn-delacruz")["abstained"]] == ["s-1"]
     theirs = api.client.get("/patients/s-1", headers=api.as_("rn-delacruz"))
+    assert theirs.status_code == 200 and "score" not in theirs.json()  # the page reads the row and its history
     before = len(audit(api))
     mine = get(api)
-    assert (mine.status_code, mine.json()) == (theirs.status_code, theirs.json()) == (
-        404, {"detail": "Not found"},
-    )  # fmt: skip
+    assert (mine.status_code, mine.json()) == (404, {"detail": "Not found"})  # no baseline to explain
     assert audit(api)[before - 1 :] == [
-        ("rn-delacruz", "view_patient", "s-1", "not_found"),
+        ("rn-delacruz", "view_patient", "s-1", "ok"),
         ("rn-delacruz", "view_baseline", "s-1", "not_found"),
     ]
 

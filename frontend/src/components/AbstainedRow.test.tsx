@@ -66,10 +66,20 @@ describe("the last stored values of a NOT RANKED row", () => {
     forgetWardNow();
   });
 
+  it("names a quality that is not ok, and says nothing for ok", () => {
+    syncWardNow("2026-09-03T07:00:00Z");
+    const weak = { ...last_seen!, heart_rate: { ...last_seen!.heart_rate, provenance: { ...last_seen!.heart_rate.provenance, quality: "degraded" } } };
+    const out = renderToStaticMarkup(<AbstainedRow row={{ ...row, last_seen: weak as AbstainedRowType["last_seen"] }} />);
+    expect(out).toContain("HR 88 (device, degraded, 2 h ago,");
+    expect(out).toContain("BP 120/80 (nurse, 2 h ago,");
+    forgetWardNow();
+  });
+
   it("gives the time alone before the ward's time is known", () => {
     forgetWardNow();
     const out = renderToStaticMarkup(<AbstainedRow row={{ ...row, last_seen }} />);
-    expect(out).toMatch(/HR 88 \(device, \d\d:\d\d/); // the clock follows the source at once: no age yet
+    expect(out).toMatch(/HR 88 \(device, [^)]*\d\d:\d\d/); // no age yet: the date and clock stand alone, so an old value is not read as today's
+    expect(out).not.toMatch(/HR 88 \(device, \d+ (h|min)/);
   });
 
   it("says no value is stored when none is, and shows nothing when the row has no last_seen", () => {

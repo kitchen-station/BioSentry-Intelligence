@@ -480,21 +480,6 @@ class PostgresStore:
         assert other is not None
         return other
 
-    def last_seen(self, patient_id: str) -> dict[str, Any]:
-        """The newest stored value of each vital, whatever its age or source, each as a measurement
-        with its own provenance. For display only: it feeds no score, rank or reason (I1, I4). A
-        vital with no stored value is the usual missing measurement."""
-        rows = {
-            r["code"]: r
-            for r in self.conn.execute(
-                "SELECT DISTINCT ON (code) * FROM observation WHERE run_id = %s AND patient_id = %s"
-                " AND absent_reason IS NULL AND code = ANY(%s)"
-                " ORDER BY code, observed_at DESC, id DESC",
-                (self.run_id, patient_id, list(VITALS)),
-            )
-        }
-        return {v: self._measurement(v, rows.get(v)) for v in VITALS}
-
     def read(self, patient_id: str) -> UnscoredPatient | None:
         # ponytail: the reads below are not one snapshot, so a batch landing mid-read can mix two
         # sim minutes in one patient. Upgrade: a read transaction (BEGIN) around each request.
@@ -539,6 +524,16 @@ class PostgresStore:
             name: self._measurement(name, latest[name]) if name in latest else None for name in LABS
         }
         labs["freshness_hours"] = round(max(ages), 1) if ages else None
+        # The newest stored value of each vital, whatever its age or source: for display only, so a
+        # patient whose signal stopped does not look empty. It feeds no score, rank or reason (I1, I4).
+        stored = {
+            v: max(
+                (r for r in by_code.get(v, []) if r["absent_reason"] is None),
+                key=lambda r: (r["observed_at"], r["id"]),
+                default=None,
+            )
+            for v in VITALS
+        }
         return UnscoredPatient.model_validate(
             {
                 "id": patient_id,
@@ -551,6 +546,7 @@ class PostgresStore:
                 "mechanism": p["mechanism"],
                 "supporting": p["supporting"],
                 "vitals": {v: self._measurement(v, latest.get(v)) for v in VITALS},
+                "last_seen": {v: self._measurement(v, stored[v]) for v in VITALS},
                 "vital_trends": {
                     v: [value for _, value in bins[v][-TREND_BINS:]] for v in DEVICE_VITALS
                 },

@@ -160,3 +160,4 @@ class UnscoredPatient(Contract):
     last_update_s: NonNegNum | None
     synthetic: Flag
     admitted_at: AwareDatetime | None  # None: the arrival is not known (I1)
+    last_seen: Vitals | None = None  # the newest stored value of each vital: shown on a NOT RANKED row only

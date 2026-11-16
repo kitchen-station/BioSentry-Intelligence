@@ -4436,6 +4436,17 @@
           "labs": {
             "$ref": "#/components/schemas/LabPanel"
           },
+          "last_seen": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Vitals"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "last_update_s": {
             "anyOf": [
               {

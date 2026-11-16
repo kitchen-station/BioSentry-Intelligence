@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { AbstainedRow as AbstainedRowType, VitalsRecorded } from "../types";
 import styles from "./AbstainedRow.module.css";
-import { formatAge, formatBloodPressure, formatClock } from "./format";
+import { formatAge, formatBloodPressure, formatClockDay } from "./format";
 import { useWardNow } from "./wardNow";
 import { VitalsEntry } from "./VitalsEntry";
 
@@ -21,7 +21,8 @@ function LastSeen({ seen, now }: { seen: NonNullable<AbstainedRowType["last_seen
     const at = Date.parse(m.provenance.observed_at);
     const value = typeof m.data.value === "number" ? m.data.value : formatBloodPressure(m.data.value);
     const age = now > 0 ? `${formatAge(Math.max(0, Math.floor((now - at) / 1000)))}, ` : "";
-    return [`${label} ${value} (${m.provenance.source}, ${age}${formatClock(at)})`];
+    const quality = m.provenance.quality === "ok" ? "" : `${m.provenance.quality}, `;
+    return [`${label} ${value} (${m.provenance.source}, ${quality}${age}${formatClockDay(at, now)})`];
   });
   return (
     <div className={styles.seen}>

@@ -35,7 +35,6 @@ from biosentry.schemas import (
     TierBreakdown,
     TierStatus,
     UnscoredPatient,
-    Vitals,
     WardResponse,
 )
 from biosentry.schemas.ingest import OPEN_BEDS_MAX, LiveWard, OpenBed, OpenSim, OpenWard
@@ -160,9 +159,7 @@ def _reason(state: UnscoredPatient, reason: str) -> str:
     return reason
 
 
-def abstained_row(
-    state: UnscoredPatient, decision: NotRanked, last_seen: dict[str, Any]
-) -> AbstainedRow:
+def abstained_row(state: UnscoredPatient, decision: NotRanked) -> AbstainedRow:
     return AbstainedRow(
         id=state.id,
         name=state.name,
@@ -173,7 +170,7 @@ def abstained_row(
         reason=_reason(state, decision.reason),
         instruction=decision.instruction,
         synthetic=state.synthetic,
-        last_seen=Vitals.model_validate(last_seen),
+        last_seen=state.last_seen,
     )
 
 
@@ -241,10 +238,7 @@ class WardService:
             score_row(states[d.patient_id], rank, d, tiers, row_models(signals[d.patient_id]))
             for rank, d in ranking.ranked
         ]
-        abstained = [
-            abstained_row(states[d.patient_id], d, self._store.last_seen(d.patient_id))
-            for d in ranking.not_ranked
-        ]
+        abstained = [abstained_row(states[d.patient_id], d) for d in ranking.not_ranked]
         return ranked, abstained, states
 
     def compute(self, ids: frozenset[str]) -> tuple[list[ScoreRow], list[AbstainedRow]]:
@@ -280,12 +274,14 @@ class WardService:
             return None
         ranked, abstained, states = self.view(visible)
         row = next((r for r in ranked if r.id == patient_id), None)
-        state = states[patient_id]
         if row is None:
             held = next((a for a in abstained if a.id == patient_id), None)
             return held and AbstainedDetail(
-                **held.model_dump(), vital_history=state.vital_history, now=whole(self._store.now())
+                **held.model_dump(),
+                vital_history=states[patient_id].vital_history,
+                now=whole(self._store.now()),
             )
+        state = states[patient_id]
         breakdown = TierBreakdown(
             tier_a=TierAScore(score=row.score, label=f"NEWS2 = {row.score}"),
         )

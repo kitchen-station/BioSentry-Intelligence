@@ -1061,6 +1061,8 @@ export interface components {
             readonly bed: string;
             readonly id: string;
             readonly labs: components["schemas"]["LabPanel"];
+            /** @default null */
+            readonly last_seen?: components["schemas"]["Vitals"] | null;
             readonly last_update_s: number | null;
             readonly mechanism: string;
             readonly name: string;

@@ -15,6 +15,7 @@ OPTIONAL_OUTPUT_FIELDS = {
     ("AbstainedDetail", "last_seen"),  # inherited from the row
     ("AbstainedRow", "last_seen"),
     ("EscalationReason", "pathway"),
+    ("UnscoredPatient", "last_seen"),
     ("Provenance", "variant"),
     ("Provenance", "file_sha256"),
     ("Provenance", "run_id"),
