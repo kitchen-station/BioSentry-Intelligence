@@ -341,7 +341,8 @@ def _need(d: dict, key: str) -> object:
 
 
 RULES = {"tier_a_threshold": "NEWS2 threshold", "tier_c_raise": "model raise", "tier_b_finding": "finding",
-         "missing_input": "missing input"}
+         "missing_input": "missing input", "prediction_model_flag": "prediction model flag",
+         "alert_policy_flag": "alert policy flag"}  # every EscalationRule the API emits (schemas/tiers.py)
 UNAVAILABLE = {"no_history": "the data holds no history for this vital.",
                "latest_bin_missing": "the latest 15-minute value is missing.",
                "patch_not_live": "the patch is not live."}

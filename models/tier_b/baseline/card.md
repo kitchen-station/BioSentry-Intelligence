@@ -52,7 +52,8 @@ consecutive bins it has held and the bin where that run started. Or `NotComputed
 | floors | 2 bpm, 1 /min, 1 %, 0.1 °C | Stops a very stable patient alarming on noise |
 
 All four are judgement, marked `shortcut:` in code, until the offline sweep (slice B4) tunes
-them on synthetic cohorts. A tuned value replaces the default here and in code together.
+them on synthetic cohorts. The API still runs these defaults (k 2.0, p 3): the tuned k 4.0, p 8 below is in
+`params.json` and not yet in code.
 Parameters are validated (window and p at least 1, k and every floor positive and finite) and
 read-only once made.
 

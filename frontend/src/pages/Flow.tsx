@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import type { PatientStay } from "../types";
 import { getStays, getWard, usesServer } from "../api";
 import { formatClock, formatDay } from "../components/format";
-import { hasWardNow, syncWardNow, useWardNow } from "../components/wardNow";
+import { syncWardNow, useWardNow } from "../components/wardNow";
 import { bedRows, dayTicks, FLOW_DAYS, flowStats, formatStay, recentMoves } from "./flowMath";
 import styles from "./Flow.module.css";
 
@@ -23,11 +23,11 @@ export function FlowSection() {
   const pollMs = usesServer ? 5_000 : 15_000; // the API changes as the simulator runs; the fixture never does
 
   useEffect(() => {
-    // The stays carry no time of their own: they are counted against the ward's time, which only a
-    // read moves. A server's ward is read on every refresh; the fixture's once, when no page has.
+    // The stays carry no time of their own: the ward is read for its time at every refresh, so at 10x or
+    // 60x a new stay never starts after the page's clock (a negative length).
     const refresh = () =>
       Promise.all([
-        usesServer || !hasWardNow() ? getWard().then((w) => syncWardNow(w.now, !usesServer)) : undefined,
+        getWard().then((w) => syncWardNow(w.now, !usesServer)),
         getStays().then(setStays),
       ]).then(
         () => {

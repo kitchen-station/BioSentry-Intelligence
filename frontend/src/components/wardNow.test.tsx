@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
-import { forgetWardNow, hasWardNow, since, syncWardNow, useWardNow, wardNowMs } from "./wardNow";
+import { forgetWardNow, since, syncWardNow, useWardNow, wardNowMs } from "./wardNow";
 
 const SERVED = "2026-09-03T07:00:00Z";
 
@@ -17,11 +17,9 @@ describe("ward time", () => {
   });
 
   it("is 0 before any read, and the server's time after one", () => {
-    expect(hasWardNow()).toBe(false);
     const { result } = renderHook(() => useWardNow());
     expect(result.current).toBe(0);
     syncWardNow(SERVED);
-    expect(hasWardNow()).toBe(true);
     expect(wardNowMs()).toBe(Date.parse(SERVED));
   });
 

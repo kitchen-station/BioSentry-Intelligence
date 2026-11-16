@@ -1,11 +1,10 @@
-// Hand-exported from the transcript in PR 19's description (merged; no ledger is committed). Not computed here.
-// When `python -m research.agent export` exists, research-agent.json is replaced by its output; this file does not change.
+// Copied from the export of PR 19's committed ledger (research/agent/records/pr19-run/ledger.jsonl). Not computed here.
 import data from "./research-agent.json";
 export const ASK_STATUSES = ["answered", "refused"] as const;
 export const PROPOSAL_STATES = ["proposed", "approved", "applied"] as const; // there is no "rejected"
 export interface AgentQuestion {
-  id: string; // derived from record counts, not shown
-  askedAt: string | null; // null: the transcript prints no time
+  id: string; // the ledger's id, not shown
+  askedAt: string | null; // null: no time recorded
   question: string;
   template: "news2_threshold" | "baseline_vs_news2" | "alerts_per_nurse" | "none";
   status: (typeof ASK_STATUSES)[number];

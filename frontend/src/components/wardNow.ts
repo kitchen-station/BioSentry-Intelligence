@@ -20,11 +20,6 @@ export function syncWardNow(now: string, demo = false): void {
   paced = demo;
 }
 
-/** Whether any read has set the clock. */
-export function hasWardNow(): boolean {
-  return served > 0;
-}
-
 /** Test only: forget every read. */
 export function forgetWardNow(): void {
   served = 0;

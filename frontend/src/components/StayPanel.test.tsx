@@ -26,7 +26,8 @@ const settle = () => act(async () => {});
 
 // Two clock days before "today" keep every time on another day, so every line carries its date.
 const T = (hhmm: string, d = "2026-01-05") => `${d}T${hhmm}:00Z`;
-const NOW = Date.now(); // ward time as served, passed in; the panel never reads the browser's clock for "today"
+// Ward time as served, passed in: noon on the ward's own clock (Manila), two days after T's default day, mid-day so NOW - 1 min is the same day. The panel never reads the browser's clock for "today".
+const NOW = Date.UTC(2026, 0, 7, 12 - 8, 0);
 // A moment on the ward's own clock (Manila, UTC+8), whatever zone the machine is in.
 const ward = (m: number, d: number, h: number, min = 0): string => new Date(Date.UTC(2026, m, d, h - 8, min)).toISOString();
 const clk = (iso: string) => formatClockDay(Date.parse(iso), NOW);

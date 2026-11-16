@@ -390,8 +390,8 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
                   label="Heart rate"
                   color="var(--trace-hr)"
                   unit="bpm"
-                  warningHigh={100}
-                  warningLow={60}
+                  warningHigh={90}
+                  warningLow={51}
                   band={hrBand}
                 />
                 <TrendChart

@@ -24,7 +24,8 @@ export function ChatBubble({ session, onSignOut }: { session: Session; onSignOut
   const trigger = useRef<HTMLButtonElement>(null);
 
   const asks = asksWard(session.role);
-  const shown = pathname !== "/" && !pathname.startsWith("/ask") && (asks || (session.role === "rn" && patientId !== undefined));
+  const connected = patientId ? hasPatientQuestions : hasLabQuestions; // the fixture build has neither: no bubble
+  const shown = connected && pathname !== "/" && !pathname.startsWith("/ask") && (asks || (session.role === "rn" && patientId !== undefined));
   const open = shown && openAt === pathname;
 
   // The patient page's own button opens the same panel.
@@ -81,16 +82,12 @@ export function ChatBubble({ session, onSignOut }: { session: Session; onSignOut
                 <Link to={patientId ? `/ask/patient/${patientId}` : "/ask"}>Open as a page</Link>
               </p>
             )}
-            {(patientId ? hasPatientQuestions : hasLabQuestions) ? (
-              <Thread
-                key={patientId ?? "ward"}
-                scope={patientId ? { kind: "patient", id: patientId } : { kind: "ward" }}
-                clinicianId={session.clinician_id}
-                onSignOut={onSignOut}
-              />
-            ) : (
-              <p className={styles.quiet}>Getting ready: the chat is not connected in this demo.</p>
-            )}
+            <Thread
+              key={patientId ?? "ward"}
+              scope={patientId ? { kind: "patient", id: patientId } : { kind: "ward" }}
+              clinicianId={session.clinician_id}
+              onSignOut={onSignOut}
+            />
           </div>
         </>
       )}

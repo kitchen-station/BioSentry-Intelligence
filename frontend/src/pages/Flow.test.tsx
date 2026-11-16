@@ -114,12 +114,12 @@ describe("Flow page", () => {
     expect(screen.getByText("Out, last 24 h").nextSibling?.textContent).toBe("1");
   });
 
-  it("reads the ward once for its time only when no page has read it", async () => {
-    syncWardNow(new Date(NOW).toISOString());
+  it("reads the ward for its time even when another page set an older one", async () => {
+    syncWardNow(new Date(NOW - 3_600_000).toISOString());
     api.getStays.mockResolvedValue(STAYS);
     show();
     await screen.findByRole("heading", { name: "Recent movement" });
-    expect(api.getWard).not.toHaveBeenCalled();
+    expect(api.getWard).toHaveBeenCalled();
   });
 
   it("reads the ward on every refresh against a server, so the last day moves with the ward", async () => {

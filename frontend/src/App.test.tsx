@@ -15,7 +15,7 @@ import { App } from "./App";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const api = vi.hoisted(() => ({ restoreSession: vi.fn(() => true), clearSession: vi.fn(), hasWardResearch: true }));
+const api = vi.hoisted(() => ({ restoreSession: vi.fn(() => true), clearSession: vi.fn(), hasWardResearch: true, usesServer: true, hasLabQuestions: true, hasPatientQuestions: true }));
 vi.mock("./api", () => api);
 
 // The pages are stand-ins: these tests are about the shell, not what each page shows.
@@ -306,6 +306,17 @@ describe("route guards", () => {
   it("sends a signed-out visitor of the ward research table to sign-in, remembering where", () => {
     at("/ward/research");
     expect(screen.getByText("sign-in page from /ward/research")).toBeTruthy();
+  });
+
+  it("opens the research and pipeline pages to every demo role in the fixture build", () => {
+    api.usesServer = false;
+    store(nurse);
+    for (const [path, words] of [["/lab/research", "research page"], ["/lab/pipeline", "pipeline page"]] as const) {
+      const { unmount } = at(path);
+      expect(screen.getByText(`${words} for rn-reyes`)).toBeTruthy();
+      unmount();
+    }
+    api.usesServer = true;
   });
 
   it("has no ward research route in the fixture build", () => {

@@ -59,6 +59,7 @@ describe("SessionMenu", () => {
   });
 
   it("takes a physician from the bar to the What-if page", async () => {
+    vi.stubEnv("VITE_API_URL", "/api");
     menu({ clinician_id: "md-santos", ward: "W4", role: "md" });
     await userEvent.click(screen.getByRole("link", { name: "What-if runs" }));
     expect(screen.getByText("at /what-if")).toBeTruthy();
@@ -72,10 +73,10 @@ describe("SessionMenu", () => {
 
   it.each([
     ["rn", ["Ward"]],
-    ["charge_rn", ["Ward", "Ask", "What-if runs", "Station"]],
-    ["md", ["Ward", "Ask", "What-if runs", "Station"]],
+    ["charge_rn", ["Ward", "Station"]],
+    ["md", ["Ward", "Station"]],
     ["admin", ["Overview", "Ward"]],
-  ] as const)("shows %s only the bar links for routes it can use", (role, names) => {
+  ] as const)("shows %s only the bar links for routes it can use (the fixture build: no Ask or What-if)", (role, names) => {
     vi.stubEnv("VITE_API_URL", ""); // the fixture build: Ward research needs the API
     menu({ clinician_id: "x-1", ward: "W4", role });
     const bar = screen.getByRole("navigation", { name: "Pages" });
