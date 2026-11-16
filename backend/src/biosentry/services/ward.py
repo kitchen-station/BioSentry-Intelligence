@@ -261,10 +261,12 @@ class WardService:
         return self._store.assigned(clinician_id, unit=unit)
 
     def view(
-        self, ids: frozenset[str]
+        self, ids: frozenset[str], whole_history: str | None = None
     ) -> tuple[list[ScoreRow], list[AbstainedRow], dict[str, UnscoredPatient]]:
-        """Rows ranked relative to this set, and the state each row was built from."""
-        read = (self._store.read(pid) for pid in sorted(ids))
+        """Rows ranked relative to this set, and the state each row was built from. The whole stored
+        history is read for the patients of a ranked unit (the models need it) and for `whole_history`
+        (the one patient whose page is being built); for the others only the bins a row shows."""
+        read = (self._store.read(pid, True if pid == whole_history else None) for pid in sorted(ids))
         every = {s.id: s for s in read if s is not None}
         units = self._store.units
         # Only a ranked unit is scored: no score, rank or model flag is computed for the others.
@@ -343,7 +345,7 @@ class WardService:
         visible = self.visible(clinician_id)
         if patient_id not in visible:
             return None
-        ranked, abstained, states = self.view(visible)
+        ranked, abstained, states = self.view(visible, patient_id)
         row = next((r for r in ranked if r.id == patient_id), None)
         if row is None:
             held = next((a for a in abstained if a.id == patient_id), None)
@@ -404,7 +406,9 @@ class WardService:
         ids = self._store.on_ward(unit)
         if len(ids) > OPEN_BEDS_MAX:
             return None
-        states = [s for s in (self._store.read(pid) for pid in sorted(ids)) if s is not None]
+        # The ranking uses each patient's own-baseline findings, which are built from the whole stored
+        # history: a ranked unit is read whole (None: by the unit), the others need only the last bins.
+        states = [s for s in (self._store.read(pid, None) for pid in sorted(ids)) if s is not None]
         bed = {s.id: s.bed for s in states}
         if self._store.units[unit]["kind"] == "ranked":
             ranking = rank_ward(decide(s) for s in states)
@@ -436,7 +440,7 @@ class WardService:
         that names the patient is read into it, and no model runs. Writes no audit row: the
         route does."""
         pid = self._store.in_bed(unit, bed) if re.fullmatch(BED_LABEL, bed) else None
-        state = self._store.read(pid) if pid else None
+        state = self._store.read(pid, False) if pid else None
         if state is None:
             return None
         info = self._store.units[unit]
