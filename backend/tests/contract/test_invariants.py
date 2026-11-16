@@ -136,7 +136,7 @@ def test_abstained_row_requires_reason_and_instruction() -> None:
 
 def test_abstained_row_has_no_score_or_rank() -> None:
     names = set(AbstainedRow.model_fields)
-    assert not names & {"score", "rank", "trend", "sort_tier", "vitals", "tier_b", "tier_c"}
+    assert not names & {"score", "rank", "trend", "sort_tier", "tier_b", "tier_c"}  # `vitals`: optional, set only on a shown or unranked unit's row (tests/integration/test_unit_vitals.py)
     for key in ("score", "rank"):
         payload = sample(AbstainedRow)
         payload[key] = 0

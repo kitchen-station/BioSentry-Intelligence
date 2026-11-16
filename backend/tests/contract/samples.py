@@ -253,6 +253,8 @@ def abstained_row() -> dict[str, Any]:
         "person": None,
         "news2_risk": None,
         "last_seen": vitals(),
+        "vitals": vitals(),
+        "vital_trends": vital_trends(),
     }
 
 
