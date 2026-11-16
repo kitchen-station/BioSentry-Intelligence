@@ -173,6 +173,13 @@ describe("BaselinePanel", () => {
     expect(text()).toContain(`15-minute set ${when(at(30))} to ${formatClock(T0 - 15 * 60_000)}`);
   });
 
+  it("says how old a charted systolic pressure is, and marks one hours old as stale", () => {
+    show(response([computed({ vital: "systolic_bp", unit: "mmHg", latest: 118, baseline_median: 120, delta: -2, z: -0.4, run_bins: 0, significant: false, latest_age_s: 3 * 3600 + 120 })]));
+    expect(text()).toContain("Systolic blood pressure");
+    expect(text()).toContain("Stale · 15-minute set");
+    expect(text()).toContain("ended 3 h ago");
+  });
+
   it("words the age with the existing formatter", () => {
     show(response([computed({ latest_age_s: 540 })]));
     expect(text()).toContain(`15-minute set ${when(at(30))} to ${formatClock(T0 - 15 * 60_000)}, ended 9 min ago`);

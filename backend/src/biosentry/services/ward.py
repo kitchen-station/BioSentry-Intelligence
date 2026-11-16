@@ -16,9 +16,9 @@ from typing import Any
 from pydantic import ValidationError
 
 from biosentry.core.audit import AuditLog
-from biosentry.domain.arbiter import NotRanked, PolicySignal, Ranked, TierCSignal, rank_ward
+from biosentry.domain.arbiter import Ranked, TierCSignal, rank_ward
 from biosentry.domain.computed import Computed, NotComputed
-from biosentry.domain.scoring.tier_a import News2Score
+from biosentry.domain.scoring.tier_a import News2Abstained, News2Score, inputs_from_vitals, score_news2
 from biosentry.domain.scoring.tier_c.confidence import Check
 from biosentry.repositories.postgres import OUT_OF_DATE, PostgresStore, whole
 from biosentry.schemas import (
@@ -36,10 +36,11 @@ from biosentry.schemas import (
     TierStatus,
     UnscoredPatient,
     WardResponse,
+    WardUnit,
 )
 from biosentry.schemas.ingest import OPEN_BEDS_MAX, LiveWard, OpenBed, OpenSim, OpenWard
 
-from .model_signals import POLICY_ID, STUDENT_ID, ModelSignals, ward_model_signals
+from .model_signals import STUDENT_ID, ModelSignals, ward_model_signals
 from .models import LoadedModels
 from .scoring import decide
 
@@ -78,14 +79,12 @@ def _log_once(reason: str) -> None:
         log.warning("model result not computed: %s", reason)
 
 
-def _flag_state(value: object) -> str:
-    if isinstance(value, Check):
-        return {Check.ALERT: "flag", Check.NOT_SURE: "not_sure", Check.QUIET: "no_flag"}[value]
-    return "flag" if value else "no_flag"
+def _flag_state(value: Check) -> str:
+    return {Check.ALERT: "flag", Check.NOT_SURE: "not_sure", Check.QUIET: "no_flag"}[value]
 
 
 def _signal(
-    result: Computed[Check] | Computed[bool] | NotComputed,
+    result: Computed[Check] | NotComputed,
     sig: ModelSignals,
     model_id: str,
     before: tuple[Computed[float] | NotComputed, ...] = (),
@@ -102,11 +101,8 @@ def _signal(
 
 
 def row_models(sig: ModelSignals) -> RowModels:
-    """The two states for a row: prediction needs the student and the check, the policy needs itself."""
-    return RowModels(
-        prediction=_signal(sig.check, sig, STUDENT_ID, (sig.probability,)),
-        alert_policy=_signal(sig.policy, sig, POLICY_ID),
-    )
+    """The state for a row: the prediction needs the student and the check."""
+    return RowModels(prediction=_signal(sig.check, sig, STUDENT_ID, (sig.probability,)))
 
 
 def score_row(
@@ -134,6 +130,9 @@ def score_row(
         synthetic=state.synthetic,
         signal_quality=state.signal_quality,
         last_update_s=state.last_update_s,
+        unit=state.unit,
+        floor=state.floor,
+        person=state.person,
     )
 
 
@@ -159,7 +158,9 @@ def _reason(state: UnscoredPatient, reason: str) -> str:
     return reason
 
 
-def abstained_row(state: UnscoredPatient, decision: NotRanked) -> AbstainedRow:
+def abstained_row(
+    state: UnscoredPatient, reason: str, instruction: str, news2_risk: str | None = None
+) -> AbstainedRow:
     return AbstainedRow(
         id=state.id,
         name=state.name,
@@ -167,14 +168,30 @@ def abstained_row(state: UnscoredPatient, decision: NotRanked) -> AbstainedRow:
         sex=state.sex,
         bed=state.bed,
         admitting_context=state.admitting_context,
-        reason=_reason(state, decision.reason),
-        instruction=decision.instruction,
+        reason=reason,
+        instruction=instruction,
         synthetic=state.synthetic,
+        unit=state.unit,
+        floor=state.floor,
+        person=state.person,
+        news2_risk=news2_risk,  # type: ignore[arg-type]
         last_seen=state.last_seen,
     )
 
 
-_OPEN_KIND = {"in": "in", "discharged": "out", "higher_care": "out"}  # where a patient went is not shown
+def unit_row(state: UnscoredPatient, unit: dict[str, Any]) -> AbstainedRow:
+    """A patient of a unit that is shown or unranked: never a rank or a score. A shown unit gives
+    the NEWS2 band when every input is there; an unranked unit never does."""
+    tier_a = score_news2(inputs_from_vitals(state.vitals))
+    risk = None if unit["kind"] == "unranked" or isinstance(tier_a, News2Abstained) else tier_a.risk.value
+    verb = "shown, not ranked" if unit["kind"] == "shown" else "not ranked"
+    return abstained_row(
+        state, f"{unit['name']} is {verb}: NEWS2 is a ward score.", "No NEWS2 rank for this unit.", risk
+    )
+
+
+# where a patient went is not shown
+_OPEN_KIND = {"in": "in", "discharged": "out", "higher_care": "out", "transferred": "out", "died": "out"}
 
 
 def open_sim(view: dict[str, Any] | None) -> OpenSim | None:
@@ -209,37 +226,48 @@ class WardService:
         self._audit = audit
         self._models = models  # loaded once at start
 
-    def visible(self, clinician_id: str) -> frozenset[str]:
+    def visible(self, clinician_id: str, unit: str | None = None) -> frozenset[str]:
         # An admin reads every patient on the ward; every write is refused earlier by `Writer`.
+        # A unit only narrows: the assignment decides, never the unit.
         if self._store.is_admin(clinician_id):
-            return self._store.on_ward()
-        return self._store.assigned(clinician_id)
+            return self._store.on_ward(unit)
+        return self._store.assigned(clinician_id, unit=unit)
 
     def view(
         self, ids: frozenset[str]
     ) -> tuple[list[ScoreRow], list[AbstainedRow], dict[str, UnscoredPatient]]:
         """Rows ranked relative to this set, and the state each row was built from."""
         read = (self._store.read(pid) for pid in sorted(ids))
-        states = {s.id: s for s in read if s is not None}
+        every = {s.id: s for s in read if s is not None}
+        units = self._store.units
+        # Only a ranked unit is scored: no score, rank or model flag is computed for the others.
+        states = {pid: s for pid, s in every.items() if units[s.unit]["kind"] == "ranked"}
         try:
             signals = ward_model_signals(self._store, states, self._models)  # two statements for the set
         except Exception as e:  # research code must never take the NEWS2 list down
             _log_once(f"{MODEL_ERROR} ({type(e).__name__})")
             _LOGGED.add(MODEL_ERROR)  # the line above already says it, with the kind of error
             failed = NotComputed(MODEL_ERROR)
-            signals = {pid: ModelSignals(failed, failed, failed, {}) for pid in states}
+            signals = {pid: ModelSignals(failed, failed, {}) for pid in states}
         decisions = [
-            decide(s, TierCSignal(g.probability, g.check), PolicySignal(g.policy))
+            decide(s, TierCSignal(g.probability, g.check))
             for s, g in ((s, signals[s.id]) for s in states.values())
         ]
-        ranking = rank_ward(decisions)
         tiers = self._store.tier_status
-        ranked = [
-            score_row(states[d.patient_id], rank, d, tiers, row_models(signals[d.patient_id]))
-            for rank, d in ranking.ranked
-        ]
-        abstained = [abstained_row(states[d.patient_id], d) for d in ranking.not_ranked]
-        return ranked, abstained, states
+        ranked: list[ScoreRow] = []
+        abstained: list[AbstainedRow] = []
+        for unit in units:  # a rank is within one unit
+            ranking = rank_ward(d for d in decisions if states[d.patient_id].unit == unit)
+            ranked += [
+                score_row(states[d.patient_id], rank, d, tiers, row_models(signals[d.patient_id]))
+                for rank, d in ranking.ranked
+            ]
+            abstained += [
+                abstained_row(states[d.patient_id], _reason(states[d.patient_id], d.reason), d.instruction)
+                for d in ranking.not_ranked
+            ]
+        abstained += [unit_row(s, units[s.unit]) for s in every.values() if s.id not in states]
+        return ranked, abstained, every
 
     def compute(self, ids: frozenset[str]) -> tuple[list[ScoreRow], list[AbstainedRow]]:
         """Ranked and NOT RANKED rows for these patients, ranked relative to this set."""
@@ -248,11 +276,21 @@ class WardService:
 
     # --- reads ---------------------------------------------------------------------------
 
-    def ward(self, clinician_id: str) -> WardResponse:
-        ranked, abstained = self.compute(self.visible(clinician_id))
-        self._audit.append_view(clinician_id, "view_ward", self._store.ward)
+    def units(self, clinician_id: str) -> list[WardUnit]:
+        counts = self._store.counts(self.visible(clinician_id))
+        self._audit.append(clinician_id, "list_wards", "-", "ok")
+        return [WardUnit(**u, patients=counts.get(u["id"], 0)) for u in self._store.units.values()]
+
+    def ward(self, clinician_id: str, unit: str | None = None) -> WardResponse:
+        unit = unit or self._store.ward  # None: the home unit
+        ranked, abstained = self.compute(self.visible(clinician_id, unit))
+        self._audit.append_view(clinician_id, "view_ward", unit)
+        info = self._store.units[unit]
         return WardResponse(
-            ward=self._store.ward,
+            ward=unit,
+            name=info["name"],
+            floor=info["floor"],
+            kind=info["kind"],
             clinician=clinician_id,
             shift=SHIFT,
             receiving_data=self._store.receiving_data(),
@@ -304,16 +342,18 @@ class WardService:
         self._audit.append_view(clinician_id, "view_patient", patient_id)
         return found
 
-    def stays(self, clinician_id: str) -> list[PatientStay]:
-        ids = self._store.assigned(clinician_id, including_left=True)
-        self._audit.append(clinician_id, "view_stays", self._store.ward, "ok")
-        return [PatientStay.model_validate(row) for row in self._store.stays(ids)]
+    def stays(self, clinician_id: str, unit: str) -> list[PatientStay]:
+        ids = self._store.assigned(clinician_id, including_left=True, unit=unit)
+        self._audit.append(clinician_id, "view_stays", unit, "ok")
+        return [PatientStay.model_validate(row) for row in self._store.stays(ids, unit)]
 
-    def live(self, clinician_id: str) -> LiveWard:
-        """The sim's live view: `shared` as stored, and only this clinician's patients' entries."""
-        visible = self._store.assigned(clinician_id)  # an admin has no live view, whatever the route
-        view = self._store.live_view() or {"shared": None, "patients": []}
-        self._audit.append_view(clinician_id, "view_live", self._store.ward)
+    def live(self, clinician_id: str, unit: str | None = None) -> LiveWard:
+        """The unit's (None: the home unit's) live view: `shared` as stored, and only this
+        clinician's patients' entries."""
+        unit = unit or self._store.ward
+        visible = self._store.assigned(clinician_id, unit=unit)  # an admin has no live view, whatever the route
+        view = self._store.live_view(unit) or {"shared": None, "patients": []}
+        self._audit.append_view(clinician_id, "view_live", unit)
         return LiveWard.model_validate(
             {
                 **view,
@@ -323,21 +363,24 @@ class WardService:
             }
         )
 
-    def open_ward(self) -> OpenWard | None:
-        """The ward for a caller nobody identified: bed, rank and NEWS2 band only, from the ward's
-        own scoring, and the simulator's figures. None when the ward holds too many patients.
-        No model runs, so no model state can reach it; the ranking does not depend on one. Writes
-        no audit row: the route does."""
-        ids = self._store.on_ward()
+    def open_ward(self, unit: str) -> OpenWard | None:
+        """The unit for a caller nobody identified: bed, rank and NEWS2 band only, from the unit's
+        own scoring, and the simulator's figures. None when the unit holds too many patients.
+        No model runs, so no model state can reach it; the ranking does not depend on one. A unit
+        that is not ranked shows every bed as not ranked. Writes no audit row: the route does."""
+        ids = self._store.on_ward(unit)
         if len(ids) > OPEN_BEDS_MAX:
             return None
         states = [s for s in (self._store.read(pid) for pid in sorted(ids)) if s is not None]
-        ranking = rank_ward(decide(s) for s in states)
         bed = {s.id: s.bed for s in states}
-        beds = [
-            *(("ranked", rank, d.patient_id, d.news2.risk.value) for rank, d in ranking.ranked),
-            *(("not_ranked", None, d.patient_id, None) for d in ranking.not_ranked),
-        ]
+        if self._store.units[unit]["kind"] == "ranked":
+            ranking = rank_ward(decide(s) for s in states)
+            beds = [
+                *(("ranked", rank, d.patient_id, d.news2.risk.value) for rank, d in ranking.ranked),
+                *(("not_ranked", None, d.patient_id, None) for d in ranking.not_ranked),
+            ]
+        else:
+            beds = [("not_ranked", None, s.id, None) for s in states]
         shown = []
         for state, rank, pid, risk in beds:
             try:
@@ -345,10 +388,10 @@ class WardService:
             except ValidationError:  # a label that breaks the rule is left out
                 continue
         return OpenWard(
-            ward=self._store.ward,
+            ward=unit,
             synthetic=True,
             can_control=False,
-            sim=open_sim(self._store.live_view()),
+            sim=open_sim(self._store.live_view(unit)),
             beds=sorted(shown, key=lambda b: (b.bed, b.rank or 0)),
         )
 
@@ -356,6 +399,6 @@ class WardService:
         ranked, abstained = self.compute(self.visible(clinician_id))
         self._audit.append(clinician_id, "list_patients", "-", "ok")
         return [
-            *(PatientSummary(id=r.id, name=r.name, bed=r.bed, ranked=True) for r in ranked),
-            *(PatientSummary(id=a.id, name=a.name, bed=a.bed, ranked=False) for a in abstained),
+            *(PatientSummary(id=r.id, name=r.name, bed=r.bed, ranked=True, unit=r.unit, floor=r.floor) for r in ranked),
+            *(PatientSummary(id=a.id, name=a.name, bed=a.bed, ranked=False, unit=a.unit, floor=a.floor) for a in abstained),
         ]

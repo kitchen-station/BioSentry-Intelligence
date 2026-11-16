@@ -103,7 +103,7 @@ export function Research({ session, onSignOut }: Props) {
               </tbody>
             </table>
           </div>
-          <p>The API loads the student with its confidence check and the reward policy: each can add a flag to a ward row as one more reason. A flag never moves a patient on the list.</p>
+          <p>The API loads the student with its confidence check: only an alert it supports adds a flag to a ward row as one more reason. A flag never moves a patient on the list. The reward policy is not connected: on the second held-out set it showed a loss.</p>
         </section>
 
         <section className={styles.card} aria-labelledby="check">

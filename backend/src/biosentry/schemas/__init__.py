@@ -44,7 +44,7 @@ from .common import (
     Trend,
 )
 from .history import HistoryEvent, HistoryProvenance, HistoryRun, PatientHistory, SimulatedEpisode
-from .ingest import LiveWard, OpenBed, OpenMove, OpenSim, OpenStaff, OpenWard
+from .ingest import LiveWard, OpenBed, OpenMove, OpenSim, OpenStaff, OpenUnit, OpenUnits, OpenWard
 from .lab import (
     LabRunDetail,
     LabRunItem,
@@ -90,6 +90,7 @@ from .rows import (
     TierBreakdown,
     UnscoredPatient,
     WardResponse,
+    WardUnit,
 )
 from .tiers import (
     EscalationReason,
@@ -129,6 +130,7 @@ CONTRACT_MODELS: tuple[type[BaseModel], ...] = (
     AbstainedRow,
     AbstainedDetail,
     WardResponse,
+    WardUnit,
     TierAScore,
     TierBreakdown,
     PatientDetail,
@@ -153,6 +155,7 @@ CONTRACT_MODELS: tuple[type[BaseModel], ...] = (
     BaselineUnavailable,
     LiveWard,
     OpenWard,
+    OpenUnits,
     OverviewPatient,
     OverviewClinician,
     OverviewActivity,
@@ -231,6 +234,8 @@ __all__ = [
     "OpenMove",
     "OpenSim",
     "OpenStaff",
+    "OpenUnit",
+    "OpenUnits",
     "OpenWard",
     "NurseVitalsInput",
     "OverviewActivity",
@@ -275,4 +280,5 @@ __all__ = [
     "VitalsRecorded",
     "WardOverview",
     "WardResponse",
+    "WardUnit",
 ]

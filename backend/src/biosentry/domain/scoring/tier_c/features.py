@@ -10,7 +10,7 @@ caller applies the product's gates (ruling 10). Research code: synthetic data on
 from collections.abc import Mapping, Sequence
 
 from biosentry.domain.scoring.tier_b.baseline import DEFAULTS, baseline_finding
-from biosentry.domain.scoring.tier_b.reward_policy import NAMES, bin_z
+from biosentry.domain.scoring.tier_b.reward_policy import NAMES
 
 from .float32 import to_float32
 
@@ -32,11 +32,6 @@ def signed_z(series: Series, k: int) -> dict[str, float | None]:
 def formed(series: Series, t: int) -> bool:
     """The baseline of every one of the four vitals has formed at bin t (ruling 10)."""
     return all(z is not None for z in signed_z(series, t).values())
-
-
-def policy_z(series: Series, k: int) -> tuple[float, float, float, float]:
-    """Section 5.2: the clipped z of bin k per vital, 0.0 where the baseline still forms (as research)."""
-    return bin_z(signed_z(series, k))
 
 
 def student_features(

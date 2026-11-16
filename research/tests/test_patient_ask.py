@@ -171,10 +171,9 @@ def test_rank_and_alerts_exact_text():
         "These alert reasons are active:\n"
         '1. Rule: NEWS2 threshold\n  "NEWS2 total 5 reached the trigger."\n'
         '2. Rule: finding\n  "Heart rate 40 over baseline."\n   Pathway:\n  "cardiac"\n') + tail("why this patient has this rank")
-    flags = [{"rule": "prediction_model_flag", "text": "Model flag.", "pathway": None},
-             {"rule": "alert_policy_flag", "text": "Policy flag.", "pathway": None}]
+    flags = [{"rule": "prediction_model_flag", "text": "Model flag.", "pathway": None}]
     text = run("which alerts are active", patient(detail=detail_dict(escalation_reasons=flags)))["text"]
-    assert '1. Rule: prediction model flag\n  "Model flag."\n2. Rule: alert policy flag\n  "Policy flag."\n' in text
+    assert '1. Rule: prediction model flag\n  "Model flag."\n' in text
     d = detail_dict(escalation_reasons=[])
     assert run("which alerts are active", patient(detail=d))["text"] == FIRST + (
         "No alert reason is active for this patient now.\nThe data holds no history of earlier alerts.\n"
@@ -593,6 +592,15 @@ def test_systolic_blood_pressure_is_the_fifth_vital_and_its_answer_says_it_is_ch
     assert "Systolic blood pressure: this patient's own baseline is 72.5, with this unit:\n  \"mmHg\"" in out["text"]
     assert "charted blood pressure readings, not a sensor stream" in out["text"]
     assert "Systolic blood pressure: the data holds no baseline entry." in run(q)["text"]  # older data: said so
+
+
+@pytest.mark.parametrize("q", ["how does her blood pressure compare with the baseline of other patients",
+                               "is her BP higher than most women", "compare her systolic baseline with her sister",
+                               "blood pressure vs baseline of women", "is her baseline blood pressure normal for a man her age",
+                               "how does her bp compare to the ward"])
+def test_a_blood_pressure_question_that_compares_with_other_people_is_refused(q):
+    assert ask.match(q)[0] is None
+    assert run(q)["status"] == "refused"
 
 
 @pytest.mark.parametrize("q", ["diastolic baseline", "what is her baseline diastolic pressure"])

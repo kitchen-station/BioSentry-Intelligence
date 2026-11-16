@@ -60,10 +60,15 @@ def seed(conn: Conn, fixture: Path = DEFAULT_DATASET, dev_passphrase: bool = Fal
     with transaction(conn):
         with conn.cursor() as cur:
             cur.executemany(
-                "INSERT INTO clinician (id, role, passphrase_hash) VALUES (%s, %s, %s)"
+                "INSERT INTO clinician (id, role, passphrase_hash, unit) VALUES (%s, %s, %s, %s)"
                 " ON CONFLICT DO NOTHING",
                 [
-                    (cid, c["role"], hash_passphrase(DEV_PASSPHRASE) if dev_passphrase else None)
+                    (
+                        cid,
+                        c["role"],
+                        hash_passphrase(DEV_PASSPHRASE) if dev_passphrase else None,
+                        None if c["role"] == "admin" else raw["ward"],
+                    )
                     for cid, c in raw["clinicians"].items()
                 ],
             )
@@ -104,6 +109,7 @@ def seed(conn: Conn, fixture: Path = DEFAULT_DATASET, dev_passphrase: bool = Fal
                         None if age is None else whole(as_of - timedelta(seconds=age))
                     ),
                     "story": raw["labels"][pid]["story"],
+                    "unit": raw["ward"],
                 },
             )
             observations += [_obs(pid, code, m) for code, m in p["vitals"].items()]
@@ -126,10 +132,10 @@ def seed(conn: Conn, fixture: Path = DEFAULT_DATASET, dev_passphrase: bool = Fal
                 for i, value in enumerate(temp)
             ]
         for pid in patients:
-            assign(conn, run_id, pid)
+            assign(conn, run_id, pid, raw["ward"])
         for cid, c in raw["clinicians"].items():
             for pid in c["patients"]:
-                assign(conn, run_id, pid, cid)
+                assign(conn, run_id, pid, raw["ward"], cid)
         insert_observations(conn, run_id, True, observations, ignore=True)
         upsert_bins(conn, run_id, bins)
         with conn.cursor() as cur:

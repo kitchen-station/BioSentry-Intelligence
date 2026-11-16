@@ -16,16 +16,24 @@ export interface components {
             readonly admitting_context: string;
             readonly age: number | null;
             readonly bed: string;
+            /** @default null */
+            readonly floor?: number | null;
             readonly id: string;
             readonly instruction: string;
             /** @default null */
             readonly last_seen?: components["schemas"]["Vitals"] | null;
             readonly name: string;
+            /** @default null */
+            readonly news2_risk?: ("low" | "low_medium" | "medium" | "high") | null;
             /** Format: date-time */
             readonly now: string;
+            /** @default null */
+            readonly person?: string | null;
             readonly reason: string;
             readonly sex: string | null;
             readonly synthetic: boolean;
+            /** @default null */
+            readonly unit?: string | null;
             readonly vital_history: components["schemas"]["VitalHistoryFull"];
         };
         /**
@@ -36,14 +44,22 @@ export interface components {
             readonly admitting_context: string;
             readonly age: number | null;
             readonly bed: string;
+            /** @default null */
+            readonly floor?: number | null;
             readonly id: string;
             readonly instruction: string;
             /** @default null */
             readonly last_seen?: components["schemas"]["Vitals"] | null;
             readonly name: string;
+            /** @default null */
+            readonly news2_risk?: ("low" | "low_medium" | "medium" | "high") | null;
+            /** @default null */
+            readonly person?: string | null;
             readonly reason: string;
             readonly sex: string | null;
             readonly synthetic: boolean;
+            /** @default null */
+            readonly unit?: string | null;
         };
         /**
          * Acknowledgement
@@ -113,6 +129,8 @@ export interface components {
             /** @default null */
             readonly philhealthPin?: string | null;
             readonly sex: components["schemas"]["Sex"];
+            /** @default null */
+            readonly unit?: string | null;
             /** @default null */
             readonly weightKg?: number | null;
         };
@@ -252,7 +270,7 @@ export interface components {
          * EscalationRule
          * @enum {string}
          */
-        readonly EscalationRule: "tier_a_threshold" | "tier_c_raise" | "tier_b_finding" | "missing_input" | "prediction_model_flag" | "alert_policy_flag";
+        readonly EscalationRule: "tier_a_threshold" | "tier_c_raise" | "tier_b_finding" | "missing_input" | "prediction_model_flag";
         /**
          * FindingDirection
          * @enum {string}
@@ -566,6 +584,26 @@ export interface components {
             readonly y: number;
         };
         /**
+         * OpenUnit
+         * @description One unit of the run, as anyone may read it: no count, no clinician, no person.
+         */
+        readonly OpenUnit: {
+            readonly floor: number | null;
+            readonly id: string;
+            /** @enum {string} */
+            readonly kind: "ranked" | "shown" | "unranked";
+            readonly name: string;
+        };
+        /**
+         * OpenUnits
+         * @description The run's units in order, with no sign-in (GET /open-view): what the public page lists.
+         */
+        readonly OpenUnits: {
+            /** @constant */
+            readonly synthetic: true;
+            readonly units: readonly components["schemas"]["OpenUnit"][];
+        };
+        /**
          * OpenWard
          * @description What anyone may watch with no sign-in (GET /wards/{ward}/open-view).
          */
@@ -600,11 +638,15 @@ export interface components {
         readonly OverviewPatient: {
             readonly bed: string;
             readonly care: readonly string[];
+            /** @default null */
+            readonly floor?: number | null;
             readonly reason: string | null;
             readonly score: number | null;
             /** @enum {string} */
             readonly state: "ranked" | "not_ranked";
             readonly synthetic: boolean;
+            /** @default null */
+            readonly unit?: string | null;
         };
         /** OverviewSimCounts */
         readonly OverviewSimCounts: {
@@ -725,6 +767,8 @@ export interface components {
             readonly age: number | null;
             readonly bed: string;
             readonly escalation_reasons: readonly components["schemas"]["EscalationReason"][];
+            /** @default null */
+            readonly floor?: number | null;
             readonly id: string;
             readonly labs: components["schemas"]["LabPanel"];
             readonly last_update_s: number | null;
@@ -733,6 +777,8 @@ export interface components {
             readonly name: string;
             /** Format: date-time */
             readonly now: string;
+            /** @default null */
+            readonly person?: string | null;
             readonly rank: number;
             readonly score: number;
             readonly sex: string | null;
@@ -743,6 +789,8 @@ export interface components {
             readonly tier_breakdown: components["schemas"]["TierBreakdown"];
             readonly tier_status: readonly components["schemas"]["TierStatus"][];
             readonly trend: components["schemas"]["Trend"];
+            /** @default null */
+            readonly unit?: string | null;
             readonly vital_history: components["schemas"]["VitalHistoryFull"];
             readonly vital_trends: components["schemas"]["VitalTrends"];
             readonly vitals: components["schemas"]["Vitals"];
@@ -808,11 +856,19 @@ export interface components {
         readonly PatientStay: {
             readonly admitted_at: string | null;
             readonly bed: string;
+            /** @default null */
+            readonly floor?: number | null;
             readonly id: string;
             readonly left_at: string | null;
             readonly name: string;
-            readonly outcome: ("discharged" | "higher_care") | null;
+            readonly outcome: ("discharged" | "higher_care" | "transferred" | "died") | null;
+            /** @default null */
+            readonly person?: string | null;
             readonly synthetic: boolean;
+            /** @default null */
+            readonly to_unit?: string | null;
+            /** @default null */
+            readonly unit?: string | null;
         };
         /**
          * PatientSummary
@@ -820,9 +876,11 @@ export interface components {
          */
         readonly PatientSummary: {
             readonly bed: string;
+            readonly floor: number | null;
             readonly id: string;
             readonly name: string;
             readonly ranked: boolean;
+            readonly unit: string;
         };
         /** PatientView */
         readonly PatientView: {
@@ -926,7 +984,6 @@ export interface components {
         };
         /** RowModels */
         readonly RowModels: {
-            readonly alert_policy: components["schemas"]["ModelSignal"];
             readonly prediction: components["schemas"]["ModelSignal"];
         };
         /**
@@ -939,12 +996,16 @@ export interface components {
             readonly age: number | null;
             readonly bed: string;
             readonly escalation_reasons: readonly components["schemas"]["EscalationReason"][];
+            /** @default null */
+            readonly floor?: number | null;
             readonly id: string;
             readonly labs: components["schemas"]["LabPanel"];
             readonly last_update_s: number | null;
             readonly mechanism: string;
             readonly models: components["schemas"]["RowModels"];
             readonly name: string;
+            /** @default null */
+            readonly person?: string | null;
             readonly rank: number;
             readonly score: number;
             readonly sex: string | null;
@@ -954,6 +1015,8 @@ export interface components {
             readonly synthetic: boolean;
             readonly tier_status: readonly components["schemas"]["TierStatus"][];
             readonly trend: components["schemas"]["Trend"];
+            /** @default null */
+            readonly unit?: string | null;
             readonly vital_trends: components["schemas"]["VitalTrends"];
             readonly vitals: components["schemas"]["Vitals"];
         };
@@ -1059,6 +1122,7 @@ export interface components {
             readonly admitting_context: string;
             readonly age: number | null;
             readonly bed: string;
+            readonly floor: number | null;
             readonly id: string;
             readonly labs: components["schemas"]["LabPanel"];
             /** @default null */
@@ -1066,11 +1130,13 @@ export interface components {
             readonly last_update_s: number | null;
             readonly mechanism: string;
             readonly name: string;
+            readonly person: string | null;
             readonly sex: string | null;
             readonly signal_quality: number | null;
             readonly supporting: string;
             readonly synthetic: boolean;
             readonly trend: components["schemas"]["Trend"];
+            readonly unit: string;
             readonly vital_history: components["schemas"]["VitalHistoryFull"];
             readonly vital_trends: components["schemas"]["VitalTrends"];
             readonly vitals: components["schemas"]["Vitals"];
@@ -1158,6 +1224,12 @@ export interface components {
         readonly WardResponse: {
             readonly abstained: readonly components["schemas"]["AbstainedRow"][];
             readonly clinician: string;
+            /** @default null */
+            readonly floor?: number | null;
+            /** @default null */
+            readonly kind?: ("ranked" | "shown" | "unranked") | null;
+            /** @default null */
+            readonly name?: string | null;
             /** Format: date-time */
             readonly now: string;
             readonly ranked: readonly components["schemas"]["ScoreRow"][];
@@ -1166,6 +1238,18 @@ export interface components {
             readonly sort_tier: components["schemas"]["Tier"];
             readonly tier_status: readonly components["schemas"]["TierStatus"][];
             readonly ward: string;
+        };
+        /**
+         * WardUnit
+         * @description One unit of the run (GET /wards): `patients` is how many the caller may see in it now.
+         */
+        readonly WardUnit: {
+            readonly floor: number | null;
+            readonly id: string;
+            /** @enum {string} */
+            readonly kind: "ranked" | "shown" | "unranked";
+            readonly name: string;
+            readonly patients: number;
         };
     };
     responses: never;
@@ -1223,6 +1307,8 @@ export type OpenBed = components['schemas']['OpenBed'];
 export type OpenMove = components['schemas']['OpenMove'];
 export type OpenSim = components['schemas']['OpenSim'];
 export type OpenStaff = components['schemas']['OpenStaff'];
+export type OpenUnit = components['schemas']['OpenUnit'];
+export type OpenUnits = components['schemas']['OpenUnits'];
 export type OpenWard = components['schemas']['OpenWard'];
 export type OverviewActivity = components['schemas']['OverviewActivity'];
 export type OverviewClinician = components['schemas']['OverviewClinician'];
@@ -1270,5 +1356,6 @@ export type VitalTrends = components['schemas']['VitalTrends'];
 export type WardOverview = components['schemas']['WardOverview'];
 export type WardResearch = components['schemas']['WardResearch'];
 export type WardResponse = components['schemas']['WardResponse'];
+export type WardUnit = components['schemas']['WardUnit'];
 export type $defs = Record<string, never>;
 export type operations = Record<string, never>;

@@ -351,9 +351,10 @@ def test_seeding_over_a_loopback_connection_gives_every_clinician_the_dev_passph
     with connect(blank_database_url) as conn:
         assert is_loopback(conn.info)  # judged on the established connection
     ensure(blank_database_url)
-    stored = _hashes(blank_database_url)
+    stored = {i: h for i, h in _hashes(blank_database_url).items() if not i.startswith("cn-")}
     assert len(stored) == 5 and all(verify(DEV_PASSPHRASE, h) for h in stored.values())
     assert len(set(stored.values())) == 5  # each with a salt of its own
+    assert {h for i, h in _hashes(blank_database_url).items() if i.startswith("cn-")} == {None}  # the migration's: none
 
 
 def test_seeding_over_a_connection_that_is_not_loopback_gives_nobody_a_passphrase(

@@ -116,12 +116,12 @@ def test_on_it_answers_with_no_header_and_the_same_bytes_with_any_credential(wat
 def test_on_the_route_table_gains_only_this_route_and_every_other_still_wants_a_token(watch: Api) -> None:
     off = create_app(replace(watch.settings, open_ward_view=False), clock=watch.wall)
     table = _route_table(watch.client.app)
-    assert sorted(set(table) - set(_route_table(off))) == [("GET", "/wards/{ward}/open-view")]
+    assert sorted(set(table) - set(_route_table(off))) == [("GET", "/open-view"), ("GET", "/wards/{ward}/open-view")]
     assert set(_route_table(off)) <= set(table)
     cases = [{}, {"Authorization": "Basic abc"}, {"Authorization": "Bearer"}, {"Authorization": "Bearer rn-nobody"}]
     walked = 0
     for method, template in table:
-        if (method, template) in PUBLIC_ROUTES or template == "/wards/{ward}/open-view":
+        if (method, template) in PUBLIC_ROUTES or template in ("/open-view", "/wards/{ward}/open-view"):
             continue
         for headers in cases:
             response = watch.client.request(
@@ -442,3 +442,92 @@ def test_one_read_runs_three_statements_for_each_patient_and_five_of_its_own(wat
     monkeypatch.setattr(psycopg.Connection, "execute", counting)
     opened(watch)
     assert seen[0] == 5 + 3 * 12  # the fixture ward holds 12 patients
+
+
+# --- The unit list: GET /open-view ----------------------------------------------------------------
+
+UNITS_URL = "/open-view"
+HOSPITAL = [
+    {"id": "ER", "name": "Emergency Room", "floor": 0, "kind": "shown"},
+    {"id": "ICU", "name": "Intensive Care", "floor": 2, "kind": "unranked"},
+    {"id": "W4", "name": "Ward W4", "floor": 4, "kind": "ranked"},
+]
+
+
+def test_off_the_unit_list_is_an_unknown_path_and_writes_nothing(api: Api) -> None:
+    unknown = get(api, "/no-such-path")
+    for headers in ({}, api.as_("rn-reyes")):
+        response = get(api, UNITS_URL, **headers)
+        assert (response.status_code, response.content) == (404, unknown.content)
+    assert all(path != UNITS_URL for _, path in _route_table(api.client.app))
+    for method in ("post", "head", "options"):
+        assert getattr(api.client, method)(UNITS_URL).status_code == 404
+    assert rows(api) == []
+
+
+def test_the_unit_list_reads_no_credential_and_is_the_same_bytes_for_every_caller(watch: Api) -> None:
+    start(watch)
+    plain = get(watch, UNITS_URL)
+    assert plain.status_code == 200 and plain.headers["cache-control"] == "no-store"
+    token = watch.as_("md-santos")["Authorization"]
+    for headers in (
+        {"Authorization": token}, {"Authorization": "Bearer junk"}, {"Cookie": "session=x"},
+        {"X-Ingest-Key": "test-ingest-key"}, {"Authorization": "Basic abc"},
+    ):  # fmt: skip
+        assert get(watch, UNITS_URL, **headers).content == plain.content
+    assert watch.sql("SELECT * FROM audit_log WHERE action = 'authenticate'") == []
+
+
+def test_an_old_run_of_one_unit_answers_that_one_unit_with_exactly_the_contracts_keys(watch: Api) -> None:
+    start(watch)  # a body with no units: one ranked unit, W4
+    assert get(watch, UNITS_URL).json() == {
+        "synthetic": True,
+        "units": [{"id": "W4", "name": "Ward W4", "floor": None, "kind": "ranked"}],
+    }
+
+
+def test_the_unit_list_is_the_runs_units_in_order_and_holds_no_count_and_no_person(watch: Api) -> None:
+    patients = [
+        {**sim_patient("PID-MARK-1", "cn-er", None), "unit": "ER", "name": "NAME-MARK", "bed": "BED-MARK", "person": "PERSON-MARK"},
+        {**sim_patient("PID-MARK-2", "rn-delacruz", "md-santos"), "unit": "W4"},
+    ]
+    made = watch.post("/sim/runs", {**new_run(patients=patients), "units": HOSPITAL})
+    assert made.status_code == 201, made.text
+    response = get(watch, UNITS_URL)
+    assert response.json() == {"synthetic": True, "units": HOSPITAL}
+    for mark in ("MARK", "cn-er", "rn-delacruz", "md-santos", "patients", "clinician"):
+        assert mark not in response.text, mark
+
+
+def test_the_unit_list_of_a_run_that_is_not_synthetic_is_the_framework_404(watch: Api) -> None:
+    real = watch.client.app.state.open_ctx
+
+    def not_synthetic() -> Any:
+        ctx = real()
+        ctx.store.synthetic = False
+        return ctx
+
+    watch.client.app.state.open_ctx = not_synthetic
+    response = get(watch, UNITS_URL)
+    assert (response.status_code, response.content) == (404, get(watch, "/no-such-path").content)
+    assert [(r["resource"], r["outcome"]) for r in rows(watch)] == [("*", "not_found")]
+
+
+def test_the_unit_list_writes_one_row_a_minute_with_no_clinician_and_its_own_resource(watch: Api) -> None:
+    start(watch)
+    for _ in range(5):
+        get(watch, UNITS_URL)
+        get(watch, UNITS_URL, **watch.as_("rn-reyes"))
+    opened(watch)  # the ward's own open view keeps its own row
+    assert [(r["clinician_id"], r["role"], r["resource"], r["outcome"]) for r in rows(watch)] == [
+        (None, None, "*", "ok"), (None, None, "W4", "ok"),
+    ]  # fmt: skip
+    watch.wall.now += timedelta(seconds=61)
+    get(watch, UNITS_URL)
+    assert [(r["resource"], r["outcome"]) for r in rows(watch)] == [("*", "ok"), ("W4", "ok"), ("*", "ok")]
+
+
+def test_the_unit_list_takes_get_only(watch: Api) -> None:
+    start(watch)
+    assert [getattr(watch.client, m)(UNITS_URL).status_code for m in ("post", "head", "put", "delete")] == [405] * 4
+    assert rows(watch) == []

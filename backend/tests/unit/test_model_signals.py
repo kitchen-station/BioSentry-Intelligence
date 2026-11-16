@@ -81,34 +81,32 @@ def run(rows: list[StoredObservation] | None = None, models=MODELS, **over: Any)
 
 
 def reasons(got: ModelSignals) -> tuple[object, ...]:
-    return tuple(r.reason if isinstance(r, NotComputed) else "ok" for r in (got.probability, got.check, got.policy))
+    return tuple(r.reason if isinstance(r, NotComputed) else "ok" for r in (got.probability, got.check))
 
 
-def test_a_quiet_patient_with_a_formed_baseline_computes_all_three_with_provenance() -> None:
+def test_a_quiet_patient_with_a_formed_baseline_computes_both_with_provenance() -> None:
     got = run()
     assert isinstance(got.probability, Computed) and isinstance(got.check, Computed)
-    assert isinstance(got.policy, Computed) and got.policy.value is False
     assert got.check.value in set(Check)
     prov = got.provenance
-    assert set(prov) == {"tier_c/student_vitals", "tier_c/confidence_check", "tier_b/reward_policy"}
+    assert set(prov) == {"tier_c/student_vitals", "tier_c/confidence_check"}
     s = prov["tier_c/student_vitals"]
     assert (s.variant, s.sim_run_id, s.bin_end, s.bin_start) == ("all", 7, slot(29), slot(29) - timedelta(minutes=15))
     assert (s.path, s.sha256, s.file_run_id) == tuple(getattr(MODELS.student_file, f) for f in ("path", "sha256", "run_id"))
     assert prov["tier_c/confidence_check"].path.endswith("calibration.json")
-    assert prov["tier_b/reward_policy"].file_run_id == MODELS.policy_file.run_id  # type: ignore[union-attr]
     assert got.probability.provenance.observed_at == slot(29) and got.probability.provenance.model_id == "tier_c/student_vitals"
     assert got.probability.window.end_s - got.probability.window.start_s == 900
 
 
 def test_not_ranked_now_is_not_ranked() -> None:
     got = run(no_o2=True)
-    assert reasons(got) == (ms.NOT_RANKED,) * 3 and got.provenance == {}
+    assert reasons(got) == (ms.NOT_RANKED,) * 2 and got.provenance == {}
 
 
 def test_a_vital_not_counted_is_not_computed() -> None:
-    assert reasons(run(last_update_s=3000)) == (ms.NOT_COUNTED,) * 3
-    assert reasons(run(last_update_s=None)) == (ms.NOT_COUNTED,) * 3
-    assert reasons(run(nurse_hr=True)) == (ms.NOT_COUNTED,) * 3
+    assert reasons(run(last_update_s=3000)) == (ms.NOT_COUNTED,) * 2
+    assert reasons(run(last_update_s=None)) == (ms.NOT_COUNTED,) * 2
+    assert reasons(run(nurse_hr=True)) == (ms.NOT_COUNTED,) * 2
 
 
 def test_no_stored_bins_and_a_stay_past_the_cap() -> None:
@@ -125,16 +123,16 @@ def test_no_stored_bins_and_a_stay_past_the_cap() -> None:
 
 
 def test_the_current_bin_not_scored_on_its_stored_inputs_has_its_own_reason() -> None:
-    assert reasons(run(rows=charted(blood_pressure={"at": slot(40)}))) == (ms.LATEST,) * 3
-    assert reasons(run(rows=charted(consciousness={"absent_reason": "x"}))) == (ms.LATEST,) * 3
+    assert reasons(run(rows=charted(blood_pressure={"at": slot(40)}))) == (ms.LATEST,) * 2
+    assert reasons(run(rows=charted(consciousness={"absent_reason": "x"}))) == (ms.LATEST,) * 2
 
 
 def test_a_baseline_still_forming_in_any_of_the_four_vitals_is_not_computed() -> None:
     n23 = pts(23)
-    assert reasons(model_signals_from(n23)) == (ms.FORMING,) * 3
+    assert reasons(model_signals_from(n23)) == (ms.FORMING,) * 2
     short = pts(30)
     short["temperature"] = short["temperature"][7:]  # 23 valid temperature bins, the others 30
-    assert reasons(model_signals_from(short)) == (ms.FORMING,) * 3
+    assert reasons(model_signals_from(short)) == (ms.FORMING,) * 2
 
 
 def model_signals_from(points: dict[str, list[VitalHistory]], rows=None, models=MODELS) -> ModelSignals:  # type: ignore[no-untyped-def]
@@ -143,17 +141,13 @@ def model_signals_from(points: dict[str, list[VitalHistory]], rows=None, models=
     return ms.signals(prep, charted() if rows is None else rows, models, run_id=7, synthetic=True, computed_at=NOW)
 
 
-def test_the_policy_needs_every_earlier_bin_of_its_window_rebuilt() -> None:
-    # a cuff pressure first charted after the end of bin t-4 (index 25), before the current bin
+def test_only_the_current_bin_needs_stored_observations() -> None:
+    # a cuff pressure first charted after the end of bin t-4, and a nurse value 3 hours back: the earlier bins are not rebuilt now
     late = charted(blood_pressure={"num": 120.0, "num2": 80.0, "at": slot(26)})
-    got = model_signals_from(pts(), late)
-    assert reasons(got) == ("ok", "ok", ms.EARLIER)
-    # a nurse typed a device vital 3 hours before the current bin: those bins are not rebuilt
+    assert reasons(model_signals_from(pts(), late)) == ("ok", "ok")
     nurse = charted() + [StoredObservation("p", "heart_rate", "nurse", slot(25), 99, "ok", 70.0, None, None, None)]
-    assert reasons(model_signals_from(pts(), nurse)) == ("ok", "ok", ms.EARLIER)
-    # the same typed value 13 hours before bin t-4 has expired and does not matter
-    old = charted() + [StoredObservation("p", "heart_rate", "nurse", slot(29) - timedelta(hours=17), 99, "ok", 70.0, None, None, None)]
-    assert reasons(model_signals_from(pts(), old))[2] == "ok"
+    assert reasons(model_signals_from(pts(), nurse)) == ("ok", "ok")
+    assert ms.observation_window(ms.prepare_series(pts(), None)) == (slot(29) - timedelta(hours=12), slot(29))  # type: ignore[arg-type]
 
 
 def test_the_as_of_rule() -> None:
@@ -185,27 +179,21 @@ def test_an_impossible_earlier_value_is_a_gap_and_the_narrow_rule_applies() -> N
     def bad(i: int) -> ModelSignals:
         return model_signals_from(pts(30, heart_rate={i: 5000.0}))
 
-    assert reasons(bad(25)) == (ms.IMPOSSIBLE, ms.IMPOSSIBLE, "ok")  # t-4: a lag bin; the policy sees a NOT RANKED bin
-    assert bad(25).policy.value is False  # type: ignore[union-attr]
-    assert reasons(bad(13)) == (ms.IMPOSSIBLE, ms.IMPOSSIBLE, ms.IMPOSSIBLE_BASELINE)  # t-16, inside the baseline window
-    assert reasons(bad(5)) == (ms.IMPOSSIBLE, ms.IMPOSSIBLE, ms.IMPOSSIBLE_BASELINE)  # inside the baseline window
-    assert reasons(bad(27)) == ("ok", "ok", "ok")  # an earlier bin that is neither: a gap, the policy run ends
-    assert reasons(bad(29)) == (ms.LATEST,) * 3  # the current bin
+    assert reasons(bad(25)) == (ms.IMPOSSIBLE, ms.IMPOSSIBLE)  # t-4: a lag bin
+    assert reasons(bad(13)) == (ms.IMPOSSIBLE, ms.IMPOSSIBLE)  # t-16, inside the baseline window
+    assert reasons(bad(5)) == (ms.IMPOSSIBLE, ms.IMPOSSIBLE)  # inside the baseline window
+    assert reasons(bad(27)) == ("ok", "ok")  # an earlier bin that is neither: a gap
+    assert reasons(bad(29)) == (ms.LATEST,) * 2  # the current bin
     nan = pts(30)
     nan["spo2"][27] = VitalHistory.model_construct(time=slot(27), value=0.0)  # zero SpO2 is not a reading
-    assert reasons(model_signals_from(nan)) == ("ok", "ok", "ok")
+    assert reasons(model_signals_from(nan)) == ("ok", "ok")
 
 
 def test_a_model_that_did_not_load_gives_its_own_reason_and_nothing_else_changes() -> None:
     no_student = replace(MODELS, student=NotComputed("student not loaded"), student_file=None)
-    assert reasons(model_signals_from(pts(), models=no_student)) == ("student not loaded", "student not loaded", "ok")
+    assert reasons(model_signals_from(pts(), models=no_student)) == ("student not loaded", "student not loaded")
     no_cal = replace(MODELS, calibration=NotComputed("calibration not loaded"), calibration_file=None)
-    assert reasons(model_signals_from(pts(), models=no_cal)) == ("ok", "calibration not loaded", "ok")
-    no_pol = replace(MODELS, policy=NotComputed("policy not loaded"), policy_file=None)
-    assert reasons(model_signals_from(pts(), models=no_pol)) == ("ok", "ok", "policy not loaded")
-    window = ms.observation_window(ms.prepare_series(pts(), None), no_pol)  # type: ignore[arg-type]
-    assert window == (slot(29) - timedelta(hours=12), slot(29))
-    assert ms.observation_window(ms.prepare_series(pts(), None), MODELS)[0] == slot(25) - timedelta(hours=12)  # type: ignore[arg-type]
+    assert reasons(model_signals_from(pts(), models=no_cal)) == ("ok", "calibration not loaded")
 
 
 def test_a_feature_that_cannot_be_made_is_not_computed(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -213,7 +201,7 @@ def test_a_feature_that_cannot_be_made_is_not_computed(monkeypatch: pytest.Monke
         raise OverflowError
 
     monkeypatch.setattr(ms, "student_features", boom)
-    assert reasons(model_signals_from(pts())) == (ms.FEATURES, ms.FEATURES, "ok")
+    assert reasons(model_signals_from(pts())) == (ms.FEATURES, ms.FEATURES)
     with pytest.raises(OverflowError):
         features.student_features({v: [1e39] * 30 for v in VITALS}, 29, news2_total=0, on_oxygen=False, consciousness_alert=True)
 

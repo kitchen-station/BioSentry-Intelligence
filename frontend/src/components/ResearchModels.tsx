@@ -19,10 +19,9 @@ const REASONS: Record<string, string> = {
 };
 // Reasons that mean the model is not running at all: the panel says "getting ready", not the reason.
 // An odd or malformed entry reads the same. An unknown text reason is a model that ran and has no result.
-const NOT_RUNNING = new Set(["student not loaded", "calibration not loaded", "policy not loaded", "model error"]);
+const NOT_RUNNING = new Set(["student not loaded", "calibration not loaded", "model error"]);
 export const ENTRIES = [
   ["prediction", "Prediction model"],
-  ["alert_policy", "Alert policy"],
 ] as const;
 
 const isObj = (x: unknown): x is Record<string, unknown> => typeof x === "object" && x !== null;

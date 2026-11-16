@@ -62,7 +62,7 @@ class BaselineService:
             if patient_id in self._wards.visible(clinician_id)
             else None
         )
-        if state is None or isinstance(decide(state), NotRanked):
+        if state is None or self._store.units[state.unit]["kind"] != "ranked" or isinstance(decide(state), NotRanked):
             return None
         return self.of(state)
 

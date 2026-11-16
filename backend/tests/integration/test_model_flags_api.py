@@ -19,17 +19,16 @@ from test_store import DATA, NOW, Api, api, obs, start  # noqa: F401 (api: fixtu
 
 from biosentry.api.app import create_app
 from biosentry.core.audit import AuditLog
-from biosentry.domain.arbiter import POLICY_FLAG, PREDICTION_FLAG
-from biosentry.domain.computed import NotComputed
+from biosentry.domain.arbiter import PREDICTION_FLAG
 from biosentry.repositories.postgres import PostgresStore, connect
 from biosentry.schemas import WardResponse
 from biosentry.services import model_signals as ms
 from biosentry.services import ward as ward_module
-from biosentry.services.models import CALIBRATION, CALIBRATION_SIBLING, MANIFEST, POLICY, STUDENT, load_models
+from biosentry.services.models import CALIBRATION, CALIBRATION_SIBLING, MANIFEST, STUDENT, load_models
 from biosentry.services.ward import WardService
 
 REAL = Path(__file__).resolve().parents[3] / "models"
-WIRED = (MANIFEST, STUDENT, CALIBRATION, CALIBRATION_SIBLING, POLICY)
+WIRED = (MANIFEST, STUDENT, CALIBRATION, CALIBRATION_SIBLING)
 RN = "rn-delacruz"
 
 
@@ -88,11 +87,8 @@ def read(api: Api, client: TestClient, path: str = "/wards/W4/rows") -> Any:
     return response.json()
 
 
-def force(monkeypatch: pytest.MonkeyPatch, p: float | None = None, alert: bool | None = None) -> None:
-    if p is not None:
-        monkeypatch.setattr(ms, "forward", lambda student, x: p)
-    if alert is not None:
-        monkeypatch.setattr(ms, "_alerting", lambda prep, rows, pol, now, touched: pol if isinstance(pol, NotComputed) else alert)
+def force(monkeypatch: pytest.MonkeyPatch, p: float) -> None:
+    monkeypatch.setattr(ms, "forward", lambda student, x: p)
 
 
 def texts(row: dict[str, Any]) -> list[str]:
@@ -111,7 +107,7 @@ def test_t1c_a_flag_adds_reason_lines_and_changes_nothing_else(api: Api, monkeyp
     loaded, refused = client_for(api, REAL), client_for(api, tmp_path / "no-models")
     on = read(api, loaded)
     off = read(api, refused)
-    force(monkeypatch, p=1.0, alert=True)
+    force(monkeypatch, p=1.0)
     flagged = read(api, loaded)
     assert len(on["ranked"]) == 4 and [a["id"] for a in on["abstained"]] == ["w-4"]
     for other in (off, flagged):
@@ -122,7 +118,7 @@ def test_t1c_a_flag_adds_reason_lines_and_changes_nothing_else(api: Api, monkeyp
     assert [texts(r) for r in off["ranked"]] == [texts(r) for r in on["ranked"]]
     for row, then in zip(flagged["ranked"], on["ranked"], strict=True):
         computes = row["models"]["prediction"]["state"] != "not_computed"
-        assert texts(row) == texts(then) + ([PREDICTION_FLAG, POLICY_FLAG] if computes else [])
+        assert texts(row) == texts(then) + ([PREDICTION_FLAG] if computes else [])
     assert sum(r["models"]["prediction"]["state"] == "flag" for r in flagged["ranked"]) == 3  # w-3 is forming
     # The service itself, loaded versus every file refused: the same rows apart from the model fields.
     store = PostgresStore(connect(api.url), api.wall)
@@ -140,11 +136,11 @@ def test_the_response_shape_and_what_each_state_carries(api: Api, monkeypatch: p
     world(api)
     client = client_for(api, REAL)
     quiet = read(api, client)
-    force(monkeypatch, p=1.0, alert=True)
+    force(monkeypatch, p=1.0)
     flagged = read(api, client)
     files = {r["path"]: r for r in json.loads((REAL / MANIFEST).read_text("utf-8"))["models"]}
     sha = lambda rel: hashlib.sha256((REAL / rel).read_bytes()).hexdigest()  # noqa: E731
-    assert all(set(r["models"]) == {"prediction", "alert_policy"} for r in quiet["ranked"])
+    assert all(set(r["models"]) == {"prediction"} for r in quiet["ranked"])
     assert all("models" not in a for a in quiet["abstained"])
     for row in quiet["ranked"]:
         for signal in row["models"].values():
@@ -155,18 +151,16 @@ def test_the_response_shape_and_what_each_state_carries(api: Api, monkeypatch: p
             assert bool(signal["provenance"]) is (signal["state"] != "not_computed")
         assert "probability" not in json.dumps(row["models"])
     by_id = {r["id"]: r["models"] for r in quiet["ranked"]}
-    assert by_id["w-1"]["prediction"]["state"] == "no_flag" and by_id["w-1"]["alert_policy"]["state"] == "no_flag"
+    assert by_id["w-1"]["prediction"]["state"] == "no_flag"
     assert by_id["w-3"]["prediction"] == {"state": "not_computed", "reason": ms.FORMING, "bin_start": None, "bin_end": None, "provenance": []}
     one = {r["id"]: r["models"] for r in flagged["ranked"]}["w-1"]
-    pred, policy = one["prediction"], one["alert_policy"]
+    pred = one["prediction"]
     assert [p["model_id"] for p in pred["provenance"]] == [ms.STUDENT_ID, ms.CHECK_ID]
-    assert [p["model_id"] for p in policy["provenance"]] == [ms.POLICY_ID]
-    for signal, wanted in ((pred, (STUDENT, CALIBRATION)), (policy, (POLICY,))):
-        for prov, rel in zip(signal["provenance"], wanted, strict=True):
-            assert (prov["variant"], prov["file_sha256"], prov["run_id"]) == ("all", sha(rel), files[f"models/{rel}"]["run_id"])
-            assert (prov["source"], prov["synthetic"], prov["observed_at"]) == ("model", True, signal["bin_end"])
-    assert [p["tier"] for p in pred["provenance"]] == ["C", "C"] and policy["provenance"][0]["tier"] == "B"
-    assert pred["bin_start"] < pred["bin_end"] == policy["bin_end"]
+    for prov, rel in zip(pred["provenance"], (STUDENT, CALIBRATION), strict=True):
+        assert (prov["variant"], prov["file_sha256"], prov["run_id"]) == ("all", sha(rel), files[f"models/{rel}"]["run_id"])
+        assert (prov["source"], prov["synthetic"], prov["observed_at"]) == ("model", True, pred["bin_end"])
+    assert [p["tier"] for p in pred["provenance"]] == ["C", "C"]
+    assert pred["bin_start"] < pred["bin_end"]
     WardResponse.model_validate(flagged)  # the contract accepts it, and the ward row and the page agree below
     detail = client.get("/patients/w-1", headers=api.as_(RN)).json()
     assert detail["models"] == one and texts(detail) == texts({r["id"]: r for r in flagged["ranked"]}["w-1"])
@@ -205,13 +199,12 @@ def test_t2d_a_row_is_flagged_if_and_only_if_its_reason_is_there(api: Api, monke
     world(api)
     client = client_for(api, REAL)
     seen = set()
-    for p, alert in ((1.0, True), (0.01, False), (0.0, True), (1.0, False)):
-        force(monkeypatch, p=p, alert=alert)
+    for p in (1.0, 0.01, 0.0):
+        force(monkeypatch, p=p)
         for row in read(api, client)["ranked"]:
             m = row["models"]
             assert (m["prediction"]["state"] == "flag") is (PREDICTION_FLAG in texts(row))
-            assert (m["alert_policy"]["state"] == "flag") is (POLICY_FLAG in texts(row))
-            seen |= {m["prediction"]["state"], m["alert_policy"]["state"]}
+            seen.add(m["prediction"]["state"])
     assert seen == {"flag", "no_flag", "not_sure", "not_computed"}
 
 
@@ -230,10 +223,9 @@ def test_the_api_starts_and_serves_with_an_empty_models_folder(
     with caplog.at_level(logging.WARNING, logger="biosentry.services.models"):
         client = client_for(api, empty)
     assert loads == [empty]
-    assert len([r for r in caplog.records if r.name == "biosentry.services.models"]) == 3  # one per file, at start
+    assert len([r for r in caplog.records if r.name == "biosentry.services.models"]) == 2  # one per file, at start
     got = read(api, client)
     assert {r["models"]["prediction"]["state"] for r in got["ranked"]} == {"not_computed"}
-    assert {r["models"]["alert_policy"]["state"] for r in got["ranked"]} == {"not_computed"}
     read(api, client)
     read(api, client, "/patients/w-1")
     assert loads == [empty]  # no file is read per request
@@ -277,8 +269,8 @@ def test_an_error_in_the_model_code_leaves_the_ranked_list_up(
     assert order(after) == order(before) and after["abstained"] == before["abstained"]
     failed = {"state": "not_computed", "reason": "model error", "bin_start": None, "bin_end": None, "provenance": []}
     for row in (*after["ranked"], detail):
-        assert row["models"] == {"prediction": failed, "alert_policy": failed}
-        assert PREDICTION_FLAG not in texts(row) and POLICY_FLAG not in texts(row)
+        assert row["models"] == {"prediction": failed}
+        assert PREDICTION_FLAG not in texts(row)
     assert [r.getMessage() for r in caplog.records] == ["model result not computed: model error (RuntimeError)"]
 
 

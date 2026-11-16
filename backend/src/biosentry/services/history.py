@@ -176,7 +176,7 @@ class HistoryService:
         """The history, or None when the caller may not see the patient or they are NOT RANKED.
         Writes no audit row: the caller audits."""
         state = self._store.read(patient_id) if patient_id in self._wards.visible(clinician_id) else None
-        if state is None or isinstance(decide(state), NotRanked):
+        if state is None or self._store.units[state.unit]["kind"] != "ranked" or isinstance(decide(state), NotRanked):
             return None
         store = self._store
         found = self.rebuild(state)

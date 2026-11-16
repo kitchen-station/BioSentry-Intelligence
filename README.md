@@ -30,9 +30,9 @@ each nurse and physician who to see next.
 The list is sorted by **NEWS2**, a published bedside early-warning score (Tier A). A patient
 who meets a NEWS2 trigger sits above one who does not. The own-baseline finding (Tier B) is listed as a
 reason and breaks ties between equal NEWS2 totals below a trigger; it never moves a patient past a NEWS2
-difference. Two research models can add a flag to a row as one more reason, labelled synthetic and not
-validated: the student with its confidence check, and the reward-learned policy (the policy flag stays only under
-decision models-rl-5, after held-out set 2). A flag never moves a patient on the list.
+difference. One research model can add a flag to a row as one more reason, labelled synthetic and not
+validated: the student with its confidence check. The reward-learned policy is not connected: it showed a loss on
+held-out set 2, and the owner dropped its flag (decision models-rl-5). A flag never moves a patient on the list.
 
 **What is here.** The dashboard (`frontend/`) and a slim API (`backend/`: FastAPI over PostgreSQL); the
 research models as plain files with their held-out results (`models/`), the code that trains them
@@ -86,7 +86,7 @@ flowchart LR
   end
   subgraph server["BioSentry server, Docker Compose"]
     api["API: FastAPI<br/>NEWS2 and the escalation arbiter"]
-    models["Research models<br/>student, confidence check, reward policy"]
+    models["Research models<br/>student, confidence check"]
     db[("PostgreSQL 18<br/>append-only audit log")]
     web["Dashboard: React<br/>one ranked list per clinician"]
     agent["Question workers<br/>a patient, or the simulated ward"]
@@ -368,7 +368,7 @@ active one: the seeded fixture ward, or a simulated ward posted to `/sim/*`.
   acknowledgements, and ingest from the ward simulation.
 - The research models (synthetic, not validated): a distilled vitals student trained in MindSpore 2.11 and
   converted to MindSpore Lite, a split-conformal confidence check on it, and a reward-driven alerting policy.
-  The API loads them and a flag adds a reason to a row (the policy flag under decision models-rl-5); a flag never moves a patient.
+  The API loads the student and its check, and a flag adds a reason to a row; the policy is not connected (decision models-rl-5), it stays a research result. A flag never moves a patient.
 - The baseline comparison: alerts per patient per shift and deteriorations caught, against NEWS2, on
   held-out simulated wards ([Results](#results)).
 

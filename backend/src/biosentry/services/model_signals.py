@@ -1,4 +1,4 @@
-"""The three model results for one patient, from stored bins (INTEGRATION.md sections 3 to 8; rulings 1 to 17).
+"""The two model results for one patient, from stored bins (INTEGRATION.md sections 3 to 8; rulings 1 to 17).
 
 `WardService` calls it on every ward and patient read. The
 series come from `scoring.grid()` (one implementation), temperature from its own stored bins (ONE statement
@@ -19,14 +19,13 @@ from datetime import datetime
 
 from biosentry.domain.computed import Computed, NotComputed, Result, Window
 from biosentry.domain.scoring.tier_a import News2Abstained, News2Score, inputs_from_vitals, score_news2
-from biosentry.domain.scoring.tier_b.reward_policy import NAMES, Policy, alert_states, score
+from biosentry.domain.scoring.tier_b.reward_policy import NAMES
 from biosentry.domain.scoring.tier_c.confidence import Check, check_calibrated
 from biosentry.domain.scoring.tier_c.features import (
     LAG_1H,
     LAG_4H,
     baseline_touched,
     formed,
-    policy_z,
     student_features,
 )
 from biosentry.domain.scoring.tier_c.plain_mlp import Plain, PlainModelError, forward
@@ -45,13 +44,10 @@ NO_BINS = "no stored bins"
 PAST_CAP = "stay past 7 days: admission baseline not kept"
 NOT_ALIGNED = "vital series not on one grid"
 FORMING = "baseline forming"
-EARLIER = "earlier bin not stored"
 IMPOSSIBLE = "impossible value in a lag or baseline bin"
-IMPOSSIBLE_BASELINE = "impossible value in a baseline bin"
 FEATURES = "feature out of range"
 STUDENT_ID = "tier_c/student_vitals"
 CHECK_ID = "tier_c/confidence_check"
-POLICY_ID = "tier_b/reward_policy"
 
 
 def bin_window(bin_at: datetime) -> tuple[datetime, datetime]:
@@ -77,13 +73,12 @@ class ModelProvenance:
 class ModelSignals:
     probability: Result[float]
     check: Result[Check]
-    policy: Result[bool]
     provenance: Mapping[str, ModelProvenance]  # by model id, for the Computed results only
 
 
 def _none(reason: str) -> ModelSignals:
     n = NotComputed(reason)
-    return ModelSignals(n, n, n, {})
+    return ModelSignals(n, n, {})
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,12 +148,11 @@ def prepare(state: UnscoredPatient, temperature: Sequence[VitalHistory]) -> Prep
     return prepare_series(pts, state.admitted_at)
 
 
-def observation_window(prep: Prepared, models: LoadedModels) -> tuple[datetime, datetime]:
-    """The stored observations the rebuild needs, per patient: from 12 hours before the end of the earliest
-    bin of the policy's window to the end of the current bin."""
-    p = models.policy.params.p if isinstance(models.policy, Policy) else 1
+def observation_window(prep: Prepared) -> tuple[datetime, datetime]:
+    """The stored observations the rebuild needs, per patient: from 12 hours before the end of the current
+    bin to its end."""
     end = bin_window(prep.at(prep.last))[1]
-    return end - (p - 1) * BIN - NURSE_VALID, end
+    return end - NURSE_VALID, end
 
 
 def _computed(value: T, model_id: str, tier: Tier, file: FileProvenance, prep: Prepared, run_id: int,
@@ -182,7 +176,7 @@ def signals(
     synthetic: bool,
     computed_at: datetime,
 ) -> ModelSignals:
-    """The three results at the last stored bin. `rows` are this patient's stored observations from
+    """The two results at the last stored bin. `rows` are this patient's stored observations from
     `observation_window`."""
     t = prep.last
     now = news2_as_of(prep.device(t), rows, bin_window(prep.at(t))[1], earlier=False)
@@ -192,7 +186,7 @@ def signals(
     if not formed(prep.series, t):
         return _none(FORMING)
     touched = any(baseline_touched(prep.series[v], prep.dropped[v]) for v in NAMES)
-    out = {"p": NotComputed(FEATURES), "c": NotComputed(FEATURES), "a": NotComputed(FEATURES)}
+    out = {"p": NotComputed(FEATURES), "c": NotComputed(FEATURES)}
     sources: dict[str, ModelProvenance] = {}
 
     def done(key: str, value: object, model_id: str, tier: Tier, file: FileProvenance | None) -> None:
@@ -219,33 +213,7 @@ def signals(
                 out["c"] = cal
             else:
                 done("c", check_calibrated(cal, p), CHECK_ID, Tier.C, models.calibration_file)
-    alert = _alerting(prep, rows, models.policy, now.result, touched)
-    if isinstance(alert, NotComputed):
-        out["a"] = alert
-    else:
-        done("a", alert, POLICY_ID, Tier.B, models.policy_file)
-    return ModelSignals(out["p"], out["c"], out["a"], sources)  # type: ignore[arg-type]
-
-
-def _alerting(
-    prep: Prepared, rows: Sequence[StoredObservation], pol: Policy | NotComputed, current: News2Score, touched: bool
-) -> bool | NotComputed:
-    """Section 5.2 at the last bin: it depends only on bins t - p + 1 to t, each rebuilt on read."""
-    if isinstance(pol, NotComputed):
-        return pol
-    if touched:
-        return NotComputed(IMPOSSIBLE_BASELINE)
-    t = prep.last
-    ks = range(max(0, t - pol.params.p + 1), t + 1)
-    rebuilt = {k: news2_as_of(prep.device(k), rows, bin_window(prep.at(k))[1], earlier=True) for k in ks if k < t}
-    if any(r is None for r in rebuilt.values()):
-        return NotComputed(EARLIER)
-    results = {k: r.result for k, r in rebuilt.items() if r is not None} | {t: current}
-    scores = [
-        (15 * k, score(pol.params, policy_z(prep.series, k)) if isinstance(results[k], News2Score) else None)
-        for k in ks
-    ]
-    return alert_states(pol.params, scores)[-1]
+    return ModelSignals(out["p"], out["c"], sources)  # type: ignore[arg-type]
 
 
 def model_signals(
@@ -273,7 +241,7 @@ def ward_model_signals(
     ok = [pid for pid, reason in found.items() if reason is None]
     temperature = store.temperature_bins(ok) if ok else {}
     prepared = {pid: prepare(states[pid], temperature.get(pid, [])) for pid in ok}
-    windows = {pid: observation_window(p, models) for pid, p in prepared.items() if isinstance(p, Prepared)}
+    windows = {pid: observation_window(p) for pid, p in prepared.items() if isinstance(p, Prepared)}
     rows = store.observations_between((pid, lo, hi) for pid, (lo, hi) in windows.items())
     now = store.now()  # ward time, the calendar of observed_at
     out: dict[str, ModelSignals] = {}

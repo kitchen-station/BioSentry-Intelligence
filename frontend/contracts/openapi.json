@@ -23,6 +23,17 @@
           "bed": {
             "type": "string"
           },
+          "floor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "id": {
             "type": "string"
           },
@@ -43,9 +54,37 @@
           "name": {
             "type": "string"
           },
+          "news2_risk": {
+            "anyOf": [
+              {
+                "enum": [
+                  "low",
+                  "low_medium",
+                  "medium",
+                  "high"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "now": {
             "format": "date-time",
             "type": "string"
+          },
+          "person": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           },
           "reason": {
             "type": "string"
@@ -62,6 +101,17 @@
           },
           "synthetic": {
             "type": "boolean"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           },
           "vital_history": {
             "$ref": "#/components/schemas/VitalHistoryFull"
@@ -105,6 +155,17 @@
           "bed": {
             "type": "string"
           },
+          "floor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "id": {
             "type": "string"
           },
@@ -125,6 +186,34 @@
           "name": {
             "type": "string"
           },
+          "news2_risk": {
+            "anyOf": [
+              {
+                "enum": [
+                  "low",
+                  "low_medium",
+                  "medium",
+                  "high"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "person": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "reason": {
             "type": "string"
           },
@@ -140,6 +229,17 @@
           },
           "synthetic": {
             "type": "boolean"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "required": [
@@ -406,6 +506,18 @@
           },
           "sex": {
             "$ref": "#/components/schemas/Sex"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,19}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           },
           "weightKg": {
             "anyOf": [
@@ -934,8 +1046,7 @@
           "tier_c_raise",
           "tier_b_finding",
           "missing_input",
-          "prediction_model_flag",
-          "alert_policy_flag"
+          "prediction_model_flag"
         ],
         "title": "EscalationRule",
         "type": "string"
@@ -2305,6 +2416,67 @@
         "title": "OpenStaff",
         "type": "object"
       },
+      "OpenUnit": {
+        "additionalProperties": false,
+        "description": "One unit of the run, as anyone may read it: no count, no clinician, no person.",
+        "properties": {
+          "floor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "ranked",
+              "shown",
+              "unranked"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "floor",
+          "kind"
+        ],
+        "title": "OpenUnit",
+        "type": "object"
+      },
+      "OpenUnits": {
+        "additionalProperties": false,
+        "description": "The run's units in order, with no sign-in (GET /open-view): what the public page lists.",
+        "properties": {
+          "synthetic": {
+            "const": true,
+            "type": "boolean"
+          },
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/OpenUnit"
+            },
+            "maxItems": 12,
+            "type": "array"
+          }
+        },
+        "required": [
+          "synthetic",
+          "units"
+        ],
+        "title": "OpenUnits",
+        "type": "object"
+      },
       "OpenWard": {
         "additionalProperties": false,
         "description": "What anyone may watch with no sign-in (GET /wards/{ward}/open-view).",
@@ -2408,6 +2580,17 @@
             },
             "type": "array"
           },
+          "floor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "reason": {
             "anyOf": [
               {
@@ -2437,6 +2620,17 @@
           },
           "synthetic": {
             "type": "boolean"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "required": [
@@ -3029,6 +3223,17 @@
             },
             "type": "array"
           },
+          "floor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "id": {
             "type": "string"
           },
@@ -3058,6 +3263,17 @@
           "now": {
             "format": "date-time",
             "type": "string"
+          },
+          "person": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           },
           "rank": {
             "minimum": 1,
@@ -3110,6 +3326,17 @@
           },
           "trend": {
             "$ref": "#/components/schemas/Trend"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           },
           "vital_history": {
             "$ref": "#/components/schemas/VitalHistoryFull"
@@ -3463,6 +3690,17 @@
           "bed": {
             "type": "string"
           },
+          "floor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "id": {
             "type": "string"
           },
@@ -3485,7 +3723,9 @@
               {
                 "enum": [
                   "discharged",
-                  "higher_care"
+                  "higher_care",
+                  "transferred",
+                  "died"
                 ],
                 "type": "string"
               },
@@ -3494,8 +3734,41 @@
               }
             ]
           },
+          "person": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "synthetic": {
             "type": "boolean"
+          },
+          "to_unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "required": [
@@ -3517,6 +3790,16 @@
           "bed": {
             "type": "string"
           },
+          "floor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "type": "string"
           },
@@ -3525,13 +3808,18 @@
           },
           "ranked": {
             "type": "boolean"
+          },
+          "unit": {
+            "type": "string"
           }
         },
         "required": [
           "id",
           "name",
           "bed",
-          "ranked"
+          "ranked",
+          "unit",
+          "floor"
         ],
         "title": "PatientSummary",
         "type": "object"
@@ -3986,16 +4274,12 @@
       "RowModels": {
         "additionalProperties": false,
         "properties": {
-          "alert_policy": {
-            "$ref": "#/components/schemas/ModelSignal"
-          },
           "prediction": {
             "$ref": "#/components/schemas/ModelSignal"
           }
         },
         "required": [
-          "prediction",
-          "alert_policy"
+          "prediction"
         ],
         "title": "RowModels",
         "type": "object"
@@ -4028,6 +4312,17 @@
             },
             "type": "array"
           },
+          "floor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "id": {
             "type": "string"
           },
@@ -4053,6 +4348,17 @@
           },
           "name": {
             "type": "string"
+          },
+          "person": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           },
           "rank": {
             "minimum": 1,
@@ -4102,6 +4408,17 @@
           },
           "trend": {
             "$ref": "#/components/schemas/Trend"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           },
           "vital_trends": {
             "$ref": "#/components/schemas/VitalTrends"
@@ -4434,6 +4751,16 @@
           "bed": {
             "type": "string"
           },
+          "floor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "type": "string"
           },
@@ -4468,6 +4795,16 @@
           "name": {
             "type": "string"
           },
+          "person": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sex": {
             "anyOf": [
               {
@@ -4499,6 +4836,9 @@
           "trend": {
             "$ref": "#/components/schemas/Trend"
           },
+          "unit": {
+            "type": "string"
+          },
           "vital_history": {
             "$ref": "#/components/schemas/VitalHistoryFull"
           },
@@ -4526,7 +4866,10 @@
           "signal_quality",
           "last_update_s",
           "synthetic",
-          "admitted_at"
+          "admitted_at",
+          "unit",
+          "floor",
+          "person"
         ],
         "title": "UnscoredPatient",
         "type": "object"
@@ -4958,6 +5301,44 @@
           "clinician": {
             "type": "string"
           },
+          "floor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ranked",
+                  "shown",
+                  "unranked"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "now": {
             "format": "date-time",
             "type": "string"
@@ -4999,6 +5380,49 @@
           "now"
         ],
         "title": "WardResponse",
+        "type": "object"
+      },
+      "WardUnit": {
+        "additionalProperties": false,
+        "description": "One unit of the run (GET /wards): `patients` is how many the caller may see in it now.",
+        "properties": {
+          "floor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "ranked",
+              "shown",
+              "unranked"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "patients": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "floor",
+          "kind",
+          "patients"
+        ],
+        "title": "WardUnit",
         "type": "object"
       }
     }

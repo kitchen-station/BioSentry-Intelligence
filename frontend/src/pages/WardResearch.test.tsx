@@ -32,7 +32,6 @@ const computed = (vital: string, latest: number, median: number, delta: number, 
 } as Vital);
 const models = (prediction: unknown = { state: "no_flag", reason: null, bin_start: null, bin_end: null, provenance: [] }) => ({
   prediction,
-  alert_policy: { state: "not_computed", reason: "baseline forming", bin_start: null, bin_end: null, provenance: [] },
 });
 const row = (over: Partial<ResearchRow>): ResearchRow => ({
   bed: "4A", assigned: true, id: "p-001", name: "Santos, Maria", rank: 1, score: 7, level: "high",
@@ -60,7 +59,7 @@ const ANSWER: Answer = {
     row({ bed: "5C", id: "p-003", name: "Villanueva, Jose", rank: 3, score: 2, level: "low", alert: { status: "counted", bins: 0, minutes: 0, ongoing: false } }),
     row({
       bed: "6D", id: "p-004", name: "Cruz, Ana", rank: 4, score: 3, level: "low_medium",
-      models: { prediction: { state: "not_sure", reason: null, bin_start: null, bin_end: null, provenance: [] }, alert_policy: { state: "weird", reason: null, bin_start: null, bin_end: null, provenance: [] } } as unknown as ResearchRow["models"],
+      models: { prediction: { state: "not_sure", reason: null, bin_start: null, bin_end: null, provenance: [] } } as unknown as ResearchRow["models"],
       alert: { status: "unavailable", reason: "no_bins" },
     }),
     row({ bed: "7E", id: "p-005", name: "Lim, Francis", rank: 5, score: 0, level: "low", models: models({ state: "not_computed", reason: "something new", bin_start: null, bin_end: null, provenance: [] }) as ResearchRow["models"], alert: { status: "counted", bins: 4, minutes: 60, ongoing: false } }),
@@ -188,10 +187,9 @@ describe("ward research: the table", () => {
     await loaded();
     const rows = screen.getAllByRole("row");
     expect(within(rows[1]).getByText("Prediction model: Flagged")).toBeTruthy();
-    expect(within(rows[1]).getByText("Alert policy: No result: the patient's own baseline is still forming")).toBeTruthy();
     expect(within(rows[2]).getByText("Prediction model: No flag")).toBeTruthy();
     expect(within(rows[4]).getByText("Prediction model: Not sure")).toBeTruthy();
-    expect(within(rows[4]).getByText("Alert policy: getting ready")).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/Alert policy/);
     expect(within(rows[5]).getByText("Prediction model: No result for this patient now.")).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/Not computed|bins/);
   });

@@ -66,14 +66,14 @@ def _item(row: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def _full(store: PostgresStore, who: str, now: datetime, kind: Kind) -> bool:
+def _full(store: PostgresStore, who: str, now: datetime, kind: Kind, ward: str) -> bool:
     """The three limits, counted for this kind only. Call under the lock, with `_expire` done."""
     counts = store.conn.execute(
         "SELECT count(*) FILTER (WHERE requested_by = %(who)s AND state IN ('queued', 'running'))"
         " AS open, count(*) FILTER (WHERE requested_by = %(who)s AND requested_at > %(day)s)"
         " AS day, count(*) FILTER (WHERE state = 'queued' AND ward = %(ward)s) AS queued"
         " FROM lab_run WHERE kind = %(kind)s",
-        {"who": who, "day": now - timedelta(hours=24), "ward": store.ward, "kind": kind},
+        {"who": who, "day": now - timedelta(hours=24), "ward": ward, "kind": kind},
     ).fetchone()
     assert counts is not None
     return (
@@ -83,47 +83,51 @@ def _full(store: PostgresStore, who: str, now: datetime, kind: Kind) -> bool:
     )
 
 
-def create(store: PostgresStore, audit: AuditLog, who: str, body: NewLabRun) -> LabRunItem | None:
+def create(
+    store: PostgresStore, audit: AuditLog, who: str, body: NewLabRun, ward: str
+) -> LabRunItem | None:
     """None when a limit is reached (audited `limited`)."""
     now = whole(store.clock())
     with store.tx():
         store.conn.execute(_LOCK)  # one request at a time, so a burst cannot pass the counts
         _expire(store.conn, now)
-        if _full(store, who, now, "compare"):
+        if _full(store, who, now, "compare", ward):
             row = None
         else:
             row = store.conn.execute(
                 "INSERT INTO lab_run (ward, requested_by, requested_at, kind, mode, seed, days,"
                 " baseline, change, state) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'queued')"
                 " RETURNING *",
-                (store.ward, who, now, body.kind, body.mode, body.seed, body.days,
+                (ward, who, now, body.kind, body.mode, body.seed, body.days,
                  body.baseline, body.change),
             ).fetchone()
             assert row is not None
     if row is None:  # audited after the transaction, so the expiry above is kept either way
-        audit.append(who, "lab_request", store.ward, "limited")
+        audit.append(who, "lab_request", ward, "limited")
         return None
     audit.append(who, "lab_request", f"lab_run:{row['id']}", "ok")
     return LabRunItem.model_validate(_item(row))
 
 
-def ask(store: PostgresStore, audit: AuditLog, who: str, body: NewQuestion) -> QuestionItem | None:
+def ask(
+    store: PostgresStore, audit: AuditLog, who: str, body: NewQuestion, ward: str
+) -> QuestionItem | None:
     """Queues a general question, as typed. None when a limit is reached (audited `limited`)."""
     now = whole(store.clock())
     with store.tx():
         store.conn.execute(_LOCK)
         _expire(store.conn, now)
-        if _full(store, who, now, "question"):
+        if _full(store, who, now, "question", ward):
             row = None
         else:
             row = store.conn.execute(
                 "INSERT INTO lab_run (ward, requested_by, requested_at, kind, question, state)"
                 " VALUES (%s, %s, %s, 'question', %s, 'queued') RETURNING *",
-                (store.ward, who, now, body.question),
+                (ward, who, now, body.question),
             ).fetchone()
             assert row is not None
     if row is None:
-        audit.append(who, "lab_question", store.ward, "limited")
+        audit.append(who, "lab_question", ward, "limited")
         return None
     audit.append(who, "lab_question", f"lab_run:{row['id']}", "ok")
     return QuestionItem.model_validate(_question_item(row))
@@ -136,20 +140,20 @@ def _question_item(row: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def list_questions(store: PostgresStore) -> list[QuestionItem]:
+def list_questions(store: PostgresStore, ward: str) -> list[QuestionItem]:
     _expire(store.conn, store.clock())
     rows = store.conn.execute(
         "SELECT * FROM lab_run WHERE ward = %s AND kind = 'question' ORDER BY id DESC LIMIT %s",
-        (store.ward, LIST_LIMIT),
+        (ward, LIST_LIMIT),
     )
     return [QuestionItem.model_validate(_question_item(r)) for r in rows]
 
 
-def get_question(store: PostgresStore, lab_run_id: int) -> QuestionDetail | None:
+def get_question(store: PostgresStore, lab_run_id: int, ward: str) -> QuestionDetail | None:
     _expire(store.conn, store.clock())
     row = store.conn.execute(
         "SELECT * FROM lab_run WHERE id = %s AND ward = %s AND kind = 'question'",
-        (lab_run_id, store.ward),
+        (lab_run_id, ward),
     ).fetchone()
     if row is None:
         return None
@@ -158,19 +162,19 @@ def get_question(store: PostgresStore, lab_run_id: int) -> QuestionDetail | None
     )
 
 
-def list_runs(store: PostgresStore) -> list[LabRunItem]:
+def list_runs(store: PostgresStore, ward: str) -> list[LabRunItem]:
     _expire(store.conn, store.clock())
     rows = store.conn.execute(
-        "SELECT * FROM lab_run WHERE ward = %s AND kind = 'compare' ORDER BY id DESC LIMIT %s", (store.ward, LIST_LIMIT)
+        "SELECT * FROM lab_run WHERE ward = %s AND kind = 'compare' ORDER BY id DESC LIMIT %s", (ward, LIST_LIMIT)
     )
     return [LabRunItem.model_validate(_item(r)) for r in rows]
 
 
-def get_run(store: PostgresStore, lab_run_id: int) -> LabRunDetail | None:
+def get_run(store: PostgresStore, lab_run_id: int, ward: str) -> LabRunDetail | None:
     _expire(store.conn, store.clock())
     row = store.conn.execute(
         "SELECT * FROM lab_run WHERE id = %s AND ward = %s AND kind = 'compare'",
-        (lab_run_id, store.ward),
+        (lab_run_id, ward),
     ).fetchone()
     if row is None:
         return None

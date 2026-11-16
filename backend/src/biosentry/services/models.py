@@ -1,4 +1,4 @@
-"""Loads and checks the three model files once (INTEGRATION.md sections 2.1 to 2.3 and 6.3, rulings 1, 13, 14).
+"""Loads and checks the two model files once (INTEGRATION.md sections 2.1 to 2.3 and 6.3, rulings 1, 13, 14).
 
 `load_models(models_dir)` never raises and never falls back: a refused file gives `NotComputed` with a fixed
 reason, one WARNING line at load (the path inside `models_dir` and the fixed reason, never the file's
@@ -7,10 +7,10 @@ the `no_temp` files are never opened, whatever fails. `create_app` calls it once
 the life of the process. Research models: synthetic data only, not validated.
 
 What each refused file disables:
-  student     -> student AND calibration (q binds one student, so it cannot be checked without it); policy loads.
-  calibration -> the calibration only (the student's p still computes, the check does not); policy loads.
-  policy      -> the policy only.
-  manifest    -> all three (nothing can be verified).
+  student     -> student AND calibration (q binds one student, so it cannot be checked without it).
+  calibration -> the calibration only (the student's p still computes, the check does not).
+  manifest    -> both (nothing can be verified).
+The reward policy is not loaded: owner decision models-rl-5 dropped it as a flag (a loss on held-out set 2).
 """
 
 import hashlib
@@ -22,8 +22,6 @@ from pathlib import Path
 from typing import Any, TypeVar
 
 from biosentry.domain.computed import NotComputed
-from biosentry.domain.scoring.tier_b.reward_policy import MAX_BYTES as MAX_POLICY_BYTES
-from biosentry.domain.scoring.tier_b.reward_policy import Policy, PolicyError, parse_policy
 from biosentry.domain.scoring.tier_c.confidence import MAX_BYTES as MAX_CALIBRATION_BYTES
 from biosentry.domain.scoring.tier_c.confidence import Calibration, CalibrationError, binds, parse_calibration
 from biosentry.domain.scoring.tier_c.plain_mlp import FORMAT, MAX_BYTES as MAX_STUDENT_BYTES
@@ -36,9 +34,7 @@ MANIFEST = "manifest.json"
 STUDENT = "tier_c/student_vitals/model.json"
 CALIBRATION = "tier_c/confidence_check/calibration.json"
 CALIBRATION_SIBLING = CALIBRATION + ".sha256"
-POLICY = "tier_b/reward_policy/policy.json"
-# Size caps. Student, calibration and policy are the readers' caps in the document (real sizes: 34,949, 660 and
-# 5,064 bytes). The manifest (6,706 bytes) and the sibling (65 bytes) get room of their own.
+# Size caps. Student and calibration are the readers' caps in the document (real sizes: 34,949 and 660 bytes). The manifest (6,706 bytes) and the sibling (65 bytes) get room of their own.
 MAX_MANIFEST_BYTES = 256 * 1024
 MAX_SIBLING_BYTES = 128
 STUDENT_NAME = "tier_c/student_vitals"
@@ -46,7 +42,6 @@ WIRED_VARIANT = "all"  # ruling 1: with temperature
 
 NO_STUDENT = "student not loaded"
 NO_CALIBRATION = "calibration not loaded"
-NO_POLICY = "policy not loaded"
 
 T = TypeVar("T")
 
@@ -66,10 +61,8 @@ class FileProvenance:
 class LoadedModels:
     student: Plain | NotComputed
     calibration: Calibration | NotComputed
-    policy: Policy | NotComputed
     student_file: FileProvenance | None
     calibration_file: FileProvenance | None
-    policy_file: FileProvenance | None
 
 
 def _read(root: Path, rel: str, cap: int) -> bytes:
@@ -167,13 +160,6 @@ def _calibration(root: Path, data: bytes, sha: str, model: Plain, onnx_sha256: s
     return cal
 
 
-def _policy(data: bytes) -> Policy:
-    try:
-        return parse_policy(_json(data), temperature=True)
-    except (PolicyError, OverflowError, RecursionError):
-        raise _Refused("policy checks failed") from None
-
-
 def _attempt(rel: str, fail: str, make: Callable[[], T]) -> tuple[T | NotComputed, bool]:
     """(the value, True) or (NotComputed(fail), False) with the one WARNING line for this file."""
     try:
@@ -188,9 +174,9 @@ def load_models(models_dir: Path) -> LoadedModels:
         root = Path(models_dir).resolve()  # a link loop raises here: the API must still start
         records = _manifest_records(root)
     except (_Refused, OSError, RuntimeError) as e:
-        for rel in (STUDENT, CALIBRATION, POLICY):
+        for rel in (STUDENT, CALIBRATION):
             log.warning("model file refused: %s: %s", rel, e)
-        return LoadedModels(NotComputed(NO_STUDENT), NotComputed(NO_STUDENT), NotComputed(NO_POLICY), None, None, None)
+        return LoadedModels(NotComputed(NO_STUDENT), NotComputed(NO_STUDENT), None, None)
 
     def student() -> tuple[Plain, str, FileProvenance]:
         data, prov = _verified(root, STUDENT, MAX_STUDENT_BYTES, records)
@@ -210,10 +196,4 @@ def load_models(models_dir: Path) -> LoadedModels:
         model, student_prov = got, None
         cal_value, cal_prov = NotComputed(NO_STUDENT), None
 
-    def policy() -> tuple[Policy, FileProvenance]:
-        data, prov = _verified(root, POLICY, MAX_POLICY_BYTES, records)
-        return _policy(data), prov
-
-    pol, pol_ok = _attempt(POLICY, NO_POLICY, policy)
-    pol_value, pol_prov = pol if pol_ok else (pol, None)  # type: ignore[misc]
-    return LoadedModels(model, cal_value, pol_value, student_prov, cal_prov, pol_prov)
+    return LoadedModels(model, cal_value, student_prov, cal_prov)
