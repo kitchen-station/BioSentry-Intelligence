@@ -536,7 +536,11 @@ class PostgresStore:
         assert other is not None
         return other
 
-    def read(self, patient_id: str) -> UnscoredPatient | None:
+    def read(self, patient_id: str, history: bool | None = True) -> UnscoredPatient | None:
+        """The patient's stored state. `history` False: only the last TREND_BINS bins of each vital are
+        read and `vital_history` is empty. That is all a card, a list row of an unranked unit or an open
+        view needs; the models and the patient page need the whole history. None: the whole history for
+        a patient of a ranked unit (the models need it), the short read for any other."""
         # ponytail: the reads below are not one snapshot, so a batch landing mid-read can mix two
         # sim minutes in one patient. Upgrade: a read transaction (BEGIN) around each request.
         p = self.conn.execute(
@@ -544,13 +548,18 @@ class PostgresStore:
         ).fetchone()
         if p is None:
             return None
+        if history is None:
+            history = self.units[p["unit"]]["kind"] == "ranked"
         by_code: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        # The newest row of each code and kind (nurse or not, a value or an absence): one probe of
+        # observation_latest_kind each, never a walk over the patient's whole week of rows.
         for r in self.conn.execute(
-            "SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY code,"
-            " (source = 'nurse'), (absent_reason IS NULL)"
-            " ORDER BY observed_at DESC, id DESC) AS n FROM observation"
-            " WHERE run_id = %s AND patient_id = %s) AS latest WHERE n = 1",
-            (self.run_id, patient_id),
+            "SELECT o.* FROM unnest(%s::text[]) AS c(code)"
+            " CROSS JOIN (VALUES (true, true), (true, false), (false, true), (false, false)) AS k(nurse, valid)"
+            " CROSS JOIN LATERAL (SELECT * FROM observation WHERE run_id = %s AND patient_id = %s"
+            " AND code = c.code AND (source = 'nurse') = k.nurse AND (absent_reason IS NULL) = k.valid"
+            " ORDER BY observed_at DESC, id DESC LIMIT 1) AS o",
+            ([*VITALS, *LABS], self.run_id, patient_id),
         ):
             by_code[r["code"]].append(r)
         sample = p["last_sample_at"]
@@ -563,12 +572,19 @@ class PostgresStore:
             for code, rows in by_code.items()
         }
         bins: dict[str, list[tuple[datetime, float | None]]] = defaultdict(list)
-        for b in self.conn.execute(
-            "SELECT vital, bin_at, value FROM vital_bin WHERE run_id = %s AND patient_id = %s"
-            " ORDER BY bin_at",
-            (self.run_id, patient_id),
-        ):
-            bins[b["vital"]].append((b["bin_at"], b["value"]))
+        # One row per vital with its bins as two arrays, not one row per bin: a week is 2 688 rows.
+        recent = (
+            "SELECT vital, array_agg(bin_at ORDER BY bin_at) AS at, array_agg(value ORDER BY bin_at) AS value"
+            " FROM vital_bin WHERE run_id = %s AND patient_id = %s GROUP BY vital"
+            if history
+            else "SELECT b.vital, array_agg(b.bin_at ORDER BY b.bin_at) AS at, array_agg(b.value ORDER BY b.bin_at) AS value"
+            " FROM unnest(%s::text[]) AS v(vital) CROSS JOIN LATERAL"
+            " (SELECT vital, bin_at, value FROM vital_bin WHERE run_id = %s AND patient_id = %s AND vital = v.vital"
+            " ORDER BY bin_at DESC LIMIT %s) AS b GROUP BY b.vital"
+        )
+        args = (self.run_id, patient_id) if history else (list(DEVICE_VITALS), self.run_id, patient_id, TREND_BINS)
+        for b in self.conn.execute(recent, args):
+            bins[b["vital"]] = list(zip(b["at"], b["value"]))
 
         run_now = self.now()
         ages = [
@@ -606,8 +622,12 @@ class PostgresStore:
                 "vital_trends": {
                     v: [value for _, value in bins[v][-TREND_BINS:]] for v in DEVICE_VITALS
                 },
+                # Built, not validated point by point: a week is 672 bins of each vital, and the values
+                # come from columns that already hold only what the contract allows.
                 "vital_history": {
-                    v: [{"time": at, "value": value} for at, value in bins[v]]
+                    v: [VitalHistory.model_construct(time=at, value=value) for at, value in bins[v]]
+                    if history
+                    else []
                     for v in HISTORY_VITALS
                 },
                 "labs": labs,
@@ -626,16 +646,15 @@ class PostgresStore:
     def temperature_bins(self, ids: Iterable[str]) -> dict[str, list[VitalHistory]]:
         """The stored temperature bins of these patients, in bin order, in ONE statement. For the
         models only: temperature is not in HISTORY_VITALS and not in any response."""
-        out: dict[str, list[VitalHistory]] = defaultdict(list)
-        for r in self.conn.execute(
-            "SELECT patient_id, bin_at, value FROM vital_bin WHERE run_id = %s"
-            " AND patient_id = ANY(%s) AND vital = 'temperature' ORDER BY patient_id, bin_at",
-            (self.run_id, sorted(set(ids))),
-        ):
-            out[r["patient_id"]].append(
-                VitalHistory.model_construct(time=r["bin_at"], value=r["value"])
+        return {
+            r["patient_id"]: [VitalHistory.model_construct(time=t, value=v) for t, v in zip(r["at"], r["value"])]
+            for r in self.conn.execute(
+                "SELECT patient_id, array_agg(bin_at ORDER BY bin_at) AS at, array_agg(value ORDER BY bin_at) AS value"
+                " FROM vital_bin WHERE run_id = %s AND patient_id = ANY(%s) AND vital = 'temperature'"
+                " GROUP BY patient_id",
+                (self.run_id, sorted(set(ids))),
             )
-        return dict(out)
+        }
 
     def systolic_bins(self, patient_id: str) -> list[VitalHistory]:
         """The charted systolic pressure of one patient as 15-minute bins, oldest first, for the own-baseline panel only
