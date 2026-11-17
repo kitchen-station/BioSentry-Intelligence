@@ -388,9 +388,10 @@ describe("the patient search", () => {
     const user = userEvent.setup();
     page();
     await loaded();
+    const box = await screen.findByRole("combobox", { name: "Find a patient by name or bed" });
+    await act(async () => {}); // the "/" listener is attached in an effect: let it run before the key
     fireEvent.keyDown(document.body, { key: "/" });
-    const box = screen.getByRole("combobox", { name: "Find a patient by name or bed" });
-    expect(document.activeElement).toBe(box);
+    await waitFor(() => expect(document.activeElement).toBe(box));
     await user.type(box, "es");
     const options = within(screen.getByRole("listbox")).getAllByRole("option").map((o) => o.textContent);
     expect(options).toEqual(["#2Reyes, Carlos54 M · Bed 2B7 High", "Flores, Ramon73 M · Bed 4BNOT RANKED"]);
