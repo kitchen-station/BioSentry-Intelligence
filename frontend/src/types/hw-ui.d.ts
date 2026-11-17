@@ -6,6 +6,15 @@ declare module "hw-ui" {
     x: string[]; xLabel?: string; max?: number;
     series: { name: string; values: (number | null)[]; dashed?: boolean }[];
     highlight?: string | number;
+    /** A clinical y-range in place of zero. */
+    range?: [number, number];
+    /** Lines drawn dashed and named at their end; grey unless toned. */
+    limits?: { at: number; label?: string; tone?: "urgent" | "emergency" }[];
+    /** A shaded usual range, named (default "Usual lo–hi"). */
+    band?: [number, number];
+    bandLabel?: string;
+    /** Only the stretch where this holds takes the highlight colour. */
+    highlightWhere?: (v: number) => boolean;
   }): Graph & { update(config: unknown): void };
   export function range(el: HTMLElement, config: Common & {
     items: { label: string; value: number | null; unit?: string; usual: [number, number]; scale?: [number, number] }[];

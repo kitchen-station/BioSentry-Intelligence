@@ -1,12 +1,13 @@
-/* Patient: layout and the clinical colour only. The look comes from hw-ui (hw-stat, hw-card, hw-tag,
-   hw-alert, hw-dialog, hw-breadcrumb, hw-timeline). Colour marks where action is due, as on the ward:
-   high (NEWS2 7+) emergency red, medium or a single 3 urgent orange, a value that adds points danger red. */
+/* Patient: layout only. The look and every clinical colour come from hw-ui (hw-decision, hw-pager,
+   hw-card, hw-tag, hw-alert, hw-dialog, hw-breadcrumb, hw-tabs, hw-actionbar, hw-timeline). */
 
 .container {
-  max-width: var(--page-max);
+  max-width: 1440px;
   margin: 0 auto;
-  padding: var(--hw-space-5) var(--hw-space-5) var(--hw-space-8);
+  padding: var(--hw-space-5) var(--hw-space-7) var(--hw-space-8);
 }
+
+.offline { padding-inline: var(--hw-space-7); }
 
 .bare {
   margin: var(--hw-space-5) 0 var(--hw-space-3);
@@ -41,7 +42,7 @@
   color: var(--hw-color-text);
 }
 
-/* ---- Top: the way back, and the two drawers ---- */
+/* ---- Header: the way back and the pager, then who, then the actions ---- */
 
 .top {
   display: flex;
@@ -49,83 +50,53 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--hw-space-3) var(--hw-space-5);
-  margin-bottom: var(--hw-space-6);
 }
 
-.crumbs {
+.crumbs { min-width: 0; }
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--hw-space-4) var(--hw-space-6);
+  margin-top: var(--hw-space-3);
+}
+
+.identity {
+  flex: 1 1 420px;
   min-width: 0;
+}
+
+.name {
+  font-size: var(--hw-font-size-32);
+  font-weight: var(--hw-weight-regular);
+  line-height: 1.2;
+}
+
+.meta {
+  margin-top: var(--hw-space-1);
+  color: var(--hw-color-text-muted);
 }
 
 .actions {
   display: flex;
-  flex-wrap: wrap; /* three buttons with the assistant's: on a phone they wrap rather than widen the page */
+  flex-wrap: wrap; /* on a phone they wrap rather than widen the page */
   gap: var(--hw-space-3);
 }
 
-/* ---- Summary: one stat per question ---- */
-
-.summaryBar {
+.notices {
   display: flex;
   flex-direction: column;
   gap: var(--hw-space-3);
-  margin-bottom: var(--hw-space-6);
+  margin-top: var(--hw-space-4);
 }
 
-.line {
-  align-items: center;
-}
+.notices:empty { display: none; }
 
-.readOnly {
-  margin-bottom: var(--hw-space-5);
-}
+/* ---- The decision strip ---- */
 
-.summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--hw-space-5) var(--hw-space-6);
-}
-
-.stat { flex: 1 1 120px; }
-.stat[data-kind="response"] { flex: 2 1 200px; }
-.why { flex: 3 1 260px; }
-
-.stat :global(.hw-stat__label) {
-  font-size: var(--hw-font-size-14);
-}
-
-.big {
-  margin-top: var(--hw-space-3);
-  font-size: 48px;
-}
-
-.step {
-  margin-top: var(--hw-space-3);
-  font-size: var(--hw-font-size-16);
-  font-weight: var(--hw-weight-semibold);
-  line-height: 1.4;
-}
-
-/* The score and the step take their band's colour, number and rule both. */
-.stat[data-band="high"] { border-top-color: var(--hw-graph-emergency); }
-.stat[data-band="high"] .big,
-.stat[data-band="high"] .step { color: var(--hw-graph-emergency-text); }
-.stat[data-band="medium"],
-.stat[data-band="low-medium"] { border-top-color: var(--hw-graph-urgent); }
-.stat[data-band="medium"] .big,
-.stat[data-band="low-medium"] .big,
-.stat[data-band="medium"] .step,
-.stat[data-band="low-medium"] .step { color: var(--hw-graph-urgent-text); }
-
-.stat[data-signal="good"] .big { color: var(--hw-color-text-muted); }
-.stat[data-signal="none"] .big { font-size: var(--hw-font-size-20); font-weight: var(--hw-weight-regular); }
-.stat[data-signal="degraded"] .big { color: var(--hw-color-warning-fg); }
-
-.tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--hw-space-2);
-  margin-top: var(--hw-space-3);
-}
+.decision { margin-top: var(--hw-space-5); }
 
 /* A reason can be a sentence: it wraps instead of running off a phone. */
 .reason {
@@ -135,21 +106,53 @@
   white-space: normal;
 }
 
-.pathway {
-  color: var(--hw-color-text-muted);
+.pathway { color: var(--hw-color-text-muted); }
+
+/* ---- Two columns of cards ---- */
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--hw-space-5);
+  align-items: start;
+  margin-top: var(--hw-space-5);
 }
 
-.none {
-  margin-top: var(--hw-space-3);
-  font-size: var(--hw-font-size-14);
-  color: var(--hw-color-text-muted);
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hw-space-5);
+  min-width: 0;
 }
 
-.modelLabel {
-  margin-top: var(--hw-space-4);
+.cardHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hw-space-3) var(--hw-space-5);
+  margin-bottom: var(--hw-space-4);
 }
 
-/* ---- Drawer (notes, charts) ---- */
+.h2 {
+  font-size: var(--hw-font-size-18);
+  font-weight: var(--hw-weight-medium);
+}
+
+.cardHead .h2 { flex-grow: 1; }
+
+/* The three trends, one under the other, with room between. */
+.trends {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hw-space-6);
+}
+
+.trends > .cardHead { margin-bottom: 0; }
+
+.after { margin-top: var(--hw-space-4); }
+
+/* ---- Notes (the latest on the page, the full list in the drawer) ---- */
 
 .drawerBody {
   display: flex;
@@ -165,9 +168,7 @@
   gap: var(--hw-space-3);
 }
 
-.noteInput > :global(.hw-textarea) {
-  align-self: stretch;
-}
+.noteInput > :global(.hw-textarea) { align-self: stretch; }
 
 .noteMeta {
   display: flex;
@@ -188,69 +189,6 @@
   color: var(--hw-color-text);
 }
 
-/* ---- Two columns of cards ---- */
-
-.layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--hw-space-5);
-  align-items: start;
-}
-
-.column {
-  display: flex;
-  flex-direction: column;
-  gap: var(--hw-space-5);
-  min-width: 0;
-}
-
-.eyebrow {
-  margin-bottom: var(--hw-space-4);
-  font-size: var(--hw-text-caption);
-  font-weight: var(--hw-weight-medium);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--hw-color-text-muted);
-}
-
-.patientName {
-  font-size: var(--hw-font-size-24);
-  font-weight: var(--hw-weight-semibold);
-  line-height: 1.25;
-}
-
-.patientSub {
-  margin-top: var(--hw-space-2);
-  font-size: var(--hw-font-size-14);
-  color: var(--hw-color-text-muted);
-}
-
-.admitting {
-  margin-top: var(--hw-space-3);
-  line-height: 1.5;
-}
-
-.scoreBlock {
-  display: flex;
-  align-items: baseline;
-  gap: var(--hw-space-3);
-}
-
-.scoreValue {
-  font-size: 40px;
-  font-weight: var(--hw-weight-light);
-  line-height: 1;
-}
-
-.scoreBlock[data-band="high"] .scoreValue { color: var(--hw-graph-emergency-text); }
-.scoreBlock[data-band="medium"] .scoreValue,
-.scoreBlock[data-band="low-medium"] .scoreValue { color: var(--hw-graph-urgent-text); }
-
-.scoreLabel {
-  font-size: var(--hw-font-size-14);
-  color: var(--hw-color-text-muted);
-}
-
 /* ---- Vitals and labs: a two-column definition list ---- */
 
 .vitalsGrid {
@@ -267,9 +205,7 @@
   border-bottom: 1px solid var(--hw-color-border-subtle);
 }
 
-.vitalRow:last-child {
-  border-bottom: 0;
-}
+.vitalRow:last-child { border-bottom: 0; }
 
 .vitalLabel {
   font-size: var(--hw-font-size-14);
@@ -293,29 +229,34 @@
 .vitalRow[data-points="2"] .vitalValue,
 .vitalRow[data-points="3"] .vitalValue { font-weight: var(--hw-weight-bold); color: var(--hw-color-danger-fg); }
 
-.vitalPoints {
-  align-self: center;
+.vitalPoints { align-self: center; }
+
+.footer {
+  margin-top: var(--hw-space-6);
+  font-size: var(--hw-text-caption);
+  color: var(--hw-color-text-muted);
 }
 
-.record {
-  margin-top: var(--hw-space-4);
+/* ---- Phone: tabs, and the action bar held at the bottom of the screen ---- */
+
+.tabs { margin-top: var(--hw-space-4); }
+
+/* Edge to edge, out of the page's own padding (the kit makes it sticky). */
+.actionbar { margin: var(--hw-space-5) calc(var(--hw-space-4) * -1) calc(var(--hw-space-6) * -1); }
+
+/* The top bar holds the tabs, search and account in one line: below 1440px the clock and the id give way. */
+@media (width < 1440px) {
+  .statusItem[data-wide] { display: none; }
 }
 
-.after {
-  margin-top: var(--hw-space-4);
-}
-
-/* ---- Desk: two columns ---- */
+/* ---- Desk: two columns, trends the wider ---- */
 @media (width >= 1200px) {
-  .layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .layout { grid-template-columns: minmax(0, 1.85fr) minmax(340px, 1fr); }
 }
 
-/* ---- Phone ---- */
-@media (width < 576px) {
-  .statusItem[data-wide] { display: none; } /* the shell bar has two lines here: the clock and the id give way */
-  .container { padding-inline: var(--hw-space-4); }
-  .summary { gap: var(--hw-space-5) var(--hw-space-4); }
-  .big { font-size: 32px; }
-  .patientName { font-size: var(--hw-font-size-20); }
+@media (width < 768px) {
+  .container { padding: var(--hw-space-4) var(--hw-space-4) var(--hw-space-6); }
+  .offline { padding-inline: var(--hw-space-4); }
+  .name { font-size: var(--hw-font-size-24); }
   .vitalRow { grid-template-columns: 110px minmax(0, 1fr) auto; gap: var(--hw-space-3); }
 }

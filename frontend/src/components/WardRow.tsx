@@ -53,7 +53,8 @@ export function DataAge({ row, ageOffsetS, offline }: { row: ScoreRow; ageOffset
   return a && <span className={styles.age} data-stale={a.red || undefined}>{a.text}</span>;
 }
 
-function obsText(due: number | "continuous", now: number, noPatch: boolean): string {
+/** When the next set of observations is due, as the row says it. */
+export function obsText(due: number | "continuous", now: number, noPatch: boolean): string {
   if (due === "continuous") return noPatch ? "Continuous monitoring needed: no patch" : "Obs continuous";
   if (due > now) return `Obs due ${formatClock(due)}`;
   return due === -Infinity ? "Obs due now" : `Obs overdue ${formatAge(Math.floor((now - due) / 1000)).replace(" ago", "")}`;

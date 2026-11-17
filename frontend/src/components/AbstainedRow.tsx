@@ -1,10 +1,8 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
-import type { AbstainedRow as AbstainedRowType, VitalsRecorded } from "../types";
+import type { AbstainedRow as AbstainedRowType } from "../types";
 import styles from "./AbstainedRow.module.css";
 import { formatAge, formatBloodPressure, formatClockDay } from "./format";
 import { useWardNow } from "./wardNow";
-import { VitalsEntry } from "./VitalsEntry";
 import { sentence } from "./vitalsDraft";
 
 const SEEN = [
@@ -37,15 +35,13 @@ interface Props {
   row: AbstainedRowType;
   /** HTTP mode only: the fixture provider cannot re-rank, so it offers no entry (D4). */
   canRecord?: boolean;
-  /** Who is recording (shown in the echo of what will be stored). */
-  clinicianId?: string;
-  onRecorded?: (row: AbstainedRowType, recorded: VitalsRecorded) => void;
+  /** Opens the Record vitals drawer for this row (the page holds it, so it outlives the row). */
+  onRecord?: (row: AbstainedRowType) => void;
   /** Offline: Record vitals waits until the connection is back. */
   disabled?: boolean;
 }
 
-export function AbstainedRow({ row, canRecord = false, clinicianId = "", onRecorded, disabled = false }: Props) {
-  const [entering, setEntering] = useState(false);
+export function AbstainedRow({ row, canRecord = false, onRecord, disabled = false }: Props) {
   const now = useWardNow();
   return (
     <div className="hw-notice__item">
@@ -58,26 +54,9 @@ export function AbstainedRow({ row, canRecord = false, clinicianId = "", onRecor
         {row.last_seen && <LastSeen seen={row.last_seen} now={now} />}
       </div>
       {canRecord && (
-        <button
-          type="button"
-          className={entering ? "hw-button" : "hw-button hw-button--accent"}
-          aria-expanded={entering}
-          disabled={disabled && !entering}
-          onClick={() => setEntering((open) => !open)}
-        >
-          {entering ? "Close" : "Record vitals"}
+        <button type="button" className="hw-button hw-button--accent" aria-haspopup="dialog" disabled={disabled} onClick={() => onRecord?.(row)}>
+          Record vitals
         </button>
-      )}
-      {canRecord && entering && (
-        <div className={styles.entry}>
-          <VitalsEntry
-            patientId={row.id}
-            patientName={row.name}
-            clinicianId={clinicianId}
-            onRecorded={(recorded) => onRecorded?.(row, recorded)}
-            onClose={() => setEntering(false)}
-          />
-        </div>
       )}
     </div>
   );

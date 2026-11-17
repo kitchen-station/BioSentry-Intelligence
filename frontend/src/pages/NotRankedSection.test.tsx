@@ -28,7 +28,7 @@ const rows = [row("p-004", "Flores, Ramon"), row("p-005", "de Leon, Isabel")];
 const html = (list: readonly AbstainedRow[] = rows) =>
   renderToStaticMarkup(
     <MemoryRouter>
-      <NotRankedSection rows={list} clinicianId="rn-delacruz" onRecorded={() => undefined} />
+      <NotRankedSection rows={list} onRecord={() => undefined} />
     </MemoryRouter>,
   );
 
@@ -61,7 +61,7 @@ describe("the NOT RANKED section", () => {
     build.canRecordVitals = true;
     const out = html();
     expect(out.match(/Record vitals/g)).toHaveLength(rows.length);
-    expect(out.match(/aria-expanded="false"/g)).toHaveLength(rows.length);
+    expect(out.match(/aria-haspopup="dialog"/g)).toHaveLength(rows.length); // each opens the one drawer
   });
 
   it("renders nothing when every patient is ranked", () => {

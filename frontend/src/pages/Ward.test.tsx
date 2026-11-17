@@ -456,20 +456,19 @@ describe("density and the table", () => {
     expect(within(table).getByRole("button", { name: "Acknowledge the alert for Reyes, Carlos" })).toBeTruthy();
   });
 
-  it("opens Record vitals under a NOT RANKED row of the table in an API build", async () => {
+  it("opens the Record vitals drawer from a NOT RANKED row of the table in an API build", async () => {
     api.build.canRecord = true;
     const user = userEvent.setup();
     page();
     await loaded();
     await user.click(screen.getByRole("radio", { name: "Table" }));
     await user.click(screen.getByRole("button", { name: "Record vitals for Flores, Ramon" }));
-    expect(screen.getByRole("button", { name: "Close for Flores, Ramon" }).getAttribute("aria-expanded")).toBe("true");
-    expect(document.querySelector("td[colspan='12'] form")).not.toBeNull();
-    await user.click(screen.getByRole("button", { name: "Close for Flores, Ramon" }));
-    expect(document.querySelector("td[colspan='12']")).toBeNull();
+    const dialog = screen.getByRole("dialog", { name: "Record vitals" });
+    expect(within(dialog).getByRole("form", { name: "Record vitals for Flores, Ramon" })).toBeTruthy();
+    expect(document.querySelector("td[colspan='12']")).toBeNull(); // nothing opens inside the table
   });
 
-  it("records from the table, says where the patient now stands, and the form's Close folds it", async () => {
+  it("records from the table and says where the patient now stands", async () => {
     api.build.canRecord = true;
     api.recordVitals.mockResolvedValue({
       ...rows[0].vitals, patient_id: "p-004", ranked: true, rank: 3, score: 5, not_ranked_reason: null, not_ranked_instruction: null,
@@ -486,7 +485,7 @@ describe("density and the table", () => {
     expect(api.getWard).toHaveBeenCalledTimes(2); // the ranking on screen is the server's
   });
 
-  it("closes the table's entry from the form's own Close", async () => {
+  it("closes the drawer from its Close", async () => {
     api.build.canRecord = true;
     const user = userEvent.setup();
     page();
@@ -494,7 +493,7 @@ describe("density and the table", () => {
     await user.click(screen.getByRole("radio", { name: "Table" }));
     await user.click(screen.getByRole("button", { name: "Record vitals for Flores, Ramon" }));
     await user.click(screen.getByRole("button", { name: "Close" }));
-    expect(document.querySelector("td[colspan='12']")).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
   it("shows a NOT RANKED patient's stored values in the table", async () => {

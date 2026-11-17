@@ -12,15 +12,25 @@ interface Props {
   data: readonly DataPoint[];
   label: string;
   unit: string;
+  /** Where the value starts to add NEWS2 points: said in the title and subtitle. */
   warningHigh?: number;
   warningLow?: number;
-  /** The patient's own baseline, as the server sent it. */
+  /** The patient's own baseline, as the server sent it: shaded, and said in the title and subtitle. */
   band?: { low: number; high: number; flagged: boolean };
+  /** A clinical y-range in place of zero. */
+  range?: [number, number];
+  /** Dashed lines, each named at its end (the NEWS2 thresholds). */
+  limits?: { at: number; label: string }[];
+  /** The stretch drawn in the highlight: where the value adds NEWS2 points. Pass the same function each render. */
+  highlightWhere?: (v: number) => boolean;
 }
 
 const text = (v: number, unit: string) => `${shown("", v)} ${unit}`;
 
-// The kit graph draws no threshold line and no band, so both are said in the subtitle.
+/** Two stored sets and one reading at least: anything less draws nothing. */
+export const drawable = (data: readonly DataPoint[]) => data.length >= 2 && data.some((d) => d.value !== null);
+
+// The warning lines and the band are also said in the subtitle, for a reader who does not see the plot.
 function subtitle({ unit, warningHigh: hi, warningLow: lo, band }: Props): string | undefined {
   const warn =
     hi !== undefined && lo !== undefined
@@ -46,10 +56,9 @@ function title({ data, label, unit, warningHigh: hi, warningLow: lo, band }: Pro
 }
 
 /** One vital over the stay, on the kit's trend graph (readout sentence, arrow keys, "Show as a table"). */
-export function TrendChart(props: Props) {
+export function TrendChart({ highlightWhere, ...props }: Props) {
   const root = useRef<HTMLDivElement>(null);
   const { data } = props;
-  const drawn = data.length >= 2 && data.some((d) => d.value !== null);
   // Rebuilt only when what it shows changes: a timed read with the same figures leaves it alone.
   const spec = JSON.stringify(props);
   useEffect(() => {
@@ -63,8 +72,12 @@ export function TrendChart(props: Props) {
       xLabel: "Time",
       series: [{ name: p.label, values: p.data.map((d) => d.value) }],
       format: (v) => text(v, p.unit),
+      ...(p.range && { range: p.range }),
+      ...(p.limits && { limits: p.limits }),
+      ...(p.band && { band: [p.band.low, p.band.high], bandLabel: `Own baseline ${p.band.low}–${p.band.high}` }),
+      ...(highlightWhere && { highlightWhere }),
     });
     return () => g.destroy();
-  }, [spec]);
-  return drawn ? <div ref={root} /> : null;
+  }, [spec, highlightWhere]);
+  return drawable(data) ? <div ref={root} /> : null;
 }

@@ -4,9 +4,11 @@ import type { Session } from "../types";
 import { AlertTray } from "./AlertTray";
 import { PatientSearch } from "./PatientSearch";
 import { asksWard, useAssistant } from "./roles";
+import { formatClock } from "./format";
 import { AccountMenu } from "./SessionMenu";
 import { usePopover } from "./usePopover";
 import { useWardFeed } from "./wardFeed";
+import { since as wardTime } from "./wardNow";
 import styles from "./AppShell.module.css";
 
 interface Props {
@@ -16,6 +18,8 @@ interface Props {
   title?: ReactNode;
   /** Live facts the page passes in: connection status and the ward clock. */
   status?: ReactNode;
+  /** A detail screen: on a phone its own action bar replaces the bottom tabs (a screen never shows both). */
+  detail?: boolean;
   children: ReactNode;
 }
 
@@ -73,7 +77,8 @@ const onMedia = (change: () => void) => {
   m.addEventListener?.("change", change);
   return () => m.removeEventListener?.("change", change);
 };
-const usePhone = () => useSyncExternalStore(onMedia, () => window.matchMedia(PHONE).matches);
+/** The phone layout (under 768px), as the bar decides it: pages that change shape on a phone read the same. */
+export const usePhone = () => useSyncExternalStore(onMedia, () => window.matchMedia(PHONE).matches);
 
 // ---- Pieces of the bar ----
 
@@ -149,11 +154,30 @@ export function UnitSwitcher({ units, current, onPick }: { units: readonly strin
 }
 
 /**
+ * The offline banner (kit hw-banner--inverse): black, so it borrows no clinical colour. `since` is the browser
+ * time of the first failed read, `from` the ward time of the last good one; `acts` adds that the writes wait.
+ */
+export function OfflineBanner({ since, from, retry, acts, className = "" }: {
+  since: number; from: number | null; retry: string; acts: boolean; className?: string;
+}) {
+  return (
+    <div className={`hw-banner hw-banner--inverse ${className}`} role="alert">
+      <span className="hw-icon fa-solid fa-ban" aria-hidden="true" />
+      <strong className="hw-banner__title">Offline since {formatClock(wardTime(since))}</strong>
+      <span>
+        Cannot reach the ward server. Showing data from {from ? formatClock(from) : "--"}; ages below stand at that time. {retry}
+        {acts && " Acknowledging and recording wait until the connection is back."}
+      </span>
+    </div>
+  );
+}
+
+/**
  * The frame of every signed-in page: one top bar (mark, the role's tabs, unit, search, status, bell,
  * account) over the page. On a phone (< 768px) the bar is an app bar with the page's title and status,
  * and the tabs move to a bottom bar; a staff nurse, who has no tabs, has none.
  */
-export function AppShell({ session, onSignOut, title, status, children }: Props) {
+export function AppShell({ session, onSignOut, title, status, detail = false, children }: Props) {
   const phone = usePhone();
   const feed = useWardFeed();
   const assistant = useAssistant();
@@ -165,7 +189,7 @@ export function AppShell({ session, onSignOut, title, status, children }: Props)
   const menuLabel = session.role === "admin" ? "Lab" : "Research";
   const analytics: unknown = import.meta.env.VITE_ANALYTICS_URL;
   const analyticsUrl = typeof analytics === "string" && ANALYTICS_PATH.test(analytics) ? analytics : null;
-  const bottomNav = phone && tabs.length > 0;
+  const bottomNav = phone && tabs.length > 0 && !detail;
 
   const tabLinks = (className: string, icon: boolean) =>
     tabs.map((t) => (
