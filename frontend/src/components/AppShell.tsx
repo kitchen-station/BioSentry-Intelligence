@@ -221,13 +221,15 @@ export function AppShell({ session, onSignOut, title, status, detail = false, ch
           </>
         )}
 
+        {/* Desk: the page's live status sits before the tools; under 1280px it takes its own slim row. */}
+        {!phone && status && <span className={`${styles.status} ${styles.deskStatus}`}>{status}</span>}
+
         <div className={styles.tools}>
           {!phone && (
             // ponytail: a session holds one ward, so this never shows; pass the units and onPick once sessions carry several.
             <UnitSwitcher units={[session.ward]} current={session.ward} />
           )}
           {!phone && feed?.data && <PatientSearch ward={feed.data} />}
-          {!phone && status && <span className={styles.status}>{status}</span>}
           {assistant && (
             // Desk: icon and word. Phone: an icon in the app bar, named for a screen reader.
             <button
@@ -239,7 +241,7 @@ export function AppShell({ session, onSignOut, title, status, detail = false, ch
               onClick={(e) => assistant.toggle(e.currentTarget)}
             >
               <span className="hw-icon fa-solid fa-comments" aria-hidden="true" />
-              {!phone && "Assistant"}
+              {!phone && <span className={styles.toolWord}>Assistant</span>}
             </button>
           )}
           {feed && !feed.readOnly && <AlertTray feed={feed} />}

@@ -62,8 +62,8 @@
   color: var(--hw-color-text-muted);
 }
 
-/* Phone: the avatar and the chevron; the id is in the panel's accessible name and the trigger's. */
-@media (width < 768px) {
+/* Phone and narrow desk: the avatar and the chevron; the id stays in the trigger's accessible name. */
+@media (width < 1280px) {
   .who {
     position: absolute;
     width: 1px;
