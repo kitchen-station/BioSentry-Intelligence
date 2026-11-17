@@ -3,6 +3,6 @@
 /* Now: four status tiles in a row, two by two on a narrow screen. */
 .tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: var(--hw-space-6);
 }

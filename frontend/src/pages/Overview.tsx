@@ -222,7 +222,7 @@ export function Overview({ session, onSignOut }: { session: Session; onSignOut: 
                 <p className="hw-text-muted">No activity in the last 24 hours.</p>
               ) : (
                 <div className="hw-table-wrap" tabIndex={0} role="region" aria-labelledby="activity">
-                  <table className="hw-table">
+                  <table className={`hw-table ${research.nowrap}`}>
                     <thead>
                       <tr>
                         <th scope="col">Clinician</th>
