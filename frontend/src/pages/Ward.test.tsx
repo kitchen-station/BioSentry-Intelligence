@@ -22,6 +22,7 @@ const SEP = new Date(Date.UTC(2026, 8, 3)).toLocaleDateString("en-GB", { month: 
 
 const api = vi.hoisted(() => ({
   getWard: vi.fn(),
+  getUnits: vi.fn(),
   getAcknowledgements: vi.fn(),
   acknowledge: vi.fn(),
   getLiveWard: vi.fn(),
@@ -77,6 +78,7 @@ const banner = () => screen.queryByRole("alert");
 
 beforeEach(() => {
   api.getWard.mockReset().mockResolvedValue(ward());
+  api.getUnits.mockReset().mockResolvedValue([]);
   api.getAcknowledgements.mockReset().mockResolvedValue([]);
   api.acknowledge.mockReset().mockResolvedValue(undefined);
   api.getLiveWard.mockReset().mockResolvedValue(null);
@@ -199,6 +201,24 @@ describe("the NOT RANKED strip", () => {
     expect(within(strip).queryByRole("link", { name: "Flores, Ramon" })).toBeNull();
     await user.click(within(strip).getByRole("button", { name: "Show" }));
     expect(within(strip).getByText("Systolic BP missing.")).toBeTruthy();
+  });
+
+  it("switches units and shows the server's ranking note and each patient's location", async () => {
+    const user = userEvent.setup();
+    api.getUnits.mockResolvedValue([
+      { id: "W4", name: "Ward 4", floor: 4, patients: 1, kind: "ranked", score_note: "NEWS2 order for Ward 4" },
+      { id: "ER", name: "Emergency", floor: 1, patients: 1, kind: "unranked", score_note: "ER patients are not ranked" },
+    ]);
+    api.getWard.mockImplementation(async (unit: string) => unit === "ER"
+      ? { ...ward(), ward: "ER", kind: "unranked", ranked: [], score_note: "ER patients are not ranked" }
+      : { ...ward(), ranked: [{ ...rows[0], unit: "W4", floor: 4 }] });
+    page();
+    expect(await screen.findByText("NEWS2 order for Ward 4")).toBeTruthy();
+    expect(screen.getByText(/W4 · Floor 4 · Bed/)).toBeTruthy();
+    await user.selectOptions(screen.getByRole("combobox", { name: "Unit" }), "ER");
+    expect(await screen.findByText("ER patients are not ranked")).toBeTruthy();
+    expect(api.getWard).toHaveBeenCalledWith("ER");
+    expect(screen.getByText("Floor 1")).toBeTruthy();
   });
 });
 

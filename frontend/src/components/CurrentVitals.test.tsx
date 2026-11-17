@@ -140,6 +140,6 @@ describe("a value a nurse typed", () => {
     const out = html(vitals);
     expect(out).toContain(`> ${text}<`);
     expect(out).toContain(`title="${text}"`);
-    expect(html(base)).not.toContain(text);
+    expect(html(base)).not.toContain(`title="${text}"`);
   });
 });

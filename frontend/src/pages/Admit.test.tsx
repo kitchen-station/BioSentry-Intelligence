@@ -327,7 +327,7 @@ describe("Enter lab results", () => {
   const feed = (abstained: Partial<AbstainedRow>[]): WardFeed => ({
     data: { ward: "W4", ranked: [], abstained, now: "2026-11-17T03:00:00Z" } as unknown as WardResponse,
     fetchedAt: null, failedSince: null, sim: null, refresh: vi.fn(), pollMs: 5_000, readOnly: false,
-    alerts: [], acknowledge: vi.fn(), flush: vi.fn(() => Promise.resolve()), notice: null, setNotice: vi.fn(),
+    alerts: [], acknowledge: vi.fn(), flush: vi.fn(() => Promise.resolve()), notice: null, setNotice: vi.fn(), unit: "W4", setUnit: vi.fn(),
   });
 
   it("asks for the patient first, and lists the NOT RANKED ones as unavailable, with the ward's reason", async () => {

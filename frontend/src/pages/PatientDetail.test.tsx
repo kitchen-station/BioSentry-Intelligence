@@ -10,7 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import synthetic from "../data/synthetic.json";
-import type { BaselineComputed, BaselineResponse, ClinicalNote, LabPanel, PatientDetail as Detail, ScoreRow, Session, SessionRole, WardResponse } from "../types";
+import type { AbstainedDetail, BaselineComputed, BaselineResponse, ClinicalNote, LabPanel, PatientDetail as Detail, ScoreRow, Session, SessionRole, WardResponse } from "../types";
 import { trend } from "hw-ui";
 import { ChatBubble } from "../components/ChatBubble";
 import { formatClock, formatClockSeconds } from "../components/format";
@@ -313,12 +313,46 @@ describe("PatientDetail", () => {
     expect(screen.getByText("Against own baseline")).toBeTruthy();
   });
 
-  it("shows not found for a patient that is missing or not yours", async () => {
+  it("shows unavailable for a patient that is missing or not yours", async () => {
     api.getPatient.mockResolvedValue(null);
     page();
-    expect(await screen.findByText("Patient not found.")).toBeTruthy();
+    expect(await screen.findByText("This patient is unavailable.")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Back to ward" }).getAttribute("href")).toBe("/ward");
     expectLabEntry();
+  });
+
+  it("renders a not-ranked patient's reason, instruction, location and stored history", async () => {
+    const row = synthetic.abstained[0];
+    api.getPatient.mockResolvedValue({
+      ...row,
+      unit: "W4",
+      floor: 4,
+      now: "2026-09-03T07:00:00Z",
+      vital_history: { heart_rate: [], respiratory_rate: [], spo2: [] },
+    } as AbstainedDetail);
+    page("rn", `/patient/${row.id}`);
+    expect((await loaded()).textContent).toBe(row.name);
+    expect(screen.getByText("NOT RANKED")).toBeTruthy();
+    expect(screen.getByText(row.reason)).toBeTruthy();
+    expect(screen.getByText(row.instruction)).toBeTruthy();
+    expect(screen.getByText(/W4 · Floor 4 · Bed/)).toBeTruthy();
+    expect(screen.getByText("No stored history available.")).toBeTruthy();
+    expect(screen.queryByText("Patient not found.")).toBeNull();
+  });
+
+  it("draws a not-ranked patient's stored history where there is some", async () => {
+    const row = synthetic.abstained[0];
+    const hr = [{ time: "2026-09-03T06:00:00Z", value: 80 }, { time: "2026-09-03T06:30:00Z", value: 84 }];
+    api.getPatient.mockResolvedValue({
+      ...row, unit: null, floor: null, now: "2026-09-03T07:00:00Z",
+      vital_history: { heart_rate: hr, respiratory_rate: [], spo2: [] },
+    } as unknown as AbstainedDetail);
+    page("rn", `/patient/${row.id}`);
+    await loaded();
+    expect(screen.getByRole("heading", { name: /^Heart rate / })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: /^SpO2 / })).toBeNull();
+    expect(screen.queryByText("No stored history available.")).toBeNull();
+    expect(screen.getByText(/Unit unavailable · Floor unavailable · Bed/)).toBeTruthy();
   });
 
   it("shows an error when the patient cannot be loaded", async () => {
@@ -555,7 +589,7 @@ describe("PatientDetail", () => {
       expect(await screen.findByText(/Recorded. Still not ranked. No device data./)).toBeTruthy();
       expect(within(screen.getByRole("dialog")).getByRole("status").textContent).toBe("Still not ranked. No device data. Apply the patch.");
       expect(screen.getByRole("link", { name: "Back to ward" }).getAttribute("href")).toBe("/ward");
-      expect(api.getPatient).toHaveBeenCalledTimes(1);
+      expect(api.getPatient).toHaveBeenCalledTimes(2);
     });
 
     it("says so when the patient cannot be read again", async () => {
@@ -1287,7 +1321,7 @@ const feedOf = (over: Partial<WardFeed> = {}): WardFeed => ({
   } as WardResponse,
   fetchedAt: Date.parse("2026-09-03T07:00:00Z"), failedSince: null, sim: null, refresh: () => undefined, pollMs: 15_000,
   readOnly: false, alerts: [], acknowledge: vi.fn(), flush: () => Promise.resolve(), notice: null, setNotice: () => undefined,
-  ...over,
+  unit: "W4", setUnit: () => undefined, ...over,
 });
 const fed = (feed: WardFeed, role: SessionRole = "charge_rn", path = "/patient/p-002") =>
   render(

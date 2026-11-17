@@ -30,6 +30,7 @@ import type {
   NewPatientQuestion,
   NewQuestion,
   NurseVitalsInput,
+  AbstainedDetail,
   PartialLabInput,
   PatientDetail,
   PatientExtractionResult,
@@ -57,16 +58,16 @@ export const httpProvider: ApiProvider = {
   getAssistantHistory: (patientId) => fetchJson<AssistantMessage[]>(`/patients/${encodeURIComponent(patientId)}/assistant/history`),
   getPatientRuns: (patientId) => fetchJson<LabRunItem[]>(`/patients/${encodeURIComponent(patientId)}/lab/runs`),
   getPatientRun: (patientId, runId) => fetchJson<LabRunDetail>(`/patients/${encodeURIComponent(patientId)}/lab/runs/${runId}`),
-  getWard(): Promise<WardResponse> {
-    return fetchJson<WardResponse>("/wards/W4/rows");
+  getWard(unit = "W4"): Promise<WardResponse> {
+    return fetchJson<WardResponse>(`/wards/${encodeURIComponent(unit)}/rows`);
   },
 
   getStays(): Promise<PatientStay[]> {
     return fetchJson<PatientStay[]>("/wards/W4/stays");
   },
 
-  getLiveWard(): Promise<LiveWard> {
-    return fetchJson<LiveWard>("/wards/W4/live");
+  getLiveWard(unit = "W4"): Promise<LiveWard> {
+    return fetchJson<LiveWard>(`/wards/${encodeURIComponent(unit)}/live`);
   },
 
   getOverview(ward = "W4"): Promise<WardOverview> {
@@ -123,14 +124,10 @@ export const httpProvider: ApiProvider = {
     return fetchJson<PatientQuestionDetail>(`/patients/${encodeURIComponent(patientId)}/questions/${questionId}`);
   },
 
-  async getPatient(id: string): Promise<PatientDetail | null> {
-    // The server answers 404 for a patient that does not exist and for one that is not the
-    // caller's, identically. The page treats both as "not found". A NOT RANKED patient now
-    // answers with the row and the stored history, which this page does not draw yet: it keeps
-    // its old answer for that patient (null) until a page for it exists.
+  async getPatient(id: string): Promise<PatientDetail | AbstainedDetail | null> {
+    // The server answers 404 identically for a missing patient and one outside the caller's view.
     try {
-      const body = await fetchJson<PatientDetail | { reason: string }>(`/patients/${id}`);
-      return "reason" in body ? null : body;
+      return await fetchJson<PatientDetail | AbstainedDetail>(`/patients/${encodeURIComponent(id)}`);
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) return null;
       throw error;

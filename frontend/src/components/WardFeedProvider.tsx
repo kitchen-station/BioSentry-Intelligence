@@ -36,6 +36,7 @@ interface Waiting {
  */
 export function WardFeedProvider({ session, children }: { session: Session; children: ReactNode }) {
   const readOnly = session.role === "admin";
+  const [unit, setUnitState] = useState(session.ward);
   const [data, setData] = useState<WardResponse | null>(null);
   const [fetchedAt, setFetchedAt] = useState<number | null>(null);
   const [failedSince, setFailedSince] = useState<number | null>(null);
@@ -55,7 +56,7 @@ export function WardFeedProvider({ session, children }: { session: Session; chil
   const load = useCallback(async () => {
     const n = ++issued.current;
     try {
-      const w = await getWard();
+      const w = await getWard(unit);
       if (n > applied.current) {
         applied.current = n;
         syncWardNow(w.now, !usesServer);
@@ -68,9 +69,13 @@ export function WardFeedProvider({ session, children }: { session: Session; chil
       if (n > applied.current) setFailedSince((t) => t ?? Date.now());
       return false;
     }
+  }, [unit]);
+  const setUnit = useCallback((next: string) => {
+    setData(null);
+    setUnitState(next);
   }, []);
   // The speed comes from the live view read in the same round: see useLivePoll.
-  const { sim, refresh, pollMs } = useLivePoll(load, !readOnly);
+  const { sim, refresh, pollMs } = useLivePoll(load, !readOnly, false, unit);
 
   // If they cannot be loaded every alert stays open: showing one twice is safer than hiding one.
   useEffect(() => {
@@ -164,7 +169,7 @@ export function WardFeedProvider({ session, children }: { session: Session; chil
 
   return (
     <WardFeedContext.Provider
-      value={{ data, fetchedAt, failedSince, sim, refresh, pollMs, readOnly, alerts, acknowledge, flush, notice, setNotice }}
+      value={{ data, fetchedAt, failedSince, sim, refresh, pollMs, readOnly, alerts, acknowledge, flush, notice, setNotice, unit, setUnit }}
     >
       {children}
     </WardFeedContext.Provider>

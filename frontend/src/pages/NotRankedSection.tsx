@@ -11,6 +11,8 @@ interface Props {
   readonly offline?: boolean;
   /** Opens the Record vitals drawer for a row (none where the page offers no entry). */
   readonly onRecord?: (row: AbstainedRowType) => void;
+  readonly fallbackUnit?: string;
+  readonly unitKind?: "ranked" | "shown" | "unranked" | null;
 }
 
 /**
@@ -18,7 +20,7 @@ interface Props {
  * Whether a row offers vitals entry is decided here, once, from the build's capability: only the
  * API can re-rank, so the fixture build offers none (D4).
  */
-export function NotRankedSection({ rows, readOnly = false, offline = false, onRecord }: Props) {
+export function NotRankedSection({ rows, readOnly = false, offline = false, onRecord, fallbackUnit, unitKind }: Props) {
   const [open, setOpen] = useState(true);
   const heading = useId();
   const list = useId();
@@ -27,7 +29,7 @@ export function NotRankedSection({ rows, readOnly = false, offline = false, onRe
     <section className={`hw-notice hw-notice--dashed ${styles.strip}`} aria-labelledby={heading}>
       <div className="hw-notice__head">
         <h2 id={heading} className="hw-notice__title">Not ranked ({rows.length})</h2>
-        <p className="hw-notice__text">Action required to enable scoring. Not ranked does not mean low risk.</p>
+        <p className="hw-notice__text">{unitKind && unitKind !== "ranked" ? "This unit has no priority ranking." : "Action required to enable scoring."} Not ranked does not mean low risk.</p>
         <button
           type="button"
           className="hw-notice__toggle"
@@ -46,6 +48,7 @@ export function NotRankedSection({ rows, readOnly = false, offline = false, onRe
             canRecord={canRecordVitals && !readOnly}
             onRecord={onRecord}
             disabled={offline}
+            fallbackUnit={fallbackUnit}
           />
         ))}
       </div>

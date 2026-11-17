@@ -6,6 +6,7 @@
 // removed. Each one names the evidence and who closes it.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import synthetic from "./synthetic.json";
 import {
   acknowledge,
   extractLabsFromFile,
@@ -247,6 +248,14 @@ describe("clinician scope (fixture stand-in for server-side filtering)", () => {
       }
     });
   }
+
+  it("uses the stored synthetic history on a not-ranked patient page", async () => {
+    setActiveClinician("rn-manalo");
+    const detail = await getPatient("p-004");
+    if (!detail || !("reason" in detail)) throw new Error("Expected not-ranked detail");
+    const source = synthetic.unscored.find((patient) => patient.id === "p-004");
+    expect(detail.vital_history.heart_rate.map((point) => point.value)).toEqual(source?.vital_history.heart_rate.map((point) => point.value));
+  });
 
   // Fail closed: a clinician id with no assignment entry sees nobody, through the
   // ward, the list and the detail endpoint alike (README "Design rules"; the

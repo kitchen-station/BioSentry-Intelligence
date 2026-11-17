@@ -203,16 +203,17 @@ describe.each(harnesses)("$name", ({ provider, signIn }) => {
   it("gaps are null in the history and never zero", async () => {
     signIn("rn-manalo");
     const detail = await provider.getPatient("p-006");
-    expect(detail).not.toBeNull();
-    const heart = detail!.vital_history.heart_rate.map((p) => p.value);
+    if (!detail || "reason" in detail) throw new Error("Expected ranked detail");
+    const heart = detail.vital_history.heart_rate.map((p) => p.value);
     expect(heart.filter((v) => v === null)).toHaveLength(3);
-    for (const series of Object.values(detail!.vital_history)) {
+    for (const series of Object.values(detail.vital_history)) {
       for (const point of series) expect(point.value === null || point.value > 0).toBe(true);
     }
-    for (const series of Object.values(detail!.vital_trends)) {
+    for (const series of Object.values(detail.vital_trends)) {
       for (const v of series) expect(v === null || v > 0).toBe(true);
     }
   });
+
 
   it("a note round-trips: newest first, synthetic, and deletable", async () => {
     signIn("rn-manalo");
@@ -228,7 +229,9 @@ describe.each(harnesses)("$name", ({ provider, signIn }) => {
 
   it("lab entry updates only what was entered and keeps the panel as stale as its oldest lab", async () => {
     signIn("rn-manalo");
-    const before = (await provider.getPatient("p-011"))!.labs;
+    const detail = await provider.getPatient("p-011");
+    if (!detail || "reason" in detail) throw new Error("Expected ranked detail");
+    const before = detail.labs;
     expect(before.freshness_hours).toBe(36);
     const panel = await provider.enterLabResults("p-011", { potassium: 4.1 });
     expect(panel.potassium?.data.present && panel.potassium.data.value).toBe(4.1);

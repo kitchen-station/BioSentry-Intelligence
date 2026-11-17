@@ -24,6 +24,8 @@ interface Props {
   offline?: boolean;
   onAcknowledge?: () => void;
   ref?: Ref<HTMLLIElement>;
+  /** The unit shown when the row carries none (the page's unit). */
+  fallbackUnit?: string;
 }
 
 /** The role's line under the name: the NEWS2 response, or on a flagged low row the drift line. Null when there is none. */
@@ -113,7 +115,7 @@ const value = <T,>(m: Measurement<T> | null | undefined, write: (v: T) => string
  * One ranked patient (kit hw-ranklist__row). Every element is rendered; the kit drops what compact
  * rows and phone cards leave out. The name and the chevron open the patient; nothing else on the row does.
  */
-export function WardRow({ row, role, now, ageOffsetS, compact = false, alert = false, offline = false, onAcknowledge, ref }: Props) {
+export function WardRow({ row, role, now, ageOffsetS, compact = false, alert = false, offline = false, onAcknowledge, ref, fallbackUnit }: Props) {
   const b = band(row);
   const p = news2Points(row.vitals);
   const v = row.vitals;
@@ -136,7 +138,7 @@ export function WardRow({ row, role, now, ageOffsetS, compact = false, alert = f
         <div className="hw-ranklist__id">
           <Link to={to} className="hw-ranklist__name">{row.name}</Link>
           <span className="hw-ranklist__meta">
-            {row.age ?? "--"}{row.sex ? ` ${row.sex}` : ""} &middot; Bed {row.bed}
+            {row.age ?? "--"}{row.sex ? ` ${row.sex}` : ""} &middot; {row.unit ?? fallbackUnit ?? "Unit unavailable"} &middot; {row.floor == null ? "Floor unavailable" : `Floor ${row.floor}`} &middot; Bed {row.bed}
           </span>
         </div>
         {line !== null

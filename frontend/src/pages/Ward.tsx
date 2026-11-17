@@ -1,7 +1,7 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import type { AbstainedRow as AbstainedRowType, ScoreRow, Session, VitalsRecorded } from "../types";
-import { canRecordVitals } from "../api";
+import type { AbstainedRow as AbstainedRowType, ScoreRow, Session, VitalsRecorded, WardUnit } from "../types";
+import { canRecordVitals, getUnits } from "../api";
 import { AppShell, OfflineBanner } from "../components/AppShell";
 import { Flip, useMoveOnReorder } from "../components/Flip";
 import { formatBloodPressure, formatClock, formatSimClock } from "../components/format";
@@ -89,7 +89,17 @@ export function Ward(props: Props) {
 }
 
 function WardPage({ session, onSignOut, feed }: Props & { feed: WardFeed }) {
-  const { data, fetchedAt, failedSince, sim, refresh, pollMs, readOnly, alerts, acknowledge, setNotice } = feed;
+  const { data, fetchedAt, failedSince, sim, refresh, pollMs, readOnly, alerts, acknowledge, setNotice, unit, setUnit } = feed;
+  const [units, setUnits] = useState<readonly WardUnit[]>([]);
+  useEffect(() => {
+    let active = true;
+    getUnits().then((result) => {
+      if (active) setUnits(result);
+    }).catch(() => {
+      // No list (the fixture build, or a refusal): the clinician's own unit remains available.
+    });
+    return () => { active = false; };
+  }, []);
   const now = useWardNow(); // ward time as served at the last good read
   const [filter, setFilter] = useState<Filter>("all");
   const [density, setDensity] = useState<"comfortable" | "compact">("comfortable");
@@ -159,6 +169,10 @@ function WardPage({ session, onSignOut, feed }: Props & { feed: WardFeed }) {
   const alertIds = new Set(alerts.map((a) => a.id));
   const tiers = data.tier_status.filter((t) => t.live).map((t) => t.label).join(", ") || "NEWS2";
   const total = count("all");
+  const selectedUnit = units.find((entry) => entry.id === unit);
+  const choices = selectedUnit ? units : [{ id: unit, name: data.name ?? unit }, ...units];
+  const floor = selectedUnit?.floor ?? data.floor;
+  const scoreNote = selectedUnit?.score_note ?? data.score_note ?? (data.kind === "unranked" ? "This unit is not ranked" : null);
   const ack = (row: ScoreRow) => (alertIds.has(row.id) && !readOnly ? () => acknowledge(row) : undefined);
 
   const status = (
@@ -194,6 +208,16 @@ function WardPage({ session, onSignOut, feed }: Props & { feed: WardFeed }) {
             <p className={styles.countLine}>
               {total} {total === 1 ? "patient" : "patients"} &middot; {data.ranked.length} ranked on {tiers}
             </p>
+            {scoreNote && <p className={styles.countLine}>{scoreNote}</p>}
+          </div>
+          <div className={styles.unitPicker}>
+            <div className="hw-field">
+              <label className="hw-field__label" htmlFor="ward-unit">Unit</label>
+              <select id="ward-unit" className="hw-native-select" value={unit} onChange={(event) => setUnit(event.target.value)}>
+                {choices.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
+              </select>
+            </div>
+            <p className={styles.countLine}>{floor != null ? `Floor ${floor}` : "Floor unavailable"}</p>
           </div>
           <div className={styles.switches}>
             <Segmented label="Row density" value={density} onChange={setDensity} options={[["comfortable", "Comfortable"], ["compact", "Compact"]]} />
@@ -222,7 +246,7 @@ function WardPage({ session, onSignOut, feed }: Props & { feed: WardFeed }) {
         </div>
 
         {view === "list" && (
-          <NotRankedSection rows={unranked} readOnly={readOnly} offline={offline} onRecord={setRecording} />
+          <NotRankedSection rows={unranked} readOnly={readOnly} offline={offline} onRecord={setRecording} fallbackUnit={data.ward} unitKind={data.kind} />
         )}
 
         {view === "list" && ranked.length > 0 && (
@@ -244,6 +268,7 @@ function WardPage({ session, onSignOut, feed }: Props & { feed: WardFeed }) {
                   alert={alertIds.has(row.id)}
                   offline={offline}
                   onAcknowledge={ack(row)}
+                  fallbackUnit={data.ward}
                 />
               ))}
             </ol>

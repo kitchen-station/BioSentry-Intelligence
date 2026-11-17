@@ -20,7 +20,7 @@ export function pollEvery(sim: SimStatus | null, hidden: boolean, failed = false
  * round on mount and on `refresh()` only, and never asks for the live view. `paused` stops the timer.
  * `load` must handle its own errors, and resolve `false` when the round failed (the next tick is then at 5 s).
  */
-export function useLivePoll(load: () => Promise<boolean | void>, enabled: boolean, paused = false) {
+export function useLivePoll(load: () => Promise<boolean | void>, enabled: boolean, paused = false, unit?: string) {
   const [sim, setSim] = useState<SimStatus | null>(null);
   const [hidden, setHidden] = useState(() => document.visibilityState === "hidden");
   const [failed, setFailed] = useState(false);
@@ -30,7 +30,7 @@ export function useLivePoll(load: () => Promise<boolean | void>, enabled: boolea
     busy.current = true;
     const live =
       usesServer && enabled
-        ? getLiveWard().then(
+        ? getLiveWard(unit).then(
             (l) => setSim(simStatus(l?.shared)),
             () => setSim(null),
           )
@@ -39,7 +39,7 @@ export function useLivePoll(load: () => Promise<boolean | void>, enabled: boolea
       busy.current = false;
       setFailed(ok === false);
     });
-  }, [load, enabled]);
+  }, [load, enabled, unit]);
 
   useEffect(() => {
     const onChange = () => setHidden(document.visibilityState === "hidden");

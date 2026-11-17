@@ -26,6 +26,10 @@ export interface WardFeed {
   readonly flush: () => Promise<void>;
   readonly notice: string | null;
   readonly setNotice: (notice: string | null) => void;
+  /** The unit this feed reads; starts at the clinician's own ward. */
+  readonly unit: string;
+  /** Reads another unit: the ward on screen clears until its first read. */
+  readonly setUnit: (unit: string) => void;
 }
 
 export const WardFeedContext = createContext<WardFeed | null>(null);
