@@ -1,46 +1,77 @@
-/* The eight stages as numbered cards joined by a line. Layout only; cards and tags are hw-ui. */
+/* The eight stages as a vertical stepper: a numbered disc on a rail, then the stage's card. The disc says the stage's
+   state by its shape (filled: live in the ranking; outlined: shown; info-tinted: research only; dashed: planned), and
+   the tag beside the name says it in words. Layout only; cards and tags are hw-ui. */
 .stages {
   display: grid;
-  gap: var(--hw-space-6);
+  gap: var(--hw-space-4);
   list-style: none;
 }
 
-.stage { position: relative; }
+.stage {
+  --rail: 36px;
 
-/* The connector: from the number above to the number below, through the gap. */
-.stage + .stage::before {
+  position: relative;
+  padding-left: calc(var(--rail) + var(--hw-space-5));
+}
+
+/* The rail: from under this stage's disc to the next one's, through the gap. */
+.stage:not(:last-child)::before {
   content: "";
   position: absolute;
-  bottom: 100%;
-  left: calc(var(--hw-card-pad) + 13px);
+  top: calc(var(--hw-space-5) + var(--rail));
+  bottom: calc(-1 * var(--hw-space-4) - var(--hw-space-5));
+  left: calc(var(--rail) / 2 - 1px);
   width: 2px;
-  height: var(--hw-space-6);
   background: var(--hw-color-border);
 }
 
-.name {
+.head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--hw-space-3);
+  gap: var(--hw-space-2) var(--hw-space-4);
 }
 
+/* The disc sits on the rail, level with the stage's name. */
 .num {
-  display: inline-grid;
-  flex-shrink: 0;
+  position: absolute;
+  top: var(--hw-space-5);
+  left: 0;
+  display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  font-size: var(--hw-text-caption);
-  color: var(--hw-color-text-muted);
-  background: var(--hw-color-surface-subtle);
-  border: 1px solid var(--hw-color-border);
+  box-sizing: border-box;
+  width: var(--rail);
+  height: var(--rail);
+  font-size: var(--hw-font-size-14);
+  font-weight: var(--hw-weight-bold);
+  color: var(--hw-color-text);
+  background: var(--hw-color-surface);
+  border: 2px solid var(--hw-color-text);
   border-radius: var(--hw-radius-full);
 }
 
-/* The arbiter, the only stage that decides what reaches the nurse. */
-.stage[data-decides="true"] { border: 2px solid var(--hw-color-accent); }
-.stage[data-decides="true"] .num {
+.stage[data-state^="live"] .num {
   color: var(--hw-color-on-accent);
   background: var(--hw-color-accent);
   border-color: var(--hw-color-accent);
+}
+
+.stage[data-state^="research"] .num {
+  color: var(--hw-color-info-fg);
+  background: var(--hw-color-info-bg);
+  border-color: var(--hw-color-info-fg);
+}
+
+.stage[data-state="planned"] .num {
+  color: var(--hw-color-text-muted);
+  border-style: dashed;
+  border-color: var(--hw-color-text-subtle);
+}
+
+/* The arbiter, the only stage that decides what reaches the nurse. */
+.stage[data-decides="true"] .card { border: 2px solid var(--hw-color-accent); }
+
+@media (width < 576px) {
+  .stage { --rail: 28px; padding-left: calc(var(--rail) + var(--hw-space-3)); }
+  .num { font-size: var(--hw-text-caption); }
 }

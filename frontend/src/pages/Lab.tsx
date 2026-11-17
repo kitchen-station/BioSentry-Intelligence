@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 import type { Session } from "../types";
-import { hasLabQuestions } from "../api";
 import { LabFrame } from "../components/LabFrame";
 import { LabRuns } from "./LabRuns";
 import research from "./Research.module.css";
@@ -14,17 +13,16 @@ const Place = ({ to, icon, children }: { to: string; icon: string; children: str
   </li>
 );
 
-/** The lab's front page. A physician or charge nurse reaches it as "What-if runs" (/what-if); an administrator as the "Simulation lab" (/lab). It writes nothing to the live ward; its two writes are a request for a simulated run and a question for the research agent. */
+/** The lab's front page. A physician or charge nurse reaches it as "What-if runs" (/what-if), with Ask in the research strip above; an administrator as the "Simulation lab" (/lab). It writes nothing to the live ward; its one write is a request for a simulated run. */
 export function Lab({ session, onSignOut }: { session: Session; onSignOut: () => void }) {
   // shortcut: only the one-address image (VITE_API_URL=/api) serves /simulator/; upgrade to an explicit VITE_SIMULATOR_PATH when deploy/ changes.
   const admin = session.role === "admin";
   const simulatorServed = admin && import.meta.env.VITE_API_URL === "/api"; // a developer tool: no word of it on the clinician's page
   return (
-    <LabFrame session={session} onSignOut={onSignOut} whatIf={!admin}>
+    <LabFrame session={session} onSignOut={onSignOut} title={admin ? "Simulation lab" : "What-if runs"}>
       <div className={research.main}>
         <h1 className="hw-heading hw-heading--3">{admin ? "Simulation lab" : "What-if runs"}</h1>
         <ul className={research.places}>
-          {hasLabQuestions && !admin && <Place to="/ask" icon="comments">Ask the assistant</Place>}
           {admin && (
             <>
               <Place to="/lab/research" icon="chart-line">Research numbers</Place>

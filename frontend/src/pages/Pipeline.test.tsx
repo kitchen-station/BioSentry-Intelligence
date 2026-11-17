@@ -52,8 +52,17 @@ describe("pipeline page", () => {
     expect(states()).toEqual(OWN);
     expect(screen.getByText("Reading the ward's tier status.")).toBeTruthy();
     expect(screen.getByText(/Synthetic, not validated/)).toBeTruthy();
-    expect(screen.getByText(/Simulation lab: not the ward/)).toBeTruthy();
+    expect(screen.getByRole("note").textContent).toBe("Research · Synthetic, not validated. Nothing here changes a patient's rank.");
     expect(screen.getByText("The only part that decides what reaches the nurse.")).toBeTruthy();
+  });
+
+  it("is a vertical stepper: each stage carries its state for the disc, and its tag says it in the build's words", () => {
+    show(new Promise(() => {}));
+    const stages = screen.getAllByRole("listitem");
+    expect(stages.map((li) => li.getAttribute("data-state"))).toEqual(OWN);
+    expect(stages.filter((li) => li.getAttribute("data-decides") === "true").map((li) => within(li).getByRole("heading").textContent)).toEqual(["8The arbiter"]);
+    expect(new Set(states())).toEqual(new Set(["live in the ranking", "shown, does not change the ranking", "research only, offline"]));
+    expect(document.querySelector("b, i, u, s")).toBeNull(); // icons are spans
   });
 
   it("takes the NEWS2 state from the ward when tier A is live", async () => {

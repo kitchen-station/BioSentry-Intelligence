@@ -18,11 +18,27 @@
   border-bottom: 1px solid var(--hw-color-border-subtle);
 }
 
+.markRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hw-space-3) var(--hw-space-4);
+}
+
 .pitch {
   display: flex;
   flex-direction: column;
   gap: var(--hw-space-3);
-  max-width: 28rem;
+  max-width: 36rem;
+}
+
+.evidence {
+  display: flex;
+  align-items: center;
+  min-height: var(--hw-target-size);
+  margin-top: var(--hw-space-3);
+  font-size: var(--hw-font-size-16);
+  font-weight: var(--hw-weight-medium);
 }
 
 .main {
@@ -120,7 +136,7 @@
 
 @media (width >= 992px) {
   .page {
-    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    grid-template-columns: minmax(0, 5fr) minmax(0, 4fr);
     grid-template-rows: 1fr auto;
     grid-template-areas: "brand main" "brand footer";
   }

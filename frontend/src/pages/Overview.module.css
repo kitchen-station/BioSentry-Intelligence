@@ -1,39 +1,8 @@
 /* Ward overview: layout only. The page frame is AppShell; cards, tables and buttons are hw-ui. */
 
-/* No data coming in: the same warning tone as the ward's "No signal". */
-.warn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--hw-space-2);
-  font-weight: var(--hw-weight-medium);
-  color: var(--hw-color-warning-fg);
-}
-
-/* Activity: one block per clinician, side by side where there is room. */
-.groups {
+/* Now: four status tiles in a row, two by two on a narrow screen. */
+.tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: var(--hw-space-4) var(--hw-space-5);
-}
-
-.group {
-  display: grid;
-  gap: var(--hw-space-2);
-  align-content: start;
-  padding-top: var(--hw-space-3);
-  border-top: 1px solid var(--hw-color-border-subtle);
-}
-
-.who {
-  font-size: var(--hw-font-size-14);
-  font-weight: var(--hw-weight-semibold);
-  color: var(--hw-color-text);
-}
-
-.group ul {
-  padding-left: var(--hw-space-5);
-  font-family: var(--hw-font-mono);
-  font-size: var(--hw-text-caption);
-  color: var(--hw-color-text-muted);
-  overflow-wrap: anywhere;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--hw-space-6);
 }

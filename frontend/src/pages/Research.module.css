@@ -1,6 +1,6 @@
 /* Lab and admin pages: layout only. The look comes from hw-ui (hw-card, hw-table, hw-alert, hw-tag,
-   hw-heading, hw-caption). Shared by Lab, LabRuns, Research, ResearchAgentSection, Pipeline, Overview
-   and WardResearch. */
+   hw-heading, hw-caption, the bars graph). Shared by Lab, LabRuns, Research, ResearchAgentSection, Pipeline,
+   Overview and WardResearch. */
 
 .main {
   display: grid;
@@ -52,6 +52,13 @@
 
 .sub { color: var(--hw-color-text-subtle); }
 
+/* Ward research: a value against its own band, above the words that say it. The kit's graph marks draw it. */
+.band {
+  height: 16px;
+  min-width: 160px;
+  margin-bottom: var(--hw-space-2);
+}
+
 /* NEWS2 level, in words and in the clinical colour: 7+ emergency, 5-6 or a single 3 urgent. */
 .level[data-level="high"],
 .level[data-level="medium"],
@@ -77,6 +84,31 @@
   flex-wrap: wrap;
   gap: var(--hw-space-2) var(--hw-space-5);
   list-style: none;
+}
+
+/* Research numbers: the result to quote first, then four findings two by two, then the tables in an accordion. */
+.headline { --hw-graph-label-width: 260px; }
+.lede {
+  max-width: 72ch;
+  color: var(--hw-color-text-muted);
+}
+
+.alone {
+  display: grid;
+  gap: var(--hw-space-4);
+}
+
+.findings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: var(--hw-space-5);
+}
+
+.tables { padding-block: 0; }
+.inner {
+  display: grid;
+  gap: var(--hw-space-5);
+  padding-bottom: var(--hw-space-6);
 }
 
 @media (width < 576px) {

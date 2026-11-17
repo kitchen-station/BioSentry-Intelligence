@@ -173,6 +173,25 @@ export function OfflineBanner({ since, from, retry, acts, className = "" }: {
 }
 
 /**
+ * The frame of a page read before sign-in (the sample build's evidence): the mark and the way back to sign-in. No
+ * account, no tabs, no search, no bell: nobody is signed in.
+ */
+export function PublicShell({ children }: { children: ReactNode }) {
+  return (
+    <div className={styles.shell}>
+      <header className={styles.bar}>
+        <span className={styles.home}><Mark /></span>
+        <div className={styles.tools}>
+          <Link to="/" className="hw-button hw-button--sm hw-button--accent">Sign in</Link>
+        </div>
+      </header>
+      <main className={styles.main}>{children}</main>
+      <p className={styles.credit}>Set in HarmonyOS Sans</p>
+    </div>
+  );
+}
+
+/**
  * The frame of every signed-in page: one top bar (mark, the role's tabs, unit, search, status, bell,
  * account) over the page. On a phone (< 768px) the bar is an app bar with the page's title and status,
  * and the tabs move to a bottom bar; a staff nurse, who has no tabs, has none.

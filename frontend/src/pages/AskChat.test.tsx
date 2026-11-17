@@ -53,13 +53,14 @@ afterEach(() => {
 });
 
 describe("the page", () => {
-  it("shows the heading, the ward's frame and the ward's thread", async () => {
+  it("shows the heading, the research space and the ward's thread", async () => {
     page();
     await settle();
-    expect(screen.getByRole("heading", { level: 1, name: "Ask" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "Ask the assistant" })).toBeTruthy();
     expect(screen.getByText("Ward W4")).toBeTruthy();
     expect(screen.getByRole("button", { name: /md-santos/ })).toBeTruthy(); // the session menu
-    expect(screen.getByText("Simulated patients until a hospital is connected.")).toBeTruthy();
+    expect(screen.getByRole("note").textContent).toBe("Research · Synthetic, not validated. Nothing here changes a patient's rank.");
+    expect(screen.getByRole("note").closest("[data-hw-space='research']")).toBeTruthy();
     expect(screen.getByText("ward question")).toBeTruthy();
     expect(screen.getByText(/Do not type anything about a patient/)).toBeTruthy();
     expect(api.getPatientQuestions).not.toHaveBeenCalled();
@@ -121,7 +122,7 @@ describe("the page", () => {
     api.hasPatientQuestions = false;
     page();
     await settle();
-    expect(screen.getByRole("heading", { level: 1, name: "Ask" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "Ask the assistant" })).toBeTruthy();
     expect(screen.getByText("Getting ready: the chat is not connected in this demo.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
     cleanup();

@@ -184,92 +184,98 @@ export function LabRuns({ role, onSignOut }: { role: SessionRole; onSignOut: () 
           </p>
           <p className="hw-caption">A lab worker beside the ward runs each request. If none is running, a request fails after an hour.</p>
 
-          {role === "rn" ? (
-            <p>A physician or the charge nurse can ask for a simulated run.</p>
-          ) : (
-            <form onSubmit={send}>
-              <div className={styles.form}>
-                {select("Mode", mode, ["w4", "hospital"], (v) => setMode(v as "w4" | "hospital"), (o) =>
-                  o === "w4" ? "Ward W4: two warning rules" : "Hospital: one group of settings")}
-                <div className="hw-field">
-                  <label htmlFor="seed" className="hw-field__label">Seed</label>
-                  <span className="hw-input">
-                    <input id="seed" className="hw-input__control" type="number" min={0} max={SEED_MAX} step={1} value={seed} aria-invalid={!seedOk} aria-describedby="seed-hint" onChange={(e) => setSeed(e.target.value)} />
-                  </span>
-                  <span id="seed-hint" className={seedOk ? "hw-field__help" : "hw-field__error"}>
-                    A whole number from 0 to 2147483647.
-                  </span>
-                </div>
-                {select("Days", days, DAYS, (v) => setDays(Number(v)))}
-                {select("Baseline", base, baselines, setBaseline)}
-                {select("Change", chosen, changes, setChange)}
-              </div>
-              <button type="submit" className={`hw-button hw-button--primary ${styles.submit}`} disabled={sending || !seedOk}>Ask for a simulated run</button>
-            </form>
-          )}
-
-          {error && (
-            <p role="alert" className="hw-alert hw-alert--danger">
-              <span className="hw-alert__icon hw-icon fa-solid fa-triangle-exclamation" aria-hidden="true" />
-              {error}
-            </p>
-          )}
-          <div className={research.toolbar}>
-            <button type="button" className="hw-button hw-button--sm" onClick={() => { if (!reading.current) void load("The runs could not be read. Try Refresh."); }}>
-              <span className="hw-icon fa-solid fa-rotate" aria-hidden="true" />
-              Refresh
-            </button>
-          </div>
-          {runs && runs.length === 0 && <p className="hw-text-muted">No simulated runs yet.</p>}
-          {runs && runs.length > 0 && (
-            <div className="hw-table-wrap" tabIndex={0} role="region" aria-label="Simulated runs">
-              <table className="hw-table hw-table--stack">
-                <thead>
-                  <tr><th scope="col">Asked by</th><th scope="col">When</th><th scope="col">Request</th><th scope="col">State</th></tr>
-                </thead>
-                <tbody>
-                  {runs.map((r) => (
-                    <tr key={r.id}>
-                      <td data-label="Asked by" className={styles.nowrap}>{r.requested_by}</td>
-                      <td data-label="When" className={styles.nowrap}>{when(r.requested_at)}</td>
-                      <td data-label="Request">{request(r)}</td>
-                      <td data-label="State" className={styles.state}>
-                        <span className={STATE_TAG[r.state] ?? "hw-tag"}><Flip>{state(r)}</Flip></span>
-                        {r.state === "done" && <> <button type="button" className="hw-button hw-button--sm" onClick={() => void show(r.id)}>Show result</button></>}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {detail && (
-            <div className={`hw-card hw-card--outlined ${research.card}`}>
-              <h3 ref={heading} tabIndex={-1} className="hw-heading hw-heading--4">Result of run {detail.id}</h3>
-              <p role="note" className="hw-alert">
-                <span className="hw-alert__icon hw-icon fa-solid fa-circle-info" aria-hidden="true" />
-                <span className="hw-alert__body">Synthetic, not validated. One seed is one run: it shows how the comparison works. Use several seeds before reading anything into a difference.</span>
-              </p>
-              <dl className={styles.dl}>
-                {header(detail.report).map(([term, lines]) => (
-                  <div key={term} className={styles.row}>
-                    <dt>{term}</dt>
-                    <dd>{lines.map((l, i) => <div key={i}>{l}</div>)}</dd>
+          {/* The request on the left, the runs and a result on the right; one column on a narrow screen. */}
+          <div className={styles.split}>
+            <div className={styles.ask}>
+              {role === "rn" ? (
+                <p>A physician or the charge nurse can ask for a simulated run.</p>
+              ) : (
+                <form onSubmit={send}>
+                  <div className={styles.form}>
+                    {select("Mode", mode, ["w4", "hospital"], (v) => setMode(v as "w4" | "hospital"), (o) =>
+                      o === "w4" ? "Ward W4: two warning rules" : "Hospital: one group of settings")}
+                    <div className="hw-field">
+                      <label htmlFor="seed" className="hw-field__label">Seed</label>
+                      <span className="hw-input">
+                        <input id="seed" className="hw-input__control" type="number" min={0} max={SEED_MAX} step={1} value={seed} aria-invalid={!seedOk} aria-describedby="seed-hint" onChange={(e) => setSeed(e.target.value)} />
+                      </span>
+                      <span id="seed-hint" className={seedOk ? "hw-field__help" : "hw-field__error"}>
+                        A whole number from 0 to 2147483647.
+                      </span>
+                    </div>
+                    {select("Days", days, DAYS, (v) => setDays(Number(v)))}
+                    {select("Baseline", base, baselines, setBaseline)}
+                    {select("Change", chosen, changes, setChange)}
                   </div>
-                ))}
-              </dl>
-              {typeof detail.report_text === "string" && (
-                <pre className={styles.pre} tabIndex={0} role="region" aria-label="compare.txt">{detail.report_text}</pre>
-              )}
-              {detail.report != null && (
-                <details className="hw-accordion hw-accordion__item" open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
-                  <summary className="hw-accordion__summary">compare.json, as stored</summary>
-                  {open && <pre className={styles.pre} tabIndex={0} role="region" aria-label="compare.json">{json}</pre>}
-                </details>
+                  <button type="submit" className={`hw-button hw-button--primary ${styles.submit}`} disabled={sending || !seedOk}>Ask for a simulated run</button>
+                </form>
               )}
             </div>
-          )}
+            <div className={styles.results}>
+              {error && (
+                <p role="alert" className="hw-alert hw-alert--danger">
+                  <span className="hw-alert__icon hw-icon fa-solid fa-triangle-exclamation" aria-hidden="true" />
+                  {error}
+                </p>
+              )}
+              <div className={research.toolbar}>
+                <button type="button" className="hw-button hw-button--sm" onClick={() => { if (!reading.current) void load("The runs could not be read. Try Refresh."); }}>
+                  <span className="hw-icon fa-solid fa-rotate" aria-hidden="true" />
+                  Refresh
+                </button>
+              </div>
+              {runs && runs.length === 0 && <p className="hw-text-muted">No simulated runs yet.</p>}
+              {runs && runs.length > 0 && (
+                <div className="hw-table-wrap" tabIndex={0} role="region" aria-label="Simulated runs">
+                  <table className="hw-table hw-table--stack">
+                    <thead>
+                      <tr><th scope="col">Asked by</th><th scope="col">When</th><th scope="col">Request</th><th scope="col">State</th></tr>
+                    </thead>
+                    <tbody>
+                      {runs.map((r) => (
+                        <tr key={r.id}>
+                          <td data-label="Asked by" className={styles.nowrap}>{r.requested_by}</td>
+                          <td data-label="When" className={styles.nowrap}>{when(r.requested_at)}</td>
+                          <td data-label="Request">{request(r)}</td>
+                          <td data-label="State" className={styles.state}>
+                            <span className={STATE_TAG[r.state] ?? "hw-tag"}><Flip>{state(r)}</Flip></span>
+                            {r.state === "done" && <> <button type="button" className="hw-button hw-button--sm" onClick={() => void show(r.id)}>Show result</button></>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {detail && (
+                <div className={`hw-card hw-card--outlined ${research.card}`}>
+                  <h3 ref={heading} tabIndex={-1} className="hw-heading hw-heading--4">Result of run {detail.id}</h3>
+                  <p role="note" className="hw-alert">
+                    <span className="hw-alert__icon hw-icon fa-solid fa-circle-info" aria-hidden="true" />
+                    <span className="hw-alert__body">Synthetic, not validated. One seed is one run: it shows how the comparison works. Use several seeds before reading anything into a difference.</span>
+                  </p>
+                  <dl className={styles.dl}>
+                    {header(detail.report).map(([term, lines]) => (
+                      <div key={term} className={styles.row}>
+                        <dt>{term}</dt>
+                        <dd>{lines.map((l, i) => <div key={i}>{l}</div>)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  {typeof detail.report_text === "string" && (
+                    <pre className={styles.pre} tabIndex={0} role="region" aria-label="compare.txt">{detail.report_text}</pre>
+                  )}
+                  {detail.report != null && (
+                    <details className="hw-accordion hw-accordion__item" open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
+                      <summary className="hw-accordion__summary">compare.json, as stored</summary>
+                      {open && <pre className={styles.pre} tabIndex={0} role="region" aria-label="compare.json">{json}</pre>}
+                    </details>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </>
       )}
     </section>
