@@ -102,6 +102,15 @@ describe("httpProvider requests", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("/wards/W4/live");
   });
 
+  it("reads the overview of the unit asked for, and the unit list", async () => {
+    fetchMock.mockResolvedValueOnce(reply(200, { ward: "ER" }));
+    await httpProvider.getOverview("ER");
+    expect(fetchMock.mock.calls[0][0]).toBe("/wards/ER/overview");
+    fetchMock.mockResolvedValueOnce(reply(200, []));
+    await httpProvider.getUnits();
+    expect(fetchMock.mock.calls[1][0]).toBe("/wards");
+  });
+
   it("reads the admin overview, and a 403 is an ApiError", async () => {
     fetchMock.mockResolvedValueOnce(reply(200, { ward: "W4" }));
     await expect(httpProvider.getOverview()).resolves.toEqual({ ward: "W4" });

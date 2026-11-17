@@ -82,6 +82,7 @@ export type {
   VitalHistoryFull,
   VitalTrends,
   WardOverview,
+  WardUnit,
   Vitals,
   VitalsRecorded,
   PatientStay,

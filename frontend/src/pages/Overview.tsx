@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import type { Session, WardOverview } from "../types";
-import { ApiError, getOverview, hasOverview } from "../api";
+import type { Session, WardOverview, WardUnit } from "../types";
+import { ApiError, getOverview, getUnits, hasOverview } from "../api";
 import { AppShell } from "../components/AppShell";
 import { SimulatedNote } from "../components/LabFrame";
 import { ROLE_LABELS } from "../components/SessionMenu";
 import { formatSimClock, simStatus } from "../components/format";
 import research from "./Research.module.css";
 import styles from "./Overview.module.css";
+
+/** "Ground floor" for 0, then "1st floor", "2nd floor": the picker's words. */
+export const floorName = (n: number) => (n === 0 ? "Ground floor" : `${n}${["th", "st", "nd", "rd"][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] ?? "th"} floor`);
 
 const when = (iso: string) => `${iso.slice(0, 16).replace("T", " ")} UTC`;
 
@@ -42,10 +45,12 @@ export function Overview({ session, onSignOut }: { session: Session; onSignOut: 
   const [error, setError] = useState<string | null>(null);
   const admin = session.role === "admin";
   const [loading, setLoading] = useState(hasOverview && admin);
+  const [units, setUnits] = useState<WardUnit[]>([]);
+  const [ward, setWard] = useState<string | undefined>(undefined); // undefined: W4, the home unit
   const failed = "The overview could not be loaded. Try Refresh.";
 
   const show = useCallback(() => {
-    getOverview()
+    getOverview(ward)
       .then((d: unknown) => {
         const o = d as Partial<WardOverview> | null;
         const ok =
@@ -68,7 +73,7 @@ export function Overview({ session, onSignOut }: { session: Session; onSignOut: 
         if (status === 401) onSignOut();
       })
       .finally(() => setLoading(false));
-  }, [onSignOut]);
+  }, [onSignOut, ward]);
 
   useEffect(() => {
     document.title = "Ward overview \u00b7 BioSentry";
@@ -81,6 +86,11 @@ export function Overview({ session, onSignOut }: { session: Session; onSignOut: 
   useEffect(() => {
     if (hasOverview && admin) show();
   }, [show, admin]);
+
+  // The floors, read once. Read-only: choosing one only changes which unit's overview is read.
+  useEffect(() => {
+    if (hasOverview && admin) getUnits().then((u) => Array.isArray(u) && setUnits([...u].sort((a, b) => (a.floor ?? 99) - (b.floor ?? 99) || a.id.localeCompare(b.id)))).catch(() => setUnits([]));
+  }, [admin]);
 
   const sim = data ? simStatus(data.sim) : null;
   const role = (id: string) => data?.clinicians.find((c) => c.id === id)?.role;
@@ -112,6 +122,16 @@ export function Overview({ session, onSignOut }: { session: Session; onSignOut: 
           <p className="hw-text-muted">The overview needs the live API. This demo has no server.</p>
         ) : (
           <>
+            {units.length > 0 && (
+              <label className="hw-caption">
+                Floor{" "}
+                <select className="hw-native-select" value={ward ?? "W4"} onChange={(e) => { setLoading(true); setWard(e.target.value); }}>
+                  {units.map((u) => (
+                    <option key={u.id} value={u.id}>{u.floor === null ? "" : `${floorName(u.floor)}: `}{u.name}</option>
+                  ))}
+                </select>
+              </label>
+            )}
             <div className={`${research.toolbar} hw-caption`}>
               {data && <p>As of {when(data.as_of)}</p>}
               <p>This page does not refresh by itself: every read is recorded.</p>
