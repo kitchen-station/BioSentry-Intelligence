@@ -1,44 +1,46 @@
+/* The eight stages as numbered cards joined by a line. Layout only; cards and tags are hw-ui. */
 .stages {
   display: grid;
-  gap: var(--sp-5);
-  margin: 0;
-  padding: 0;
+  gap: var(--hw-space-6);
   list-style: none;
 }
 
-.stages li {
-  position: relative;
-  margin: 0;
+.stage { position: relative; }
+
+/* The connector: from the number above to the number below, through the gap. */
+.stage + .stage::before {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: calc(var(--hw-card-pad) + 13px);
+  width: 2px;
+  height: var(--hw-space-6);
+  background: var(--hw-color-border);
 }
 
-.stages li + li::before {
-  content: "\2193" / "";
-  position: absolute;
-  right: 0;
-  bottom: 100%;
-  left: 0;
-  line-height: var(--sp-5);
-  text-align: center;
-  color: var(--label);
+.name {
+  display: flex;
+  align-items: center;
+  gap: var(--hw-space-3);
 }
 
 .num {
-  margin-right: var(--sp-2);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--label);
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  font-size: var(--hw-text-caption);
+  color: var(--hw-color-text-muted);
+  background: var(--hw-color-surface-subtle);
+  border: 1px solid var(--hw-color-border);
+  border-radius: var(--hw-radius-full);
 }
 
-.state {
-  display: inline-block;
-  margin-bottom: var(--sp-2);
-  padding: 0 var(--sp-2);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-
-.decides {
-  border: 2px solid var(--primary);
+/* The arbiter, the only stage that decides what reaches the nurse. */
+.stage[data-decides="true"] { border: 2px solid var(--hw-color-accent); }
+.stage[data-decides="true"] .num {
+  color: var(--hw-color-on-accent);
+  background: var(--hw-color-accent);
+  border-color: var(--hw-color-accent);
 }

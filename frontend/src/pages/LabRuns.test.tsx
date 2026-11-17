@@ -217,17 +217,17 @@ describe("simulated runs: the form", () => {
     const hint = screen.getByText("A whole number from 0 to 2147483647.");
     expect(seed.getAttribute("aria-describedby")).toBe(hint.id);
     expect(hint.closest("label")).toBeNull();
-    expect(hint.className).toBe("");
+    expect(seed.getAttribute("aria-invalid")).toBe("false");
     for (const bad of ["", "-1", "1.5", "2147483648"]) {
       await userEvent.clear(seed);
       if (bad) await userEvent.type(seed, bad);
       expect(button.disabled, bad).toBe(true);
-      expect(hint.className, bad).not.toBe("");
+      expect(seed.getAttribute("aria-invalid"), bad).toBe("true");
     }
     await userEvent.clear(seed);
     await userEvent.type(seed, "2147483647");
     expect(button.disabled).toBe(false);
-    expect(hint.className).toBe("");
+    expect(seed.getAttribute("aria-invalid")).toBe("false");
   });
 
   it.each([
