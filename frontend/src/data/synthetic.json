@@ -464,6 +464,70 @@
             "time": "2026-09-03T06:45:00Z",
             "value": 93.0
           }
+        ],
+        "temperature": [
+          {
+            "time": "2026-09-03T04:00:00Z",
+            "value": 37.1
+          },
+          {
+            "time": "2026-09-03T04:15:00Z",
+            "value": 37.0
+          },
+          {
+            "time": "2026-09-03T04:30:00Z",
+            "value": 37.1
+          },
+          {
+            "time": "2026-09-03T04:45:00Z",
+            "value": 37.0
+          },
+          {
+            "time": "2026-09-03T05:00:00Z",
+            "value": 37.1
+          },
+          {
+            "time": "2026-09-03T05:15:00Z",
+            "value": 37.1
+          },
+          {
+            "time": "2026-09-03T05:30:00Z",
+            "value": 37.1
+          },
+          {
+            "time": "2026-09-03T05:45:00Z",
+            "value": 37.1
+          },
+          {
+            "time": "2026-09-03T06:00:00Z",
+            "value": 37.1
+          },
+          {
+            "time": "2026-09-03T06:15:00Z",
+            "value": 37.0
+          },
+          {
+            "time": "2026-09-03T06:30:00Z",
+            "value": 37.1
+          },
+          {
+            "time": "2026-09-03T06:45:00Z",
+            "value": 37.1
+          }
+        ],
+        "systolic": [
+          {
+            "time": "2026-09-03T06:40:00Z",
+            "value": 88,
+            "source": "nurse"
+          }
+        ],
+        "diastolic": [
+          {
+            "time": "2026-09-03T06:40:00Z",
+            "value": 52,
+            "source": "nurse"
+          }
         ]
       }
     },
@@ -844,6 +908,70 @@
           {
             "time": "2026-09-03T06:45:00Z",
             "value": 93.4
+          }
+        ],
+        "temperature": [
+          {
+            "time": "2026-09-03T04:00:00Z",
+            "value": 36.8
+          },
+          {
+            "time": "2026-09-03T04:15:00Z",
+            "value": 36.7
+          },
+          {
+            "time": "2026-09-03T04:30:00Z",
+            "value": 36.8
+          },
+          {
+            "time": "2026-09-03T04:45:00Z",
+            "value": 36.7
+          },
+          {
+            "time": "2026-09-03T05:00:00Z",
+            "value": 36.7
+          },
+          {
+            "time": "2026-09-03T05:15:00Z",
+            "value": 36.7
+          },
+          {
+            "time": "2026-09-03T05:30:00Z",
+            "value": 36.7
+          },
+          {
+            "time": "2026-09-03T05:45:00Z",
+            "value": 36.8
+          },
+          {
+            "time": "2026-09-03T06:00:00Z",
+            "value": 36.8
+          },
+          {
+            "time": "2026-09-03T06:15:00Z",
+            "value": 36.8
+          },
+          {
+            "time": "2026-09-03T06:30:00Z",
+            "value": 36.7
+          },
+          {
+            "time": "2026-09-03T06:45:00Z",
+            "value": 36.8
+          }
+        ],
+        "systolic": [
+          {
+            "time": "2026-09-03T06:25:00Z",
+            "value": 104,
+            "source": "nurse"
+          }
+        ],
+        "diastolic": [
+          {
+            "time": "2026-09-03T06:25:00Z",
+            "value": 68,
+            "source": "nurse"
           }
         ]
       }
@@ -1226,6 +1354,70 @@
             "time": "2026-09-03T06:45:00Z",
             "value": 94.3
           }
+        ],
+        "temperature": [
+          {
+            "time": "2026-09-03T04:00:00Z",
+            "value": 38.1
+          },
+          {
+            "time": "2026-09-03T04:15:00Z",
+            "value": 38.1
+          },
+          {
+            "time": "2026-09-03T04:30:00Z",
+            "value": 38.1
+          },
+          {
+            "time": "2026-09-03T04:45:00Z",
+            "value": 38.1
+          },
+          {
+            "time": "2026-09-03T05:00:00Z",
+            "value": 38.2
+          },
+          {
+            "time": "2026-09-03T05:15:00Z",
+            "value": 38.1
+          },
+          {
+            "time": "2026-09-03T05:30:00Z",
+            "value": 38.2
+          },
+          {
+            "time": "2026-09-03T05:45:00Z",
+            "value": 38.2
+          },
+          {
+            "time": "2026-09-03T06:00:00Z",
+            "value": 38.3
+          },
+          {
+            "time": "2026-09-03T06:15:00Z",
+            "value": 38.3
+          },
+          {
+            "time": "2026-09-03T06:30:00Z",
+            "value": 38.2
+          },
+          {
+            "time": "2026-09-03T06:45:00Z",
+            "value": 38.1
+          }
+        ],
+        "systolic": [
+          {
+            "time": "2026-09-03T06:20:00Z",
+            "value": 100,
+            "source": "nurse"
+          }
+        ],
+        "diastolic": [
+          {
+            "time": "2026-09-03T06:20:00Z",
+            "value": 62,
+            "source": "nurse"
+          }
         ]
       }
     },
@@ -1606,6 +1798,70 @@
           {
             "time": "2026-09-03T06:45:00Z",
             "value": 93.6
+          }
+        ],
+        "temperature": [
+          {
+            "time": "2026-09-03T04:00:00Z",
+            "value": 36.8
+          },
+          {
+            "time": "2026-09-03T04:15:00Z",
+            "value": 36.9
+          },
+          {
+            "time": "2026-09-03T04:30:00Z",
+            "value": 36.8
+          },
+          {
+            "time": "2026-09-03T04:45:00Z",
+            "value": 37.0
+          },
+          {
+            "time": "2026-09-03T05:00:00Z",
+            "value": 36.9
+          },
+          {
+            "time": "2026-09-03T05:15:00Z",
+            "value": 36.8
+          },
+          {
+            "time": "2026-09-03T05:30:00Z",
+            "value": 36.8
+          },
+          {
+            "time": "2026-09-03T05:45:00Z",
+            "value": 36.9
+          },
+          {
+            "time": "2026-09-03T06:00:00Z",
+            "value": 36.8
+          },
+          {
+            "time": "2026-09-03T06:15:00Z",
+            "value": 36.8
+          },
+          {
+            "time": "2026-09-03T06:30:00Z",
+            "value": 36.9
+          },
+          {
+            "time": "2026-09-03T06:45:00Z",
+            "value": 36.9
+          }
+        ],
+        "systolic": [
+          {
+            "time": "2026-09-03T06:10:00Z",
+            "value": 110,
+            "source": "nurse"
+          }
+        ],
+        "diastolic": [
+          {
+            "time": "2026-09-03T06:10:00Z",
+            "value": 70,
+            "source": "nurse"
           }
         ]
       }
@@ -1988,6 +2244,70 @@
             "time": "2026-09-03T06:45:00Z",
             "value": 93.7
           }
+        ],
+        "temperature": [
+          {
+            "time": "2026-09-03T04:00:00Z",
+            "value": 36.8
+          },
+          {
+            "time": "2026-09-03T04:15:00Z",
+            "value": 36.8
+          },
+          {
+            "time": "2026-09-03T04:30:00Z",
+            "value": 36.8
+          },
+          {
+            "time": "2026-09-03T04:45:00Z",
+            "value": 36.8
+          },
+          {
+            "time": "2026-09-03T05:00:00Z",
+            "value": 36.8
+          },
+          {
+            "time": "2026-09-03T05:15:00Z",
+            "value": 36.7
+          },
+          {
+            "time": "2026-09-03T05:30:00Z",
+            "value": 36.7
+          },
+          {
+            "time": "2026-09-03T05:45:00Z",
+            "value": 36.8
+          },
+          {
+            "time": "2026-09-03T06:00:00Z",
+            "value": 36.7
+          },
+          {
+            "time": "2026-09-03T06:15:00Z",
+            "value": 36.7
+          },
+          {
+            "time": "2026-09-03T06:30:00Z",
+            "value": 36.8
+          },
+          {
+            "time": "2026-09-03T06:45:00Z",
+            "value": 36.9
+          }
+        ],
+        "systolic": [
+          {
+            "time": "2026-09-03T06:05:00Z",
+            "value": 132,
+            "source": "nurse"
+          }
+        ],
+        "diastolic": [
+          {
+            "time": "2026-09-03T06:05:00Z",
+            "value": 84,
+            "source": "nurse"
+          }
         ]
       }
     },
@@ -2368,6 +2688,70 @@
           {
             "time": "2026-09-03T06:45:00Z",
             "value": 98.3
+          }
+        ],
+        "temperature": [
+          {
+            "time": "2026-09-03T04:00:00Z",
+            "value": 36.6
+          },
+          {
+            "time": "2026-09-03T04:15:00Z",
+            "value": 36.6
+          },
+          {
+            "time": "2026-09-03T04:30:00Z",
+            "value": 36.7
+          },
+          {
+            "time": "2026-09-03T04:45:00Z",
+            "value": 36.7
+          },
+          {
+            "time": "2026-09-03T05:00:00Z",
+            "value": 36.7
+          },
+          {
+            "time": "2026-09-03T05:15:00Z",
+            "value": 36.5
+          },
+          {
+            "time": "2026-09-03T05:30:00Z",
+            "value": 36.7
+          },
+          {
+            "time": "2026-09-03T05:45:00Z",
+            "value": 36.7
+          },
+          {
+            "time": "2026-09-03T06:00:00Z",
+            "value": 36.7
+          },
+          {
+            "time": "2026-09-03T06:15:00Z",
+            "value": 36.6
+          },
+          {
+            "time": "2026-09-03T06:30:00Z",
+            "value": 36.7
+          },
+          {
+            "time": "2026-09-03T06:45:00Z",
+            "value": 36.7
+          }
+        ],
+        "systolic": [
+          {
+            "time": "2026-09-03T06:35:00Z",
+            "value": 224,
+            "source": "nurse"
+          }
+        ],
+        "diastolic": [
+          {
+            "time": "2026-09-03T06:35:00Z",
+            "value": 118,
+            "source": "nurse"
           }
         ]
       }
@@ -2750,6 +3134,70 @@
             "time": "2026-09-03T06:45:00Z",
             "value": 94.3
           }
+        ],
+        "temperature": [
+          {
+            "time": "2026-09-03T04:00:00Z",
+            "value": 36.5
+          },
+          {
+            "time": "2026-09-03T04:15:00Z",
+            "value": 36.4
+          },
+          {
+            "time": "2026-09-03T04:30:00Z",
+            "value": 36.4
+          },
+          {
+            "time": "2026-09-03T04:45:00Z",
+            "value": 36.5
+          },
+          {
+            "time": "2026-09-03T05:00:00Z",
+            "value": 36.4
+          },
+          {
+            "time": "2026-09-03T05:15:00Z",
+            "value": 36.4
+          },
+          {
+            "time": "2026-09-03T05:30:00Z",
+            "value": 36.5
+          },
+          {
+            "time": "2026-09-03T05:45:00Z",
+            "value": 36.5
+          },
+          {
+            "time": "2026-09-03T06:00:00Z",
+            "value": 36.5
+          },
+          {
+            "time": "2026-09-03T06:15:00Z",
+            "value": 36.6
+          },
+          {
+            "time": "2026-09-03T06:30:00Z",
+            "value": 36.5
+          },
+          {
+            "time": "2026-09-03T06:45:00Z",
+            "value": 36.6
+          }
+        ],
+        "systolic": [
+          {
+            "time": "2026-09-03T06:15:00Z",
+            "value": 122,
+            "source": "nurse"
+          }
+        ],
+        "diastolic": [
+          {
+            "time": "2026-09-03T06:15:00Z",
+            "value": 76,
+            "source": "nurse"
+          }
         ]
       }
     },
@@ -3130,6 +3578,70 @@
           {
             "time": "2026-09-03T06:45:00Z",
             "value": 99.5
+          }
+        ],
+        "temperature": [
+          {
+            "time": "2026-09-03T04:00:00Z",
+            "value": 36.3
+          },
+          {
+            "time": "2026-09-03T04:15:00Z",
+            "value": 36.3
+          },
+          {
+            "time": "2026-09-03T04:30:00Z",
+            "value": 36.5
+          },
+          {
+            "time": "2026-09-03T04:45:00Z",
+            "value": 36.5
+          },
+          {
+            "time": "2026-09-03T05:00:00Z",
+            "value": 36.6
+          },
+          {
+            "time": "2026-09-03T05:15:00Z",
+            "value": 36.6
+          },
+          {
+            "time": "2026-09-03T05:30:00Z",
+            "value": 36.5
+          },
+          {
+            "time": "2026-09-03T05:45:00Z",
+            "value": 36.5
+          },
+          {
+            "time": "2026-09-03T06:00:00Z",
+            "value": 36.5
+          },
+          {
+            "time": "2026-09-03T06:15:00Z",
+            "value": 36.5
+          },
+          {
+            "time": "2026-09-03T06:30:00Z",
+            "value": 36.4
+          },
+          {
+            "time": "2026-09-03T06:45:00Z",
+            "value": 36.5
+          }
+        ],
+        "systolic": [
+          {
+            "time": "2026-09-03T06:30:00Z",
+            "value": 110,
+            "source": "nurse"
+          }
+        ],
+        "diastolic": [
+          {
+            "time": "2026-09-03T06:30:00Z",
+            "value": 70,
+            "source": "nurse"
           }
         ]
       }
@@ -3512,6 +4024,70 @@
             "time": "2026-09-03T06:45:00Z",
             "value": null
           }
+        ],
+        "temperature": [
+          {
+            "time": "2026-09-03T04:00:00Z",
+            "value": 36.4
+          },
+          {
+            "time": "2026-09-03T04:15:00Z",
+            "value": 36.5
+          },
+          {
+            "time": "2026-09-03T04:30:00Z",
+            "value": 36.4
+          },
+          {
+            "time": "2026-09-03T04:45:00Z",
+            "value": 36.4
+          },
+          {
+            "time": "2026-09-03T05:00:00Z",
+            "value": 36.4
+          },
+          {
+            "time": "2026-09-03T05:15:00Z",
+            "value": 36.4
+          },
+          {
+            "time": "2026-09-03T05:30:00Z",
+            "value": 36.4
+          },
+          {
+            "time": "2026-09-03T05:45:00Z",
+            "value": 36.4
+          },
+          {
+            "time": "2026-09-03T06:00:00Z",
+            "value": 36.3
+          },
+          {
+            "time": "2026-09-03T06:15:00Z",
+            "value": 36.4
+          },
+          {
+            "time": "2026-09-03T06:30:00Z",
+            "value": 36.4
+          },
+          {
+            "time": "2026-09-03T06:45:00Z",
+            "value": null
+          }
+        ],
+        "systolic": [
+          {
+            "time": "2026-09-03T06:00:00Z",
+            "value": 106,
+            "source": "nurse"
+          }
+        ],
+        "diastolic": [
+          {
+            "time": "2026-09-03T06:00:00Z",
+            "value": 68,
+            "source": "nurse"
+          }
         ]
       }
     },
@@ -3892,6 +4468,70 @@
           {
             "time": "2026-09-03T06:45:00Z",
             "value": 98.5
+          }
+        ],
+        "temperature": [
+          {
+            "time": "2026-09-03T04:00:00Z",
+            "value": 36.5
+          },
+          {
+            "time": "2026-09-03T04:15:00Z",
+            "value": 36.5
+          },
+          {
+            "time": "2026-09-03T04:30:00Z",
+            "value": 36.5
+          },
+          {
+            "time": "2026-09-03T04:45:00Z",
+            "value": 36.5
+          },
+          {
+            "time": "2026-09-03T05:00:00Z",
+            "value": 36.5
+          },
+          {
+            "time": "2026-09-03T05:15:00Z",
+            "value": 36.4
+          },
+          {
+            "time": "2026-09-03T05:30:00Z",
+            "value": 36.4
+          },
+          {
+            "time": "2026-09-03T05:45:00Z",
+            "value": 36.4
+          },
+          {
+            "time": "2026-09-03T06:00:00Z",
+            "value": 36.5
+          },
+          {
+            "time": "2026-09-03T06:15:00Z",
+            "value": 36.4
+          },
+          {
+            "time": "2026-09-03T06:30:00Z",
+            "value": 36.5
+          },
+          {
+            "time": "2026-09-03T06:45:00Z",
+            "value": 36.5
+          }
+        ],
+        "systolic": [
+          {
+            "time": "2026-09-03T05:55:00Z",
+            "value": 118,
+            "source": "nurse"
+          }
+        ],
+        "diastolic": [
+          {
+            "time": "2026-09-03T05:55:00Z",
+            "value": 72,
+            "source": "nurse"
           }
         ]
       }
@@ -4465,6 +5105,22 @@
             "synthetic": true,
             "tier": null
           }
+        },
+        "rhythm": {
+          "data": {
+            "present": false,
+            "reason": "not_recorded"
+          },
+          "provenance": {
+            "computed_at": null,
+            "model_id": null,
+            "observed_at": "2026-09-03T07:00:00Z",
+            "quality": "missing",
+            "source": "nurse",
+            "synthetic": true,
+            "tier": null
+          },
+          "source_text": "Simulated rhythm state, not detected from an ECG"
         }
       }
     },
@@ -4943,6 +5599,22 @@
             "synthetic": true,
             "tier": null
           }
+        },
+        "rhythm": {
+          "data": {
+            "present": false,
+            "reason": "not_recorded"
+          },
+          "provenance": {
+            "computed_at": null,
+            "model_id": null,
+            "observed_at": "2026-09-03T07:00:00Z",
+            "quality": "missing",
+            "source": "nurse",
+            "synthetic": true,
+            "tier": null
+          },
+          "source_text": "Simulated rhythm state, not detected from an ECG"
         }
       }
     },
@@ -5421,6 +6093,22 @@
             "synthetic": true,
             "tier": null
           }
+        },
+        "rhythm": {
+          "data": {
+            "present": false,
+            "reason": "not_recorded"
+          },
+          "provenance": {
+            "computed_at": null,
+            "model_id": null,
+            "observed_at": "2026-09-03T07:00:00Z",
+            "quality": "missing",
+            "source": "nurse",
+            "synthetic": true,
+            "tier": null
+          },
+          "source_text": "Simulated rhythm state, not detected from an ECG"
         }
       }
     },
@@ -5885,6 +6573,22 @@
             "synthetic": true,
             "tier": null
           }
+        },
+        "rhythm": {
+          "data": {
+            "present": false,
+            "reason": "not_recorded"
+          },
+          "provenance": {
+            "computed_at": null,
+            "model_id": null,
+            "observed_at": "2026-09-03T07:00:00Z",
+            "quality": "missing",
+            "source": "nurse",
+            "synthetic": true,
+            "tier": null
+          },
+          "source_text": "Simulated rhythm state, not detected from an ECG"
         }
       }
     },
@@ -6335,6 +7039,22 @@
             "synthetic": true,
             "tier": null
           }
+        },
+        "rhythm": {
+          "data": {
+            "present": false,
+            "reason": "not_recorded"
+          },
+          "provenance": {
+            "computed_at": null,
+            "model_id": null,
+            "observed_at": "2026-09-03T07:00:00Z",
+            "quality": "missing",
+            "source": "nurse",
+            "synthetic": true,
+            "tier": null
+          },
+          "source_text": "Simulated rhythm state, not detected from an ECG"
         }
       }
     },
@@ -6765,6 +7485,22 @@
             "synthetic": true,
             "tier": null
           }
+        },
+        "rhythm": {
+          "data": {
+            "present": false,
+            "reason": "not_recorded"
+          },
+          "provenance": {
+            "computed_at": null,
+            "model_id": null,
+            "observed_at": "2026-09-03T07:00:00Z",
+            "quality": "missing",
+            "source": "nurse",
+            "synthetic": true,
+            "tier": null
+          },
+          "source_text": "Simulated rhythm state, not detected from an ECG"
         }
       }
     },
@@ -7195,6 +7931,22 @@
             "synthetic": true,
             "tier": null
           }
+        },
+        "rhythm": {
+          "data": {
+            "present": false,
+            "reason": "not_recorded"
+          },
+          "provenance": {
+            "computed_at": null,
+            "model_id": null,
+            "observed_at": "2026-09-03T07:00:00Z",
+            "quality": "missing",
+            "source": "nurse",
+            "synthetic": true,
+            "tier": null
+          },
+          "source_text": "Simulated rhythm state, not detected from an ECG"
         }
       }
     },
@@ -7639,6 +8391,22 @@
             "synthetic": true,
             "tier": null
           }
+        },
+        "rhythm": {
+          "data": {
+            "present": false,
+            "reason": "not_recorded"
+          },
+          "provenance": {
+            "computed_at": null,
+            "model_id": null,
+            "observed_at": "2026-09-03T07:00:00Z",
+            "quality": "missing",
+            "source": "nurse",
+            "synthetic": true,
+            "tier": null
+          },
+          "source_text": "Simulated rhythm state, not detected from an ECG"
         }
       }
     },
@@ -8069,6 +8837,22 @@
             "synthetic": true,
             "tier": null
           }
+        },
+        "rhythm": {
+          "data": {
+            "present": false,
+            "reason": "not_recorded"
+          },
+          "provenance": {
+            "computed_at": null,
+            "model_id": null,
+            "observed_at": "2026-09-03T07:00:00Z",
+            "quality": "missing",
+            "source": "nurse",
+            "synthetic": true,
+            "tier": null
+          },
+          "source_text": "Simulated rhythm state, not detected from an ECG"
         }
       }
     },
@@ -8499,6 +9283,22 @@
             "synthetic": true,
             "tier": null
           }
+        },
+        "rhythm": {
+          "data": {
+            "present": false,
+            "reason": "not_recorded"
+          },
+          "provenance": {
+            "computed_at": null,
+            "model_id": null,
+            "observed_at": "2026-09-03T07:00:00Z",
+            "quality": "missing",
+            "source": "nurse",
+            "synthetic": true,
+            "tier": null
+          },
+          "source_text": "Simulated rhythm state, not detected from an ECG"
         }
       }
     }
@@ -8839,6 +9639,70 @@
             "time": "2026-09-03T06:45:00Z",
             "value": 96.7
           }
+        ],
+        "temperature": [
+          {
+            "time": "2026-09-03T04:00:00Z",
+            "value": 36.7
+          },
+          {
+            "time": "2026-09-03T04:15:00Z",
+            "value": 36.7
+          },
+          {
+            "time": "2026-09-03T04:30:00Z",
+            "value": 36.7
+          },
+          {
+            "time": "2026-09-03T04:45:00Z",
+            "value": 36.8
+          },
+          {
+            "time": "2026-09-03T05:00:00Z",
+            "value": 36.8
+          },
+          {
+            "time": "2026-09-03T05:15:00Z",
+            "value": 36.8
+          },
+          {
+            "time": "2026-09-03T05:30:00Z",
+            "value": 36.8
+          },
+          {
+            "time": "2026-09-03T05:45:00Z",
+            "value": 36.7
+          },
+          {
+            "time": "2026-09-03T06:00:00Z",
+            "value": 36.9
+          },
+          {
+            "time": "2026-09-03T06:15:00Z",
+            "value": 36.8
+          },
+          {
+            "time": "2026-09-03T06:30:00Z",
+            "value": 36.8
+          },
+          {
+            "time": "2026-09-03T06:45:00Z",
+            "value": 36.8
+          }
+        ],
+        "systolic": [
+          {
+            "time": "2026-09-03T07:00:00Z",
+            "value": null,
+            "source": "nurse"
+          }
+        ],
+        "diastolic": [
+          {
+            "time": "2026-09-03T07:00:00Z",
+            "value": null,
+            "source": "nurse"
+          }
         ]
       },
       "vital_trends": {
@@ -9019,6 +9883,22 @@
             "synthetic": true,
             "tier": null
           }
+        },
+        "rhythm": {
+          "data": {
+            "present": false,
+            "reason": "not_recorded"
+          },
+          "provenance": {
+            "computed_at": null,
+            "model_id": null,
+            "observed_at": "2026-09-03T07:00:00Z",
+            "quality": "missing",
+            "source": "nurse",
+            "synthetic": true,
+            "tier": null
+          },
+          "source_text": "Simulated rhythm state, not detected from an ECG"
         }
       }
     },
@@ -9355,6 +10235,70 @@
             "time": "2026-09-03T06:45:00Z",
             "value": null
           }
+        ],
+        "temperature": [
+          {
+            "time": "2026-09-03T04:00:00Z",
+            "value": null
+          },
+          {
+            "time": "2026-09-03T04:15:00Z",
+            "value": null
+          },
+          {
+            "time": "2026-09-03T04:30:00Z",
+            "value": null
+          },
+          {
+            "time": "2026-09-03T04:45:00Z",
+            "value": null
+          },
+          {
+            "time": "2026-09-03T05:00:00Z",
+            "value": null
+          },
+          {
+            "time": "2026-09-03T05:15:00Z",
+            "value": null
+          },
+          {
+            "time": "2026-09-03T05:30:00Z",
+            "value": null
+          },
+          {
+            "time": "2026-09-03T05:45:00Z",
+            "value": null
+          },
+          {
+            "time": "2026-09-03T06:00:00Z",
+            "value": null
+          },
+          {
+            "time": "2026-09-03T06:15:00Z",
+            "value": null
+          },
+          {
+            "time": "2026-09-03T06:30:00Z",
+            "value": null
+          },
+          {
+            "time": "2026-09-03T06:45:00Z",
+            "value": null
+          }
+        ],
+        "systolic": [
+          {
+            "time": "2026-09-03T06:15:00Z",
+            "value": 118,
+            "source": "nurse"
+          }
+        ],
+        "diastolic": [
+          {
+            "time": "2026-09-03T06:15:00Z",
+            "value": 74,
+            "source": "nurse"
+          }
         ]
       },
       "vital_trends": {
@@ -9538,6 +10482,22 @@
             "synthetic": true,
             "tier": null
           }
+        },
+        "rhythm": {
+          "data": {
+            "present": false,
+            "reason": "not_recorded"
+          },
+          "provenance": {
+            "computed_at": null,
+            "model_id": null,
+            "observed_at": "2026-09-03T07:00:00Z",
+            "quality": "missing",
+            "source": "nurse",
+            "synthetic": true,
+            "tier": null
+          },
+          "source_text": "Simulated rhythm state, not detected from an ECG"
         }
       }
     }

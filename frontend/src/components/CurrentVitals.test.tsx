@@ -143,3 +143,23 @@ describe("a value a nurse typed", () => {
     expect(html(base)).not.toContain(text);
   });
 });
+
+describe("Rhythm", () => {
+  const rhythm = (data: Vitals["rhythm"]["data"]): Vitals => ({
+    ...patients[0].vitals,
+    rhythm: { ...patients[0].vitals.rhythm, data, source_text: "Charted rhythm" },
+  });
+
+  it("writes Sinus or AF with its source text, in the label too", () => {
+    const sinus = html(rhythm({ present: true, value: "sinus" }));
+    expect(sinus).toContain("Sinus");
+    expect(sinus).toContain("Charted rhythm");
+    expect(html(rhythm({ present: true, value: "af" }))).toContain('aria-label="Rhythm AF. Charted rhythm"');
+  });
+
+  it("writes -- when it was never recorded", () => {
+    const out = html(rhythm({ present: false, reason: "not_recorded" }));
+    expect(out).toContain("Rhythm not recorded");
+    expect(out).toContain(">--<");
+  });
+});

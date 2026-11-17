@@ -141,6 +141,19 @@ class AcvpuMeasurement(Contract):
     provenance: Provenance
 
 
+class RhythmPresent(Contract):
+    present: Literal[True]
+    value: Literal["sinus", "af"]
+
+
+class RhythmMeasurement(Contract):
+    """Display-only rhythm observation; never a score or model input."""
+
+    data: Annotated[RhythmPresent | MeasurementAbsent, Field(discriminator="present")]
+    provenance: Provenance
+    source_text: str
+
+
 class Spo2ScalePresent(Contract):
     present: Literal[True]
     value: Spo2Scale

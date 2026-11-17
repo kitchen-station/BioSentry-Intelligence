@@ -28,7 +28,7 @@ DETAIL = {
 }  # fmt: skip
 VITALS = {
     "heart_rate", "respiratory_rate", "spo2", "temperature", "blood_pressure",
-    "consciousness", "supplemental_o2", "spo2_scale",
+    "consciousness", "supplemental_o2", "spo2_scale", "rhythm",
 }  # fmt: skip
 BASELINE = {"admission_known", "label", "params", "vitals"}
 
@@ -46,7 +46,9 @@ def test_the_context_holds_exactly_the_listed_keys_at_every_level() -> None:
     assert set(context) == TOP
     assert set(context["detail"]) == DETAIL
     assert set(context["detail"]["vitals"]) == VITALS
-    assert set(context["detail"]["vital_history"]) == {"heart_rate", "respiratory_rate", "spo2"}
+    assert set(context["detail"]["vital_history"]) == {
+        "heart_rate", "respiratory_rate", "spo2", "temperature", "systolic", "diastolic",
+    }
     assert set(context["baseline"]) == BASELINE
     assert set(context["baseline"]["params"]) == {"window_bins", "k", "p"}
     assert context["abstained"] is None and context["format"] == 1 and context["as_of"] == "2026-09-03T07:00:00Z"
@@ -60,7 +62,8 @@ PATHS = (
     | {f"detail.escalation_reasons[].{k}" for k in ("rule", "text", "pathway")}
     | {f"detail.vitals.*.data.{k}" for k in ("present", "value", "reason", "value.systolic", "value.diastolic")}
     | {f"detail.vitals.*.provenance.{k}" for k in PROVENANCE}
-    | {f"detail.vital_history.*[].{k}" for k in ("time", "value")}
+    | {f"detail.vital_history.*[].{k}" for k in ("time", "value", "source")}
+    | {"detail.vitals.*.source_text"}
     | {"baseline.admission_known", "baseline.label"}
     | {f"baseline.params.{k}" for k in ("window_bins", "k", "p")}
     | {
@@ -139,11 +142,16 @@ def test_the_history_is_the_last_72_hours_with_gaps_kept() -> None:
         "heart_rate": bins([70, 71, None, 73]),
         "respiratory_rate": bins([None, None, None, None]),
         "spo2": bins([95, 96, 97, 98]),
+        "temperature": bins([36.5, 36.6, None, 36.8]),
+        "systolic": [{**b, "source": "nurse"} for b in bins([120, 121, None, 123])],
+        "diastolic": [{**b, "source": "nurse"} for b in bins([80, 81, None, 83])],
     }
     got = build(detail(vital_history=history), None, AS_OF).model_dump(mode="json")["detail"]["vital_history"]
     assert [b["value"] for b in got["heart_rate"]] == [71, None, 73]  # the bin at the edge stays
     assert [b["value"] for b in got["respiratory_rate"]] == [None, None, None]
     assert len(got["spo2"]) == 3
+    assert [b["value"] for b in got["temperature"]] == [36.6, None, 36.8]
+    assert [b["value"] for b in got["systolic"]] == [121, None, 123]
 
 
 def test_the_hash_is_the_documented_expression_on_the_parsed_text() -> None:

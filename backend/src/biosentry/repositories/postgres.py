@@ -44,7 +44,7 @@ NURSE_VALID = timedelta(hours=12)
 OUT_OF_DATE = "out_of_date"
 TREND_BINS = 12
 DEVICE_VITALS = ("heart_rate", "respiratory_rate", "spo2", "temperature")
-VITALS = (*DEVICE_VITALS, "blood_pressure", "consciousness", "supplemental_o2", "spo2_scale")
+VITALS = (*DEVICE_VITALS, "blood_pressure", "consciousness", "supplemental_o2", "spo2_scale", "rhythm")
 LABS = tuple(name for name in LabPanel.model_fields if name != "freshness_hours")
 HISTORY_VITALS = ("heart_rate", "respiratory_rate", "spo2")
 CHARTED_VITALS = ("blood_pressure", "consciousness", "supplemental_o2", "spo2_scale")
@@ -54,6 +54,7 @@ Conn = psycopg.Connection[dict[str, Any]]
 _VALUE: dict[str, Callable[[dict[str, Any]], Any]] = {
     "blood_pressure": lambda r: {"systolic": int(r["num"]), "diastolic": int(r["num2"])},
     "consciousness": lambda r: r["txt"],
+    "rhythm": lambda r: r["txt"],
     "supplemental_o2": lambda r: bool(r["num"]),
     "spo2_scale": lambda r: int(r["num"]),
 }
@@ -482,9 +483,14 @@ class PostgresStore:
     # --- reading a patient ---------------------------------------------------------------------
 
     def _measurement(self, code: str, row: dict[str, Any] | None) -> dict[str, Any]:
+        rhythm = {"source_text": (
+            "Simulated rhythm state, not detected from an ECG"
+            if self.synthetic else "Charted rhythm" if row is None or row["source"] == "nurse" else "Device rhythm observation"
+        )} if code == "rhythm" else {}
         if row is None:  # nothing was ever recorded: missing is missing (I1)
             device = code in DEVICE_VITALS
             return {
+                **rhythm,
                 "data": {"present": False, "reason": "not_recorded"},
                 "provenance": {
                     "source": "device" if device else "nurse",
@@ -502,6 +508,7 @@ class PostgresStore:
             else {"present": True, "value": _VALUE.get(code, lambda r: r["num"])(row)}
         )
         return {
+            **rhythm,
             "data": data,
             "provenance": {
                 "source": row["source"],
@@ -559,7 +566,8 @@ class PostgresStore:
         """The patient's stored state. `history` False: only the last TREND_BINS bins of each vital are
         read and `vital_history` is empty. That is all a card, a list row of an unranked unit or an open
         view needs; the models and the patient page need the whole history. None: the whole history for
-        a patient of a ranked unit (the models need it), the short read for any other."""
+        a patient of a ranked unit (the models need it), the short read for any other. Only True also reads
+        the blood-pressure history (systolic and diastolic): it is shown on the patient page, not scored."""
         # ponytail: the reads below are not one snapshot, so a batch landing mid-read can mix two
         # sim minutes in one patient. Upgrade: a read transaction (BEGIN) around each request.
         p = self.conn.execute(
@@ -567,6 +575,7 @@ class PostgresStore:
         ).fetchone()
         if p is None:
             return None
+        page = history is True  # asked for outright, not defaulted from the unit: only then is the BP history read
         if history is None:
             history = self.units[p["unit"]]["kind"] == "ranked"
         by_code: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -605,6 +614,20 @@ class PostgresStore:
         for b in self.conn.execute(recent, args):
             bins[b["vital"]] = list(zip(b["at"], b["value"]))
 
+        pressure = list(self.conn.execute(
+            "SELECT observed_at, num, num2, absent_reason, source FROM observation"
+            " WHERE run_id = %s AND patient_id = %s AND code = 'blood_pressure'"
+            " AND source IN ('nurse', 'device') AND observed_at <= %s"
+            # The same window as the bins above: from the start of the earliest bin, up to the run's now.
+            " AND observed_at >= COALESCE((SELECT min(bin_at) - interval '15 minutes' FROM vital_bin"
+            " WHERE run_id = %s AND patient_id = %s), '-infinity') ORDER BY observed_at, id",
+            (self.run_id, patient_id, self.now(), self.run_id, patient_id),
+        )) if page else []  # only the patient's own page needs it: the ward list reads with None
+        pressure_history = {
+            name: [{"time": r["observed_at"], "value": r[column] if r["absent_reason"] is None else None,
+                    "source": r["source"]} for r in pressure]
+            for name, column in (("systolic", "num"), ("diastolic", "num2"))
+        }
         run_now = self.now()
         ages = [
             max(0.0, (run_now - r["observed_at"]).total_seconds()) / 3600
@@ -644,10 +667,9 @@ class PostgresStore:
                 # Built, not validated point by point: a week is 672 bins of each vital, and the values
                 # come from columns that already hold only what the contract allows.
                 "vital_history": {
-                    v: [VitalHistory.model_construct(time=at, value=value) for at, value in bins[v]]
-                    if history
-                    else []
-                    for v in HISTORY_VITALS
+                    **{v: [VitalHistory.model_construct(time=at, value=value) for at, value in bins[v]]
+                       if history else [] for v in DEVICE_VITALS},
+                    **pressure_history,
                 },
                 "labs": labs,
                 "signal_quality": p["signal_quality"],
@@ -664,7 +686,7 @@ class PostgresStore:
 
     def temperature_bins(self, ids: Iterable[str]) -> dict[str, list[VitalHistory]]:
         """The stored temperature bins of these patients, in bin order, in ONE statement. For the
-        models only: temperature is not in HISTORY_VITALS and not in any response."""
+        models only, independently of the display history."""
         return {
             r["patient_id"]: [VitalHistory.model_construct(time=t, value=v) for t, v in zip(r["at"], r["value"])]
             for r in self.conn.execute(

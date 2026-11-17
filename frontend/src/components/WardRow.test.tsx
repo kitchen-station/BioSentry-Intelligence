@@ -283,3 +283,23 @@ describe("the complete ranked row", () => {
     expect(screen.queryByText("NEWS2 2, no trigger")).toBeNull();
   });
 });
+
+describe("the AF tag", () => {
+  const withRhythm = (data: ScoreRow["vitals"]["rhythm"]["data"]): ScoreRow => ({
+    ...row,
+    vitals: { ...row.vitals, rhythm: { ...row.vitals.rhythm, data, source_text: "Charted rhythm" } },
+  });
+  const tag = (r: ScoreRow) => {
+    const { container } = render(<MemoryRouter><WardRow row={r} role="rn" now={due} ageOffsetS={0} /></MemoryRouter>);
+    return [...container.querySelectorAll(".hw-tag")].find((e) => e.textContent === "AF");
+  };
+
+  it("shows for af, with its source", () => {
+    expect(tag(withRhythm({ present: true, value: "af" }))?.getAttribute("title")).toBe("Charted rhythm");
+  });
+
+  it("does not show for sinus or a missing rhythm", () => {
+    expect(tag(withRhythm({ present: true, value: "sinus" }))).toBeUndefined();
+    expect(tag(withRhythm({ present: false, reason: "not_recorded" }))).toBeUndefined();
+  });
+});

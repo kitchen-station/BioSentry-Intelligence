@@ -827,7 +827,26 @@ describe("PatientDetail trends on the page", () => {
     expect(spo2.limits).toEqual([{ at: 96, label: "+1 point below 96" }]); // scale 1
     expect([95, 96].map(spo2.highlightWhere!)).toEqual([true, false]);
     expect(trends.closest("[data-hw-space]")).toBeNull(); // no space: the points stretch keeps the default (red) highlight
-    expect(within(trends).getByText("Charts show patch data only. Values entered by a nurse are not plotted.")).toBeTruthy();
+    expect(within(trends).getByText("Heart rate, respiratory rate, SpO2 and temperature are patch data. Blood pressure shows cuff and nurse readings, each labelled with its source.")).toBeTruthy();
+  });
+
+  it("charts temperature in °C and blood pressure in mmHg with sourced systolic and diastolic lines, gaps kept", async () => {
+    const reading = (time: string, value: number | null, source: "nurse" | "device") => ({ time, value, source });
+    const sys = [reading("2026-09-03T04:00:00Z", 118, "nurse"), reading("2026-09-03T05:00:00Z", null, "device"), reading("2026-09-03T06:00:00Z", 124, "device")];
+    const dia = [reading("2026-09-03T04:00:00Z", 70, "nurse"), reading("2026-09-03T05:00:00Z", null, "device"), reading("2026-09-03T06:00:00Z", 76, "device")];
+    api.getPatient.mockResolvedValue({ ...base, vital_history: { ...base.vital_history, systolic: sys, diastolic: dia } });
+    page();
+    await loaded();
+    const trends = screen.getByRole("region", { name: "Trends" });
+    expect(within(trends).getByRole("heading", { level: 3, name: /^Temperature / })).toBeTruthy();
+    expect(last("Temperature").format!(37.1)).toBe("37.1 °C");
+    const bp = vi.mocked(trend).mock.calls.map(([, c]) => c).filter((c) => c.series[0].name === "Systolic").at(-1)!;
+    expect(bp.series.map((s) => s.name)).toEqual(["Systolic", "Diastolic"]);
+    expect(bp.series[0].values).toEqual([118, null, 124]); // the gap stays null
+    expect(bp.series[1].values).toEqual([70, null, 76]);
+    expect(bp.format!(120)).toBe("120 mmHg");
+    expect(bp.x[0]).toMatch(/nurse$/);
+    expect(bp.x[2]).toMatch(/device$/);
   });
 
   it("filters the stored readings with 1 h, 6 h, 24 h and Stay, counted from the newest", async () => {

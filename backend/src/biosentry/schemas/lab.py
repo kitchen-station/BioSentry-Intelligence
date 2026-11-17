@@ -150,7 +150,7 @@ class PatientContextDetail(Contract):
     vitals: Vitals
     signal_quality: Percent | None
     last_update_s: NonNegNum | None
-    vital_history: VitalHistoryFull  # the last 72 hours, gaps kept as null
+    vital_history: VitalHistoryFull  # five vitals over 72 hours, including sourced cuff readings; null gaps kept
 
 
 class PatientContextBaseline(Contract):

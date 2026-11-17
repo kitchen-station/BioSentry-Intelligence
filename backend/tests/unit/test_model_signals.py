@@ -71,6 +71,7 @@ def state(**over: Any) -> UnscoredPatient:
     s["admitted_at"] = T0 - timedelta(hours=1)
     h = pts(**over.pop("points", {}))
     s["vital_history"] = {v: [{"time": p.time, "value": p.value} for p in h[v]] for v in VITALS[:3]}
+    s["vital_history"].update(temperature=[], systolic=[], diastolic=[])
     s.update(over)
     return UnscoredPatient.model_validate(s), h["temperature"]
 
@@ -229,3 +230,24 @@ def test_the_check_takes_its_numbers_from_the_loaded_calibration() -> None:
     assert check_calibrated(cal, cal.q) is Check.NOT_SURE
     assert check_calibrated(cal, cal.q + 1e-9) is Check.ALERT
     assert check_calibrated(replace(cal, q=None), 0.9) is Check.NOT_SURE
+
+
+def test_rhythm_changes_neither_the_news2_score_nor_the_model_results() -> None:
+    """Rhythm is display-only: the same patient with sinus, af or no rhythm scores identically."""
+    st, temperature = state()
+    results = []
+    for rhythm in ({"present": True, "value": "sinus"}, {"present": True, "value": "af"}, absent("not_recorded")):
+        vitals = type(st.vitals).model_validate(
+            {**st.vitals.model_dump(), "rhythm": {**st.vitals.rhythm.model_dump(), "data": rhythm}}
+        )
+        results.append(model_signals(st.model_copy(update={"vitals": vitals}), temperature, charted(), MODELS,
+                                     run_id=7, computed_at=NOW))
+    assert results[0] == results[1] == results[2]
+
+
+def test_nothing_that_scores_or_ranks_reads_rhythm() -> None:
+    src = Path(__file__).resolve().parents[2] / "src" / "biosentry"
+    for part in ("domain", "services"):
+        for f in (src / part).rglob("*.py"):
+            text = f.read_text(encoding="utf-8").replace("start_arrhythmia", "")
+            assert "rhythm" not in text.replace("arrhythmic", ""), f

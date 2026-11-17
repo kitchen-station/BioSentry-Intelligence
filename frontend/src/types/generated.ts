@@ -1168,6 +1168,22 @@ export interface components {
             readonly rank: number;
             readonly score: number;
         };
+        /**
+         * RhythmMeasurement
+         * @description Display-only rhythm observation; never a score or model input.
+         */
+        readonly RhythmMeasurement: {
+            readonly data: components["schemas"]["RhythmPresent"] | components["schemas"]["MeasurementAbsent"];
+            readonly provenance: components["schemas"]["Provenance"];
+            readonly source_text: string;
+        };
+        /** RhythmPresent */
+        readonly RhythmPresent: {
+            /** @constant */
+            readonly present: true;
+            /** @enum {string} */
+            readonly value: "sinus" | "af";
+        };
         /** RowModels */
         readonly RowModels: {
             readonly prediction: components["schemas"]["ModelSignal"];
@@ -1236,6 +1252,16 @@ export interface components {
             readonly source: "simulation";
             /** Format: date-time */
             readonly start: string;
+        };
+        /**
+         * SourcedVitalHistory
+         * @description One timestamped nurse or cuff reading; null is an explicit missing observation.
+         */
+        readonly SourcedVitalHistory: {
+            readonly source: components["schemas"]["ProvenanceSource"];
+            /** Format: date-time */
+            readonly time: string;
+            readonly value: number | null;
         };
         /**
          * Spo2Scale
@@ -1348,9 +1374,12 @@ export interface components {
         };
         /** VitalHistoryFull */
         readonly VitalHistoryFull: {
+            readonly diastolic: readonly components["schemas"]["SourcedVitalHistory"][];
             readonly heart_rate: readonly components["schemas"]["VitalHistory"][];
             readonly respiratory_rate: readonly components["schemas"]["VitalHistory"][];
             readonly spo2: readonly components["schemas"]["VitalHistory"][];
+            readonly systolic: readonly components["schemas"]["SourcedVitalHistory"][];
+            readonly temperature: readonly components["schemas"]["VitalHistory"][];
         };
         /** Vitals */
         readonly Vitals: {
@@ -1358,6 +1387,7 @@ export interface components {
             readonly consciousness: components["schemas"]["AcvpuMeasurement"];
             readonly heart_rate: components["schemas"]["NumberMeasurement"];
             readonly respiratory_rate: components["schemas"]["NumberMeasurement"];
+            readonly rhythm: components["schemas"]["RhythmMeasurement"];
             readonly spo2: components["schemas"]["NumberMeasurement"];
             readonly spo2_scale: components["schemas"]["Spo2ScaleMeasurement"];
             readonly supplemental_o2: components["schemas"]["FlagMeasurement"];
@@ -1545,12 +1575,15 @@ export type QuestionDetail = components['schemas']['QuestionDetail'];
 export type QuestionItem = components['schemas']['QuestionItem'];
 export type ResearchAbstained = components['schemas']['ResearchAbstained'];
 export type ResearchRow = components['schemas']['ResearchRow'];
+export type RhythmMeasurement = components['schemas']['RhythmMeasurement'];
+export type RhythmPresent = components['schemas']['RhythmPresent'];
 export type RowModels = components['schemas']['RowModels'];
 export type ScoreRow = components['schemas']['ScoreRow'];
 export type Session = components['schemas']['Session'];
 export type SessionRole = components['schemas']['SessionRole'];
 export type Sex = components['schemas']['Sex'];
 export type SimulatedEpisode = components['schemas']['SimulatedEpisode'];
+export type SourcedVitalHistory = components['schemas']['SourcedVitalHistory'];
 export type Spo2Scale = components['schemas']['Spo2Scale'];
 export type Spo2ScaleMeasurement = components['schemas']['Spo2ScaleMeasurement'];
 export type Spo2ScalePresent = components['schemas']['Spo2ScalePresent'];

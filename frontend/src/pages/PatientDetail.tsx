@@ -17,6 +17,7 @@ import { CurrentVitals, VitalRow } from "../components/CurrentVitals";
 import { TrendChart, drawable } from "../components/TrendChart";
 import { formatAge, formatClock, formatClockSeconds, formatSimClock, patchInUse } from "../components/format";
 import { useLivePoll } from "../components/useLivePoll";
+import { PressureChart } from "../components/PressureChart";
 import { addsPoints, chartLimits, zeroBand, type Charted } from "../components/news2";
 import { band, driftResponse, obsDue, response } from "../components/risk";
 import { openAssistant } from "../components/roles";
@@ -49,7 +50,10 @@ const LAB_ROWS = [
   ["inr", "INR", ""],
 ] as const;
 
-// The three charted vitals, each on a clinical y-range rather than from zero.
+// Temperature has no NEWS2 line drawn on its chart here; blood pressure is the PressureChart.
+const EXTRA_CHARTS = [{ key: "temperature", label: "Temperature", unit: "°C", range: [35, 41] as [number, number] }] as const;
+
+// The three NEWS2-charted vitals, each on a clinical y-range rather than from zero.
 const CHARTS: readonly { key: Charted; label: string; unit: string; range: [number, number] }[] = [
   { key: "heart_rate", label: "Heart rate", unit: "bpm", range: [40, 140] },
   { key: "respiratory_rate", label: "Respiratory rate", unit: "/min", range: [8, 30] },
@@ -64,7 +68,7 @@ const SPAN_MS: Record<Span, number> = { "1h": 3_600_000, "6h": 6 * 3_600_000, "2
  * The stored readings within `ms` of the newest one. Counted from the newest reading, not the clock: the
  * last hour of a patch that stopped still shows, and its times say when.
  */
-export function lastSpan(points: readonly VitalHistory[], ms: number): readonly VitalHistory[] {
+export function lastSpan<T extends VitalHistory>(points: readonly T[], ms: number): readonly T[] {
   if (ms === Infinity) return points;
   const end = Math.max(...points.map((p) => Date.parse(p.time)).filter(Number.isFinite));
   return points.filter((p) => Date.parse(p.time) > end - ms);
@@ -423,10 +427,27 @@ function Patient({ id, session, onSignOut }: Props & { id: string | undefined })
           <p key={key} className={styles.quiet}>{label}: no stored readings in this range.</p>
         );
       })}
+      {EXTRA_CHARTS.map(({ key, label, unit, range }) => {
+        const data = lastSpan(patient.vital_history[key], SPAN_MS[span]);
+        return drawable(data) ? (
+          <TrendChart key={key} data={data} label={label} unit={unit} range={range} />
+        ) : (
+          <p key={key} className={styles.quiet}>{label}: no stored readings in this range.</p>
+        );
+      })}
+      {(() => {
+        const sys = lastSpan(patient.vital_history.systolic, SPAN_MS[span]);
+        const keep = new Set(sys.map((p) => p.time));
+        return sys.length >= 2 ? (
+          <PressureChart systolic={sys} diastolic={patient.vital_history.diastolic.filter((p) => keep.has(p.time))} />
+        ) : (
+          <p className={styles.quiet}>Blood pressure: no stored readings in this range.</p>
+        );
+      })()}
       {CHARTS.some(({ key }) => bandOf(key)) && (
         <p className="hw-caption">Own baseline: this patient's own baseline (synthetic, not validated). Not a normal range.</p>
       )}
-      <p className="hw-caption">Charts show patch data only. Values entered by a nurse are not plotted.</p>
+      <p className="hw-caption">Heart rate, respiratory rate, SpO2 and temperature are patch data. Blood pressure shows cuff and nurse readings, each labelled with its source.</p>
     </section>
   );
 

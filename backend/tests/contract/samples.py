@@ -171,6 +171,15 @@ def vitals() -> dict[str, Any]:
         "consciousness": measurement(present("A")),
         "supplemental_o2": measurement(absent("not_recorded")),
         "spo2_scale": measurement(absent("not_recorded")),
+        "rhythm": {**measurement(absent("not_recorded")), "source_text": "Charted rhythm"},
+    }
+
+
+def full_history() -> dict[str, Any]:
+    point = {"time": "2026-09-03T06:30:00Z", "value": 97}
+    return {
+        **{k: [point] for k in ("heart_rate", "respiratory_rate", "spo2", "temperature")},
+        **{k: [{**point, "source": "nurse"}] for k in ("systolic", "diastolic")},
     }
 
 
@@ -236,10 +245,7 @@ def unscored() -> dict[str, Any]:
     )  # fmt: skip
     state = {key: row[key] for key in keys}
     state["admitted_at"] = "2026-09-03T04:00:00Z"
-    state["vital_history"] = {
-        k: [{"time": "2026-09-03T06:30:00Z", "value": 97}]
-        for k in ("heart_rate", "respiratory_rate", "spo2")
-    }
+    state["vital_history"] = full_history()
     return state
 
 
@@ -297,10 +303,7 @@ _BUILDERS: dict[type[BaseModel], Any] = {
     VitalHistory: lambda: {"time": "2026-09-03T06:30:00Z", "value": 97},
     Vitals: vitals,
     VitalTrends: vital_trends,
-    VitalHistoryFull: lambda: {
-        k: [{"time": "2026-09-03T06:30:00Z", "value": 97}]
-        for k in ("heart_rate", "respiratory_rate", "spo2")
-    },
+    VitalHistoryFull: lambda: full_history(),
     BaselineUsed: lambda: {"window_bins": 24, "k": 2.0, "p": 3},
     BaselineComputed: lambda: {
         "vital": "heart_rate",
@@ -370,10 +373,7 @@ _BUILDERS: dict[type[BaseModel], Any] = {
     WardUnit: lambda: {"id": "ER", "name": "Emergency Room", "floor": 0, "kind": "shown", "patients": 3},
     AbstainedDetail: lambda: {
         **abstained_row(),
-        "vital_history": {
-            k: [{"time": "2026-09-03T06:30:00Z", "value": 97}]
-            for k in ("heart_rate", "respiratory_rate", "spo2")
-        },
+        "vital_history": full_history(),
         "now": "2026-09-03T07:00:00Z",
     },
     WardResponse: lambda: {
@@ -396,10 +396,7 @@ _BUILDERS: dict[type[BaseModel], Any] = {
     },
     PatientDetail: lambda: {
         **score_row(),
-        "vital_history": {
-            k: [{"time": "2026-09-03T06:30:00Z", "value": 97}]
-            for k in ("heart_rate", "respiratory_rate", "spo2")
-        },
+        "vital_history": full_history(),
         "tier_breakdown": {
             "tier_a": {"score": 9, "label": "NEWS2 9"},
         },

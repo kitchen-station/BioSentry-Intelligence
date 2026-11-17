@@ -8,6 +8,8 @@ from .common import (
     BloodPressureMeasurement,
     FlagMeasurement,
     NumberMeasurement,
+    RhythmMeasurement,
+    ProvenanceSource,
     Spo2ScaleMeasurement,
 )
 
@@ -17,6 +19,12 @@ class VitalHistory(Contract):
 
     time: AwareDatetime  # END of the 15-minute bin, ISO 8601 with a timezone
     value: Num | None
+
+
+class SourcedVitalHistory(VitalHistory):
+    """One timestamped nurse or cuff reading; null is an explicit missing observation."""
+
+    source: ProvenanceSource
 
 
 class Vitals(Contract):
@@ -29,6 +37,7 @@ class Vitals(Contract):
     # NEWS2 inputs the original contract lacked (D3). Nurse-sourced, provenance required.
     supplemental_o2: FlagMeasurement
     spo2_scale: Spo2ScaleMeasurement
+    rhythm: RhythmMeasurement
 
 
 class VitalTrends(Contract):
@@ -44,6 +53,9 @@ class VitalHistoryFull(Contract):
     heart_rate: list[VitalHistory]
     respiratory_rate: list[VitalHistory]
     spo2: list[VitalHistory]
+    temperature: list[VitalHistory]
+    systolic: list[SourcedVitalHistory]
+    diastolic: list[SourcedVitalHistory]
 
 
 class LabPanel(Contract):
