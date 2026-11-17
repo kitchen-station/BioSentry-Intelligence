@@ -12,10 +12,10 @@ import { Research } from "./Research";
 
 afterEach(cleanup);
 
-const show = (at = "/") =>
+const show = (at = "/", role: "md" | "admin" = "admin") =>
   render(
     <MemoryRouter initialEntries={[at]}>
-      <Research session={{ clinician_id: "md-santos", ward: "W4", role: "md" }} onSignOut={() => {}} />
+      <Research session={{ clinician_id: "md-santos", ward: "W4", role }} onSignOut={() => {}} />
     </MemoryRouter>,
   );
 
@@ -262,9 +262,16 @@ describe("Research page", () => {
     for (const r of RUN_COMPARISON) for (const s of [r.v1, r.v2]) expect(s.lo <= s.anyAll && s.anyAll <= s.hi, r.id).toBe(true);
   });
 
-  it("has the research agent section under its own heading", () => {
+  it("has the recorded run under its own heading, for an admin only", () => {
     show();
-    expect(screen.getByRole("heading", { level: 2, name: "Research agent: questions asked on the simulated ward" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Recorded run: questions asked on the simulated ward" })).toBeTruthy();
+    expect(screen.getByText(/uses the Ask button/)).toBeTruthy();
+    cleanup();
+    show("/", "md");
+    expect(screen.queryByRole("heading", { level: 2, name: /Recorded run/ })).toBeNull();
+    expect(document.getElementById("agent")).toBeNull();
+    cleanup();
+    show();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 

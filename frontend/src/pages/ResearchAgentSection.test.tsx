@@ -38,7 +38,7 @@ describe("research agent section", () => {
     show();
     expect(screen.getByText("Proposal P-0001")).toBeTruthy();
     expect(screen.getByText("Signed off by Unattended demo run - not a person, then applied to the models folder that run was given.")).toBeTruthy();
-    expect(screen.getByText(/This page cannot ask it anything yet/)).toBeTruthy();
+    expect(screen.getByText(/This page cannot ask anything/)).toBeTruthy();
     expect(screen.getByText(/typed by the unattended run, not by a doctor/)).toBeTruthy();
     expect(screen.getByRole("heading", { level: 3, name: "Proposals" })).toBeTruthy();
     expect(screen.getByText(/^Source: The run's ledger, committed as research\/agent\/records\/pr19-run\/ledger\.jsonl \(sha256 340e0bcc/).textContent).toMatch(/ 21 ledger records, copied from the ledger's export \(frontend\/src\/data\/evaluation\/research-agent\.json\), 2026-11-13\.$/);
