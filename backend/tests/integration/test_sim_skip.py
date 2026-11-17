@@ -15,7 +15,7 @@ SKIP = {"kind": "skip", "minutes": 60}
 
 def test_each_allowed_value_goes_on_the_feed_with_its_minutes_for_the_whole_run(api: Api) -> None:
     run_id = start(api)
-    who_sent = ("md-santos", "rn-manalo", "md-aquino", "md-santos")
+    who_sent = ("md-santos", "rn-manalo", "rn-manalo", "md-santos")  # the two who may steer the whole run
     for who, minutes in zip(who_sent, ALLOWED, strict=True):
         assert command(api, who, kind="skip", minutes=minutes).status_code == 204
         row = sent(api, run_id)[-1]

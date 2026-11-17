@@ -434,6 +434,7 @@ class Actions(Contract):
 
 
 SKIP_MINUTES = (60, 360, 720, 1440)  # +1 h, +6 h, +12 h, +1 day
+WHOLE_RUN_KINDS = ("set_speed", "reset", "skip")  # commands that act on the whole shared run, not on a unit or patient
 
 
 class NewCommand(Contract):
@@ -460,7 +461,7 @@ class NewCommand(Contract):
             raise ValueError("speed is 0, 1, 10 or 60")
         if self.minutes not in (None, *SKIP_MINUTES):
             raise ValueError("minutes is 60, 360, 720 or 1440")
-        patient = self.kind not in ("set_speed", "reset", "skip")
+        patient = self.kind not in WHOLE_RUN_KINDS
         if (
             (self.patient_id is not None) != patient
             or (self.speed is not None) != (self.kind == "set_speed")

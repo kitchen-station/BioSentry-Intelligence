@@ -96,6 +96,7 @@ from biosentry.schemas.ingest import (
     LiveWard,
     NewCommand,
     NewRun,
+    WHOLE_RUN_KINDS,
 )
 from biosentry.schemas.lab import LabJob, LabReport, PatientQuestionJob, QuestionJob
 from biosentry.schemas.analytics import HOURS_MAX, OpenWardAnalytics
@@ -571,6 +572,9 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
             ctx.audit.append(who, "sim_command", ward, "not_found")
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         if not ctx.store.can_control(who):
+            ctx.audit.append(who, "sim_command", ward, "denied")
+            raise HTTPException(status_code=403, detail="Forbidden")
+        if body.kind in WHOLE_RUN_KINDS and not ctx.store.can_steer_run(who):  # these act on the whole shared run
             ctx.audit.append(who, "sim_command", ward, "denied")
             raise HTTPException(status_code=403, detail="Forbidden")
         member(ctx, who, "sim_command", ward)
