@@ -44,7 +44,7 @@ function Segmented<T extends string>({ label, value, options, onChange }: {
 }) {
   const name = useId();
   return (
-    <fieldset className="hw-segmented hw-segmented--sm">
+    <fieldset className="hw-segmented hw-segmented--sm hw-segmented--accent">
       <legend className="hw-visually-hidden">{label}</legend>
       {options.map(([v, text]) => (
         <label key={v}>

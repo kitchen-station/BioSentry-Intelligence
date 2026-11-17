@@ -1,8 +1,14 @@
 /* The row is the kit's hw-ranklist__row. This file adds what the kit leaves to the app:
-   overdue observations in red, and the table's data age (Ward.tsx), red once stale or offline. */
+   overdue observations in red, the table's data age (Ward.tsx) red once stale or offline,
+   and the app's sparkline scaled to the width the kit gives its slot (64px, 48px on laptops). */
 
 .obs[data-overdue],
 .age[data-stale] {
   font-weight: var(--hw-weight-bold);
   color: var(--hw-graph-emergency-text);
+}
+
+.spark > svg {
+  width: 100%;
+  height: 100%;
 }

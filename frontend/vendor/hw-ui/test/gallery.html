@@ -152,6 +152,10 @@
       <label><input class="hw-segmented__input" type="radio" name="speed"><span class="hw-segmented__option">10×</span></label>
       <label><input class="hw-segmented__input" type="radio" name="speed"><span class="hw-segmented__option">60×</span></label>
     </fieldset>
+    <fieldset class="hw-segmented hw-segmented--sm hw-segmented--accent"><legend class="hw-visually-hidden">Row density</legend>
+      <label><input class="hw-segmented__input" type="radio" name="density" checked><span class="hw-segmented__option">Comfortable</span></label>
+      <label><input class="hw-segmented__input" type="radio" name="density"><span class="hw-segmented__option">Compact</span></label>
+    </fieldset>
     <div>
       <label class="hw-field__label" for="vol">Alert threshold</label>
       <div class="hw-slider-field"><input class="hw-slider" type="range" id="vol" min="0" max="10" value="4"><output class="hw-slider-field__value" for="vol"></output></div>
@@ -262,11 +266,12 @@
     <div class="hw-cluster" id="scores">
       <div class="hw-score" data-band="high" role="img" aria-label="NEWS2 9, High, rising" id="score-high"><span class="hw-score__value">9</span><span class="hw-score__band">High<i class="hw-icon fa-solid fa-arrow-up" aria-hidden="true"></i></span></div>
       <div class="hw-score" data-band="medium" role="img" aria-label="NEWS2 5, Medium" id="score-medium"><span class="hw-score__value">5</span><span class="hw-score__band">Medium</span></div>
-      <div class="hw-score" data-band="medium" role="img" aria-label="NEWS2 3, Low-medium"><span class="hw-score__value">3</span><span class="hw-score__band">Low-medium</span></div>
+      <div class="hw-score" data-band="medium" data-long role="img" aria-label="NEWS2 3, Low-medium"><span class="hw-score__value">3</span><span class="hw-score__band">Low-medium</span></div>
       <div class="hw-score" data-band="low" role="img" aria-label="NEWS2 1, Low" id="score-low"><span class="hw-score__value">1</span><span class="hw-score__band">Low</span></div>
       <div class="hw-score hw-score--sm" data-band="high" role="img" aria-label="NEWS2 9, High" id="score-sm"><span class="hw-score__value">9</span><span class="hw-score__band">High</span></div>
       <div class="hw-score hw-score--sm" data-band="medium" role="img" aria-label="NEWS2 5, Medium"><span class="hw-score__value">5</span><span class="hw-score__band">Medium</span></div>
       <div class="hw-score hw-score--sm" data-band="low" role="img" aria-label="NEWS2 0, Low"><span class="hw-score__value">0</span><span class="hw-score__band">Low</span></div>
+      <div class="hw-score hw-score--sm" data-band="medium" data-long role="img" aria-label="NEWS2 3, Low-medium"><span class="hw-score__value">3</span><span class="hw-score__band">Low-medium</span></div>
       <div class="hw-score hw-score--sm" data-band="high" role="img" aria-label="NEWS2 7, High"><span class="hw-score__value">7</span></div>
     </div>
     <div class="hw-filter" role="group" aria-label="Filter patients" id="filter">

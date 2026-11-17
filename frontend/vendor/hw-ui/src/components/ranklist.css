@@ -30,9 +30,15 @@
                    button.hw-button.hw-button--ghost.hw-button--icon.hw-ranklist__open[aria-label="Open Santos, Maria"] > i.fa-chevron-right
      Boolean attributes (data-alert, data-stale, data-weak) count when present; ="false" counts as absent.
      Compact: 56px rows, no sparklines, chips, context, "by nurse", signal or obs.
-     Cards: score, name and age on top, response line, vitals in one line with labels, Acknowledge full width. */
+     Cards: score, name and age on top, response line, vitals in one line with labels, Acknowledge full width.
+     Rows from 1200px; from 1200 to 1365px the same columns run tighter (narrower vitals, shorter sparklines,
+     smaller gaps) so the action column stays in view without a sideways scroll. */
   .hw-ranklist-wrap, .hw-ranklist {
     --hw-ranklist-cols: 32px 64px minmax(250px, 1fr) 112px 112px 112px 84px 52px 132px 150px;
+    --hw-ranklist-gap: var(--hw-space-5);
+    --hw-ranklist-pad: 20px;
+    --hw-ranklist-spark-width: 64px;
+    --hw-ranklist-action-pad: 20px;
   }
   .hw-ranklist[data-density="compact"], .hw-ranklist-wrap:has(> .hw-ranklist[data-density="compact"]) {
     --hw-ranklist-cols: 32px 100px minmax(250px, 1fr) 56px 56px 56px 84px 52px 132px 150px;
@@ -115,7 +121,7 @@
     --hw-ranklist-dot: var(--hw-graph-emergency);
   }
   .hw-ranklist__vital:is([data-points="2"], [data-points="3"]) { --hw-ranklist-value-weight: var(--hw-weight-bold); }
-  .hw-ranklist__spark { display: none; flex-shrink: 0; width: 64px; height: 24px; overflow: visible; }
+  .hw-ranklist__spark { display: none; flex-shrink: 0; width: var(--hw-ranklist-spark-width); height: 24px; overflow: visible; }
   .hw-ranklist__spark polyline { fill: none; stroke: var(--hw-graph-context); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
   .hw-ranklist__spark circle { fill: var(--hw-ranklist-dot); }
   .hw-ranklist__label { font-size: var(--hw-text-caption); color: var(--hw-color-text-muted); }
@@ -153,10 +159,10 @@
     .hw-ranklist__head, .hw-ranklist__row {
       display: grid;
       grid-template-columns: var(--hw-ranklist-cols);
-      column-gap: var(--hw-space-5);
+      column-gap: var(--hw-ranklist-gap);
       align-items: center;
       min-width: min-content;
-      padding-inline: 20px;
+      padding-inline: var(--hw-ranklist-pad);
     }
     .hw-ranklist__head { padding-block: 10px; font-size: var(--hw-text-caption); color: var(--hw-color-text-muted); }
     .hw-ranklist__head > :first-child { text-align: center; }
@@ -185,6 +191,7 @@
     .hw-ranklist__action { display: flex; margin-top: 0; }
     .hw-ranklist__action > .hw-button {
       --hw-button-height: var(--hw-control-height);
+      --hw-button-pad: var(--hw-ranklist-action-pad);
 
       width: auto;
     }
@@ -192,5 +199,19 @@
 
     /* Compact: the same columns, less in each. */
     .hw-ranklist[data-density="compact"] :is(.hw-ranklist__spark, .hw-ranklist__context, .hw-ranklist__reasons, .hw-ranklist__by, .hw-ranklist__signal, .hw-ranklist__obs) { display: none; }
+  }
+
+  /* Laptops (1200 to 1365px): about 1110px of rows instead of 1284, so a 1280px screen shows Acknowledge. */
+  @media (1200px <= width < 1366px) {
+    .hw-ranklist-wrap, .hw-ranklist {
+      --hw-ranklist-cols: 28px 64px minmax(220px, 1fr) 92px 92px 92px 76px 48px 116px 144px;
+      --hw-ranklist-gap: var(--hw-space-4);
+      --hw-ranklist-pad: var(--hw-space-5);
+      --hw-ranklist-spark-width: 48px;
+      --hw-ranklist-action-pad: 14px;
+    }
+    .hw-ranklist[data-density="compact"], .hw-ranklist-wrap:has(> .hw-ranklist[data-density="compact"]) {
+      --hw-ranklist-cols: 28px 100px minmax(220px, 1fr) 52px 52px 56px 76px 48px 116px 144px;
+    }
   }
 }

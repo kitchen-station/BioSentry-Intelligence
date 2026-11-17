@@ -4,7 +4,9 @@
        > span.hw-score__value + span.hw-score__band (+ i.hw-icon.fa-solid.fa-arrow-up when rising)
      Sizes: default 60px (54px below 576px), --sm 40px with the band beside the tile.
      In --sm, leave out .hw-score__band where the band is already written next to it (the alert tray line).
-     "Low-medium" (a single parameter at 3) is data-band="medium" with that word in the band. */
+     "Low-medium" (a single parameter at 3) is data-band="medium" with that word in the band, and data-long on the
+     tile: the word breaks after its hyphen onto two lines ("Low-" / "medium"), inside the tile (the number moves up
+     to make room) and beside the --sm tile, which so stays within 100px with its word. */
   .hw-score {
     --hw-score-bg: var(--hw-color-fill-disabled);
     --hw-score-fg: var(--hw-color-text);
@@ -20,6 +22,8 @@
     --hw-score-band-inset: 7px;
     --hw-score-band-font: var(--hw-font-size-11);
     --hw-score-band-fg: var(--hw-score-fg);
+    --hw-score-band-wrap: nowrap;
+    --hw-score-band-max: none;
 
     display: inline-grid;
     flex-shrink: 0;
@@ -68,8 +72,9 @@
     font-size: var(--hw-score-band-font);
     font-weight: var(--hw-weight-bold);
     line-height: 1.1;
+    max-width: var(--hw-score-band-max);
     color: var(--hw-score-band-fg);
-    white-space: nowrap;
+    white-space: var(--hw-score-band-wrap);
   }
   .hw-score__band > .hw-icon { --hw-icon-size: 1em; width: 1em; }
 
@@ -87,7 +92,21 @@
     --hw-score-band-fg: var(--hw-score-word);
   }
 
+  .hw-score[data-long] {
+    --hw-score-band-font: 10px;
+    --hw-score-band-wrap: normal;
+    --hw-score-band-max: min-content;
+    --hw-score-band-inset: 5px;
+    --hw-score-lift: 22px;
+  }
+  .hw-score--sm[data-long] {
+    --hw-score-band-font: var(--hw-text-caption);
+    --hw-score-band-inset: 0;
+    --hw-score-lift: 0;
+  }
+
   @media (width >= 576px) {
     .hw-score:not(.hw-score--sm) { --hw-score-size: 60px; --hw-score-font: 28px; --hw-score-band-inset: 9px; }
+    .hw-score[data-long]:not(.hw-score--sm) { --hw-score-band-inset: 6px; --hw-score-lift: 24px; }
   }
 }

@@ -18,6 +18,7 @@ export function Score({ score, band, rising = false, small = false, bandWord = t
     <div
       className={small ? "hw-score hw-score--sm" : "hw-score"}
       data-band={band === "low-medium" ? "medium" : band}
+      data-long={band === "low-medium" || undefined}
       role="img"
       aria-label={`NEWS2 ${score}, ${word}${rising ? ", rising" : ""}`}
     >

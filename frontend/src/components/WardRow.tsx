@@ -69,7 +69,7 @@ function Vital({ name, label, unit, said, points, trend, children }: {
   return (
     <div className="hw-ranklist__vital" role="img" aria-label={said === null ? `${name} not recorded` : `${name} ${said}${unit}${adds}`} data-points={p}>
       {trend && (
-        <span className="hw-ranklist__spark" aria-hidden="true">
+        <span className={`hw-ranklist__spark ${styles.spark}`} aria-hidden="true">
           <Sparkline data={trend} width={64} height={24} color="var(--trace-hr)" />
         </span>
       )}
