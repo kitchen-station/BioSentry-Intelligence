@@ -238,6 +238,25 @@ def test_the_record_names_each_kind(kind):
     assert json.loads(body(fake)["record_json"])["kind"] == kind
 
 
+@pytest.mark.parametrize("q, kind", [("which vitals drive NEWS2", "news2_vitals"),
+                                     ("what happened in their last runs", "baseline_runs")])
+def test_new_rule_answers_round_trip_without_patient_identifiers(q, kind):
+    fake = Fake(job(question=q))
+    go(fake)
+    report = body(fake)
+    assert report["state"] == "done"
+    record = json.loads(report["record_json"])
+    assert record["kind"] == kind and record["agent"]["ask"] == "keywords"
+    for secret in ("Test Person", "B4", "p-1", "cardiac"):
+        assert secret not in report["answer"] + report["record_json"]
+
+
+def test_shift_question_round_trips_as_a_refusal():
+    fake = Fake(job(question="what changed since last shift"))
+    go(fake)
+    assert body(fake) == {"state": "refused", "reason": worker.R_SHIFT}
+
+
 # The body the dashboard session's API returned for one claim (seeded patient p-001), and the hash it stored at ask time.
 SAMPLE = json.loads((Path(__file__).parent / "data" / "patient_question_job.json").read_text(encoding="utf-8"))
 SAMPLE_SHA256 = "4ae3a9251c5a8adfff7fa31573af60abcabf38cee1493db92ed5b5bb0a33521b"

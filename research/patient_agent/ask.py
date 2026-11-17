@@ -1,4 +1,4 @@
-"""A clinician's question about ONE patient. A keyword matcher picks one of four fixed kinds; the answer is
+"""A clinician's question about ONE patient. A keyword matcher picks a fixed kind; the answer is
 fixed sentences filled from this patient's data only. The data is outside input: every type is checked, and every
 text field of it is quoted and capped, never read as an instruction. Nothing is written or kept."""
 
@@ -21,7 +21,7 @@ OWN = "this patient's own baseline"
 STALE_AGE_S = 1200
 NO_BASELINE = "The data for this patient holds no baseline at this time."
 FIXED = ("NEWS2", "SpO2", "15-minute")
-KINDS = ("own_baseline", "recent_change", "why_rank", "active_alerts")
+KINDS = ("own_baseline", "recent_change", "why_rank", "active_alerts", "news2_vitals", "baseline_runs")
 VITALS = ("heart_rate", "respiratory_rate", "spo2", "temperature", "systolic_bp")
 NAMES = {"heart_rate": "Heart rate", "respiratory_rate": "Respiratory rate", "spo2": "SpO2", "temperature": "Temperature",
          "systolic_bp": "Systolic blood pressure"}
@@ -41,9 +41,11 @@ REFUSALS = {
                "earlier alerts." + _NOT_ANSWERED,
     "followed": "The data this agent gets holds no alert history and no NEWS2 over time, so it cannot say whether an "
                 "alert was followed by a deterioration." + _NOT_ANSWERED,
+    "shift": "The data this agent gets holds no shift boundary. Ask for changes over a number of hours instead." + _NOT_ANSWERED,
     "none": "I can answer four things about this patient's own data: (1) the patient's own baseline for a vital, and how the latest value compares with it; "
             "(2) what changed in the vital history in the last hours; (3) why the patient has this rank; "
-            "(4) which alerts are active." + _NOT_ANSWERED,
+            "(4) which alerts are active; (5) the current readings available alongside NEWS2; "
+            "(6) the current baseline run state recorded in this data." + _NOT_ANSWERED,
 }
 UNGROUNDED = "I did not answer: a number in my answer is not in this patient's data.\n" + LAST
 BAD_DATA = "I did not answer: the data for this patient has a shape that this agent does not accept.\n" + LAST
@@ -96,9 +98,14 @@ _KIND = {
     "recent_change": re.compile(r"\bchang\w*|\brecent\w*|\bhours?\b"),
     "why_rank": re.compile(r"\brank\w*|\bflagged\b|\bon the list\b|\bpriority\b|\bhigh on\b"),
     "active_alerts": re.compile(r"\balerts?\b|\balarms?\b|\bescalat\w*"),
+    "news2_vitals": re.compile(r"\bnews ?2\b.{0,40}\b(?:vitals?|driv\w*|contribut\w*|components?|breakdown)\b"
+                               r"|\b(?:vitals?|driv\w*|contribut\w*|components?)\b.{0,40}\bnews ?2\b"),
+    "baseline_runs": re.compile(r"\b(?:last|latest|recent)\s+(?:baseline\s+)?runs?\b|\bbaseline\s+runs?\b"),
 }
 PHRASES = {"own_baseline": "this patient's own baseline", "recent_change": "what changed in this patient's vital history",
-           "why_rank": "why this patient has this rank", "active_alerts": "which alerts are active for this patient"}
+           "why_rank": "why this patient has this rank", "active_alerts": "which alerts are active for this patient",
+           "news2_vitals": "the current readings available alongside this patient's NEWS2 total",
+           "baseline_runs": "the current baseline run state recorded for this patient"}
 _VITAL = {
     "heart_rate": re.compile(r"\bhr\b|heart[ -]?rate|heart ?beat|\bpulse\b"),
     "respiratory_rate": re.compile(r"\brr\b|resp(?:iratory)?[ -]?rate|breathing rate|\brespiration\b"),
@@ -153,6 +160,8 @@ def _refusal(question: object) -> str | None:
         return "outside"
     if _HIST.search(t):
         return "history"
+    if re.search(r"\b(?:last|previous|current) shift\b|\bsince (?:the )?shift\b", t):
+        return "shift"
     return None
 
 
@@ -180,6 +189,10 @@ def match(question: str) -> tuple[str | None, dict | str]:
     kinds = [k for k, rx in _KIND.items() if rx.search(t)]
     if kinds == ["own_baseline", "recent_change"] and not re.search(r"\bhours?\b|\brecent\w*", t):
         kinds = ["own_baseline"]  # "has the pulse changed from her baseline?" asks about the baseline
+    if "baseline_runs" in kinds:
+        kinds = ["baseline_runs"] if set(kinds) <= {"baseline_runs", "own_baseline", "recent_change"} else kinds
+    if "news2_vitals" in kinds:
+        kinds = ["news2_vitals"] if set(kinds) <= {"news2_vitals", "why_rank"} else kinds
     if len(kinds) != 1:
         return None, "none"
     plain, kind, named = _plain(t), kinds[0], _named(t)
@@ -471,6 +484,52 @@ def _rank(w: _Out, detail: dict) -> list[str]:
             "The system gives this supporting text:\n" + w.q(_need(detail, "supporting")), *_reasons(w, detail)]
 
 
+def _news2_vitals(w: _Out, detail: dict) -> list[str]:
+    vitals = _dict(_need(detail, "vitals"))
+    out = [f"The NEWS2 total is {w.n(_int(_need(detail, 'score'), 0, 20))}.",
+           "These current vital readings are in this patient's data:"]
+    for vital in ("heart_rate", "respiratory_rate", "spo2", "temperature"):
+        data = _dict(_need(_dict(_need(vitals, vital)), "data"))
+        present = data.get("present")
+        if type(present) is not bool:
+            raise Bad
+        out.append(f"{NAMES[vital]}: {w.n(_need(data, 'value'))}." if present else f"{NAMES[vital]}: no reading is present.")
+    pressure = _dict(_need(_dict(_need(vitals, "blood_pressure")), "data"))
+    if pressure.get("present") is True:
+        out.append(f"Systolic blood pressure: {w.n(_need(_dict(_need(pressure, 'value')), 'systolic'))}.")
+    elif pressure.get("present") is False:
+        out.append("Systolic blood pressure: no reading is present.")
+    else:
+        raise Bad
+    out.append("This data has no NEWS2 component scores, so I cannot say which reading contributed how much to the total.")
+    return out
+
+
+def _baseline_runs(w: _Out, base: object) -> list[str]:
+    if base is None:
+        return [NO_BASELINE, "The data holds no history of earlier baseline runs."]
+    entries = _list(_need(_dict(base), "vitals"))
+    out = ["The data holds the latest baseline run state for each vital, not a history of earlier runs."]
+    for item in entries:
+        e = _dict(item)
+        vital = _word(e.get("vital"), VITALS)
+        status = _word(e.get("status"), ("computed", "forming", "unavailable"))
+        if status != "computed":
+            out.append(f"{NAMES[vital]}: baseline {status}.")
+            continue
+        significant = e.get("significant")
+        if type(significant) is not bool:
+            raise Bad
+        line = f"{NAMES[vital]}: the current deviation run has {w.n(_int(_need(e, 'run_bins'), 0))} consecutive 15-minute values."
+        if e.get("since") is not None:
+            line += f" It started at {w.t(e['since'])}."
+        line += " Its change is significant." if significant else " Its change is not significant."
+        if e.get("direction") is not None:
+            line += f" Its direction is {_word(e['direction'], ('rising', 'falling', 'stable', 'new'))}."
+        out.append(line)
+    return out
+
+
 def _shape(patient: object) -> tuple[dict, bool]:
     """(the one row that is set, whether it is the abstained row). Exactly one of detail and abstained is set."""
     p = _dict(patient)
@@ -499,8 +558,12 @@ def build(kind: str, args: dict, patient: dict) -> tuple[str, list[str]]:
             lines = _changes(w, args, data)
         elif kind == "why_rank":
             lines = _rank(w, data)
-        else:
+        elif kind == "active_alerts":
             lines = [*_reasons(w, data), "The data holds no history of earlier alerts."]
+        elif kind == "news2_vitals":
+            lines = _news2_vitals(w, data)
+        else:
+            lines = _baseline_runs(w, patient["baseline"])
     return "\n".join([FIRST, *lines, f"I answered only this: {phrase}. I used nothing else in the question.", LAST]), w.used
 
 
@@ -518,6 +581,11 @@ def _roots(kind: str, args: dict, patient: dict) -> list:
         return [d["vital_history"][x] for x in ([v] if v else HISTORY) if x in HISTORY]
     if kind == "why_rank":
         return [d["rank"], d["score"], d["supporting"], d["escalation_reasons"]]
+    if kind == "news2_vitals":
+        return [d["score"], *[d["vitals"][x]["data"] for x in
+                              ("heart_rate", "respiratory_rate", "spo2", "temperature", "blood_pressure")]]
+    if kind == "baseline_runs":
+        return [] if patient["baseline"] is None else [patient["baseline"]["vitals"]]
     return [d["escalation_reasons"]]
 
 
