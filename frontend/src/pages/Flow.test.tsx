@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PatientStay } from "../types";
@@ -115,6 +115,12 @@ describe("Flow page", () => {
     await screen.findByRole("heading", { name: "Recent movement" });
     expect(screen.getAllByRole("img", { name: "Cruz, Ana, Transferred" })).toHaveLength(1);
     expect(screen.getAllByRole("img", { name: "Cruz, Ana, Died" })).toHaveLength(1);
+    // Each has its own mark, and the key names it.
+    expect(screen.getByRole("img", { name: "Cruz, Ana, Died" }).getAttribute("data-outcome")).toBe("died");
+    const key = within(screen.getByRole("region", { name: "Bed timeline" })).getByRole("list");
+    expect(within(key).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
+      "On the ward", "Discharged", "Higher care", "Transferred", "Died",
+    ]);
   });
 
   it("counts the last day against the ward's time, not the browser's", async () => {

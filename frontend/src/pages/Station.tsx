@@ -1,8 +1,18 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type FormEvent,
+  type InputHTMLAttributes,
+  type KeyboardEvent,
+  type ReactNode,
+  type SelectHTMLAttributes,
+} from "react";
 import type { Session, AdmitPatientInput, LabExtractionResult, PatientExtractionResult } from "../types";
 import { admitPatient, enterLabResults, extractLabsFromFile, extractPatientFromFile, listAllPatients } from "../api";
+import { AppShell } from "../components/AppShell";
 import { SimulatedNote } from "../components/LabFrame";
-import { SessionMenu } from "../components/SessionMenu";
 import { FlowSection } from "./Flow";
 import styles from "./Station.module.css";
 
@@ -20,61 +30,116 @@ const PHYSICIANS = [
 
 type Section = "admit" | "labs" | "upload" | "flow";
 
+const TABS: Array<{ id: Section; label: string }> = [
+  { id: "admit", label: "Admit patient" },
+  { id: "labs", label: "Enter lab results" },
+  { id: "upload", label: "Upload" },
+  { id: "flow", label: "Patient flow" },
+];
+
 export function Station({ session, onSignOut }: Props) {
   const [section, setSection] = useState<Section>("admit");
 
+  // On a phone the tab list scrolls sideways: keep the selected tab in view.
+  useEffect(() => {
+    document.getElementById(`station-tab-${section}`)?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [section]);
+
+  // WAI-ARIA tabs, automatic activation: arrows, Home and End select a tab and move focus to it.
+  // Only the selected panel is mounted, so switching drops whatever was typed in the other.
+  const onTabKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    const i = TABS.findIndex((t) => t.id === section);
+    const to = ({ ArrowLeft: i - 1, ArrowRight: i + 1, Home: 0, End: -1 } as Record<string, number>)[e.key];
+    if (to === undefined) return;
+    e.preventDefault();
+    const n = (to + TABS.length) % TABS.length;
+    setSection(TABS[n].id);
+    (e.currentTarget.children[n] as HTMLElement).focus();
+  };
+
   return (
-    <div className={styles.page}>
-      <div className={styles.statusBar}>
-        <div className={styles.statusInner}>
-          <div className={styles.statusLeft}>
-            <span className={styles.statusLabel}>BioSentry</span>
-            <span className={styles.statusValue}>Station &middot; Ward {session.ward}</span>
-          </div>
-          <div className={styles.statusRight}>
-            <SessionMenu session={session} onSignOut={onSignOut} />
-          </div>
+    <AppShell session={session} onSignOut={onSignOut} title={`Station · Ward ${session.ward}`}>
+      <SimulatedNote />
+      <div className={`hw-tabs ${styles.container}`}>
+        <div className="hw-tabs__list" role="tablist" aria-label="Station" onKeyDown={onTabKey}>
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              id={`station-tab-${t.id}`}
+              className="hw-tabs__tab"
+              aria-selected={section === t.id}
+              aria-controls="station-panel"
+              tabIndex={section === t.id ? 0 : -1}
+              onClick={() => setSection(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div className="hw-tabs__panel" role="tabpanel" id="station-panel" aria-labelledby={`station-tab-${section}`}>
+          {section === "admit" && <AdmitForm />}
+          {section === "labs" && <LabForm />}
+          {section === "upload" && <UploadForm />}
+          {section === "flow" && <FlowSection />}
         </div>
       </div>
-      <SimulatedNote />
+    </AppShell>
+  );
+}
 
-      <div className={`${styles.tabBar} ${section === "flow" ? styles.wide : ""}`}>
-        <button
-          type="button"
-          className={`${styles.tab} ${section === "admit" ? styles.tabActive : ""}`}
-          onClick={() => setSection("admit")}
-        >
-          Admit patient
-        </button>
-        <button
-          type="button"
-          className={`${styles.tab} ${section === "labs" ? styles.tabActive : ""}`}
-          onClick={() => setSection("labs")}
-        >
-          Enter lab results
-        </button>
-        <button
-          type="button"
-          className={`${styles.tab} ${section === "upload" ? styles.tabActive : ""}`}
-          onClick={() => setSection("upload")}
-        >
-          Upload
-        </button>
-        <button
-          type="button"
-          className={`${styles.tab} ${section === "flow" ? styles.tabActive : ""}`}
-          onClick={() => setSection("flow")}
-        >
-          Patient flow
-        </button>
-      </div>
+// --- Kit fields: every label names its control ---
 
-      <main className={`${styles.container} ${section === "flow" ? styles.wide : ""}`}>
-        {section === "admit" && <AdmitForm />}
-        {section === "labs" && <LabForm />}
-        {section === "upload" && <UploadForm />}
-        {section === "flow" && <FlowSection />}
-      </main>
+type FieldProps = { label: string; wide?: boolean };
+
+function InputField({ label, wide, ...input }: FieldProps & InputHTMLAttributes<HTMLInputElement>) {
+  const id = useId();
+  return (
+    <div className={`hw-field hw-field--full ${wide ? styles.wide : ""}`}>
+      <label className="hw-field__label" htmlFor={id}>{label}</label>
+      <div className="hw-input"><input id={id} className="hw-input__control" {...input} /></div>
+    </div>
+  );
+}
+
+function SelectField({ label, wide, ...select }: FieldProps & SelectHTMLAttributes<HTMLSelectElement>) {
+  const id = useId();
+  return (
+    <div className={`hw-field hw-field--full ${wide ? styles.wide : ""}`}>
+      <label className="hw-field__label" htmlFor={id}>{label}</label>
+      <div className="hw-input"><select id={id} className="hw-input__control" {...select} /></div>
+    </div>
+  );
+}
+
+/** One titled group of fields. */
+function Card({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="hw-card hw-card--outlined">
+      <h2 className={`hw-card__title ${styles.cardTitle}`}>{title}</h2>
+      <div className={styles.fields}>{children}</div>
+    </section>
+  );
+}
+
+/** What was saved. No role, as before: the page does not announce it. */
+function Saved({ text, onDismiss }: { text: string; onDismiss: () => void }) {
+  return (
+    <div className={`hw-alert hw-alert--success ${styles.banner}`}>
+      <span className="hw-alert__icon hw-icon fa-solid fa-circle-check" aria-hidden="true" />
+      <span className="hw-alert__body">{text}</span>
+      <button type="button" className="hw-close" onClick={onDismiss}>&times;</button>
+    </div>
+  );
+}
+
+/** A panel's own title and lead line. */
+function Head({ title, children }: { title: string; children?: ReactNode }) {
+  return (
+    <div className={styles.head}>
+      <h1 className="hw-heading hw-heading--4">{title}</h1>
+      {children}
     </div>
   );
 }
@@ -101,6 +166,7 @@ function AdmitForm() {
   const [avpu, setAvpu] = useState("");
   const [result, setResult] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const contextId = useId();
 
   const canSubmit = lastName.trim() && firstName.trim() && dob && age && sex && bed.trim() && chiefComplaint.trim() && context.trim();
 
@@ -152,133 +218,69 @@ function AdmitForm() {
 
   return (
     <form className={styles.form} onSubmit={handleSubmit}>
-      <p className={styles.formTitle}>Admit patient</p>
-      <p className={styles.formSub}>
-        New patients start NOT RANKED. This is a synthetic ward: never enter a real patient's details.
-      </p>
+      <Head title="Admit patient">
+        <p className="hw-text-muted">
+          New patients start NOT RANKED. This is a synthetic ward: never enter a real patient's details.
+        </p>
+      </Head>
 
-      {result && (
-        <div className={styles.successBanner}>
-          {result}
-          <button type="button" className={styles.dismissBtn} onClick={() => setResult(null)}>&times;</button>
-        </div>
-      )}
+      {result && <Saved text={result} onDismiss={() => setResult(null)} />}
 
-      <p className={styles.sectionDivider}>Patient identity</p>
-
-      <div className={styles.fieldRow}>
-        <div className={styles.field}>
-          <label className={styles.label}>Last name</label>
-          <input className={styles.input} value={lastName} onChange={(e) => setLastName(e.target.value)} required />
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>First name</label>
-          <input className={styles.input} value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>Middle name</label>
-          <input className={styles.input} value={middleName} onChange={(e) => setMiddleName(e.target.value)} />
-        </div>
-      </div>
-
-      <div className={styles.fieldRow}>
-        <div className={styles.field}>
-          <label className={styles.label}>Date of birth</label>
-          <input className={styles.input} type="date" value={dob} onChange={(e) => handleDobChange(e.target.value)} required />
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>Age</label>
-          <input className={styles.input} type="number" min={0} max={150} value={age} onChange={(e) => setAge(e.target.value)} required />
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>Sex</label>
-          <select className={styles.select} value={sex} onChange={(e) => setSex(e.target.value as "M" | "F" | "")} required>
+      <div className={styles.cards}>
+        <Card title="Patient identity">
+          <InputField label="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+          <InputField label="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
+          <InputField label="Middle name" value={middleName} onChange={(e) => setMiddleName(e.target.value)} />
+          <InputField label="Date of birth" type="date" value={dob} onChange={(e) => handleDobChange(e.target.value)} required />
+          <InputField label="Age" type="number" min={0} max={150} value={age} onChange={(e) => setAge(e.target.value)} required />
+          <SelectField label="Sex" value={sex} onChange={(e) => setSex(e.target.value as "M" | "F" | "")} required>
             <option value="">--</option>
             <option value="M">M</option>
             <option value="F">F</option>
-          </select>
-        </div>
-      </div>
+          </SelectField>
+          <InputField label="Contact number" type="tel" placeholder="09XX XXX XXXX" value={contactNumber} onChange={(e) => setContactNumber(e.target.value)} />
+          <InputField label="Bed" placeholder="e.g. MW-4A" value={bed} onChange={(e) => setBed(e.target.value)} required />
+        </Card>
 
-      <div className={styles.fieldRow}>
-        <div className={styles.field}>
-          <label className={styles.label}>Contact number</label>
-          <input className={styles.input} type="tel" placeholder="09XX XXX XXXX" value={contactNumber} onChange={(e) => setContactNumber(e.target.value)} />
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>Bed</label>
-          <input className={styles.input} placeholder="e.g. MW-4A" value={bed} onChange={(e) => setBed(e.target.value)} required />
-        </div>
-      </div>
-
-      <p className={styles.sectionDivider}>Admission details</p>
-
-      <div className={styles.fieldRow}>
-        <div className={styles.field}>
-          <label className={styles.label}>Admission route</label>
-          <select className={styles.select} value={route} onChange={(e) => setRoute(e.target.value as "er_triage" | "direct_admission" | "transfer")}>
+        <Card title="Admission details">
+          <SelectField label="Admission route" value={route} onChange={(e) => setRoute(e.target.value as "er_triage" | "direct_admission" | "transfer")}>
             <option value="er_triage">ER Triage</option>
             <option value="direct_admission">Direct Ward Admission</option>
             <option value="transfer">Transfer from another facility</option>
-          </select>
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>Attending physician</label>
-          <select className={styles.select} value={physician} onChange={(e) => setPhysician(e.target.value)}>
+          </SelectField>
+          <SelectField label="Attending physician" value={physician} onChange={(e) => setPhysician(e.target.value)}>
             {PHYSICIANS.map((p) => <option key={p} value={p}>{p}</option>)}
-          </select>
-        </div>
-      </div>
+          </SelectField>
+          <InputField wide label="Chief complaint" placeholder="e.g. Chest pain, onset 2 hours ago" value={chiefComplaint} onChange={(e) => setChiefComplaint(e.target.value)} required />
+          <div className={`hw-field hw-field--full ${styles.wide}`}>
+            <label className="hw-field__label" htmlFor={contextId}>Admitting diagnosis / context</label>
+            <div className="hw-textarea">
+              <textarea id={contextId} className="hw-textarea__control" rows={3} value={context} onChange={(e) => setContext(e.target.value)} required />
+            </div>
+          </div>
+          <InputField wide label="Allergies" placeholder="NKDA or list allergies" value={allergies} onChange={(e) => setAllergies(e.target.value)} />
+        </Card>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Chief complaint</label>
-        <input className={styles.input} placeholder="e.g. Chest pain, onset 2 hours ago" value={chiefComplaint} onChange={(e) => setChiefComplaint(e.target.value)} required />
-      </div>
-
-      <div className={styles.field}>
-        <label className={styles.label}>Admitting diagnosis / context</label>
-        <textarea className={styles.textarea} rows={3} value={context} onChange={(e) => setContext(e.target.value)} required />
-      </div>
-
-      <div className={styles.field}>
-        <label className={styles.label}>Allergies</label>
-        <input className={styles.input} placeholder="NKDA or list allergies" value={allergies} onChange={(e) => setAllergies(e.target.value)} />
-      </div>
-
-      <p className={styles.sectionDivider}>Initial assessment (nurse-entered)</p>
-
-      <div className={styles.fieldRow}>
-        <div className={styles.field}>
-          <label className={styles.label}>Weight (kg)</label>
-          <input className={styles.input} type="number" step="0.1" min={0} value={weightKg} onChange={(e) => setWeightKg(e.target.value)} />
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>Height (cm)</label>
-          <input className={styles.input} type="number" step="0.1" min={0} value={heightCm} onChange={(e) => setHeightCm(e.target.value)} />
-        </div>
-      </div>
-
-      <div className={styles.fieldRow}>
-        <div className={styles.field}>
-          <label className={styles.label}>Blood pressure (sys/dia)</label>
-          <input className={styles.input} placeholder="e.g. 120/80" value={bp} onChange={(e) => setBp(e.target.value)} />
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label}>Consciousness (ACVPU)</label>
-          <select className={styles.select} value={avpu} onChange={(e) => setAvpu(e.target.value)}>
+        <Card title="Initial assessment (nurse-entered)">
+          <InputField label="Weight (kg)" type="number" step="0.1" min={0} value={weightKg} onChange={(e) => setWeightKg(e.target.value)} />
+          <InputField label="Height (cm)" type="number" step="0.1" min={0} value={heightCm} onChange={(e) => setHeightCm(e.target.value)} />
+          <InputField label="Blood pressure (sys/dia)" placeholder="e.g. 120/80" value={bp} onChange={(e) => setBp(e.target.value)} />
+          <SelectField label="Consciousness (ACVPU)" value={avpu} onChange={(e) => setAvpu(e.target.value)}>
             <option value="">--</option>
             <option value="A">Alert</option>
             <option value="C">New confusion</option>
             <option value="V">Verbal</option>
             <option value="P">Pain</option>
             <option value="U">Unresponsive</option>
-          </select>
-        </div>
+          </SelectField>
+        </Card>
       </div>
 
-      <button type="submit" className={styles.submitBtn} disabled={!canSubmit || submitting}>
-        Admit patient
-      </button>
+      <div className={styles.actions}>
+        <button type="submit" className="hw-button hw-button--primary" disabled={!canSubmit || submitting}>
+          Admit patient
+        </button>
+      </div>
     </form>
   );
 }
@@ -305,6 +307,12 @@ const LAB_FIELDS: Array<{ key: string; label: string; unit: string; section: str
   { key: "sgot", label: "SGOT", unit: "U/L", section: "Liver" },
   { key: "blood_glucose", label: "Blood glucose", unit: "mg/dL", section: "Metabolic" },
 ];
+
+const LAB_SECTIONS = [...new Set(LAB_FIELDS.map((f) => f.section))];
+
+const LAB_LABELS: Record<string, string> = Object.fromEntries(
+  LAB_FIELDS.map((f) => [f.key, f.unit ? `${f.label} (${f.unit})` : f.label])
+);
 
 function LabForm() {
   const [patients, setPatients] = useState<Array<{ id: string; name: string; bed: string; ranked: boolean }>>([]);
@@ -347,21 +355,14 @@ function LabForm() {
 
   return (
     <form className={styles.form} onSubmit={handleSubmit}>
-      <p className={styles.formTitle}>Enter lab results</p>
-      <p className={styles.formSub}>
-        Select a ranked patient.
-      </p>
+      <Head title="Enter lab results">
+        <p className="hw-text-muted">Select a ranked patient.</p>
+      </Head>
 
-      {result && (
-        <div className={styles.successBanner}>
-          {result}
-          <button type="button" className={styles.dismissBtn} onClick={() => setResult(null)}>&times;</button>
-        </div>
-      )}
+      {result && <Saved text={result} onDismiss={() => setResult(null)} />}
 
-      <div className={styles.field}>
-        <label className={styles.label}>Patient</label>
-        <select className={styles.select} value={selectedId} onChange={(e) => setSelectedId(e.target.value)} required>
+      <div className={styles.patient}>
+        <SelectField label="Patient" value={selectedId} onChange={(e) => setSelectedId(e.target.value)} required>
           <option value="">Select patient...</option>
           {patients.filter((p) => p.ranked).map((p) => (
             <option key={p.id} value={p.id}>
@@ -377,39 +378,32 @@ function LabForm() {
               ))}
             </optgroup>
           )}
-        </select>
+        </SelectField>
       </div>
 
-      {(() => {
-        const sections: string[] = [];
-        for (const f of LAB_FIELDS) {
-          if (!sections.includes(f.section)) sections.push(f.section);
-        }
-        return sections.map((sec) => (
-          <div key={sec}>
-            <p className={styles.sectionDivider}>{sec}</p>
-            <div className={styles.fieldRow}>
-              {LAB_FIELDS.filter((f) => f.section === sec).map((f) => (
-                <div key={f.key} className={styles.field}>
-                  <label className={styles.label}>{f.label}{f.unit ? ` (${f.unit})` : ""}</label>
-                  <input
-                    className={styles.input}
-                    type="number"
-                    step="any"
-                    min={0}
-                    value={values[f.key] ?? ""}
-                    onChange={(e) => setField(f.key, e.target.value)}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        ));
-      })()}
+      <div className={styles.cards}>
+        {LAB_SECTIONS.map((sec) => (
+          <Card key={sec} title={sec}>
+            {LAB_FIELDS.filter((f) => f.section === sec).map((f) => (
+              <InputField
+                key={f.key}
+                label={LAB_LABELS[f.key]}
+                type="number"
+                step="any"
+                min={0}
+                value={values[f.key] ?? ""}
+                onChange={(e) => setField(f.key, e.target.value)}
+              />
+            ))}
+          </Card>
+        ))}
+      </div>
 
-      <button type="submit" className={styles.submitBtn} disabled={!canSubmit || submitting}>
-        Record lab results
-      </button>
+      <div className={styles.actions}>
+        <button type="submit" className="hw-button hw-button--primary" disabled={!canSubmit || submitting}>
+          Record lab results
+        </button>
+      </div>
     </form>
   );
 }
@@ -418,10 +412,6 @@ function LabForm() {
 
 type UploadType = "lab" | "patient";
 type UploadStep = "select" | "review" | "done";
-
-const LAB_LABELS: Record<string, string> = Object.fromEntries(
-  LAB_FIELDS.map((f) => [f.key, f.unit ? `${f.label} (${f.unit})` : f.label])
-);
 
 const PATIENT_LABELS: Record<string, string> = {
   lastName: "Last name",
@@ -438,6 +428,22 @@ const PATIENT_LABELS: Record<string, string> = {
   attendingPhysician: "Attending physician",
   allergies: "Allergies",
 };
+
+/** One value read from the document: its name, the editable value, and how sure the reading was. */
+function ReviewRow({ label, confidence, ...input }: { label: string; confidence?: number } & InputHTMLAttributes<HTMLInputElement>) {
+  const id = useId();
+  return (
+    <div className={styles.reviewRow}>
+      <label className={styles.reviewLabel} htmlFor={id}>{label}</label>
+      <div className="hw-input hw-input--sm">
+        <input id={id} className="hw-input__control" aria-describedby={confidence === undefined ? undefined : `${id}-c`} {...input} />
+      </div>
+      {confidence !== undefined && (
+        <span id={`${id}-c`} className={`hw-tag hw-tag--round ${styles.confidence}`}>{Math.round(confidence * 100)}%</span>
+      )}
+    </div>
+  );
+}
 
 function UploadForm() {
   const [uploadType, setUploadType] = useState<UploadType>("lab");
@@ -543,150 +549,142 @@ function UploadForm() {
     if (fileRef.current) fileRef.current.value = "";
   };
 
+  const edit = (key: string) => (e: { target: { value: string } }) =>
+    setEditedValues((prev) => ({ ...prev, [key]: e.target.value }));
+
   return (
     <div className={styles.form}>
-      <p className={styles.formTitle}>Upload document</p>
-      <div className={styles.syntheticBanner}>
-        Document reading is simulated: the values are sample data, not from your file.
-      </div>
+      <Head title="Upload document">
+        <p className={`hw-alert ${styles.banner}`}>
+          <span className="hw-alert__icon hw-icon fa-solid fa-circle-info" aria-hidden="true" />
+          <span className="hw-alert__body">
+            Document reading is simulated: the values are sample data, not from your file.
+          </span>
+        </p>
+      </Head>
 
-      {result && (
-        <div className={styles.successBanner}>
-          {result}
-          <button type="button" className={styles.dismissBtn} onClick={handleReset}>&times;</button>
-        </div>
-      )}
+      {result && <Saved text={result} onDismiss={handleReset} />}
 
       {step === "select" && (
-        <>
-          <div className={styles.field}>
-            <label className={styles.label}>Document type</label>
-            <select
-              className={styles.select}
+        <section className={`hw-card hw-card--outlined ${styles.stack}`}>
+          <div className={styles.fields}>
+            <SelectField
+              label="Document type"
               value={uploadType}
               onChange={(e) => { setUploadType(e.target.value as UploadType); setSelectedId(""); }}
             >
               <option value="lab">Lab results</option>
               <option value="patient">Patient record (admission)</option>
-            </select>
-          </div>
+            </SelectField>
 
-          {uploadType === "lab" && (
-            <div className={styles.field}>
-              <label className={styles.label}>Patient</label>
-              <select className={styles.select} value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>
+            {uploadType === "lab" && (
+              <SelectField label="Patient" value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>
                 <option value="">Select patient...</option>
                 {patients.filter((p) => p.ranked).map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name} -- Bed {p.bed} ({p.id})
                   </option>
                 ))}
-              </select>
-            </div>
-          )}
+              </SelectField>
+            )}
+          </div>
 
-          <div className={styles.field}>
-            <label className={styles.label}>File</label>
+          <label className="hw-upload">
             <input
               ref={fileRef}
-              className={styles.input}
+              className="hw-visually-hidden"
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />
-          </div>
+            <span className="hw-icon hw-icon--xl fa-solid fa-upload" aria-hidden="true" />
+            <span className="hw-upload__title">File</span>
+          </label>
 
           {file && (
-            <div className={styles.filePreview}>
+            <div className={`hw-file ${styles.file}`}>
+              <span className="hw-icon fa-regular fa-file" aria-hidden="true" />
               <span className={styles.fileName}>{file.name}</span>
-              <span className={styles.fileSize}>{(file.size / 1024).toFixed(1)} KB</span>
+              <span className="hw-caption">{(file.size / 1024).toFixed(1)} KB</span>
             </div>
           )}
 
-          <button
-            type="button"
-            className={styles.submitBtn}
-            disabled={!canExtract || extracting}
-            onClick={handleExtract}
-          >
-            {extracting ? "Reading document..." : "Read document"}
-          </button>
-        </>
+          <div className={styles.actions}>
+            <button
+              type="button"
+              className="hw-button hw-button--primary"
+              disabled={!canExtract || extracting}
+              onClick={handleExtract}
+            >
+              {extracting ? "Reading document..." : "Read document"}
+            </button>
+          </div>
+        </section>
       )}
 
       {step === "review" && uploadType === "lab" && labExtraction && (
-        <>
-          <p className={styles.sectionDivider}>Values read from document -- review and correct</p>
+        <section className={`hw-card hw-card--outlined ${styles.stack}`}>
+          <h2 className={`hw-card__title ${styles.cardTitle}`}>Values read from document -- review and correct</h2>
 
-          <div className={styles.extractionGrid}>
-            {Object.entries(labExtraction.values).map(([key, val]) => {
-              if (val === undefined) return null;
-              const conf = labExtraction.confidence[key];
-              return (
-                <div key={key} className={styles.extractionRow}>
-                  <span className={styles.extractionLabel}>{LAB_LABELS[key] ?? key}</span>
-                  <input
-                    className={styles.input}
-                    type="number"
-                    step="any"
-                    value={editedValues[key] ?? ""}
-                    onChange={(e) => setEditedValues((prev) => ({ ...prev, [key]: e.target.value }))}
-                  />
-                  {conf !== undefined && (
-                    <span className={styles.confidence}>{Math.round(conf * 100)}%</span>
-                  )}
-                </div>
-              );
-            })}
+          <div className={styles.review}>
+            {Object.entries(labExtraction.values).map(([key, val]) =>
+              val === undefined ? null : (
+                <ReviewRow
+                  key={key}
+                  label={LAB_LABELS[key] ?? key}
+                  confidence={labExtraction.confidence[key]}
+                  type="number"
+                  step="any"
+                  value={editedValues[key] ?? ""}
+                  onChange={edit(key)}
+                />
+              ),
+            )}
           </div>
 
-          <div className={styles.reviewActions}>
-            <button type="button" className={styles.submitBtn} disabled={submitting} onClick={handleConfirmLab}>
+          <div className={styles.actions}>
+            <button type="button" className="hw-button hw-button--primary" disabled={submitting} onClick={handleConfirmLab}>
               {submitting ? "Saving..." : "Confirm and save"}
             </button>
-            <button type="button" className={styles.cancelBtn} onClick={handleReset}>Cancel</button>
+            <button type="button" className="hw-button hw-button--ghost" onClick={handleReset}>Cancel</button>
           </div>
-        </>
+        </section>
       )}
 
       {step === "review" && uploadType === "patient" && patientExtraction && (
-        <>
-          <p className={styles.sectionDivider}>Values read from document -- review and correct</p>
+        <section className={`hw-card hw-card--outlined ${styles.stack}`}>
+          <h2 className={`hw-card__title ${styles.cardTitle}`}>Values read from document -- review and correct</h2>
 
-          <div className={styles.extractionGrid}>
-            {Object.entries(patientExtraction.values).map(([key, val]) => {
-              if (val === undefined) return null;
-              const conf = patientExtraction.confidence[key];
-              return (
-                <div key={key} className={styles.extractionRow}>
-                  <span className={styles.extractionLabel}>{PATIENT_LABELS[key] ?? key}</span>
-                  <input
-                    className={styles.input}
-                    type="text"
-                    value={editedValues[key] ?? ""}
-                    onChange={(e) => setEditedValues((prev) => ({ ...prev, [key]: e.target.value }))}
-                  />
-                  {conf !== undefined && (
-                    <span className={styles.confidence}>{Math.round(conf * 100)}%</span>
-                  )}
-                </div>
-              );
-            })}
+          <div className={styles.review}>
+            {Object.entries(patientExtraction.values).map(([key, val]) =>
+              val === undefined ? null : (
+                <ReviewRow
+                  key={key}
+                  label={PATIENT_LABELS[key] ?? key}
+                  confidence={patientExtraction.confidence[key]}
+                  type="text"
+                  value={editedValues[key] ?? ""}
+                  onChange={edit(key)}
+                />
+              ),
+            )}
           </div>
 
-          <div className={styles.reviewActions}>
-            <button type="button" className={styles.submitBtn} disabled={submitting} onClick={handleConfirmPatient}>
+          <div className={styles.actions}>
+            <button type="button" className="hw-button hw-button--primary" disabled={submitting} onClick={handleConfirmPatient}>
               {submitting ? "Admitting..." : "Confirm and admit"}
             </button>
-            <button type="button" className={styles.cancelBtn} onClick={handleReset}>Cancel</button>
+            <button type="button" className="hw-button hw-button--ghost" onClick={handleReset}>Cancel</button>
           </div>
-        </>
+        </section>
       )}
 
       {step === "done" && (
-        <button type="button" className={styles.submitBtn} onClick={handleReset}>
-          Upload another
-        </button>
+        <div className={styles.actions}>
+          <button type="button" className="hw-button hw-button--primary" onClick={handleReset}>
+            Upload another
+          </button>
+        </div>
       )}
     </div>
   );
