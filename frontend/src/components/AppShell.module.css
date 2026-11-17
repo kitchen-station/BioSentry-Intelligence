@@ -68,7 +68,8 @@
 
 .credit {
   grid-area: credit;
-  padding: var(--hw-space-6) var(--hw-space-5) var(--hw-space-5);
+  /* The floating Ask button sits bottom-right on every page: room so the last row can scroll above it. */
+  padding: var(--hw-space-6) var(--hw-space-5) calc(88px + env(safe-area-inset-bottom));
   font-size: var(--hw-text-caption);
   color: var(--hw-color-text-subtle);
   text-align: center;
