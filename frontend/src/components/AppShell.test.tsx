@@ -26,7 +26,7 @@ const who = (role: SessionRole): Session => ({ clinician_id: `${role}-1`, ward: 
 const ward = { ward: "W4", ranked: synthetic.ranked, abstained: synthetic.abstained, now: "2026-09-03T07:00:00Z" } as unknown as WardResponse;
 const fakeFeed = (over: Partial<WardFeed> = {}): WardFeed => ({
   data: null, fetchedAt: null, failedSince: null, sim: null, refresh: vi.fn(), pollMs: 5_000, readOnly: false,
-  alerts: [], acknowledge: vi.fn(), flush: vi.fn(() => Promise.resolve()), notice: null, setNotice: vi.fn(), ...over,
+  alerts: [], acknowledge: vi.fn(), flush: vi.fn(() => Promise.resolve()), notice: null, setNotice: vi.fn(), unit: "W4", setUnit: vi.fn(), ...over,
 });
 
 const shell = (

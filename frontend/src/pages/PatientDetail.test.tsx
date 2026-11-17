@@ -1321,7 +1321,7 @@ const feedOf = (over: Partial<WardFeed> = {}): WardFeed => ({
   } as WardResponse,
   fetchedAt: Date.parse("2026-09-03T07:00:00Z"), failedSince: null, sim: null, refresh: () => undefined, pollMs: 15_000,
   readOnly: false, alerts: [], acknowledge: vi.fn(), flush: () => Promise.resolve(), notice: null, setNotice: () => undefined,
-  ...over,
+  unit: "W4", setUnit: () => undefined, ...over,
 });
 const fed = (feed: WardFeed, role: SessionRole = "charge_rn", path = "/patient/p-002") =>
   render(
