@@ -422,14 +422,15 @@ describe("density and the table", () => {
     await loaded();
     const row = rowOf("Santos, Maria");
     const vitals = within(row).getAllByRole("img").filter((e) => e.classList.contains("hw-ranklist__vital"));
-    expect(vitals.map((v) => v.getAttribute("aria-label")?.replace(/ \d+(\/\d+)?/, " N"))).toEqual([
+    expect(vitals.map((v) => v.getAttribute("aria-label")?.replace(/ \d+(?:\.\d+)?(\/\d+)?/, " N"))).toEqual([
       expect.stringMatching(/^Heart rate N per minute/),
       expect.stringMatching(/^Respiratory rate N per minute/),
       expect.stringMatching(/^SpO2 N percent/),
+      expect.stringMatching(/^Temperature N °C/),
       expect.stringMatching(/^Blood pressure N mmHg, adds 3 NEWS2 points$/),
       expect.stringMatching(/^ACVPU /),
     ]);
-    expect(vitals[3].getAttribute("data-points")).toBe("3");
+    expect(vitals[4].getAttribute("data-points")).toBe("3");
   });
 
   it("shows every patient as a table, NOT RANKED first, sortable by rank or bed", async () => {
@@ -465,7 +466,7 @@ describe("density and the table", () => {
     await user.click(screen.getByRole("button", { name: "Record vitals for Flores, Ramon" }));
     const dialog = screen.getByRole("dialog", { name: "Record vitals" });
     expect(within(dialog).getByRole("form", { name: "Record vitals for Flores, Ramon" })).toBeTruthy();
-    expect(document.querySelector("td[colspan='12']")).toBeNull(); // nothing opens inside the table
+    expect(document.querySelector("td[colspan='13']")).toBeNull(); // nothing opens inside the table
   });
 
   it("records from the table and says where the patient now stands", async () => {
@@ -503,7 +504,7 @@ describe("density and the table", () => {
     await loaded();
     await user.click(screen.getByRole("radio", { name: "Table" }));
     const cells = within(screen.getAllByRole("row")[1]).getAllByRole("cell").map((c) => c.textContent);
-    expect(cells.slice(5, 10)).not.toContain("--");
+    expect(cells.slice(5, 11)).not.toContain("--");
   });
 });
 
@@ -1020,5 +1021,69 @@ describe("every age and due time follows the ward's time as served", () => {
     expect(screen.getByText(/^Obs overdue 1 min$/)).toBeTruthy();
     expect(banner()!.textContent).toMatch(/^Offline since /);
     expect(chip(/^Overdue/).textContent).toBe("Overdue 1");
+  });
+});
+
+
+describe("clinical readings in the ward table", () => {
+  it.each([true, false])("shows temperature present=%s in ranked and NOT RANKED rows, with all units and ACVPU", async (present) => {
+    const vitals = { ...rows[0].vitals, temperature: { ...rows[0].vitals.temperature,
+      data: present ? { present: true as const, value: 38.2 } : { present: false as const, reason: "not recorded" },
+    } };
+    api.getWard.mockResolvedValue(ward({ ranked: [{ ...rows[0], vitals }], abstained: [{ ...unranked[0], vitals }] }));
+    page();
+    await loaded();
+    await userEvent.click(screen.getByRole("radio", { name: "Table" }));
+    const table = screen.getByRole("table");
+    expect(within(table).getAllByRole("columnheader").slice(5, 11).map((el) => el.textContent)).toEqual([
+      "HR (bpm)", "RR (/min)", "SpO2 (%)", "Temp (°C)", "BP (mmHg)", "ACVPU",
+    ]);
+    for (const tr of within(table).getAllByRole("row").slice(1)) {
+      const cells = within(tr).getAllByRole("cell");
+      expect(cells).toHaveLength(13);
+      expect(cells[5].textContent).toContain("bpm");
+      expect(cells[6].textContent).toContain("/min");
+      expect(cells[7].textContent).toContain("%");
+      expect(cells[8].textContent).toBe(present ? "38.2 °C" : "--");
+      if (!present) expect(cells[8].querySelector(".missing")).not.toBeNull();
+      expect(cells[9].textContent).toContain("mmHg");
+      expect(cells[10].textContent).toContain("A");
+    }
+  });
+
+  it("preserves all six missing slots when a NOT RANKED row has no vitals", async () => {
+    api.getWard.mockResolvedValue(ward({ ranked: [], abstained: [{ ...unranked[0], vitals: null }] }));
+    page();
+    await loaded();
+    await userEvent.click(screen.getByRole("radio", { name: "Table" }));
+    const cells = within(screen.getAllByRole("row")[1]).getAllByRole("cell");
+    expect(cells.slice(5, 11).map((el) => el.textContent)).toEqual(Array(6).fill("--"));
+  });
+
+  it.each([
+    ["flag", null, "flagged"], ["no_flag", null, "no flag"], ["not_sure", null, "unsure"],
+    ["not_computed", "baseline forming", "forming"], ["not_computed", "model error", "unavailable"],
+  ] as const)("keeps the reason and confidence %s / %s beside NEWS2", async (state, reason, label) => {
+    const ranked = { ...rows[0], score: 2, escalation_reasons: [], models: { prediction: { ...rows[0].models.prediction, state, reason } } };
+    api.getWard.mockResolvedValue(ward({ ranked: [ranked] }));
+    page();
+    await loaded();
+    await userEvent.click(screen.getByRole("radio", { name: "Table" }));
+    const cells = within(screen.getAllByRole("row")[1]).getAllByRole("cell");
+    expect(within(cells[3]).getByText(`Confidence: ${label}`)).toBeTruthy();
+    expect(within(cells[3]).getByText("Own baseline: see patient page")).toBeTruthy();
+    expect(cells[3].querySelector(".hw-score")).not.toBeNull();
+    expect(cells[4].textContent).toBe(state === "flag" ? "Prediction model flag (synthetic, not validated)" : "NEWS2 2, no trigger");
+  });
+
+  it("shows the served reason and baseline flag in the table", async () => {
+    api.getWard.mockResolvedValue(ward({ ranked: [{ ...rows[0], score: 2,
+      escalation_reasons: [{ rule: "tier_b_finding", text: "Drifting from own baseline", pathway: null }],
+    }] }));
+    page();
+    await loaded();
+    await userEvent.click(screen.getByRole("radio", { name: "Table" }));
+    expect(screen.getByText("Drifting from own baseline")).toBeTruthy();
+    expect(screen.getByText("Own baseline: flagged").closest("td")?.querySelector(".hw-score")).not.toBeNull();
   });
 });

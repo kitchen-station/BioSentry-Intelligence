@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 /** When the next set of observations is due, as the row shows it: ahead, overdue, or now. */
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import { readFileSync } from "node:fs";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 import synthetic from "../data/synthetic.json";
@@ -144,7 +145,7 @@ describe("an own-baseline drift reason on the row", () => {
   it("shows both texts when there are two drift reasons", () => {
     const second = { ...drift, text: "Drifting from own baseline: SpO2, 2 h (synthetic, not validated)" };
     showFlag(2, "rn", [drift, second]);
-    expect(screen.getByText(drift.text).className).toContain("hw-tag"); // one reason chip each
+    expect(screen.getByText(drift.text).className).toContain("hw-ranklist__reason"); // the first reason always stays visible
     expect(screen.getByText(second.text).className).toContain("hw-tag");
   });
 
@@ -207,5 +208,78 @@ describe("the model reason on the row", () => {
     expect(screen.getByText(model[0].text)).toBeTruthy();
     expect(screen.queryByText(/^Not a NEWS2 trigger/)).toBeNull();
     expect(screen.queryByText(response("low", "rn"))).toBeNull();
+  });
+});
+
+
+describe("the complete ranked row", () => {
+  const showRow = (r: ScoreRow, compact = false) => render(
+    <MemoryRouter><ol className="hw-ranklist" data-density={compact ? "compact" : "comfortable"}>
+      <WardRow row={r} role="rn" now={0} ageOffsetS={0} compact={compact} />
+    </ol></MemoryRouter>,
+  );
+
+  it.each([false, true])("shows five vital slots with units and separate ACVPU (compact=%s)", (compact) => {
+    showRow({ ...row, vitals: { ...row.vitals, temperature: { ...row.vitals.temperature, data: { present: true, value: 38.2 } } } }, compact);
+    const slots = [...document.querySelectorAll(".hw-ranklist__vital")];
+    expect(slots.map((el) => el.querySelector(".hw-ranklist__label")?.textContent)).toEqual([
+      "HR (bpm)", "RR (/min)", "SpO2 (%)", "Temp (°C)", "BP (mmHg)", "ACVPU",
+    ]);
+    for (const [index, unit] of ["bpm", "/min", "%", "°C", "mmHg"].entries()) {
+      expect(slots[index].querySelector(".hw-ranklist__value")?.textContent).toContain(unit);
+    }
+    expect(slots[3].querySelector(".hw-ranklist__value")?.textContent).toBe("38.2 °C");
+    expect(slots[3].querySelector("svg")).not.toBeNull();
+    expect(slots[3].getAttribute("data-points")).toBe("1");
+    expect(slots[4].getAttribute("aria-label")?.match(/mmHg/g)).toHaveLength(1);
+  });
+
+  it("keeps a missing temperature missing even with a stored trend", () => {
+    showRow({ ...row, vitals: { ...row.vitals, temperature: { ...row.vitals.temperature, data: { present: false, reason: "not recorded" } } }, vital_trends: { ...row.vital_trends, temperature: [37, 38] } });
+    const slot = screen.getByRole("img", { name: "Temperature not recorded" });
+    expect(within(slot).getByText("--").className).toBe("missing");
+    expect(slot.textContent).toBe("Temp (°C)--");
+  });
+
+  it.each([false, true])("keeps the reason outside every responsive hiding rule (compact=%s)", (compact) => {
+    showRow({ ...row, score: 2, escalation_reasons: [], models: { prediction: { ...row.models.prediction, state: "no_flag" } } }, compact);
+    const reason = screen.getByText("NEWS2 2, no trigger");
+    expect(reason.className).toBe("hw-ranklist__reason");
+    // jsdom does not lay out media queries: check every hiding selector, at every breakpoint.
+    const css = readFileSync("vendor/hw-ui/src/components/ranklist.css", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    const ancestors: Element[] = [];
+    for (let el: Element | null = reason; el; el = el.parentElement) ancestors.push(el);
+    for (const [, selector, declarations] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (/display:\s*none/.test(declarations)) expect(ancestors.some((el) => el.matches(selector.trim())), selector).toBe(false);
+    }
+  });
+
+  it.each([
+    ["flag", null, "flagged"],
+    ["no_flag", null, "no flag"],
+    ["not_sure", null, "unsure"],
+    ["not_computed", "baseline forming", "forming"],
+    ["not_computed", "model error", "unavailable"],
+    ["not_computed", "student not loaded", "unavailable"],
+    ["not_computed", "calibration not loaded", "unavailable"],
+    ["not_computed", "no stored bins", "unavailable"],
+  ] as const)("shows confidence %s / %s as %s beside NEWS2", (state, reason, label) => {
+    showRow({ ...row, escalation_reasons: [], models: { prediction: { ...row.models.prediction, state, reason } } });
+    const scoreGroup = document.querySelector(".hw-ranklist__score")!;
+    expect(scoreGroup.querySelector(".hw-score")).not.toBeNull();
+    expect(within(scoreGroup as HTMLElement).getByText(`Confidence: ${label}`)).toBeTruthy();
+    expect(within(scoreGroup as HTMLElement).getByText("Own baseline: see patient page")).toBeTruthy();
+  });
+
+  it("shows a served baseline flag without inferring a full baseline state from model confidence", () => {
+    showRow({ ...row, escalation_reasons: [{ rule: "tier_b_finding", text: "Drifting from own baseline", pathway: null }] });
+    expect(screen.getByText("Own baseline: flagged").closest(".hw-ranklist__score")).not.toBeNull();
+    expect(screen.getByText("Drifting from own baseline").className).toBe("hw-ranklist__reason");
+  });
+
+  it("uses an existing model flag as the reason when no escalation text is supplied", () => {
+    showRow({ ...row, score: 2, escalation_reasons: [], models: { prediction: { ...row.models.prediction, state: "flag" } } });
+    expect(screen.getByText("Prediction model flag (synthetic, not validated)").className).toBe("hw-ranklist__reason");
+    expect(screen.queryByText("NEWS2 2, no trigger")).toBeNull();
   });
 });
