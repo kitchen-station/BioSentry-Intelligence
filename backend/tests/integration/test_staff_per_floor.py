@@ -158,20 +158,38 @@ def test_the_answers_that_hold_a_whole_unit_refuse_another_units_new_staff(api: 
     assert api.sql("SELECT count(*) AS n FROM sim_command") == [{"n": 0}]
 
 
-def test_who_may_send_whole_run_commands_is_pinned_as_the_code_does_today(api: Api) -> None:
-    # Pinned, not endorsed: the unit only gates which clinicians reach the route (`belongs`); a command applies
-    # to the whole shared run. A new unit's physician or charge nurse can set the speed, skip and reset it.
-    # Owner decision orch-s2 may narrow this to rn-manalo and md-santos: that change must change this test.
-    hospital(api)
+def test_only_rn_manalo_and_md_santos_may_set_the_speed_of_skip_or_reset_the_whole_run(api: Api) -> None:
+    # Owner decision orch-s2: a command that acts on the whole shared run is for these two. Any other physician
+    # or charge nurse (the new ones too) gets 403 and a `denied` audit row, and no command is queued.
+    run_id = hospital(api)
     give_passphrase(api, *ALL_NEW)
     set_speed = {"kind": "set_speed", "speed": 10}
-    for who, unit in (("md-sarmiento", "ER"), ("cn-er", "ER"), ("md-ocampo", "ICU"), ("md-santos", "W4"), ("rn-manalo", "W4")):
-        assert send(api, who, f"/wards/{unit}/sim/commands", set_speed).status_code == 204, who
-        assert send(api, who, f"/wards/{unit}/sim/commands", {"kind": "reset"}).status_code == 204, who
-    assert send(api, "md-sarmiento", "/wards/ER/sim/commands", {"kind": "skip", "minutes": 60}).status_code == 204
-    for who, unit in (("rn-pangilinan", "ER"), ("rn-guevarra", "ER"), ("rn-abad", "ICU"), ("md-ocampo", "ER"), ("md-sarmiento", "W4")):
-        assert send(api, who, f"/wards/{unit}/sim/commands", set_speed).status_code == 403, who
-        assert send(api, who, f"/wards/{unit}/sim/commands", {"kind": "reset"}).status_code == 403, who
+    skip = {"kind": "skip", "minutes": 60}
+    reset = {"kind": "reset"}
+    denied = [
+        ("md-sarmiento", "ER"), ("cn-er", "ER"), ("md-ocampo", "ICU"), ("cn-icu", "ICU"), ("md-hizon", "MED3A"),
+        ("md-aquino", "W4"), ("md-sarmiento", "W4"), ("rn-pangilinan", "ER"), ("rn-abad", "ICU"), ("rn-delacruz", "W4"),
+    ]  # a physician or charge nurse of any unit, a W4 physician who is not md-santos, and the staff nurses
+    for who, unit in denied:
+        for body in (set_speed, skip, reset):
+            assert send(api, who, f"/wards/{unit}/sim/commands", body).status_code == 403, (who, unit, body)
     admin = add_admin(api)
-    assert api.client.post("/wards/ER/sim/commands", json=set_speed, headers=admin).status_code == 403
-    assert api.sql("SELECT count(*) AS n FROM sim_command") == [{"n": 11}]
+    assert api.client.post("/wards/W4/sim/commands", json=set_speed, headers=admin).status_code == 403
+    assert api.sql("SELECT count(*) AS n FROM sim_command") == [{"n": 0}]
+    rows = api.sql("SELECT clinician_id, outcome FROM audit_log WHERE action = 'sim_command'")
+    assert len(rows) == 3 * len(denied) + 1 and {r["outcome"] for r in rows} == {"denied"}  # every refusal is audited
+    for who in ("md-santos", "rn-manalo"):
+        assert send(api, who, "/wards/W4/sim/commands", set_speed).status_code == 204, who
+        assert send(api, who, "/wards/W4/sim/commands", reset).status_code == 204, who
+    assert send(api, "md-santos", "/wards/W4/sim/commands", skip).status_code == 204
+    assert api.sql("SELECT count(*) AS n FROM sim_command") == [{"n": 5}]
+    assert run_id  # the one run of the hospital
+
+
+def test_a_new_physician_still_sends_the_patient_commands_of_their_own_units_patients(api: Api) -> None:
+    hospital(api, [*PATIENTS, stay("e-2", "ER", "rn-pangilinan", "md-sarmiento", "E2")])
+    give_passphrase(api, *ALL_NEW)
+    own = {"kind": "inject_deterioration", "patient_id": "e-2"}
+    assert send(api, "md-sarmiento", "/wards/ER/sim/commands", own).status_code == 204  # their own patient, unchanged
+    assert send(api, "md-ocampo", "/wards/ER/sim/commands", own).status_code == 403  # another unit's physician
+    assert send(api, "rn-pangilinan", "/wards/ER/sim/commands", own).status_code == 403  # a staff nurse

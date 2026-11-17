@@ -33,6 +33,9 @@ from biosentry.schemas import ClinicalNote, LabPanel, TierStatus, UnscoredPatien
 
 LIVE_WITHIN = timedelta(seconds=30)  # a sim run whose last batch is older is not "receiving data"
 CONTROL_ROLES = ("md", "charge_rn")  # the roles that may send commands to the ward simulation
+# Owner decision orch-s2: only these two may set the speed of, skip or reset the whole shared run. Any other physician
+# or charge nurse may still send the patient commands of their own unit's patients.
+RUN_STEERERS = ("rn-manalo", "md-santos")
 ADMIN_ROLE = "admin"  # reads the ward and its patients, writes nothing, is never assigned
 SESSION_TTL = timedelta(hours=12)
 # judgement: RCP NEWS2 (2017) chart, "minimum 12 hourly" at aggregate 0, used for every score.
@@ -345,6 +348,11 @@ class PostgresStore:
     def can_control(self, clinician_id: str) -> bool:
         """Whether this clinician may send the sim commands: the one place that rule is written."""
         return self.role_of(clinician_id) in CONTROL_ROLES
+
+    def can_steer_run(self, clinician_id: str) -> bool:
+        """Whether this clinician may send the commands that act on the whole shared run (speed, skip,
+        reset): the one place that rule is written. Needs `can_control` too, as the route checks."""
+        return clinician_id in RUN_STEERERS
 
     def is_admin(self, clinician_id: str) -> bool:
         """Whether this clinician is an admin: the one place that rule is written."""
