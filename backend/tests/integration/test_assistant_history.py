@@ -77,7 +77,9 @@ def test_admin_uses_patient_page_scope_and_sees_no_other_persons_messages(api: A
     put(api, MD, "p-001")
     add_admin(api)
     assert history(api, who=ADMIN).json() == []
-    assert runs(api, who=ADMIN).json() == []
+    assert runs(api, who=ADMIN).status_code == 403  # a lab row says who asked what: closed to the admin, as the ward lab routes are
+    assert runs(api, suffix="/1", who=ADMIN).status_code == 403
+    assert ("view_patient_lab_runs", "p-001", "denied") in audit_of(api, ADMIN)
     assert history(api, "p-005", who=ADMIN).status_code == 200  # not ranked still visible
 
 
@@ -97,7 +99,9 @@ def test_simulated_runs_are_explicit_newest_first_read_only_and_stay_scoped(api:
     unlinked = linked(api)
     assert [r["id"] for r in runs(api).json()] == [second, first]
     assert runs(api, "p-002").json() == []
-    assert runs(api, suffix=f"/{first}").json()["report"]["synthetic"] is True
+    detail = runs(api, suffix=f"/{first}").json()
+    assert detail["report"]["synthetic"] is True
+    assert "patient_refs" not in detail["report"]  # the other patients' ids stay out
     for rid in ("bad", "0", "999", str(unlinked)):
         assert runs(api, suffix=f"/{rid}").status_code == 404
     assert runs(api, "p-002", suffix=f"/{first}").status_code == 404

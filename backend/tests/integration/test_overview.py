@@ -403,6 +403,8 @@ CLOSED_TO_ADMIN = {
 CLOSED_TO_ADMIN_BY_PATIENT = {
     "/patients/{patient_id}/questions": "view_patient_questions",
     "/patients/{patient_id}/questions/{question_id}": "view_patient_question",
+    "/patients/{patient_id}/lab/runs": "view_patient_lab_runs",
+    "/patients/{patient_id}/lab/runs/{lab_run_id}": "view_patient_lab_run",
 }
 
 

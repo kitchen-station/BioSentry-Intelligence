@@ -682,7 +682,10 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return found
 
-    def history_scope(ctx: Context, who: str, patient_id: str, action: str) -> None:
+    def history_scope(ctx: Context, who: str, patient_id: str, action: str, *, closed_to_admin: bool = False) -> None:
+        if closed_to_admin and ctx.store.is_admin(who):  # a lab row says who asked what: the same refusal as lab_reader
+            ctx.audit.append(who, action, patient_id, "denied")
+            raise HTTPException(status_code=403, detail="Forbidden")
         if patient_id not in ctx.wards.visible(who):
             ctx.audit.append(who, action, patient_id, "not_found")
             raise HTTPException(status_code=404, detail=NOT_FOUND)
@@ -698,7 +701,7 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
     @app.get("/patients/{patient_id}/lab/runs", response_model=list[LabRunItem])
     def patient_lab_runs(patient_id: str, ctx: Ctx, who: Who) -> list[LabRunItem]:
         action = "view_patient_lab_runs"
-        history_scope(ctx, who, patient_id, action)
+        history_scope(ctx, who, patient_id, action, closed_to_admin=True)
         rows = patient_runs(ctx.store, patient_id)
         ctx.audit.append(who, action, patient_id, "ok")
         return [LabRunItem.model_validate(lab._item(row)) for row in rows]
@@ -706,7 +709,7 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
     @app.get("/patients/{patient_id}/lab/runs/{lab_run_id}", response_model=LabRunDetail)
     def patient_lab_run(patient_id: str, lab_run_id: str, ctx: Ctx, who: Who) -> LabRunDetail:
         action = "view_patient_lab_run"
-        history_scope(ctx, who, patient_id, action)
+        history_scope(ctx, who, patient_id, action, closed_to_admin=True)
         rid = row_id(lab_run_id)
         rows = [] if rid is None else patient_runs(ctx.store, patient_id, rid)
         if not rows:
@@ -714,8 +717,9 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         ctx.audit.append(who, action, patient_id, "ok")
         row = rows[0]
+        report = {k: v for k, v in (row["report"] or {}).items() if k != "patient_refs"}  # the other patients' ids stay out
         return LabRunDetail.model_validate(
-            {**lab._item(row), "report": row["report"], "report_text": row["report_text"]}
+            {**lab._item(row), "report": report, "report_text": row["report_text"]}
         )
 
     @app.post(
