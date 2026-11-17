@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError, clearSession, signIn, usesServer } from "../api";
 import type { Session, SessionRole } from "../types";
 import { ROLE_LABELS } from "../components/SessionMenu";
-import ch from "../components/Crosshair.module.css";
+import { Mark } from "../components/AppShell";
 import styles from "./SignIn.module.css";
 
 // --- Types ---
@@ -176,219 +176,206 @@ export function SignIn({ onSignIn }: Props) {
     ? PROFILES.filter((p) => p.department === department)
     : [];
 
+  // The kit stepper: an administrator has no profile card and no destination to choose.
+  const steps: [Phase, string][] =
+    department === "admin"
+      ? [["department", "Department"], ["auth", "Passphrase"]]
+      : [["department", "Department"], ["profile", "Profile"], ["auth", "Passphrase"], ["destination", "Destination"]];
+  const at = steps.findIndex(([p]) => p === phase);
+
+  const choice = `hw-card hw-card--interactive hw-card--outlined ${styles.choice}`;
+
   return (
     <main className={styles.page}>
-      <div className={styles.hero}>
-        <p className={styles.eyebrow}>BioSentry</p>
-        <h1 className={styles.heading}>Sign in</h1>
-      </div>
+      <section className={styles.brand}>
+        <Mark />
+        <div className={styles.pitch}>
+          <p className="hw-heading hw-heading--4">A ranked early-warning list for hospital wards in the Philippines.</p>
+          <p className="hw-text-muted">This is not a diagnosis system. It ranks and displays. A human decides.</p>
+        </div>
+      </section>
 
-      <div className={styles.content}>
-        {phase !== "department" && (
-          <button
-            type="button"
-            className={styles.backLink}
-            onClick={handleBack}
-          >
-            &larr; Back
-          </button>
-        )}
-
-        {/* Phase 1: Department */}
-        {phase === "department" && (
-          <>
-            <p className={styles.sectionLabel}>I am a</p>
-            <div className={styles.cards}>
-              <button
-                type="button"
-                className={`${ch.box} ${styles.roleCard}`}
-                onClick={() => handlePickDepartment("nursing")}
-              >
-                <div className={ch.inner} />
-                <span className={styles.roleTitle}>Nurse</span>
-                <span className={styles.roleDesc}>
-                  Staff Nurse, Charge Nurse
-                </span>
+      <div className={styles.main}>
+        <div className={`hw-card ${styles.card}`}>
+          <div className={styles.head}>
+            <h1 className="hw-heading hw-heading--3">Sign in</h1>
+            {phase !== "department" && (
+              <button type="button" className="hw-button hw-button--ghost hw-button--sm" onClick={handleBack}>
+                <span className="hw-icon fa-solid fa-arrow-left" aria-hidden="true" />
+                Back
               </button>
-              <button
-                type="button"
-                className={`${ch.box} ${styles.roleCard}`}
-                onClick={() => handlePickDepartment("medical")}
+            )}
+          </div>
+
+          <ol className={`hw-steps ${styles.steps}`} aria-label="Steps">
+            {steps.map(([p, label], i) => (
+              <li
+                key={p}
+                className="hw-steps__step"
+                data-status={i < at ? "done" : i === at ? "current" : undefined}
+                aria-current={i === at ? "step" : undefined}
               >
-                <div className={ch.inner} />
-                <span className={styles.roleTitle}>Physician</span>
-                <span className={styles.roleDesc}>
-                  Attending Physician, Consultant
-                </span>
-              </button>
-              {usesServer && (
-                <button
-                  type="button"
-                  className={`${ch.box} ${styles.roleCard}`}
-                  onClick={() => handlePickDepartment("admin")}
-                >
-                  <div className={ch.inner} />
-                  <span className={styles.roleTitle}>Administration</span>
-                  <span className={styles.roleDesc}>Every patient on the ward, read only</span>
-                </button>
-              )}
-            </div>
-          </>
-        )}
+                {label}
+              </li>
+            ))}
+          </ol>
 
-        {/* Phase 2: Profile */}
-        {phase === "profile" && (
-          <>
-            <p className={styles.sectionLabel}>
-              {department === "nursing" ? "Select nurse" : "Select physician"}
-            </p>
-            <div className={styles.cards}>
-              {filteredProfiles.map((p) => (
-                <button
-                  key={p.id}
-                  className={`${ch.box} ${styles.profileCard}`}
-                  onClick={() => handleSelectProfile(p)}
-                  type="button"
-                >
-                  <div className={ch.inner} />
-                  <div className={styles.profileHeader}>
-                    <span className={styles.profileInitial}>
-                      {p.label.split(" ").pop()?.charAt(0) ?? p.label.charAt(0)}
-                    </span>
-                    <div>
-                      <div className={styles.profileName}>{p.label}</div>
-                      <div className={styles.profileRole}>{p.role}</div>
-                    </div>
-                  </div>
-                  <div className={styles.profileMeta}>
-                    <span>Ward {p.ward}</span>
-                  </div>
+          {/* Phase 1: Department */}
+          {phase === "department" && (
+            <>
+              <p className={`hw-text-muted ${styles.sectionLabel}`}>I am a</p>
+              <div className={styles.cards}>
+                <button type="button" className={choice} onClick={() => handlePickDepartment("nursing")}>
+                  <span className="hw-card__title">Nurse</span>
+                  <span className="hw-caption">Staff Nurse, Charge Nurse</span>
                 </button>
-              ))}
-            </div>
-          </>
-        )}
-
-        {/* Phase 3: Auth */}
-        {phase === "auth" && (selected || department === "admin") && (
-          <form onSubmit={handleAuth} className={styles.form}>
-            {selected ? (
-              <div className={styles.selectedInfo}>
-                <span className={styles.selectedName}>{selected.label}</span>
-                <span className={styles.selectedDetail}>
-                  {selected.role} &middot; Ward {selected.ward}
-                </span>
+                <button type="button" className={choice} onClick={() => handlePickDepartment("medical")}>
+                  <span className="hw-card__title">Physician</span>
+                  <span className="hw-caption">Attending Physician, Consultant</span>
+                </button>
+                {usesServer && (
+                  <button type="button" className={choice} onClick={() => handlePickDepartment("admin")}>
+                    <span className="hw-card__title">Administration</span>
+                    <span className="hw-caption">Every patient on the ward, read only</span>
+                  </button>
+                )}
               </div>
-            ) : (
-              <div className={styles.field}>
-                <label className={styles.label} htmlFor="admin-id">
-                  Administrator id
+            </>
+          )}
+
+          {/* Phase 2: Profile */}
+          {phase === "profile" && (
+            <>
+              <p className={`hw-text-muted ${styles.sectionLabel}`}>
+                {department === "nursing" ? "Select nurse" : "Select physician"}
+              </p>
+              <div className={styles.cards}>
+                {filteredProfiles.map((p) => (
+                  <button key={p.id} className={`${choice} ${styles.profile}`} onClick={() => handleSelectProfile(p)} type="button">
+                    <span className="hw-avatar hw-avatar--lg">{initial(p)}</span>
+                    <span className={styles.who}>
+                      <span className="hw-card__title">{p.label}</span>
+                      <span className="hw-caption">{p.role}</span>
+                    </span>
+                    <span className="hw-caption">Ward {p.ward}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* Phase 3: Auth */}
+          {phase === "auth" && (selected || department === "admin") && (
+            <form onSubmit={handleAuth} className={styles.form}>
+              {selected ? (
+                <Picked profile={selected} detail={selected.role} />
+              ) : (
+                <div className="hw-field hw-field--full">
+                  <label className="hw-field__label" htmlFor="admin-id">
+                    Administrator id
+                  </label>
+                  <div className="hw-input">
+                    <input
+                      className="hw-input__control"
+                      id="admin-id"
+                      value={adminId}
+                      onChange={(e) => setAdminId(e.target.value)}
+                      autoComplete="off"
+                      placeholder=" "
+                      maxLength={64}
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="hw-field hw-field--full">
+                <label className="hw-field__label" htmlFor="passphrase">
+                  Passphrase
                 </label>
-                <div className={ch.box}>
-                  <div className={ch.inner} />
+                <div className="hw-input">
                   <input
-                    className={styles.input}
-                    id="admin-id"
-                    value={adminId}
-                    onChange={(e) => setAdminId(e.target.value)}
+                    className="hw-input__control"
+                    id="passphrase"
+                    type="password"
+                    value={passphrase}
+                    onChange={(e) => setPassphrase(e.target.value)}
                     autoComplete="off"
-                    maxLength={64}
-                    required
+                    placeholder=" " // the kit marks an empty field invalid only once a placeholder is gone
+                    maxLength={256}
+                    required={usesServer}
                   />
                 </div>
               </div>
-            )}
 
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="passphrase">
-                Passphrase
-              </label>
-              <div className={ch.box}>
-                <div className={ch.inner} />
-                <input
-                  className={styles.input}
-                  id="passphrase"
-                  type="password"
-                  value={passphrase}
-                  onChange={(e) => setPassphrase(e.target.value)}
-                  autoComplete="off"
-                  maxLength={256}
-                  required={usesServer}
-                />
-              </div>
-            </div>
-
-            {error && (
-              <p className={styles.error} role="alert">
-                {error}
-              </p>
-            )}
-
-            <button type="submit" className={styles.btn} disabled={busy}>
-              {busy ? "Signing in" : "Continue"}
-            </button>
-
-            <p className={styles.authNote}>
-              {usesServer
-                ? "After 5 failed attempts for a clinician, sign-in is locked for 15 minutes. Every attempt is recorded."
-                : "Public demo: any passphrase works. Nothing is kept after a reload."}
-            </p>
-          </form>
-        )}
-
-        {/* Phase 4: Destination */}
-        {phase === "destination" && selected && (
-          <>
-            <div className={styles.selectedInfo}>
-              <span className={styles.selectedName}>{selected.label}</span>
-              <span className={styles.selectedDetail}>
-                {ROLE_LABELS[selected.sessionRole]} &middot; Ward {selected.ward}
-              </span>
-            </div>
-
-            <p className={styles.sectionLabel}>Choose destination</p>
-            <div className={styles.cards}>
-              <button
-                type="button"
-                className={`${ch.box} ${styles.destCard}`}
-                onClick={() => signInAndGo(selected, "/ward")}
-              >
-                <div className={ch.inner} />
-                <span className={styles.destTitle}>Ward Monitor</span>
-                <span className={styles.destDesc}>
-                  Your assigned patients, in priority order.
-                </span>
-              </button>
-              {(selected.sessionRole === "md" || selected.sessionRole === "charge_rn") && (
-                <button
-                  type="button"
-                  className={`${ch.box} ${styles.destCard}`}
-                  onClick={() => signInAndGo(selected, "/station")}
-                >
-                  <div className={ch.inner} />
-                  <span className={styles.destTitle}>Station</span>
-                  <span className={styles.destDesc}>
-                    Admit, labs, documents.
-                  </span>
-                </button>
+              {error && (
+                <p className="hw-alert hw-alert--danger" role="alert">
+                  <span className="hw-alert__icon hw-icon fa-solid fa-triangle-exclamation" aria-hidden="true" />
+                  <span className="hw-alert__body">{error}</span>
+                </p>
               )}
-            </div>
-          </>
-        )}
+
+              <button type="submit" className="hw-button hw-button--primary hw-button--block" disabled={busy}>
+                {busy ? "Signing in" : "Continue"}
+              </button>
+
+              <p className="hw-caption">
+                {usesServer
+                  ? "After 5 failed attempts for a clinician, sign-in is locked for 15 minutes. Every attempt is recorded."
+                  : "Public demo: any passphrase works. Nothing is kept after a reload."}
+              </p>
+            </form>
+          )}
+
+          {/* Phase 4: Destination */}
+          {phase === "destination" && selected && (
+            <>
+              <Picked profile={selected} detail={ROLE_LABELS[selected.sessionRole]} />
+
+              <p className={`hw-text-muted ${styles.sectionLabel}`}>Choose destination</p>
+              <div className={styles.cards}>
+                <button type="button" className={choice} onClick={() => signInAndGo(selected, "/ward")}>
+                  <span className="hw-card__title">Ward Monitor</span>
+                  <span className="hw-caption">Your assigned patients, in priority order.</span>
+                </button>
+                {(selected.sessionRole === "md" || selected.sessionRole === "charge_rn") && (
+                  <button type="button" className={choice} onClick={() => signInAndGo(selected, "/station")}>
+                    <span className="hw-card__title">Station</span>
+                    <span className="hw-caption">Admit, labs, documents.</span>
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
-      <footer className={styles.footer}>
-        <div className={styles.footerGrid}>
-          <div className={styles.footerItem}>
-            <span className={styles.footerLabel}>Privacy</span>
-            <span>
-              {usesServer
-                ? "Pilot build: synthetic data only. Not for real patients."
-                : "Public demo: synthetic data, no server, no real sign-in"}
-            </span>
-          </div>
-        </div>
+      <footer className={`hw-caption ${styles.footer}`}>
+        <p>
+          <strong>Privacy</strong>{" "}
+          {usesServer
+            ? "Pilot build: synthetic data only. Not for real patients."
+            : "Public demo: synthetic data, no server, no real sign-in"}
+        </p>
+        <p>Set in HarmonyOS Sans</p>
       </footer>
     </main>
+  );
+}
+
+const initial = (p: Profile) => p.label.split(" ").pop()?.charAt(0) ?? p.label.charAt(0);
+
+/** The chosen clinician, above the passphrase and the destinations. */
+function Picked({ profile, detail }: { profile: Profile; detail: string }) {
+  return (
+    <div className={styles.picked}>
+      <span className="hw-avatar hw-avatar--lg">{initial(profile)}</span>
+      <span className={styles.who}>
+        <span className="hw-heading hw-heading--4">{profile.label}</span>
+        <span className="hw-caption">
+          {detail} &middot; Ward {profile.ward}
+        </span>
+      </span>
+    </div>
   );
 }
