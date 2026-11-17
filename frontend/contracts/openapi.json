@@ -2611,6 +2611,45 @@
         "title": "OpenBedCard",
         "type": "object"
       },
+      "OpenEr": {
+        "additionalProperties": false,
+        "properties": {
+          "awaiting_icu": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "beds_in_use": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "capacity": {
+            "anyOf": [
+              {
+                "maximum": 1000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "capacity",
+          "beds_in_use",
+          "awaiting_icu"
+        ],
+        "title": "OpenEr",
+        "type": "object"
+      },
       "OpenHistory": {
         "additionalProperties": false,
         "description": "The last 12 hours of the five vitals of a ranked bed, oldest first, at most 49 points each.",
@@ -2903,6 +2942,18 @@
         "additionalProperties": false,
         "description": "One unit of the run, as anyone may read it: no count, no clinician, no person.",
         "properties": {
+          "capacity": {
+            "anyOf": [
+              {
+                "maximum": 1000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "floor": {
             "anyOf": [
               {
@@ -2944,7 +2995,8 @@
           "id",
           "name",
           "floor",
-          "kind"
+          "kind",
+          "capacity"
         ],
         "title": "OpenUnit",
         "type": "object"
@@ -3029,6 +3081,17 @@
         "additionalProperties": false,
         "description": "What anyone may watch with no sign-in (GET /wards/{ward}/open-view).",
         "properties": {
+          "awaiting_icu": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "beds": {
             "items": {
               "$ref": "#/components/schemas/OpenBed"
@@ -3039,6 +3102,61 @@
           "can_control": {
             "const": false,
             "type": "boolean"
+          },
+          "capacity": {
+            "anyOf": [
+              {
+                "maximum": 1000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deaths_24h": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "er": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OpenEr"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nurses_on_duty": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outliers": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "sim": {
             "anyOf": [
@@ -3054,6 +3172,17 @@
             "const": true,
             "type": "boolean"
           },
+          "transfers_24h": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "ward": {
             "type": "string"
           }
@@ -3063,7 +3192,14 @@
           "synthetic",
           "can_control",
           "sim",
-          "beds"
+          "beds",
+          "capacity",
+          "nurses_on_duty",
+          "awaiting_icu",
+          "outliers",
+          "er",
+          "transfers_24h",
+          "deaths_24h"
         ],
         "title": "OpenWard",
         "type": "object"

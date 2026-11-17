@@ -169,6 +169,8 @@ def add_batch(
             for r in conn.execute("SELECT id, unit FROM patient WHERE run_id = %s", (run_id,))
         }
         units = {r["id"] for r in conn.execute("SELECT id FROM run_unit WHERE run_id = %s", (run_id,))}
+        if any(op.unit not in units for op in body.operations):
+            raise RejectedError("an operations unit is a unit of the run")
         _check_clinicians(conn, body.admissions)
         if any(a.unit not in (None, *units) for a in body.admissions):
             raise RejectedError("a patient's unit is a unit of the run")
@@ -238,6 +240,13 @@ def add_batch(
             )
         # Ward time only moves forward: a late batch with an older minute stores its rows but never moves `now` back.
         as_of = max(whole(_at(origin, body.minute)), run["as_of"] or whole(_at(origin, body.minute)))
+        if whole(_at(origin, body.minute)) >= run["as_of"]:
+            with conn.cursor() as cur:
+                cur.executemany(
+                    "UPDATE run_unit SET nurses_on_duty = %s, awaiting_icu = %s, outliers = %s"
+                    " WHERE run_id = %s AND id = %s",
+                    [(op.nurses_on_duty, op.awaiting_icu, op.outliers, run_id, op.unit) for op in body.operations],
+                )
         if as_of.replace(minute=0, second=0) != run["as_of"].replace(minute=0, second=0):
             cutoff = as_of - timedelta(days=retention_days)
             conn.execute("DELETE FROM vital_bin WHERE run_id = %s AND bin_at < %s", (run_id, cutoff))

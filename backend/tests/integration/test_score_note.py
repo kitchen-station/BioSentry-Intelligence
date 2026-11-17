@@ -28,7 +28,7 @@ def test_the_note_is_served_in_the_public_list_in_wards_and_in_the_rows_of_its_u
     assert run(watch).status_code == 201
     listed = watch.client.get("/open-view").json()["units"]
     assert {u["id"]: u["score_note"] for u in listed} == {"W4": None, "ER": NOTE, "ICU": None, "MED3A": None}
-    assert all(u.keys() == {"id", "name", "floor", "kind", "score_note"} for u in listed)
+    assert all(u.keys() == {"id", "name", "floor", "kind", "score_note", "capacity"} for u in listed)
     assert [(u["id"], u["kind"]) for u in listed][1] == ("ER", "ranked")
     assert {u["id"]: u["score_note"] for u in get(watch, "md-santos", "/wards").json()} == {
         "W4": None, "ER": NOTE, "ICU": None, "MED3A": None,

@@ -51,6 +51,7 @@ from biosentry.schemas.ingest import (
     LiveWard,
     OpenBed,
     OpenBedCard,
+    OpenEr,
     OpenHistory,
     OpenSim,
     OpenWard,
@@ -357,7 +358,10 @@ class WardService:
     def units(self, clinician_id: str) -> list[WardUnit]:
         counts = self._store.counts(self.visible(clinician_id))
         self._audit.append(clinician_id, "list_wards", "-", "ok")
-        return [WardUnit(**u, patients=counts.get(u["id"], 0)) for u in self._store.units.values()]
+        return [
+            WardUnit(**{k: u[k] for k in ("id", "name", "floor", "kind", "score_note")}, patients=counts.get(u["id"], 0))
+            for u in self._store.units.values()
+        ]
 
     def ward(self, clinician_id: str, unit: str | None = None) -> WardResponse:
         unit = unit or self._store.ward  # None: the home unit
@@ -481,12 +485,28 @@ class WardService:
                 shown.append(OpenBed(bed=bed[pid], state=state, rank=rank, risk=risk))
             except ValidationError:  # a label that breaks the rule is left out
                 continue
+        operations = self._store.unit_operations(unit)
+        outcomes = self._store.outcomes_24h(unit)
+        er = None
+        if "ER" in self._store.units:
+            er = OpenEr(
+                capacity=self._store.units["ER"]["capacity"],
+                beds_in_use=len(self._store.on_ward("ER")),
+                awaiting_icu=self._store.unit_operations("ER")["awaiting_icu"],
+            )
         return OpenWard(
             ward=unit,
             synthetic=True,
             can_control=False,
             sim=open_sim(self._store.live_view(unit)),
             beds=sorted(shown, key=lambda b: (b.bed, b.rank or 0)),
+            capacity=self._store.units[unit]["capacity"],
+            nurses_on_duty=operations["nurses_on_duty"],
+            awaiting_icu=operations["awaiting_icu"],
+            outliers=operations["outliers"],
+            er=er,
+            transfers_24h=analytics.hide(outcomes["transfers"]),
+            deaths_24h=analytics.hide(outcomes["deaths"]),
         )
 
     def open_bed(self, unit: str, bed: str) -> OpenBedCard | None:
