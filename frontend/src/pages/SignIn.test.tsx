@@ -160,12 +160,11 @@ describe("SignIn", () => {
 });
 
 describe("the front door", () => {
-  it("in the sample build: the product line, a Sample data badge, and the evidence one click away, readable before sign-in", async () => {
+  it("in the sample build: the product line, a Sample data line, and the evidence one click away, readable before sign-in", async () => {
     page();
     expect(screen.getByText("A ranked early-warning list for hospital wards in the Philippines.")).toBeTruthy();
     expect(screen.getByText("This is not a diagnosis system. It ranks and displays. A human decides.")).toBeTruthy();
-    expect(screen.getByText("Sample data")).toBeTruthy();
-    expect(screen.getByText("Synthetic, not validated.")).toBeTruthy();
+    expect(screen.getByText("Sample data. Synthetic, not validated.")).toBeTruthy();
     const evidence = screen.getByRole("link", { name: "See the evidence from the simulated trials" });
     expect(evidence.getAttribute("href")).toBe("/lab/research");
     expect(screen.getByRole("heading", { level: 1, name: "Sign in" })).toBeTruthy(); // the steps keep their heading
@@ -177,11 +176,11 @@ describe("the front door", () => {
     expect(api.signIn).not.toHaveBeenCalled(); // nothing was signed in to get there
   });
 
-  it("with the API: the product line only, no Sample data badge and no evidence link", () => {
+  it("with the API: the product line only, no Sample data line and no evidence link", () => {
     api.usesServer = true;
     page();
     expect(screen.getByText("A ranked early-warning list for hospital wards in the Philippines.")).toBeTruthy();
-    expect(screen.queryByText("Sample data")).toBeNull();
+    expect(screen.queryByText("Sample data. Synthetic, not validated.")).toBeNull();
     expect(screen.queryByText("Synthetic, not validated.")).toBeNull();
     expect(screen.queryByRole("link")).toBeNull();
     expect(screen.getByText(/Pilot build: synthetic data only\. Not for real patients\./)).toBeTruthy();

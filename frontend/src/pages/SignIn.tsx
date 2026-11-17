@@ -194,8 +194,7 @@ export function SignIn({ onSignIn }: Props) {
           <Mark />
           {!usesServer && (
             <>
-              <span className="hw-tag hw-tag--round">Sample data</span>
-              <span className="hw-text-muted">Synthetic, not validated.</span>
+              <span className="hw-text-muted">Sample data. Synthetic, not validated.</span>
             </>
           )}
         </div>

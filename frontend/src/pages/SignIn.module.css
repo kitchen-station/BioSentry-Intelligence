@@ -61,7 +61,7 @@
   gap: var(--hw-space-3);
 }
 
-.steps { margin: var(--hw-space-5) 0 var(--hw-space-6); }
+.steps { flex-wrap: wrap; row-gap: var(--hw-space-2); margin: var(--hw-space-5) 0 var(--hw-space-6); }
 
 /* Phone: the kit stacks the steps, and the last one already has room below it. */
 @media (width < 576px) {
