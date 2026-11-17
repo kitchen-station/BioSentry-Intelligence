@@ -11,6 +11,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import synthetic from "../data/synthetic.json";
 import type { BaselineComputed, BaselineResponse, ClinicalNote, LabPanel, PatientDetail as Detail, Session, SessionRole } from "../types";
+import { ChatBubble } from "../components/ChatBubble";
 import { formatClock, formatClockSeconds } from "../components/format";
 import { PatientDetail } from "./PatientDetail";
 
@@ -989,34 +990,41 @@ describe("PatientDetail: ask about this patient", () => {
     api.hasPatientQuestions = false;
   });
 
-  it("sits after Current vitals and before Labs, as a link to the patient's thread, and reads no thread itself", async () => {
-    for (const role of ["charge_rn", "md"] as const) {
-      page(role);
+  it("has a header button that opens the assistant panel on this patient, and reads no thread itself", async () => {
+    for (const role of ["rn", "md"] as const) {
+      render(
+        <MemoryRouter initialEntries={["/patient/p-001"]}>
+          <Routes>
+            <Route path="/patient/:id" element={<><PatientDetail session={session(role)} onSignOut={() => undefined} /><ChatBubble session={session(role)} onSignOut={() => undefined} /></>} />
+          </Routes>
+        </MemoryRouter>,
+      );
       await loaded();
-      const heading = await screen.findByRole("heading", { level: 2, name: "Ask about this patient" });
-      const vitals = screen.getByText("Current vitals");
-      const labs = screen.getByText(/^Labs/);
-      expect(vitals.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(heading.compareDocumentPosition(labs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(screen.getByRole("link", { name: "Open the chat" }).getAttribute("href")).toBe("/ask/patient/p-001");
-      expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+      expect(api.getPatientQuestions).not.toHaveBeenCalled(); // closed: the page and the panel read nothing
+      await userEvent.click(screen.getByRole("button", { name: "Ask the assistant" }));
+      const dialog = screen.getByRole("dialog", { name: "Assistant" });
+      expect(within(dialog).getByText("This patient")).toBeTruthy();
+      await waitFor(() => expect(api.getPatientQuestions).toHaveBeenCalledWith("p-001"));
+      expect(screen.queryByText("Ask about this patient")).toBeNull(); // the old card is gone
       cleanup();
+      vi.clearAllMocks();
+      api.getPatient.mockResolvedValue(base);
+      api.getNotes.mockResolvedValue([]);
+      api.getBaseline.mockResolvedValue(null);
+      api.getLiveWard.mockResolvedValue(null);
+      api.getPatientQuestions.mockResolvedValue([asked]);
     }
-    // One copy of the thread: the page never reads the questions, the panel does.
-    expect(api.getPatientQuestions).not.toHaveBeenCalled();
   });
 
-  it("is absent, with no call, for an admin, for a staff nurse (who cannot open the Ask page) and in the demo build", async () => {
-    for (const role of ["admin", "rn"] as const) {
-      page(role);
-      await loaded();
-      expect(screen.queryByText("Ask about this patient")).toBeNull();
-      cleanup();
-    }
+  it("has no button, and no call, for an admin and in the demo build", async () => {
+    page("admin");
+    await loaded();
+    expect(screen.queryByRole("button", { name: "Ask the assistant" })).toBeNull();
+    cleanup();
     api.hasPatientQuestions = false;
     page("rn");
     await loaded();
-    expect(screen.queryByText("Ask about this patient")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Ask the assistant" })).toBeNull();
     expect(api.getPatientQuestions).not.toHaveBeenCalled();
     expect(api.getPatientQuestion).not.toHaveBeenCalled();
   });
@@ -1037,17 +1045,15 @@ describe("PatientDetail: stay panel", () => {
     api.hasHistory = false;
   });
 
-  it("sits after Current vitals and before Ask about this patient, for an admin too, and reads nothing while closed", async () => {
+  it("sits after Current vitals, for an admin too, and reads nothing while closed", async () => {
     api.hasPatientQuestions = true;
     api.getPatientQuestions.mockResolvedValue([]);
     try {
-      page("md");
+      page("rn");
       await loaded();
       const summary = await screen.findByText("Stay");
       const vitals = screen.getByText("Current vitals");
-      const ask = await screen.findByRole("heading", { level: 2, name: "Ask about this patient" });
       expect(vitals.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(summary.compareDocumentPosition(ask) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(api.getPatientHistory).not.toHaveBeenCalled();
       cleanup();
       page("admin");

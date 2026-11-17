@@ -12,9 +12,10 @@ export function ResearchAgentSection({ data = RESEARCH_AGENT }: { data?: AgentEx
   const { provenance: P, questions, proposals } = data;
   return (
     <section className={`hw-card hw-card--outlined ${styles.card}`} aria-labelledby="agent">
-      <h2 id="agent" className="hw-heading hw-heading--4">Research agent: questions asked on the simulated ward</h2>
+      <h2 id="agent" className="hw-heading hw-heading--4">Recorded run: questions asked on the simulated ward</h2>
       <p>
-        Answers recorded from a program run by hand. This page cannot ask it anything yet.
+        Answers recorded from a program run by hand. This page cannot ask anything. To ask the assistant live, a physician or a
+        charge nurse uses the Ask button.
       </p>
       <p>
         Synthetic, not validated. These answers use tuning seeds 1 to 10, not the held-out seeds 11 to 30 in

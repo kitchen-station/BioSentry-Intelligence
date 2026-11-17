@@ -12,6 +12,7 @@ import { Lab } from "./pages/Lab";
 import { AskChat } from "./pages/AskChat";
 import { Overview } from "./pages/Overview";
 import { WardResearch } from "./pages/WardResearch";
+import { ChatBubble } from "./components/ChatBubble";
 import { asksWard } from "./components/roles";
 import { WardFeedProvider } from "./components/WardFeedProvider";
 
@@ -159,5 +160,7 @@ export function App() {
 
   // A signed-in clinician's pages share one read of the ward: the Ward rows and the bell on every page show the same alerts.
   // An administrator reads the ward only on the Ward page (it brings its own read), never in the background.
-  return session && session.role !== "admin" ? <WardFeedProvider key={session.clinician_id} session={session}>{routes}</WardFeedProvider> : routes;
+  // The assistant's panel, once around every page: the top bar's Assistant button opens it.
+  const pages = session ? <ChatBubble session={session} onSignOut={signOut}>{routes}</ChatBubble> : routes;
+  return session && session.role !== "admin" ? <WardFeedProvider key={session.clinician_id} session={session}>{pages}</WardFeedProvider> : pages;
 }

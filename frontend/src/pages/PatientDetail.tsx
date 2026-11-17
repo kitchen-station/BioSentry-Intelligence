@@ -9,8 +9,6 @@ import { AppShell } from "../components/AppShell";
 import { SimulatedNote } from "../components/LabFrame";
 import { StayPanel } from "../components/StayPanel";
 import { since, syncWardNow, useWardNow } from "../components/wardNow";
-import { AskPatient } from "../components/AskPatient";
-import { asksWard } from "../components/roles";
 import { BaselinePanel, BaselineRange, bands } from "../components/BaselinePanel";
 import { ResearchModels } from "../components/ResearchModels";
 import { useBaseline } from "../components/useBaseline";
@@ -19,6 +17,7 @@ import { TrendChart } from "../components/TrendChart";
 import { formatClock, formatClockSeconds, formatSimClock, patchInUse } from "../components/format";
 import { useLivePoll } from "../components/useLivePoll";
 import { band, driftResponse, response } from "../components/risk";
+import { openAssistant } from "../components/roles";
 import { VitalsEntry } from "../components/VitalsEntry";
 import { standing } from "../components/vitalsDraft";
 import styles from "./PatientDetail.module.css";
@@ -264,6 +263,13 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
         <div className={styles.top}>
           <Crumbs current={patient.name} />
           <div className={styles.actions}>
+            {/* The assistant's panel (the chat bubble) opens on this patient's scope. Not for an admin, who cannot ask. */}
+            {hasPatientQuestions && !readOnly && (
+              <button type="button" className="hw-button hw-button--sm" onClick={(e) => openAssistant(e.currentTarget)}>
+                <Icon name="comments" />
+                Ask the assistant
+              </button>
+            )}
             <button type="button" className="hw-button hw-button--sm" aria-expanded={drawer === "notes"} onClick={() => toggleDrawer("notes")}>
               <Icon name="note-sticky" />
               Notes{notes.length > 0 ? ` (${notes.length})` : ""}
@@ -533,13 +539,6 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
             {hasHistory && (
               <div className="hw-card hw-card--outlined">
                 <StayPanel key={patient.id} patientId={patient.id} onSignOut={onSignOut} now={now} />
-              </div>
-            )}
-
-            {/* Only a role that can open the Ask page gets the link: a staff nurse and an admin do not. */}
-            {hasPatientQuestions && asksWard(role) && (
-              <div className="hw-card hw-card--outlined">
-                <AskPatient patientId={patient.id} />
               </div>
             )}
 

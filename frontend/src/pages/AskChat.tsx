@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { NavLink, useParams } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import type { Session } from "../types";
 import { ApiError, getWard, hasLabQuestions, hasPatientQuestions } from "../api";
 import { SimulatedNote } from "../components/LabFrame";
 import { AppShell } from "../components/AppShell";
 import { Thread } from "../components/Thread";
+import { useAskScope } from "../components/useAskScope";
 import styles from "./AskChat.module.css";
 
 interface Props {
@@ -15,7 +16,9 @@ interface Props {
 // A thread is a pill link; the current one (aria-current) gets its heavier edge in the module.
 const PICK = `hw-button hw-button--sm ${styles.pick}`;
 
-function Chat({ session, onSignOut, patientId }: Props & { patientId?: string }) {
+function Chat({ session, onSignOut }: Props) {
+  const scope = useAskScope();
+  const patientId = scope.kind === "patient" ? scope.id : undefined;
   // The reader's patients, ranked and not ranked, for the picker. Without them the ward's thread still works.
   const [patients, setPatients] = useState<{ id: string; name: string }[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -44,7 +47,7 @@ function Chat({ session, onSignOut, patientId }: Props & { patientId?: string })
         {/* key: a new thread starts with its own state. */}
         <Thread
           key={patientId ?? "ward"}
-          scope={patientId ? { kind: "patient", id: patientId } : { kind: "ward" }}
+          scope={scope.kind === "patient" ? scope : { kind: "ward" }}
           clinicianId={session.clinician_id}
           onSignOut={onSignOut}
         />
@@ -55,15 +58,14 @@ function Chat({ session, onSignOut, patientId }: Props & { patientId?: string })
 
 /** The chat: the ward's thread at /ask and one patient's at /ask/patient/:id. Nothing here writes to the live ward. */
 export function AskChat({ session, onSignOut }: Props) {
-  const { id } = useParams();
-  const connected = id ? hasPatientQuestions : hasLabQuestions;
+  const connected = useAskScope().kind === "patient" ? hasPatientQuestions : hasLabQuestions;
   return (
     <AppShell session={session} onSignOut={onSignOut} title="Ask" status={`Ward ${session.ward}`}>
       <SimulatedNote />
       <div className={styles.container}>
         <h1 className="hw-heading hw-heading--3">Ask</h1>
         {connected ? (
-          <Chat session={session} onSignOut={onSignOut} patientId={id} />
+          <Chat session={session} onSignOut={onSignOut} />
         ) : (
           <p className="hw-text-muted">Getting ready: the chat is not connected in this demo.</p>
         )}

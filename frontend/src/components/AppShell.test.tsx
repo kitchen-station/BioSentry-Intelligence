@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import synthetic from "../data/synthetic.json";
 import type { Session, SessionRole, WardResponse } from "../types";
 import { AppShell, UnitSwitcher, researchItems } from "./AppShell";
+import { AssistantContext, type Assistant } from "./roles";
 import { WardFeedContext, type WardFeed } from "./wardFeed";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -28,16 +29,21 @@ const fakeFeed = (over: Partial<WardFeed> = {}): WardFeed => ({
   alerts: [], acknowledge: vi.fn(), flush: vi.fn(() => Promise.resolve()), notice: null, setNotice: vi.fn(), ...over,
 });
 
-const shell = (role: SessionRole = "md", path = "/ward", feed: WardFeed | null = null, extra: { title?: string; status?: string } = {}) =>
+const shell = (
+  role: SessionRole = "md", path = "/ward", feed: WardFeed | null = null,
+  extra: { title?: string; status?: string; assistant?: Assistant } = {},
+) =>
   render(
     <MemoryRouter initialEntries={[path]}>
-      <WardFeedContext.Provider value={feed}>
-        <AppShell session={who(role)} onSignOut={vi.fn()} title={extra.title} status={extra.status && <span>{extra.status}</span>}>
-          <Routes>
-            <Route path="*" element={<Where />} />
-          </Routes>
-        </AppShell>
-      </WardFeedContext.Provider>
+      <AssistantContext.Provider value={extra.assistant ?? null}>
+        <WardFeedContext.Provider value={feed}>
+          <AppShell session={who(role)} onSignOut={vi.fn()} title={extra.title} status={extra.status && <span>{extra.status}</span>}>
+            <Routes>
+              <Route path="*" element={<Where />} />
+            </Routes>
+          </AppShell>
+        </WardFeedContext.Provider>
+      </AssistantContext.Provider>
     </MemoryRouter>,
   );
 
@@ -138,7 +144,7 @@ describe("the Research and Lab menus", () => {
     shell("md");
     await userEvent.click(research());
     expect(screen.getByText("Research space. Synthetic, not validated. Nothing here changes a patient’s rank.")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /^Ask the agent/ })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /^Ask the assistant/ })).toBeTruthy();
     expect(screen.getByRole("link", { name: /^What-if runs Change a rule/ })).toBeTruthy();
     expect(screen.getByRole("link", { name: /^Ward research Every patient/ })).toBeTruthy();
   });
@@ -259,7 +265,7 @@ describe("on a phone", () => {
     vi.stubEnv("VITE_API_URL", "/api");
     shell("md");
     await userEvent.click(within(bottom()!).getByRole("button", { name: "Research" }));
-    expect(screen.getByRole("link", { name: /^Ask the agent/ })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /^Ask the assistant/ })).toBeTruthy();
   });
 
   it("follows the width as it changes", () => {
@@ -274,6 +280,34 @@ describe("on a phone", () => {
     narrow = true;
     act(() => change());
     expect(screen.getByRole("navigation", { name: "Main" }).className).toContain("hw-bottomnav");
+  });
+});
+
+// Where it shows is the panel's rule, tested with the real panel in ChatBubble.test; here, how the bar draws it.
+describe("the assistant's button", () => {
+  it("is not in the bar where the assistant cannot be opened", () => {
+    shell("md");
+    expect(screen.queryByRole("button", { name: /assistant/i })).toBeNull();
+  });
+
+  it("says Assistant beside the bell on a desk, mirrors the panel, and hands itself to the panel", async () => {
+    const toggle = vi.fn();
+    shell("md", "/ward", fakeFeed(), { assistant: { open: false, toggle } });
+    const button = within(screen.getByRole("banner")).getByRole("button", { name: "Assistant" });
+    expect(button.className).toContain("hw-button");
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+    expect(button.nextElementSibling?.querySelector(".hw-bell")).not.toBeNull();
+    await userEvent.click(button);
+    expect(toggle).toHaveBeenCalledWith(button);
+  });
+
+  it("is an icon in the phone's app bar, named Ask the assistant", () => {
+    phone(true);
+    shell("rn", "/patient/p-001", null, { assistant: { open: true, toggle: vi.fn() } });
+    const button = within(screen.getByRole("banner")).getByRole("button", { name: "Ask the assistant" });
+    expect(button.className).toBe("hw-appbar__action");
+    expect(button.textContent).toBe("");
+    expect(button.getAttribute("aria-expanded")).toBe("true");
   });
 });
 

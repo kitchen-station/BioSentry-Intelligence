@@ -58,6 +58,7 @@
 
 .actions {
   display: flex;
+  flex-wrap: wrap; /* three buttons with the assistant's: on a phone they wrap rather than widen the page */
   gap: var(--hw-space-3);
 }
 

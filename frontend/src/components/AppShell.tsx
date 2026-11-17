@@ -3,7 +3,7 @@ import { Link, useLocation, useSearchParams } from "react-router-dom";
 import type { Session } from "../types";
 import { AlertTray } from "./AlertTray";
 import { PatientSearch } from "./PatientSearch";
-import { asksWard } from "./roles";
+import { asksWard, useAssistant } from "./roles";
 import { AccountMenu } from "./SessionMenu";
 import { usePopover } from "./usePopover";
 import { useWardFeed } from "./wardFeed";
@@ -43,7 +43,7 @@ const TABS: Record<string, readonly Tab[]> = { md: [WARD, CENSUS, ADMIT], charge
 interface Item { title: string; sub: string; to: string }
 
 const CLINICAL_RESEARCH: readonly Item[] = [
-  { title: "Ask the agent", sub: "Questions about the ward", to: "/ask" },
+  { title: "Ask the assistant", sub: "Questions about the ward", to: "/ask" },
   { title: "What-if runs", sub: "Change a rule and compare the result", to: "/what-if" },
   { title: "Ward research", sub: "Every patient against their own baseline", to: "/ward/research" },
 ];
@@ -156,6 +156,7 @@ export function UnitSwitcher({ units, current, onPick }: { units: readonly strin
 export function AppShell({ session, onSignOut, title, status, children }: Props) {
   const phone = usePhone();
   const feed = useWardFeed();
+  const assistant = useAssistant();
   const { pathname } = useLocation();
   const [params] = useSearchParams();
   const tab = params.get("tab");
@@ -206,6 +207,20 @@ export function AppShell({ session, onSignOut, title, status, children }: Props)
           )}
           {!phone && feed?.data && <PatientSearch ward={feed.data} />}
           {!phone && status && <span className={styles.status}>{status}</span>}
+          {assistant && (
+            // Desk: icon and word. Phone: an icon in the app bar, named for a screen reader.
+            <button
+              type="button"
+              className={phone ? "hw-appbar__action" : "hw-button hw-button--sm"}
+              aria-label={phone ? "Ask the assistant" : undefined}
+              aria-haspopup="dialog"
+              aria-expanded={assistant.open}
+              onClick={(e) => assistant.toggle(e.currentTarget)}
+            >
+              <span className="hw-icon fa-solid fa-comments" aria-hidden="true" />
+              {!phone && "Assistant"}
+            </button>
+          )}
           {feed && !feed.readOnly && <AlertTray feed={feed} />}
           <AccountMenu session={session} onSignOut={onSignOut} />
         </div>

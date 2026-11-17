@@ -1,0 +1,33 @@
+/* The assistant's drawer, opened from the top bar or a patient page. Layout only: the look is hw-ui's
+   (hw-dialog drawer, hw-close, hw-tag); this file places it and plays the kit's own drawer motion,
+   since the drawer is React's, not a native <dialog>. */
+
+/* Nothing behind the open drawer can be pressed; a press there closes it. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--hw-z-modal);
+  background: var(--hw-color-overlay);
+  animation: hw-fade-in var(--hw-motion-exit);
+}
+
+.panel {
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: calc(var(--hw-z-modal) + 1);
+  display: flex;
+  flex-direction: column;
+  animation: hw-drawer-in 350ms var(--hw-ease-move);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hw-space-4);
+  min-height: 0;
+}
+
+/* The scope tag sits beside the title, not centred between it and the close button. */
+.scope {
+  margin-right: auto;
+}
