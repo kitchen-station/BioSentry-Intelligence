@@ -1,14 +1,15 @@
-import { useCallback, useId, useState } from "react";
+import { useCallback, useState } from "react";
 import { Link } from "react-router-dom";
 import type { AbstainedRow as AbstainedRowType, ScoreRow, Session, VitalsRecorded } from "../types";
 import { canRecordVitals } from "../api";
-import { AppShell } from "../components/AppShell";
+import { AppShell, OfflineBanner } from "../components/AppShell";
 import { Flip, useMoveOnReorder } from "../components/Flip";
 import { formatBloodPressure, formatClock, formatSimClock } from "../components/format";
 import { SimulatedNote } from "../components/LabFrame";
 import { MeasurementDisplay } from "../components/MeasurementDisplay";
 import { band, obsDue } from "../components/risk";
 import { Score } from "../components/Score";
+import { Segmented } from "../components/Segmented";
 import { VitalsEntry } from "../components/VitalsEntry";
 import { news2Points } from "../components/news2";
 import { sentence, standing } from "../components/vitalsDraft";
@@ -38,74 +39,39 @@ const NO_MATCH: Record<Exclude<Filter, "all">, string> = {
   overdue: "No observations are overdue",
 };
 
-/** Two or more exclusive choices as the kit's segmented control: real radios under a named group. */
-function Segmented<T extends string>({ label, value, options, onChange }: {
-  label: string; value: T; options: readonly (readonly [T, string])[]; onChange: (v: T) => void;
+/** A NOT RANKED patient in the table: its reason in place of a next step, and Record vitals opening the drawer. */
+function NotRankedTableRow({ row, now, canRecord, offline, onRecord }: {
+  row: AbstainedRowType; now: number; canRecord: boolean; offline: boolean; onRecord: (row: AbstainedRowType) => void;
 }) {
-  const name = useId();
-  return (
-    <fieldset className="hw-segmented hw-segmented--sm hw-segmented--accent">
-      <legend className="hw-visually-hidden">{label}</legend>
-      {options.map(([v, text]) => (
-        <label key={v}>
-          <input type="radio" className="hw-segmented__input" name={name} checked={value === v} onChange={() => onChange(v)} />
-          <span className="hw-segmented__option">{text}</span>
-        </label>
-      ))}
-    </fieldset>
-  );
-}
-
-/** A NOT RANKED patient in the table: its reason in place of a next step, and Record vitals opening under the row. */
-function NotRankedTableRow({ row, now, canRecord, offline, clinicianId, onRecorded }: {
-  row: AbstainedRowType; now: number; canRecord: boolean; offline: boolean; clinicianId: string;
-  onRecorded: (row: AbstainedRowType, recorded: VitalsRecorded) => void;
-}) {
-  const [entering, setEntering] = useState(false);
   const v = row.vitals;
   return (
-    <>
-      <tr>
-        <td>--</td>
-        <td>{row.bed}</td>
-        <td className={styles.who}><Link to={`/patient/${row.id}`}>{row.name}</Link> <span className={styles.sub}>{row.age ?? "--"}{row.sex ? ` ${row.sex}` : ""}</span></td>
-        <td><span className="hw-tag hw-tag--dashed">NOT RANKED</span></td>
-        <td><strong>{sentence(row.reason)}</strong> {sentence(row.instruction)}</td>
-        <td>{v ? <MeasurementDisplay now={now} measurement={v.heart_rate} /> : "--"}</td>
-        <td>{v ? <MeasurementDisplay now={now} measurement={v.respiratory_rate} /> : "--"}</td>
-        <td>{v ? <MeasurementDisplay now={now} measurement={v.spo2} format={(n) => `${n}%`} /> : "--"}</td>
-        <td>{v ? <MeasurementDisplay now={now} measurement={v.blood_pressure} format={formatBloodPressure} /> : "--"}</td>
-        <td>{v ? <MeasurementDisplay now={now} measurement={v.consciousness} /> : "--"}</td>
-        <td>--</td>
-        <td>
-          {canRecord && (
-            <button
-              type="button"
-              className={entering ? "hw-button hw-button--sm" : "hw-button hw-button--accent hw-button--sm"}
-              aria-expanded={entering}
-              aria-label={`${entering ? "Close" : "Record vitals"} for ${row.name}`}
-              disabled={offline && !entering}
-              onClick={() => setEntering((o) => !o)}
-            >
-              {entering ? "Close" : "Record vitals"}
-            </button>
-          )}
-        </td>
-      </tr>
-      {canRecord && entering && (
-        <tr>
-          <td colSpan={12}>
-            <VitalsEntry
-              patientId={row.id}
-              patientName={row.name}
-              clinicianId={clinicianId}
-              onRecorded={(recorded) => onRecorded(row, recorded)}
-              onClose={() => setEntering(false)}
-            />
-          </td>
-        </tr>
-      )}
-    </>
+    <tr>
+      <td>--</td>
+      <td>{row.bed}</td>
+      <td className={styles.who}><Link to={`/patient/${row.id}`}>{row.name}</Link> <span className={styles.sub}>{row.age ?? "--"}{row.sex ? ` ${row.sex}` : ""}</span></td>
+      <td><span className="hw-tag hw-tag--dashed">NOT RANKED</span></td>
+      <td><strong>{sentence(row.reason)}</strong> {sentence(row.instruction)}</td>
+      <td>{v ? <MeasurementDisplay now={now} measurement={v.heart_rate} /> : "--"}</td>
+      <td>{v ? <MeasurementDisplay now={now} measurement={v.respiratory_rate} /> : "--"}</td>
+      <td>{v ? <MeasurementDisplay now={now} measurement={v.spo2} format={(n) => `${n}%`} /> : "--"}</td>
+      <td>{v ? <MeasurementDisplay now={now} measurement={v.blood_pressure} format={formatBloodPressure} /> : "--"}</td>
+      <td>{v ? <MeasurementDisplay now={now} measurement={v.consciousness} /> : "--"}</td>
+      <td>--</td>
+      <td>
+        {canRecord && (
+          <button
+            type="button"
+            className="hw-button hw-button--accent hw-button--sm"
+            aria-haspopup="dialog"
+            aria-label={`Record vitals for ${row.name}`}
+            disabled={offline}
+            onClick={() => onRecord(row)}
+          >
+            Record vitals
+          </button>
+        )}
+      </td>
+    </tr>
   );
 }
 
@@ -129,6 +95,8 @@ function WardPage({ session, onSignOut, feed }: Props & { feed: WardFeed }) {
   const [view, setView] = useState<"list" | "table">("list");
   const [sort, setSort] = useState<"rank" | "bed">("rank");
   const moveRef = useMoveOnReorder(data ? data.ranked.map((r) => r.id) : []);
+  // The row being recorded for. Held here, not on the row: a patient who becomes ranked leaves the strip, and the result stays.
+  const [recording, setRecording] = useState<AbstainedRowType | null>(null);
 
   // A recorded value changes a patient's standing, which only the server can compute: say
   // what it said, then fetch the ward again so the ranking on screen is the server's.
@@ -216,16 +184,7 @@ function WardPage({ session, onSignOut, feed }: Props & { feed: WardFeed }) {
 
   return (
     <AppShell session={session} onSignOut={onSignOut} title={`Ward ${data.ward}`} status={status}>
-      {failedSince && (
-        <div className={`hw-banner hw-banner--inverse ${styles.offline}`} role="alert">
-          <span className="hw-icon fa-solid fa-ban" aria-hidden="true" />
-          <strong className="hw-banner__title">Offline since {formatClock(since(failedSince))}</strong>
-          <span>
-            Cannot reach the ward server. Showing data from {fetchedAt ? formatClock(fetchedAt) : "--"}; ages below stand at that time. {retry}
-            {!readOnly && " Acknowledging and recording wait until the connection is back."}
-          </span>
-        </div>
-      )}
+      {failedSince && <OfflineBanner className={styles.offline} since={failedSince} from={fetchedAt} retry={retry} acts={!readOnly} />}
       <SimulatedNote />
       <div className={styles.container}>
         <div className={styles.header}>
@@ -262,7 +221,7 @@ function WardPage({ session, onSignOut, feed }: Props & { feed: WardFeed }) {
         </div>
 
         {view === "list" && (
-          <NotRankedSection rows={unranked} clinicianId={session.clinician_id} readOnly={readOnly} offline={offline} onRecorded={handleRecorded} />
+          <NotRankedSection rows={unranked} readOnly={readOnly} offline={offline} onRecord={setRecording} />
         )}
 
         {view === "list" && ranked.length > 0 && (
@@ -309,7 +268,7 @@ function WardPage({ session, onSignOut, feed }: Props & { feed: WardFeed }) {
                 {tableRows.map((r) => {
                   if (!("rank" in r)) {
                     return (
-                      <NotRankedTableRow key={r.id} row={r} now={now} canRecord={canRecord} offline={offline} clinicianId={session.clinician_id} onRecorded={handleRecorded} />
+                      <NotRankedTableRow key={r.id} row={r} now={now} canRecord={canRecord} offline={offline} onRecord={setRecording} />
                     );
                   }
                   const b = band(r);
@@ -368,6 +327,18 @@ function WardPage({ session, onSignOut, feed }: Props & { feed: WardFeed }) {
             <p>The ranked list is unchanged. This filter only hides rows.</p>
             <button type="button" className="hw-button" onClick={() => setFilter("all")}>Show all patients</button>
           </div>
+        )}
+
+        {recording && canRecord && (
+          <VitalsEntry
+            patient={recording}
+            clinicianId={session.clinician_id}
+            role={session.role}
+            offline={offline}
+            showOpen
+            onRecorded={(recorded) => handleRecorded(recording, recorded)}
+            onClose={() => setRecording(null)}
+          />
         )}
 
         <p className={styles.footer}>

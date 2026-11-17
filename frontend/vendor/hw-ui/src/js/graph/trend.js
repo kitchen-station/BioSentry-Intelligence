@@ -10,6 +10,48 @@
 //     unit: '', format: (v) => v.toFixed(2), height: 250,
 //   })
 // null in values breaks the line. Returns { update(config), destroy() }.
+//
+// Clinical options (all optional; without them the graph draws exactly as before):
+//   trend(el, { …, unit: ' bpm',
+//     range: [40, 140],                                  // fixed y-range; ticks at its two ends
+//     limits: [{ at: 90, label: 'Adds 1 point above 90' }, { at: 110, label: 'Adds 2 points above 110' }],
+//     band: [72, 88], bandLabel: 'Own usual 72–88',
+//     highlightWhere: (v) => v > 90 || v <= 50,           // only these stretches of the highlighted line are lit
+//   })
+/**
+ * @typedef {object} TrendSeries
+ * @property {string} name
+ * @property {(number|null)[]} values  one per x; null is a gap, never bridged
+ * @property {boolean} [dashed]        tells two context lines apart
+ *
+ * @typedef {object} TrendLimit
+ * @property {number} at               value where the dashed line is drawn (outside `range`: not drawn)
+ * @property {string} [label]          its name at the right end of the line; defaults to the formatted value
+ * @property {'urgent'|'emergency'} [tone]  colours the line and its name; leave it off for a grey limit
+ *
+ * @typedef {object} TrendConfig
+ * @property {string} title            states the finding
+ * @property {string} [subtitle]       says what was measured
+ * @property {(string|number)[]} x     one label per point
+ * @property {string} [xLabel]         first column of the table
+ * @property {TrendSeries[]} series    up to four
+ * @property {string|number} [highlight]  name or index of the highlighted line; defaults to the last
+ * @property {number} [max]            zero-based scale: at least this tall (ignored with `range`)
+ * @property {[number, number]} [range]  a fixed y-range in place of the zero-based scale, ticked at its two ends.
+ *                                     Values outside it are drawn on its edge; the readout and the table keep the
+ *                                     real value
+ * @property {TrendLimit[]} [limits]   dashed horizontal lines, each named at its right end
+ * @property {[number, number]} [band] a shaded range (a patient's own usual range), named at its right end
+ * @property {string} [bandLabel]      the band's name; defaults to "Usual lo–hi"
+ * @property {(v: number) => boolean} [highlightWhere]  only where this holds do the highlighted line's stretches,
+ *                                     its dots and the readout number take the highlight colour; the rest of the
+ *                                     line is context grey. A segment that crosses is cut where it crosses
+ * @property {string} [unit]           appended to every number
+ * @property {(v: number) => string} [format]  takes over number formatting
+ * @property {string} [hint]           the line under the plot
+ * @property {number} [height]         plot height in px, default 250
+ * @property {number} [level]          heading level, default 3
+ */
 import { frame, svg, el, missing, formatter, niceScale } from './frame.js';
 
 const GAP = 16; // minimum distance between two end labels
@@ -33,18 +75,49 @@ function spread(items, floor) {
   return items;
 }
 
+/**
+ * The stretches of a line where pass(v) holds, as one path along the drawn line. A segment that crosses is cut
+ * where it crosses (found by bisection on the value).
+ * ponytail: a segment that passes at both ends is drawn whole, even if it dips out in between (a jump from below
+ * one limit to above another in one step); split it at every crossing if that ever matters.
+ */
+function stretches(values, xAt, yAt, pass) {
+  const ok = (v) => Boolean(pass(v));
+  let d = '', pen = false;
+  for (let i = 0; i < values.length - 1; i++) {
+    const a = values[i], b = values[i + 1];
+    if (missing(a) || missing(b) || (!ok(a) && !ok(b))) { pen = false; continue; }
+    let t0 = 0, t1 = 1;
+    if (ok(a) !== ok(b)) {
+      let lo = 0, hi = 1;
+      for (let j = 0; j < 16; j++) { const m = (lo + hi) / 2; if (ok(a + (b - a) * m) === ok(a)) lo = m; else hi = m; }
+      if (ok(a)) t1 = lo; else t0 = hi;
+    }
+    const at = (t) => `${(xAt(i) + (xAt(i + 1) - xAt(i)) * t).toFixed(1)},${(yAt(a) + (yAt(b) - yAt(a)) * t).toFixed(1)}`;
+    d += `${pen && t0 === 0 ? '' : `M${at(t0)}`}L${at(t1)}`;
+    pen = t1 === 1;
+  }
+  return d;
+}
+
 export function trend(root, initial) {
   let config = initial;
   let f, keyButtons, fmt, focus, index, width = 0, geo = null;
 
   const clampIndex = (i) => Math.max(0, Math.min(config.x.length - 1, i));
+  /** Does a reading of the highlighted line take the highlight colour? Always, unless highlightWhere says no. */
+  const lit = (v) => !missing(v) && (!config.highlightWhere || Boolean(config.highlightWhere(v)));
+  const limitName = (l) => l.label ?? fmt(l.at);
+  const bandName = () => config.bandLabel ?? `Usual ${config.band[0]}–${config.band[1]}`;
 
   function say() {
     const { series, x } = config;
+    const v = series[focus].values[index];
     f.say({
-      value: fmt(series[focus].values[index]),
+      value: fmt(v),
       label: `${series[focus].name}, ${x[index]}`,
       detail: series.filter((_, k) => k !== focus).map((s) => `${s.name} ${fmt(s.values[index])}`).join(', '),
+      tone: config.highlightWhere && lit(v) ? 'highlight' : undefined,
     });
   }
 
@@ -58,6 +131,7 @@ export function trend(root, initial) {
         const v = config.series[k].values[index];
         dot.toggleAttribute('hidden', missing(v));
         if (!missing(v)) { dot.setAttribute('cx', geo.xAt(index)); dot.setAttribute('cy', geo.yAt(v)); }
+        if (config.highlightWhere && k === focus) dot.toggleAttribute('data-on', lit(v));
       });
       geo.ticks.forEach((t, k) => t?.toggleAttribute('data-on', k === index));
     }
@@ -65,22 +139,28 @@ export function trend(root, initial) {
   }
 
   function draw() {
-    const { x, series, height = 250 } = config;
+    const { x, series, height = 250, band, range: fixed } = config;
     width = Math.round(f.plot.clientWidth);
     if (!width) return;
     f.plot.querySelector('svg')?.remove();
     const n = x.length;
     const all = series.flatMap((s) => s.values).filter((v) => !missing(v));
-    const { top, ticks } = niceScale(Math.max(config.max ?? 0, ...all));
+    let lo = 0, top, ticks;
+    if (fixed) { [lo, top] = fixed; ticks = [lo, top]; }
+    else ({ top, ticks } = niceScale(Math.max(config.max ?? 0, ...all, ...(config.limits ?? []).map((l) => l.at), ...(band ?? []))));
+    const limits = (config.limits ?? []).filter((l) => l.at >= lo && l.at <= top);
     const endLabels = width >= 480 && series.length <= 4;
-    const longest = Math.max(...series.map((s) => s.name.length + fmt(s.values.findLast((v) => !missing(v))).length + 1));
+    const longest = Math.max(...series.map((s) => s.name.length + fmt(s.values.findLast((v) => !missing(v))).length + 1),
+      ...limits.map((l) => limitName(l).length), band ? bandName().length : 0);
     const right = endLabels ? Math.min(width * 0.36, longest * 6.6 + 24) : 14;
     const x0 = 36, x1 = width - right - 6, y0 = 14, y1 = height - 34;
     const xAt = (i) => (n === 1 ? (x0 + x1) / 2 : x0 + (i * (x1 - x0)) / (n - 1));
-    const yAt = (v) => y1 - (v / top) * (y1 - y0);
+    const clamp = fixed ? (v) => Math.max(lo, Math.min(top, v)) : (v) => v; // outside a fixed range: on its edge
+    const yAt = (v) => y1 - ((clamp(v) - lo) / (top - lo)) * (y1 - y0);
 
     const root_ = svg('svg', { viewBox: `0 0 ${width} ${height}`, height, class: 'hw-graph__svg', 'aria-hidden': 'true' });
     f.plot.prepend(root_);
+    if (band) svg('rect', { x: 0, width: x1 + 6, y: yAt(band[1]), height: yAt(band[0]) - yAt(band[1]), class: 'hw-graph__band' }, root_);
     ticks.forEach((t) => {
       svg('line', { x1: 0, x2: x1 + 6, y1: yAt(t), y2: yAt(t), class: t === 0 ? 'hw-graph__baseline' : 'hw-graph__gridline' }, root_);
       svg('text', { x: 0, y: yAt(t) - 6, class: 'hw-graph__tick' }, root_).textContent = fmt(t);
@@ -94,6 +174,13 @@ export function trend(root, initial) {
       t.textContent = label;
       return t;
     });
+    // Limits and the band are named at the right end, in the label gutter with the line ends. A narrow plot has no
+    // gutter: the names move inside it, at the left, above their line (as in steps).
+    const notes = limits.map((l) => {
+      svg('line', { x1: 0, x2: x1 + 6, y1: yAt(l.at), y2: yAt(l.at), class: 'hw-graph__limit', 'data-dashed': '', 'data-tone': l.tone }, root_);
+      return { at: yAt(l.at) - (endLabels ? 0 : 5), text: limitName(l), tone: l.tone, kind: 'limit' };
+    });
+    if (band) notes.push({ at: (yAt(band[0]) + yAt(band[1])) / 2 + (endLabels ? 0 : 4), text: bandName(), kind: 'band' });
     const guide = svg('line', { y1: y0, y2: y1, class: 'hw-graph__guide' }, root_);
 
     const order = series.map((_, k) => k).filter((k) => k !== focus).concat(focus); // highlight on top
@@ -106,19 +193,24 @@ export function trend(root, initial) {
         d += `${pen ? 'L' : 'M'}${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`;
         pen = true;
       });
-      svg('path', { d, class: 'hw-graph__line', 'data-on': k === focus ? '' : null, 'data-dashed': s.dashed ? '' : null }, root_);
+      const where = k === focus && config.highlightWhere; // then the line is context and only its stretches are lit
+      svg('path', { d, class: 'hw-graph__line', 'data-on': k === focus && !where ? '' : null, 'data-dashed': s.dashed ? '' : null }, root_);
+      if (where) svg('path', { d: stretches(s.values, xAt, yAt, where), class: 'hw-graph__line', 'data-on': '', 'data-dashed': s.dashed ? '' : null }, root_);
       const end = s.values.findLastIndex((v) => !missing(v));
       if (end < 0) return;
-      svg('circle', { cx: xAt(end), cy: yAt(s.values[end]), r: 4, class: 'hw-graph__dot', 'data-on': k === focus ? '' : null }, root_);
+      svg('circle', { cx: xAt(end), cy: yAt(s.values[end]), r: 4, class: 'hw-graph__dot', 'data-on': k === focus && lit(s.values[end]) ? '' : null }, root_);
       ends.push({ k, at: yAt(s.values[end]), x: xAt(end), text: fmt(s.values[end]) });
     });
-    if (endLabels) {
-      spread(ends, y1).forEach((e) => {
-        const t = svg('text', { x: e.x + 14, y: e.y, class: 'hw-graph__end', 'data-on': e.k === focus ? '' : null }, root_);
-        svg('tspan', {}, t).textContent = series[e.k].name;
-        svg('tspan', { dx: 6, class: 'hw-graph__end-value' }, t).textContent = e.text;
-      });
-    }
+    spread(endLabels ? ends.concat(notes) : notes, y1).forEach((e) => {
+      if (e.kind) {
+        const name = `hw-graph__${e.kind}-label`;
+        svg('text', { x: endLabels ? x1 + 14 : x0, y: e.y, class: endLabels ? name : `${name} ${name}--inside`, 'data-tone': e.tone }, root_).textContent = e.text;
+        return;
+      }
+      const t = svg('text', { x: e.x + 14, y: e.y, class: 'hw-graph__end', 'data-on': e.k === focus ? '' : null }, root_);
+      svg('tspan', {}, t).textContent = series[e.k].name;
+      svg('tspan', { dx: 6, class: 'hw-graph__end-value' }, t).textContent = e.text;
+    });
     const dots = series.map((_, k) => svg('circle', { r: 4.5, class: 'hw-graph__dot', 'data-on': k === focus ? '' : null }, root_));
     root_.append(dots[focus]); // highlighted reading dot on top
 
@@ -153,7 +245,8 @@ export function trend(root, initial) {
 
     f.plot.tabIndex = 0;
     f.plot.setAttribute('role', 'group');
-    f.plot.setAttribute('aria-label', `${config.title}. Use the left and right arrow keys to read each point.`);
+    const marks = [...(config.limits ?? []).map(limitName), ...(config.band ? [bandName()] : [])];
+    f.plot.setAttribute('aria-label', `${config.title}.${marks.length ? ` Marked: ${marks.join('; ')}.` : ''} Use the left and right arrow keys to read each point.`);
     f.table({
       columns: [config.xLabel ?? '', ...series.map((s) => s.name)],
       rows: x.map((label, i) => [label, ...series.map((s) => fmt(s.values[i]))]),

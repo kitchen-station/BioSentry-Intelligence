@@ -1,16 +1,16 @@
 import { useId, useState } from "react";
 import { canRecordVitals } from "../api";
 import { AbstainedRow } from "../components/AbstainedRow";
-import type { AbstainedRow as AbstainedRowType, VitalsRecorded } from "../types";
+import type { AbstainedRow as AbstainedRowType } from "../types";
 import styles from "./Ward.module.css";
 
 interface Props {
   readonly rows: readonly AbstainedRowType[];
-  readonly clinicianId: string;
   readonly readOnly?: boolean;
   /** Offline: Record vitals waits until the connection is back. */
   readonly offline?: boolean;
-  readonly onRecorded: (row: AbstainedRowType, recorded: VitalsRecorded) => void;
+  /** Opens the Record vitals drawer for a row. */
+  readonly onRecord: (row: AbstainedRowType) => void;
 }
 
 /**
@@ -18,7 +18,7 @@ interface Props {
  * Whether a row offers vitals entry is decided here, once, from the build's capability: only the
  * API can re-rank, so the fixture build offers none (D4).
  */
-export function NotRankedSection({ rows, clinicianId, readOnly = false, offline = false, onRecorded }: Props) {
+export function NotRankedSection({ rows, readOnly = false, offline = false, onRecord }: Props) {
   const [open, setOpen] = useState(true);
   const heading = useId();
   const list = useId();
@@ -44,8 +44,7 @@ export function NotRankedSection({ rows, clinicianId, readOnly = false, offline 
             key={row.id}
             row={row}
             canRecord={canRecordVitals && !readOnly}
-            clinicianId={clinicianId}
-            onRecorded={onRecorded}
+            onRecord={onRecord}
             disabled={offline}
           />
         ))}

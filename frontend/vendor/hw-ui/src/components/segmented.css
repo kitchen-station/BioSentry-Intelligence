@@ -1,9 +1,8 @@
 @layer hw.components {
   /* Markup: fieldset.hw-segmented > label > input[type=radio].hw-segmented__input + span.hw-segmented__option */
   /* Selected: brand red by default (the kit's emphasis rule); --accent makes it ink, for products where red is clinical. */
-  .hw-segmented { --hw-segmented-selected: var(--hw-color-brand); }
+  .hw-segmented { --hw-segmented-selected: var(--hw-color-brand); display: inline-flex; flex-wrap: wrap; gap: var(--hw-space-3); margin: 0; padding: 0; border: 0; }
   .hw-segmented--accent { --hw-segmented-selected: var(--hw-color-accent); }
-  .hw-segmented { display: inline-flex; flex-wrap: wrap; gap: var(--hw-space-3); margin: 0; padding: 0; border: 0; }
   .hw-segmented__input { position: absolute; width: 1px; height: 1px; opacity: 0; }
   .hw-segmented__option {
     white-space: nowrap;

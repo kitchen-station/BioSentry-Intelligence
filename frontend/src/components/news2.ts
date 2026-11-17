@@ -29,6 +29,51 @@ function spo2Scale2(v: number, onO2: boolean): Points {
   return v <= 94 ? 1 : v <= 96 ? 2 : 3;
 }
 
+/** The three vitals the patient page charts. */
+export type Charted = "heart_rate" | "respiratory_rate" | "spo2";
+
+/**
+ * Where a charted vital stops scoring 0, from the tables above: [lowest 0-point value, highest]
+ * (null where that side never scores). SpO2 depends on the scale, and on scale 2 on oxygen.
+ * news2.test.ts checks these edges against the point functions.
+ */
+export function zeroBand(vital: Charted, scale: 1 | 2 = 1, onO2 = false): [number | null, number | null] {
+  if (vital === "heart_rate") return [51, 90];
+  if (vital === "respiratory_rate") return [12, 20];
+  return scale === 2 ? [88, onO2 ? 92 : null] : [96, null];
+}
+
+const POINTS = {
+  heart_rate: (v: number) => hr(halfUp(v)),
+  respiratory_rate: (v: number) => rr(halfUp(v)),
+  spo2: (v: number) => spo2Scale1(halfUp(v)),
+  spo2Air2: (v: number) => spo2Scale2(halfUp(v), false),
+  spo2O22: (v: number) => spo2Scale2(halfUp(v), true),
+};
+type Rule = keyof typeof POINTS;
+const rule = (vital: Charted, scale: 1 | 2, onO2: boolean): Rule =>
+  vital !== "spo2" || scale === 1 ? vital : onO2 ? "spo2O22" : "spo2Air2";
+// One function per case, made once: a chart that receives the same rule is not rebuilt.
+const ADDS = Object.fromEntries(
+  Object.entries(POINTS).map(([k, points]) => [k, (v: number) => points(v) > 0]),
+) as Record<Rule, (v: number) => boolean>;
+
+/** Whether a value of a charted vital adds NEWS2 points: the stretch of a trend drawn in the highlight. */
+export function addsPoints(vital: Charted, scale: 1 | 2 = 1, onO2 = false): (v: number) => boolean {
+  return ADDS[rule(vital, scale, onO2)];
+}
+
+/** A chart's dashed lines: where the value starts to add points, named with the points it adds just past them. */
+export function chartLimits(vital: Charted, scale: 1 | 2 = 1, onO2 = false): { at: number; label: string }[] {
+  const [lo, hi] = zeroBand(vital, scale, onO2);
+  const points = POINTS[rule(vital, scale, onO2)];
+  const name = (n: number) => `+${n} ${n === 1 ? "point" : "points"}`;
+  return [
+    ...(hi !== null ? [{ at: hi, label: `${name(points(hi + 1))} above ${hi}` }] : []),
+    ...(lo !== null ? [{ at: lo, label: `${name(points(lo - 1))} below ${lo}` }] : []),
+  ];
+}
+
 export function news2Points(v: Vitals): Partial<Record<VitalKey, Points>> {
   const out: Partial<Record<VitalKey, Points>> = {};
   const r = value(v.respiratory_rate);

@@ -1,14 +1,7 @@
-/* One NOT RANKED patient: the kit's hw-notice__item. This file adds the last stored values and room for the entry form. */
+/* One NOT RANKED patient: the kit's hw-notice__item. This file adds the last stored values. */
 
 .seen {
   margin-top: var(--hw-space-2);
   font-size: var(--hw-text-caption);
   color: var(--hw-color-text-muted);
-}
-
-/* The entry form opens under the patient, across the whole item. */
-.entry {
-  flex: 1 1 100%;
-  padding-top: var(--hw-space-4);
-  border-top: 1px solid var(--hw-color-border-subtle);
 }

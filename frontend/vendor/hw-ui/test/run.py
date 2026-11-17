@@ -1,6 +1,6 @@
 """hw-ui test runner: keyboard behaviour, axe accessibility scan, and screenshots.
 Usage: python3 -I test/run.py   (needs Playwright + Chrome; serves the repo over HTTP for ES modules)."""
-import http.server, threading, functools, pathlib, sys, json, os
+import http.server, threading, functools, pathlib, sys, json, os, re
 from playwright.sync_api import sync_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -213,7 +213,7 @@ with sync_playwright() as p:
     check('share: tapping a part highlights it', rd('#g-share')[0] == '28%' and pg.locator('#g-share .hw-graph__part[aria-pressed=true]').count() == 1)
 
     check('stat: number, sparkline, and a change with its arrow', pg.locator('#g-stat-1 .hw-stat__value').inner_text() == '0.13' and pg.locator('#g-stat-1 .hw-stat__line').count() == 1 and pg.locator('#g-stat-1 .hw-stat__change .fa-arrow-down').count() == 1)
-    check('graphs: every graph is a labelled figure', pg.evaluate('[...document.querySelectorAll(".hw-graph")].every(g => g.getAttribute("role") === "figure" && document.getElementById(g.getAttribute("aria-labelledby")))') and pg.locator('.hw-graph').count() == 6)
+    check('graphs: every graph is a labelled figure', pg.evaluate('[...document.querySelectorAll(".hw-graph")].every(g => g.getAttribute("role") === "figure" && document.getElementById(g.getAttribute("aria-labelledby")))') and pg.locator('.hw-graph').count() == 7)
 
     # ---- Ward components (0.10): score, filter, bell and tray, search, ranklist, notice, banner ----
     EMERGENCY, URGENT, URGENT_TEXT, WHITE, INK, GREY = 'rgb(199, 0, 11)', 'rgb(244, 132, 12)', 'rgb(149, 67, 4)', 'rgb(255, 255, 255)', 'rgb(25, 25, 25)', 'rgb(223, 223, 223)'
@@ -266,6 +266,66 @@ with sync_playwright() as p:
     check('tag: --dashed is dashed', css('#tag-dashed', 'borderTopStyle') == 'dashed')
     check('banner: --inverse is black with white text', [css('#offline-banner', p) for p in ('backgroundColor', 'color')] == [INK, WHITE])
 
+    # ---- Patient (0.10 Phase 2): trend range, limits, band, highlightWhere; highlight by space; pager, decision, action bar ----
+    pg.locator('#g-hr').scroll_into_view_if_needed(); pg.wait_for_timeout(200)
+    hr = pg.evaluate("""(() => { const g = document.getElementById("g-hr"), q = (s) => [...g.querySelectorAll(s)], n = (e, a) => +e.getAttribute(a), cs = getComputedStyle;
+      const band = g.querySelector(".hw-graph__band"), dots = q(".hw-graph__dot");
+      return { ticks: q(".hw-graph__tick:not(.hw-graph__tick--x)").map(t => t.textContent), baselines: q(".hw-graph__baseline").length,
+        grid: q(".hw-graph__gridline").map(l => n(l, "y1")), limits: q(".hw-graph__limit").map(l => [n(l, "y1"), n(l, "x2"), cs(l).strokeDasharray]),
+        labels: q(".hw-graph__limit-label").map(t => [t.textContent, n(t, "x")]), band: [n(band, "y"), n(band, "height"), cs(band).fill],
+        bandLabel: q(".hw-graph__band-label").map(t => t.textContent), strokes: q(".hw-graph__line").map(l => [l.hasAttribute("data-on"), cs(l).stroke]),
+        lit: g.querySelector(".hw-graph__line[data-on]").getAttribute("d"), endDot: cs(dots[0]).fill, value: cs(g.querySelector(".hw-graph__value")).color }; })()""")
+    top, bottom = min(hr['grid']), max(hr['grid'])
+    yv = lambda v: bottom - (v - 40) / 100 * (bottom - top)
+    check('trend range: the y-axis runs from 40 to 140, not from zero', hr['ticks'] == ['40 bpm', '140 bpm'] and hr['baselines'] == 0 and len(hr['grid']) == 2, str(hr['ticks']))
+    check('trend limits: dashed lines where their values fall on the range', sorted(round(y) for y, _, _ in hr['limits']) == sorted(round(yv(v)) for v in (50, 90, 110)) and all(d != 'none' for _, _, d in hr['limits']), str(hr['limits']))
+    check('trend limits: each named at its right end', sorted(t for t, _ in hr['labels']) == ['+1 point above 90', '+1 point at 50 or below', '+2 points above 110'] and all(x > max(x2 for _, x2, _ in hr['limits']) for _, x in hr['labels']), str(hr['labels']))
+    check('trend band: shaded from 72 to 88 and named', abs(hr['band'][0] - yv(88)) < 0.5 and abs(hr['band'][1] - (yv(72) - yv(88))) < 0.5 and hr['band'][2] == 'rgba(25, 25, 25, 0.18)' and hr['bandLabel'] == ['Own usual 72–88'], str(hr['band']))
+    starts = [float(y) for y in re.findall(r'M[\d.]+,([\d.]+)', hr['lit'])]
+    check('trend highlightWhere: only the stretches adding points are red, cut at the limit', hr['strokes'] == [[False, 'rgb(147, 147, 147)'], [True, EMERGENCY]] and len(starts) == 2 and all(abs(y - yv(90)) < 0.6 for y in starts), str([hr['strokes'], starts, yv(90)]))
+    check('trend highlightWhere: the latest reading adds points, so its dot and number are red', hr['endDot'] == EMERGENCY and hr['value'] == EMERGENCY, str([hr['endDot'], hr['value']]))
+    reading = lambda: pg.evaluate('(() => { const g = document.getElementById("g-hr"); return [g.querySelector(".hw-graph__value").textContent, getComputedStyle(g.querySelector(".hw-graph__value")).color, [...g.querySelectorAll(".hw-graph__dot")].at(-1).hasAttribute("data-on")]; })()')
+    pg.locator('#g-hr .hw-graph__plot').focus(); pg.keyboard.press('Home')
+    first = reading()
+    for _ in range(6): pg.keyboard.press('ArrowRight')
+    spike = reading()
+    check('trend highlightWhere: a reading inside the limits is grey, one outside them red', first == ['78 bpm', INK, False] and spike == ['96 bpm', EMERGENCY, True], str([first, spike]))
+    out = pg.evaluate("""(() => { const d = document.createElement("div"); d.style.width = "600px"; document.getElementById("g-hr").after(d);
+      const t = window.hw.trend(d, { title: "Out of range", x: ["a", "b"], series: [{ name: "HR", values: [150, 30] }], range: [40, 140] });
+      const grid = [...d.querySelectorAll(".hw-graph__gridline")].map(l => +l.getAttribute("y1")), dot = () => +[...d.querySelectorAll(".hw-graph__dot")].at(-1).getAttribute("cy");
+      const r = [Math.min(...grid), Math.max(...grid), dot(), d.querySelector(".hw-graph__value").textContent, [...d.querySelectorAll("tbody td")].map(c => c.textContent)];
+      d.querySelector(".hw-graph__plot").dispatchEvent(new KeyboardEvent("keydown", { key: "Home" }));
+      r.push(dot(), d.querySelector(".hw-graph__value").textContent); t.destroy(); d.remove(); return r; })()""")
+    check('trend range: a value outside it sits on the edge; the readout and table keep it', out[2] == out[1] and out[3] == '30' and out[4] == ['150', '30'] and out[5] == out[0] and out[6] == '150', str(out))
+    old = pg.evaluate("""(() => { const g = document.getElementById("g-trend"), t = g.querySelector(".hw-graph__title").textContent;
+      return [g.querySelectorAll(".hw-graph__band, .hw-graph__limit, .hw-graph__limit-label, .hw-graph__band-label").length, g.querySelector(".hw-graph__tick").textContent,
+              g.querySelectorAll(".hw-graph__baseline").length, g.querySelector(".hw-graph__plot").getAttribute("aria-label") === t + ". Use the left and right arrow keys to read each point.",
+              g.querySelector(".hw-graph__readout").hasAttribute("data-tone"), g.querySelectorAll(".hw-graph__line[data-on]").length]; })()""")
+    check('trend: an old-style trend (no new options) draws as before: zero-based, one lit line, no reference marks', old == [0, '0', 1, True, False, 1], str(old))
+    sp = pg.evaluate("""(() => { const c = document.getElementById("g-trend").closest(".hw-card"), l = document.querySelector("#g-trend .hw-graph__line[data-on]"), out = [];
+      for (const s of ["clinical", "research"]) { c.dataset.hwSpace = s; out.push(getComputedStyle(l).stroke); }
+      delete c.dataset.hwSpace; out.push(getComputedStyle(l).stroke); return out; })()""")
+    check('graphs: data-hw-space sets the highlight (clinical ink, research info blue)', sp == [INK, 'rgb(31, 85, 181)', EMERGENCY], str(sp))
+
+    pgr = pg.evaluate('["#pager-first", "#pager-last"].map(s => [...document.querySelectorAll(s + " .hw-button")].map(b => b.disabled))')
+    check('pager: Previous is disabled at the first patient, Next at the last', pgr == [[True, False], [False, True]], str(pgr))
+    snap = pg.locator('#pager-first').aria_snapshot()
+    check('pager: the K and J hints show but are not read out', 'button "Previous" [disabled]' in snap and 'button "Next"' in snap and css('#pager-first .hw-pager__key', 'display') != 'none', snap)
+
+    dc = pg.evaluate("""(() => { const cs = getComputedStyle, d = document.getElementById("decision-high"), cells = [...d.querySelectorAll(".hw-decision__cell")], col = (s) => cs(document.querySelector(s)).color;
+      const band = () => ["score", "band", "step"].map(e => col("#decision-high .hw-decision__" + e));
+      const r = [cs(d).gridTemplateColumns.split(" ").length, new Set(cells.map(c => Math.round(c.getBoundingClientRect().top))).size, cs(cells[1]).boxShadow, band(),
+                 ["score", "band", "step"].map(e => col("#decision-nr .hw-decision__" + e)), [col("#decision-nr [data-stale]"), cs(document.querySelector("#decision-nr [data-stale]")).fontWeight],
+                 cs(d.querySelector(".hw-decision__model")).backgroundColor];
+      d.dataset.band = "medium"; r.push(band()); d.dataset.band = "high"; return r; })()""")
+    check('decision: four cells in one row from 1200px, divided by subtle lines', dc[0] == 4 and dc[1] == 1 and GREY in dc[2], str(dc[:3]))
+    check('decision: the band colours score, band word and next step (high red, medium urgent, not ranked ink)', dc[3] == [EMERGENCY] * 3 and dc[7] == [URGENT_TEXT] * 3 and dc[4] == [INK] * 3, str([dc[3], dc[7], dc[4]]))
+    check('decision: a stale source is red and bold; the model note is info-tinted', dc[5] == [EMERGENCY, '700'] and dc[6] == 'rgb(238, 243, 254)', str(dc[5:7]))
+
+    ab = pg.evaluate("""(() => { const b = [...document.querySelectorAll("#actionbar .hw-button")].map(e => e.getBoundingClientRect()), c = getComputedStyle(document.getElementById("actionbar"));
+      return [Math.abs(b[0].width - 2 * b[1].width) < 3, Math.abs(b[1].width - b[2].width) < 0.5, b.map(r => r.height), c.position, c.paddingBottom, c.borderTopColor]; })()""")
+    check('actionbar: the first action takes two shares, 48px buttons, sticky with a top border', ab[0] and ab[1] and ab[2] == [48] * 3 and ab[3:] == ['sticky', '10px', GREY], str(ab))
+
     pg.evaluate('window.hw.destroy()')
     trig.click()
     check('destroy(): listeners removed', trig.get_attribute('aria-expanded') == 'false')
@@ -274,6 +334,12 @@ with sync_playwright() as p:
     for label, q in [('light', ''), ('dark', '?theme=dark'), ('cloud', '?family=cloud&density=compact')]:
         pg = page_for(viewport={'width': 1280, 'height': 900}, reduced_motion='reduce')  # stable captures
         pg.goto(BASE + q); pg.wait_for_function('window.hw'); pg.wait_for_timeout(300)
+        if label == 'dark':
+            sp = []
+            for s in ('clinical', 'research', ''):  # reduced motion leaves a 0.01ms transition on everything: let it end
+                pg.evaluate('(s) => { const c = document.getElementById("g-trend").closest(".hw-card"); if (s) c.dataset.hwSpace = s; else delete c.dataset.hwSpace; }', s)
+                pg.wait_for_timeout(50); sp.append(pg.evaluate('getComputedStyle(document.querySelector("#g-trend .hw-graph__line[data-on]")).stroke'))
+            check('dark: data-hw-space highlights in light ink and light info blue', sp == ['rgb(243, 243, 243)', 'rgb(157, 189, 252)', 'rgb(238, 105, 111)'], str(sp))
         axe(pg, label)
         pg.screenshot(path=str(OUT / f'desktop-{label}.png'), full_page=True)
 
@@ -326,6 +392,15 @@ with sync_playwright() as p:
     pg.evaluate('document.querySelector("#g-trend").scrollIntoView()'); pg.wait_for_timeout(300)
     check('mobile: graphs fit the phone width', pg.evaluate('[...document.querySelectorAll(".hw-graph")].every(g => g.getBoundingClientRect().right <= innerWidth && g.scrollWidth <= g.clientWidth + 1)'))
     check('mobile: trend drops end labels and keeps the keys', pg.locator('#g-trend .hw-graph__end').count() == 0 and pg.locator('#g-trend .hw-graph__key').count() == 3)
+    nar = pg.evaluate('(() => { const g = document.getElementById("g-hr"); return [g.querySelectorAll(".hw-graph__limit-label--inside").length, g.querySelectorAll(".hw-graph__band-label--inside").length, g.querySelectorAll(".hw-graph__end").length]; })()')
+    check('mobile: a narrow trend names its limits and band inside the plot', nar == [3, 1, 0], str(nar))
+    mp = pg.evaluate("""(() => { const cs = getComputedStyle, p = document.getElementById("pager-first"), pos = p.querySelector(".hw-pager__position").getBoundingClientRect(),
+        b = [...p.querySelectorAll(".hw-button")].map(e => e.getBoundingClientRect()), d = [...document.querySelectorAll("#decision-high .hw-decision__cell")].map(c => c.getBoundingClientRect());
+      return [cs(p.querySelector(".hw-pager__key")).display, pos.bottom <= b[0].top, Math.abs(b[0].width - b[1].width) < 0.5, cs(document.getElementById("decision-high")).gridTemplateColumns.split(" ").length,
+              d.every(r => Math.round(r.left) === Math.round(d[0].left)), [...document.querySelectorAll("#actionbar .hw-button")].map(e => e.getBoundingClientRect().height)]; })()""")
+    check('mobile: pager hides the key hints, position above two equal buttons', mp[0] == 'none' and mp[1] and mp[2], str(mp))
+    check('mobile: decision strip stacks into one column', mp[3] == 1 and mp[4], str(mp))
+    check('mobile: action bar buttons stay 48px on touch', mp[5] == [48] * 3, str(mp))
     pg.locator('#g-columns .hw-graph__column').nth(5).tap()
     check('mobile: tapping a column reads it', pg.locator('#g-columns .hw-graph__label').inner_text() == 'alerts on 8 Nov')
     pg.locator('#toast-btn').tap(); pg.wait_for_timeout(300)

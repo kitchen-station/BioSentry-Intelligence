@@ -1,16 +1,21 @@
-/* Manual vitals entry: a kit card with kit fields and radios. Layout only here. */
+/* Record vitals: a kit drawer (hw-dialog--drawer, full screen on a phone) with kit fields and radios. Layout only here. */
 
+/* The form fills the drawer: its body scrolls, its footer stays. */
 .form {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.body {
   display: flex;
   flex-direction: column;
   gap: var(--hw-space-5);
+  color: var(--hw-color-text);
 }
 
-.title {
-  font-size: var(--hw-font-size-18);
-  font-weight: var(--hw-weight-semibold);
-}
-
+.who,
 .sub,
 .hint,
 .echoTitle {
@@ -18,7 +23,7 @@
   color: var(--hw-color-text-muted);
 }
 
-.sub { margin-top: calc(var(--hw-space-4) * -1); }
+.why { margin: 0 var(--hw-space-6) var(--hw-space-4); }
 
 .group {
   display: flex;
@@ -42,9 +47,10 @@
   gap: var(--hw-space-4);
 }
 
-.wrap {
+.grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--hw-space-4);
 }
 
 .field { min-width: 0; }
@@ -74,8 +80,4 @@
 
 .message { align-items: center; }
 
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--hw-space-3);
-}
+.next { font-size: var(--hw-font-size-16); }

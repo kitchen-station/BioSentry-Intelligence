@@ -103,7 +103,7 @@
     --hw-icon-size-sm: 12px; --hw-icon-size-md: 16px; --hw-icon-size-lg: 20px; --hw-icon-size-xl: 32px;
 
     /* Graphs (js/graph/, components/graph.css). Every colour has one job. */
-    --hw-graph-highlight: var(--hw-color-brand);          /* the one thing to look at */
+    --hw-graph-highlight: var(--hw-color-brand);          /* the one thing to look at; ink or info blue by data-hw-space (themes.css) */
     --hw-graph-context: var(--hw-gray-40);                /* everything else */
     --hw-graph-context-strong: var(--hw-gray-60);
     --hw-graph-context-soft: var(--hw-gray-20);

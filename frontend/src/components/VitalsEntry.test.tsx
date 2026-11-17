@@ -11,7 +11,6 @@ const base: VitalsEntryFormProps = {
   problems: {},
   busy: false,
   failure: null,
-  standingText: null,
   onChange: () => undefined,
   onSubmit: () => undefined,
   onClose: () => undefined,
@@ -71,13 +70,25 @@ describe("the vitals entry form", () => {
     expect(out).toContain('aria-invalid="true"');
   });
 
-  it("shows the server's refusal as an alert and its answer as a status", () => {
+  it("shows the server's refusal as an alert", () => {
     const failed = html({ failure: "Not recorded. systolic 19 is outside 20-300." });
     expect(failed).toContain('role="alert"');
     expect(failed).toContain("systolic 19 is outside 20-300");
-    const answered = html({ standingText: "Ranked #3 with NEWS2 0." });
-    expect(answered).toContain('role="status"');
-    expect(answered).toContain("Ranked #3 with NEWS2 0.");
+  });
+
+  it("asks for blood pressure first, then ACVPU, oxygen, the SpO2 scale and the patch values", () => {
+    const legends = [...html().matchAll(/<legend[^>]*>([^<]*)<\/legend>/g)].map((m) => m[1]);
+    expect(legends).toEqual([
+      "Blood pressure (mmHg)", "Level of consciousness (ACVPU)", "Oxygen", "SpO2 scale", "Patch values, if measured by hand",
+    ]);
+  });
+
+  it("ties each problem to its field, and waits to record while offline", () => {
+    const out = html({ problems: { heartRate: "Heart rate must be 1 to 300." } });
+    const id = /<p id="([^"]+)" class="hw-field__error">Heart rate must be 1 to 300\.<\/p>/.exec(out)![1];
+    expect(out).toContain(`aria-describedby="${id}"`);
+    expect(html()).not.toMatch(/<button type="submit"[^>]*disabled/);
+    expect(html({ offline: true })).toMatch(/<button type="submit"[^>]*disabled/);
   });
 
   it("locks the form while a request is in flight", () => {

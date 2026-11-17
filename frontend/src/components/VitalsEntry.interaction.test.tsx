@@ -7,7 +7,7 @@
  * and what it shows for what comes back.
  */
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -84,15 +84,18 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-const entry = (over: { onRecorded?: (r: VitalsRecorded) => void; onClose?: () => void } = {}) =>
+const entry = (over: Partial<Parameters<typeof VitalsEntry>[0]> = {}) =>
   render(
-    <VitalsEntry
-      patientId="p-004"
-      patientName="Flores, Ramon"
-      clinicianId="rn-delacruz"
-      onRecorded={over.onRecorded ?? (() => undefined)}
-      onClose={over.onClose ?? (() => undefined)}
-    />,
+    <MemoryRouter>
+      <VitalsEntry
+        patient={{ id: "p-004", name: "Flores, Ramon", age: 73, sex: "M", bed: "4B" }}
+        clinicianId="rn-delacruz"
+        role="rn"
+        onRecorded={() => undefined}
+        onClose={() => undefined}
+        {...over}
+      />
+    </MemoryRouter>,
   );
 
 const field = (label: string) => screen.getByLabelText(label) as HTMLInputElement;
@@ -197,21 +200,36 @@ describe("a valid draft is one request carrying only what was entered", () => {
     // Exactly these keys: no acvpu, no spo2_scale, nothing null or defaulted. Room air is a
     // recorded false, not an omission.
     expect(sentInput()).toStrictEqual({ systolic: 130, diastolic: 84, on_oxygen: false });
-    expect(await screen.findByText("Ranked #5 with NEWS2 0.")).toBeTruthy();
+    const status = await screen.findByRole("status");
+    expect(status.textContent).toBe("Ranked #5 with NEWS2 0.");
     expect(onRecorded).toHaveBeenCalledTimes(1);
     expect(onRecorded).toHaveBeenCalledWith(ranked(5, 0));
-    // The form is ready for the next entry.
-    expect(field("Systolic").value).toBe("");
+    // The result takes the form's place. NEWS2 0 has no step, and the patient page offers no Open patient.
+    expect(screen.queryByLabelText("Systolic")).toBeNull();
+    expect(screen.queryByText(/^Next step/)).toBeNull();
+    expect(screen.queryByRole("link", { name: "Open patient" })).toBeNull();
+  });
+
+  it("names the next step for a ranked result of 5 or more, by role, and opens the patient from the ward", async () => {
+    const user = userEvent.setup();
+    api.recordVitals.mockResolvedValue(ranked(1, 7));
+    entry({ role: "md", showOpen: true });
+    await user.click(screen.getByLabelText("A Alert"));
+    await user.click(recordButton());
+    expect(await screen.findByText("Ranked #1 with NEWS2 7.")).toBeTruthy();
+    expect(screen.getByText("Emergency assessment; consider critical care")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Open patient" }).getAttribute("href")).toBe("/patient/p-004");
   });
 
   it("sends a single choice alone", async () => {
     const user = userEvent.setup();
-    api.recordVitals.mockResolvedValue(ranked(2, 3));
+    api.recordVitals.mockResolvedValue(stillNotRanked);
     entry();
     await user.click(screen.getByLabelText("U Unresponsive"));
     await user.click(recordButton());
     expect(sentInput()).toStrictEqual({ acvpu: "U" });
 
+    await user.click(await screen.findByRole("button", { name: "Add the missing values" }));
     await user.click(screen.getByLabelText("Scale 2"));
     await user.click(recordButton());
     expect(sentInput(1)).toStrictEqual({ spo2_scale: 2 });
@@ -220,9 +238,9 @@ describe("a valid draft is one request carrying only what was entered", () => {
 
   it("a choice set back to Not recorded is left out of the request", async () => {
     const user = userEvent.setup();
-    api.recordVitals.mockResolvedValue(ranked(2, 3));
+    api.recordVitals.mockResolvedValue(stillNotRanked);
     entry();
-    const [acvpuUnset, oxygenUnset, scaleUnset] = screen.getAllByLabelText("Not recorded");
+    const [acvpuUnset, oxygenUnset] = screen.getAllByLabelText("Not recorded");
     await user.click(screen.getByLabelText("A Alert"));
     await user.click(screen.getByLabelText("On supplemental oxygen"));
     await user.click(screen.getByLabelText("Scale 2"));
@@ -232,8 +250,9 @@ describe("a valid draft is one request carrying only what was entered", () => {
     await user.click(recordButton());
     expect(sentInput()).toStrictEqual({ spo2_scale: 1 });
 
+    await user.click(await screen.findByRole("button", { name: "Add the missing values" }));
     await user.click(screen.getByLabelText("Scale 1"));
-    await user.click(scaleUnset);
+    await user.click(screen.getAllByLabelText("Not recorded")[2]);
     await user.click(recordButton());
     expect(screen.getByRole("alert").textContent).toBe("Record at least one value.");
     expect(api.recordVitals).toHaveBeenCalledTimes(1);
@@ -271,23 +290,67 @@ describe("a valid draft is one request carrying only what was entered", () => {
 
     finish(ranked(3, 0));
     expect(await screen.findByText("Ranked #3 with NEWS2 0.")).toBeTruthy();
-    for (const control of [...screen.getAllByRole("radio"), field("Systolic"), field("Diastolic")]) {
-      expect(control.matches(":disabled")).toBe(false);
-    }
+    expect(screen.queryAllByRole("radio")).toHaveLength(0); // the result in place of the form
   });
 
-  it("states why a patient is still not ranked, in the server's words", async () => {
+  it("states why a patient is still not ranked, in the server's words, and asks again for what is missing", async () => {
     const user = userEvent.setup();
     api.recordVitals.mockResolvedValue(stillNotRanked);
-    entry();
+    entry({ patient: row });
+    // Opened from a NOT RANKED row: its reason first.
+    expect(screen.getByText("Systolic BP missing.")).toBeTruthy();
     await user.type(field("Systolic"), "118");
     await user.type(field("Diastolic"), "74");
     await user.click(recordButton());
     expect(
-      await screen.findByText(
-        "Still not ranked. No device data. Apply the patch and verify the signal.",
-      ),
-    ).toBeTruthy();
+      (await screen.findByRole("status")).textContent,
+    ).toBe("Still not ranked. No device data. Apply the patch and verify the signal.");
+    expect(screen.queryByText("Systolic BP missing.")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Add the missing values" }));
+    // The form again, empty, under the server's new reason.
+    expect(field("Systolic").value).toBe("");
+    expect(screen.getByText("No device data.")).toBeTruthy();
+    expect(screen.getByText("Apply the patch and verify the signal.", { exact: false })).toBeTruthy();
+  });
+
+  it("keeps a reason the server left out as none, and a ranked answer ends the NOT RANKED line", async () => {
+    const user = userEvent.setup();
+    api.recordVitals
+      .mockResolvedValueOnce({ ...stillNotRanked, not_ranked_reason: null, not_ranked_instruction: null })
+      .mockResolvedValueOnce(ranked(2, 3));
+    entry({ patient: { ...row, instruction: undefined } });
+    expect(screen.getByText("Systolic BP missing.").parentElement!.textContent).toBe("NOT RANKED Systolic BP missing. .");
+    await user.click(screen.getByLabelText("A Alert"));
+    await user.click(recordButton());
+    await user.click(await screen.findByRole("button", { name: "Add the missing values" }));
+    expect(screen.getByText("NOT RANKED").parentElement!.textContent).toBe("NOT RANKED . .");
+    await user.click(screen.getByLabelText("A Alert"));
+    await user.click(recordButton());
+    expect(await screen.findByText("Ranked #2 with NEWS2 3.")).toBeTruthy();
+    expect(screen.queryByText("NOT RANKED")).toBeNull();
+  });
+
+  it("closes from Close, the corner button, Esc and the backdrop, and not from a click inside", async () => {
+    const user = userEvent.setup();
+    for (const how of ["Close", "Close record vitals", "Esc", "backdrop"]) {
+      const onClose = vi.fn();
+      entry({ onClose });
+      const dialog = screen.getByRole("dialog", { name: "Record vitals" });
+      await user.click(within(dialog).getByText("Flores, Ramon · 73 M · Bed 4B")); // inside: stays open
+      expect(onClose).not.toHaveBeenCalled();
+      if (how === "Esc") fireEvent(dialog, new Event("cancel", { cancelable: true }));
+      else if (how === "backdrop") await user.click(dialog);
+      else await user.click(within(dialog).getByRole("button", { name: how }));
+      await waitFor(() => expect(onClose, how).toHaveBeenCalledTimes(1));
+      cleanup();
+    }
+  });
+
+  it("waits to record while offline, and says so", () => {
+    entry({ offline: true, patient: { id: "p-004", name: "Flores, Ramon", age: null, sex: null, bed: "4B" } });
+    expect(screen.getByText("Flores, Ramon · -- · Bed 4B")).toBeTruthy();
+    expect((recordButton() as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("Cannot reach the ward server. Recording waits until the connection is back.")).toBeTruthy();
   });
 });
 
@@ -356,28 +419,32 @@ describe("what the server refuses is shown as the server said it", () => {
 });
 
 describe("the row and the ward page", () => {
-  it("opens and closes the form from the row, collapsed until asked for", async () => {
+  it("asks the page to open the drawer for its row: no form under the row", async () => {
     const user = userEvent.setup();
-    render(<MemoryRouter><AbstainedRow row={row} canRecord clinicianId="rn-delacruz" /></MemoryRouter>);
+    const onRecord = vi.fn();
+    render(<MemoryRouter><AbstainedRow row={row} canRecord onRecord={onRecord} /></MemoryRouter>);
+    const button = screen.getByRole("button", { name: "Record vitals" });
+    expect(button.getAttribute("aria-haspopup")).toBe("dialog");
+    await user.click(button);
+    expect(onRecord).toHaveBeenCalledWith(row);
     expect(screen.queryByRole("form")).toBeNull();
-
-    const toggle = screen.getByRole("button", { name: "Record vitals" });
-    expect(toggle.getAttribute("aria-expanded")).toBe("false");
-    await user.click(toggle);
-    expect(screen.getByRole("form", { name: "Record vitals for Flores, Ramon" })).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: "Close" })[0].getAttribute("aria-expanded")).toBe("true");
-
-    await user.click(screen.getAllByRole("button", { name: "Close" })[0]);
-    expect(screen.queryByRole("form")).toBeNull();
+    cleanup();
+    render(<MemoryRouter><AbstainedRow row={row} canRecord /></MemoryRouter>);
+    await user.click(screen.getByRole("button", { name: "Record vitals" })); // no handler: nothing happens
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("closes from the form's own Close button too, and the row collapses with it", async () => {
+  it("opens the drawer from the strip, and Close takes it away", async () => {
     const user = userEvent.setup();
-    render(<MemoryRouter><AbstainedRow row={row} canRecord clinicianId="rn-delacruz" /></MemoryRouter>);
-    await user.click(screen.getByRole("button", { name: "Record vitals" }));
-    await user.click(screen.getAllByRole("button", { name: "Close" })[1]); // the form's, not the row toggle
-    expect(screen.queryByRole("form")).toBeNull();
-    expect(screen.getByRole("button", { name: "Record vitals" }).getAttribute("aria-expanded")).toBe("false");
+    setActiveClinician("rn-delacruz");
+    api.getWard.mockResolvedValue(await fixtureWard());
+    render(<MemoryRouter><Ward session={{ clinician_id: "rn-delacruz", ward: "W4", role: "rn" }} onSignOut={() => undefined} /></MemoryRouter>);
+    await user.click((await screen.findAllByRole("button", { name: "Record vitals" }))[0]);
+    const dialog = screen.getByRole("dialog", { name: "Record vitals" });
+    expect(within(dialog).getByRole("form", { name: /^Record vitals for / })).toBeTruthy();
+    expect(within(dialog).getByText("NOT RANKED")).toBeTruthy(); // the row's reason, above the form
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
   it("fetches the ward again after a record and says where the patient now stands", async () => {
@@ -386,7 +453,9 @@ describe("the row and the ward page", () => {
     const before = await fixtureWard();
     expect(before.abstained.length).toBeGreaterThan(0);
     const target = before.abstained[0];
-    api.getWard.mockResolvedValueOnce(before).mockResolvedValue({ ...before, abstained: [] });
+    // The server's next read has the patient in the ranked list, at rank 5.
+    const moved = { ...before.ranked[0], id: target.id, name: target.name, bed: target.bed, rank: 5, score: 0, escalation_reasons: [] };
+    api.getWard.mockResolvedValueOnce(before).mockResolvedValue({ ...before, abstained: [], ranked: [...before.ranked.slice(0, 4), moved] });
     api.recordVitals.mockResolvedValue({ ...ranked(5, 0), patient_id: target.id });
 
     const session: Session = { clinician_id: "rn-delacruz", ward: before.ward, role: "rn" };
@@ -405,5 +474,11 @@ describe("the row and the ward page", () => {
     expect(await screen.findByText(`Recorded for ${target.name}. Ranked #5 with NEWS2 0.`)).toBeTruthy();
     expect(api.getWard).toHaveBeenCalledTimes(2); // the ranking on screen is the server's
     expect(screen.queryByText(/Not ranked \(/)).toBeNull();
+    // The patient has moved into the ranked list, and the drawer kept its answer although the row is gone.
+    const list = within(screen.getByRole("region", { name: "Ranked patients" }));
+    expect(list.getByRole("link", { name: target.name })).toBeTruthy();
+    const dialog = within(screen.getByRole("dialog", { name: "Record vitals" }));
+    expect(dialog.getByRole("status").textContent).toBe("Ranked #5 with NEWS2 0.");
+    expect(dialog.getByRole("link", { name: "Open patient" }).getAttribute("href")).toBe(`/patient/${target.id}`);
   });
 });

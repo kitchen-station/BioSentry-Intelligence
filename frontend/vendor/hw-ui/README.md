@@ -144,6 +144,23 @@ with its full contract in a comment, and `test/gallery.html` (section "Ward") ha
 New tokens: `--hw-color-emergency` (NEWS2 7+ fill; red-50 in dark), `--hw-color-on-emergency` (white),
 `--hw-target-size` (44px; 40px in compact density, 44px on touch).
 
+### Phase 2 (0.10.0-biosentry.2): Patient
+
+Patient components, CSS only, as in Phase 1; `trend` gains four options. `test/gallery.html` (section "Patient
+(0.10 Phase 2)") has working markup for each, and each CSS file opens with its full element list.
+
+| Component | Contract |
+|---|---|
+| `hw-pager` (`pager.css`) | `div.hw-pager[role=group][aria-label="Move through patients in rank order"] > button.hw-button[type=button] (i.hw-icon.fa-solid.fa-arrow-left[aria-hidden] + "Previous" + kbd.hw-pager__key[aria-hidden=true] "K") + span.hw-pager__position ("1 of 9 in rank order" \| "Not in the ranked order") + button.hw-button[type=button] (kbd.hw-pager__key[aria-hidden=true] "J" + "Next" + i.hw-icon.fa-solid.fa-arrow-right[aria-hidden])`. `disabled` on the button at either end (both when not in the ranked order). The app wires K and J while focus is not in a field. Key hints hide below 768px; below 576px the position sits above two equal buttons. |
+| `hw-decision` (`decision.css`) | `section.hw-decision[aria-label="Decision"][data-band=high\|medium\|low]` (no `data-band` when NOT RANKED) `> div.hw-decision__cell` × 4: NEWS2 (`p.hw-decision__label` + `div.hw-decision__reading > span.hw-decision__score + span.hw-decision__meta > span.hw-decision__band` (+ `i.fa-arrow-up` when rising) `+ span.hw-decision__change`); Next step (`p.hw-decision__label + p.hw-decision__step + p.hw-decision__note`, a `strong` in the note for the NOT RANKED reason); Why (`p.hw-decision__label + ul.hw-decision__reasons > li.hw-tag` or `p.hw-decision__text`, `+ p.hw-decision__model > i.hw-icon.fa-solid.fa-flask + span > strong "Prediction models · rank unchanged." + text`); Signal (`p.hw-decision__label + p.hw-decision__signal + p.hw-decision__note[data-stale]`). The band colours the score, the band word and the next step: high emergency text, medium (and Low-medium) urgent text, low and NOT RANKED ink. A stale source is red and bold. Subtle lines between cells; one row from 1200px, two by two from 576px, stacked on phones; a cell left out leaves no gap. |
+| `hw-actionbar` (`actionbar.css`) | `div.hw-actionbar.hw-only-mobile > button.hw-button.hw-button--primary + button.hw-button + button.hw-button` (Record vitals · Notes · Next). The first action takes two shares of the width; 48px buttons; sticky to the bottom of the viewport, padded with the safe-area inset; surface with a top border. **Rule:** it replaces the bottom tab bar on a detail screen. A screen shows `.hw-actionbar` or `.hw-bottomnav`, never both (drop `.hw-has-bottomnav` too). Put it last in the screen. |
+| `trend` (`js/graph/trend.js`) | New options, all optional; without them a trend draws exactly as before. `range: [lo, hi]` fixed y-range (ticks at its ends; values outside drawn on the edge, real values in the readout and table). `limits: [{ at, label?, tone? }]` dashed lines named at their right end. `band: [lo, hi]` + `bandLabel` a shaded usual range, named. `highlightWhere: (v) => boolean` only the stretches, dots and readout number where it holds take the highlight colour; the rest of the line is grey. Below 480px of plot the names move inside it. API and example: [docs/graphs.md](docs/graphs.md#trend-clinical-options). |
+| Highlight by space (`themes.css`) | `data-hw-space="clinical"` sets `--hw-graph-highlight` to ink (`--hw-color-text`), `data-hw-space="research"` to `--hw-color-info-fg`; dark values follow the theme (`#F3F3F3`, `#9DBDFC`). The Patient trends set no space, so their `highlightWhere` stretch stays red. |
+
+New tokens (component tier, pointing at semantic tokens): `--hw-pager-position-width`; `--hw-decision-band-fg`,
+`-bg`, `-line`, `-cols`, `-pad`, `-score-size`, `-step-size`; `--hw-actionbar-pad-y`, `-pad-x`, `-gap`, `-bg`,
+`-border`, `-button-height`. No new semantic tokens; the spaces override `--hw-graph-highlight`.
+
 ## Rules (enforced by `npm run lint`)
 
 1. **Cascade layers** `hw.tokens → hw.base → hw.components → hw.utilities`. Later layers win regardless of
@@ -170,7 +187,7 @@ New tokens: `--hw-color-emergency` (NEWS2 7+ fill; red-50 in dark), `--hw-color-
 ```bash
 npm install          # dev tools + Font Awesome Free (the only runtime peer dependency; the font is bundled)
 npm run lint         # CSS architecture rules + JS lint
-npm test             # Playwright: 133 checks (keyboard, form states, link names, motion, graphs, reduced motion, axe in 5 modes)
+npm test             # Playwright: 154 checks (keyboard, form states, link names, motion, graphs, reduced motion, axe in 5 modes)
 ```
 
 ## Adding a component

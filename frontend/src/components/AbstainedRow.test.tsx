@@ -35,13 +35,11 @@ describe("a NOT RANKED row", () => {
     expect(out).not.toContain("<button");
   });
 
-  it("offers a collapsed 'Record vitals' action when it can", () => {
-    const out = html(
-      <AbstainedRow row={row} canRecord clinicianId="rn-delacruz" />,
-    );
+  it("offers 'Record vitals', which opens the drawer, when it can", () => {
+    const out = html(<AbstainedRow row={row} canRecord />);
     expect(out).toContain("Record vitals");
-    expect(out).toContain('aria-expanded="false"');
-    expect(out).not.toContain("<form"); // the form is opened by the nurse, not rendered up front
+    expect(out).toContain('aria-haspopup="dialog"');
+    expect(out).not.toContain("<form"); // one form, in the drawer: none under the row
   });
 
   it("disables Record vitals while offline", () => {

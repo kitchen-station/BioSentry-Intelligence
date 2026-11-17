@@ -69,7 +69,7 @@ export function frame(root, kind, { title, subtitle, level = 3 } = {}) {
 
   return {
     root, plot, foot, titleId: heading.id,
-    /** Update the sentence above the plot. tone: 'urgent' | 'emergency' colours the number. */
+    /** Update the sentence above the plot. tone: 'urgent' | 'emergency' | 'highlight' colours the number. */
     say({ value: v = '', label: l = '', detail: d = '', tone } = {}) {
       value.textContent = v;
       label.textContent = l;

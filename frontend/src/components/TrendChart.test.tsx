@@ -3,9 +3,16 @@
 
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { trend } from "hw-ui";
 import { formatClock } from "./format";
 import { TrendChart } from "./TrendChart";
+
+// The kit's own graph, watched: the clinical options must reach it.
+vi.mock("hw-ui", async (importOriginal) => {
+  const real = await importOriginal<typeof import("hw-ui")>();
+  return { ...real, trend: vi.fn(real.trend) };
+});
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 afterEach(cleanup);
@@ -98,6 +105,29 @@ describe("TrendChart", () => {
       expect(container.innerHTML).toBe("");
       unmount();
     }
+  });
+
+  it("gives the kit the clinical range, the limits, the named own band and the points stretch, and none without them", () => {
+    const adds = (v: number) => v > 80;
+    const limits = [{ at: 80, label: "+1 point above 80" }];
+    render(<TrendChart label="HR" unit="bpm" data={two} range={[40, 140]} limits={limits} band={{ low: 62, high: 78, flagged: false }} highlightWhere={adds} />);
+    const config = vi.mocked(trend).mock.calls.at(-1)![1];
+    expect(config).toMatchObject({ range: [40, 140], limits, band: [62, 78], bandLabel: "Own baseline 62–78" });
+    expect(config.highlightWhere).toBe(adds);
+    cleanup();
+    render(<TrendChart label="HR" unit="bpm" data={two} />);
+    const plain = vi.mocked(trend).mock.calls.at(-1)![1];
+    for (const key of ["range", "limits", "band", "bandLabel", "highlightWhere"]) expect(plain, key).not.toHaveProperty(key);
+  });
+
+  it("is drawn again when the points rule changes, not when the same one comes back", () => {
+    const a = (v: number) => v > 80;
+    const { rerender } = render(<TrendChart label="HR" unit="bpm" data={two} highlightWhere={a} />);
+    const drawn = vi.mocked(trend).mock.calls.length;
+    rerender(<TrendChart label="HR" unit="bpm" data={two} highlightWhere={a} />);
+    expect(vi.mocked(trend).mock.calls.length).toBe(drawn);
+    rerender(<TrendChart label="HR" unit="bpm" data={two} highlightWhere={(v) => v > 70} />);
+    expect(vi.mocked(trend).mock.calls.length).toBe(drawn + 1);
   });
 
   it("is not rebuilt for the same figures, is for new ones, and goes when the data does", () => {
