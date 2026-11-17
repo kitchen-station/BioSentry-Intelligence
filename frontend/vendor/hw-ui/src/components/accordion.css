@@ -1,0 +1,40 @@
+@layer hw.components {
+  /* Native <details>; no JS needed. */
+  .hw-accordion { border-top: 1px solid var(--hw-color-border-subtle); }
+  .hw-accordion__item { border-bottom: 1px solid var(--hw-color-border-subtle); }
+  .hw-accordion__summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--hw-space-5) var(--hw-space-2);
+    font-size: var(--hw-font-size-16);
+    font-weight: var(--hw-weight-semibold);
+    cursor: pointer;
+    list-style: none;
+  }
+  .hw-accordion__summary::-webkit-details-marker { display: none; }
+  .hw-accordion__summary::after {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-right: 1.5px solid var(--hw-color-text-muted);
+    border-bottom: 1.5px solid var(--hw-color-text-muted);
+    transform: rotate(45deg);
+    transition: transform var(--hw-motion-enter) var(--hw-ease-move);
+  }
+  .hw-accordion__item[open] > .hw-accordion__summary::after { transform: rotate(-135deg); }
+  @supports selector(::details-content) {
+    .hw-accordion__item { interpolate-size: allow-keywords; }
+    .hw-accordion__item::details-content {
+      block-size: 0;
+      overflow: clip;
+      opacity: 0;
+      transition:
+        block-size var(--hw-motion-enter) var(--hw-ease-move),
+        opacity var(--hw-motion-enter) var(--hw-ease-move),
+        content-visibility var(--hw-motion-enter) allow-discrete;
+    }
+    .hw-accordion__item[open]::details-content { block-size: auto; opacity: 1; }
+  }
+  .hw-accordion__body { padding: 0 var(--hw-space-2) var(--hw-space-5); color: var(--hw-color-text-muted); }
+}

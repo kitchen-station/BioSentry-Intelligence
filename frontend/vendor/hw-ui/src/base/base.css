@@ -1,0 +1,45 @@
+@layer hw.base {
+  *, *::before, *::after { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: var(--hw-font-sans);
+    font-size: var(--hw-text-body);
+    line-height: var(--hw-line-height);
+    color: var(--hw-color-text);
+    background: var(--hw-color-canvas);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :where(button, input, select, textarea) { font: inherit; color: inherit; }
+  :where(a) { color: var(--hw-color-link); }
+  :where(a):hover { color: var(--hw-color-link-hover); }
+
+  /* One focus style everywhere. Components opt in with .hw-focusable or inherit it via :focus-visible. */
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: none;
+    box-shadow: var(--hw-focus-ring);
+  }
+
+  /* stylelint-disable-next-line declaration-no-important -- [hidden] must beat component display rules */
+  [hidden] { display: none !important; }
+}
+
+@layer hw.utilities {
+  .hw-visually-hidden {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+  }
+}
+
+/* Reduced motion wins over everything, so it lives outside the layers. */
+/* stylelint-disable declaration-no-important -- accessibility override must win */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+/* stylelint-enable declaration-no-important */

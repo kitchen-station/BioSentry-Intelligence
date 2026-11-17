@@ -1,0 +1,75 @@
+/* Overrides of semantic tokens only. Components never change for a theme. */
+@layer hw.tokens {
+  /* Dark theme — contrast checked: text 15:1, muted 7.9:1, brand text 5.8:1 on #191919 */
+  [data-hw-theme="dark"] {
+    --hw-graph-highlight: var(--hw-red-30);
+    --hw-graph-context: var(--hw-gray-40);
+    --hw-graph-context-strong: var(--hw-gray-30);
+    --hw-graph-context-soft: var(--hw-gray-60);
+    --hw-graph-grid: var(--hw-gray-80);
+    --hw-graph-band: rgb(255 255 255 / 24%);
+    --hw-graph-urgent: var(--hw-orange-50);   --hw-graph-urgent-text: var(--hw-orange-50);
+    --hw-graph-emergency: var(--hw-red-30);   --hw-graph-emergency-text: var(--hw-red-30);
+    --hw-graph-compare-1: var(--hw-blue-40); --hw-graph-compare-2: var(--hw-orange-60);
+    --hw-graph-compare-3: var(--hw-indigo-40); --hw-graph-compare-4: var(--hw-mint-50);
+
+    color-scheme: dark;
+    --hw-color-canvas: var(--hw-gray-100);
+    --hw-color-surface: var(--hw-gray-90);
+    --hw-color-surface-subtle: var(--hw-gray-80);
+    --hw-color-surface-inverse: var(--hw-gray-05);
+    --hw-color-overlay: rgb(0 0 0 / 60%);
+    --hw-color-fill-hover: rgb(255 255 255 / 8%);
+    --hw-color-fill-disabled: var(--hw-gray-80);
+    --hw-color-skeleton: var(--hw-gray-80);
+    --hw-color-skeleton-shine: var(--hw-gray-70);
+    --hw-color-text: var(--hw-gray-05);
+    --hw-color-text-muted: var(--hw-gray-30);
+    --hw-color-text-subtle: var(--hw-gray-40);
+    --hw-color-text-inverse: var(--hw-gray-90);
+    --hw-color-border: var(--hw-gray-70);
+    --hw-color-border-strong: var(--hw-gray-05);
+    --hw-color-border-subtle: var(--hw-gray-80);
+    --hw-color-brand-text: var(--hw-red-30);
+    --hw-color-brand-subtle: rgb(238 105 111 / 16%);
+    --hw-color-accent: var(--hw-gray-05);
+    --hw-color-accent-hover: var(--hw-gray-30);
+    --hw-color-on-accent: var(--hw-gray-90);
+    --hw-color-link: var(--hw-blue-20);
+    --hw-color-link-hover: var(--hw-gray-0);
+    --hw-color-focus: var(--hw-blue-20);
+    --hw-color-info-fg: var(--hw-blue-20);   --hw-color-info-bg: rgb(10 89 247 / 16%);   --hw-color-info-border: rgb(10 89 247 / 32%);
+    --hw-color-success-fg: var(--hw-mint-30); --hw-color-success-bg: rgb(9 170 113 / 16%); --hw-color-success-border: rgb(9 170 113 / 32%);
+    --hw-color-warning-fg: var(--hw-orange-10); --hw-color-warning-bg: rgb(244 132 12 / 16%); --hw-color-warning-border: rgb(244 132 12 / 32%);
+    --hw-color-danger-fg: var(--hw-red-20);  --hw-color-danger-bg: rgb(224 33 40 / 16%);  --hw-color-danger-border: rgb(224 33 40 / 32%);
+    --hw-color-danger: var(--hw-red-30);
+    --hw-elevation-popup: 0 4px 12px rgb(0 0 0 / 50%);
+    --hw-elevation-dialog: 0 16px 48px rgb(0 0 0 / 60%);
+  }
+
+  /* Cloud-console family: near-black primary, pill buttons, compact controls */
+  [data-hw-family="cloud"] {
+    --hw-color-primary: var(--hw-color-accent);
+    --hw-color-primary-hover: var(--hw-color-accent-hover);
+    --hw-color-primary-active: var(--hw-color-accent);
+    --hw-color-on-primary: var(--hw-color-on-accent);
+    --hw-button-radius: var(--hw-radius-full);
+  }
+
+  /* Density: compact = Cloud's 32px controls */
+  [data-hw-density="compact"] {
+    --hw-control-height: var(--hw-size-sm);
+    --hw-control-height-lg: var(--hw-size-md);
+  }
+}
+
+/* Touch: bigger hit targets on coarse pointers (phones, tablets). Token-level, so every control follows. */
+@layer hw.tokens {
+  @media (pointer: coarse) {
+    :root {
+      --hw-control-height: 44px;
+      --hw-control-height-sm: 36px;
+      --hw-control-height-lg: 52px;
+    }
+  }
+}

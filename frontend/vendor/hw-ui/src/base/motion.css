@@ -1,0 +1,28 @@
+@layer hw.base {
+  /* Entrances */
+  @keyframes hw-fade-in { from { opacity: 0; } }
+  @keyframes hw-pop-in { from { opacity: 0; transform: translateY(-4px) scaleY(.96); } }
+  @keyframes hw-dialog-in { from { opacity: 0; transform: translate3d(0, -20px, 0); } }
+  @keyframes hw-drawer-in { from { transform: translateX(100%); } }
+  @keyframes hw-nav-in { from { transform: translateX(-100%); } }
+  @keyframes hw-sheet-in { from { transform: translateY(100%); } }
+  @keyframes hw-toast-in { from { opacity: 0; transform: translateY(var(--hw-toast-offset, -8px)); } }
+  @keyframes hw-fade-in-up { from { opacity: 0; transform: translate3d(0, var(--hw-reveal-distance), 0); } }
+
+  /* Exits: played while [data-hw-leaving] is set (js/core/motion.js) */
+  @keyframes hw-fade-out { to { opacity: 0; } }
+  @keyframes hw-pop-out { to { opacity: 0; transform: translateY(-4px) scaleY(.96); } }
+  @keyframes hw-dialog-out { to { opacity: 0; transform: translate3d(0, -12px, 0); } }
+  @keyframes hw-drawer-out { to { transform: translateX(100%); } }
+  @keyframes hw-nav-out { to { transform: translateX(-100%); } }
+  @keyframes hw-sheet-out { to { transform: translateY(100%); } }
+  @keyframes hw-toast-out { to { opacity: 0; transform: translateY(var(--hw-toast-offset, -8px)); } }
+
+  /* Loops */
+  @keyframes hw-spin { to { transform: rotate(1turn); } }
+  @keyframes hw-linear-slide { from { left: -40%; } to { left: 100%; } }
+  @keyframes hw-shimmer { from { background-position: 100% 50%; } to { background-position: 0 50%; } }
+
+  /* Anything on its way out ignores clicks, so a closing menu can't be activated twice. */
+  [data-hw-leaving] { pointer-events: none; }
+}

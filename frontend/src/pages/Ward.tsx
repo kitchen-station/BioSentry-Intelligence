@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { AbstainedRow as AbstainedRowType, Session, VitalsRecorded, WardResponse } from "../types";
@@ -15,7 +14,7 @@ import { formatClock, formatSimClock } from "../components/format";
 import { useLivePoll } from "../components/useLivePoll";
 import { since, syncWardNow, useWardNow } from "../components/wardNow";
 import { SimulatedNote } from "../components/LabFrame";
-import { SessionMenu } from "../components/SessionMenu";
+import { AppShell } from "../components/AppShell";
 import { standing } from "../components/vitalsDraft";
 import { NotRankedSection } from "./NotRankedSection";
 import styles from "./Ward.module.css";
@@ -41,19 +40,6 @@ function beep(): void {
 
 function setTitle(title: string): void {
   document.title = title;
-}
-
-function Bar({ session, onSignOut, left }: { session: Session; onSignOut: () => void; left?: ReactNode }) {
-  return (
-    <div className={styles.statusBar}>
-      <div className={styles.statusInner}>
-        <div className={styles.statusLeft}>{left}</div>
-        <div className={styles.statusRight}>
-          <SessionMenu session={session} onSignOut={onSignOut} />
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export function Ward({ session, onSignOut }: Props) {
@@ -139,18 +125,17 @@ export function Ward({ session, onSignOut }: Props) {
 
   if (!data) {
     return (
-      <div className={styles.page}>
-        <Bar session={session} onSignOut={onSignOut} />
-        <main className={styles.container}>
-          <p role={failedSince ? "alert" : "status"}>
+      <AppShell session={session} onSignOut={onSignOut}>
+        <SimulatedNote />
+        <div className={styles.container}>
+          <p role={failedSince ? "alert" : "status"} className={failedSince ? "hw-alert hw-alert--danger" : styles.loading}>
             {failedSince
               ? `The ward server cannot be reached. ${retry}`
               : "Loading ward…"}
           </p>
-          {readOnly && failedSince && <button type="button" onClick={refresh}>Refresh</button>}
-        </main>
-        <SimulatedNote />
-      </div>
+          {readOnly && failedSince && <button type="button" className="hw-button hw-button--sm" onClick={refresh}>Refresh</button>}
+        </div>
+      </AppShell>
     );
   }
 
@@ -166,95 +151,87 @@ export function Ward({ session, onSignOut }: Props) {
   const medium = bands.filter((b) => b === "medium" || b === "low-medium").length;
   const rising = data.ranked.filter((r) => r.trend === "rising").length;
 
-  return (
-    <div className={styles.page}>
-      <Bar session={session} onSignOut={onSignOut} left={
-        <>
-          <span className={styles.statusItem}>
-            <span className={styles.statusLabel}>BioSentry</span>
-            <span className={styles.statusValue}>Ward {data.ward}</span>
-          </span>
-          <span className={styles.statusDivider} />
-          <span className={styles.statusItem}>
-            <span className={styles.statusValue}>
-              {!data.receiving_data
-                ? "No signal"
-                : failedSince
-                  ? `Offline since ${formatClock(since(failedSince))}`
-                  : `Updated ${fetchedAt ? formatClock(fetchedAt) : "--"}`}
-            </span>
-          </span>
-          {sim !== null && (
-            <>
-              <span className={styles.statusDivider} />
-              <span className={styles.statusItem} role="group" aria-label="Ward clock">
-                <span className={styles.statusLabel}>Ward clock</span>
-                <span className={styles.statusValue}><Flip>{formatSimClock(sim)}</Flip></span>
-              </span>
-            </>
-          )}
-        </>
-      } />
+  const status = (
+    <>
+      <span className={styles.statusItem} data-tone={!data.receiving_data || failedSince ? "warn" : undefined}>
+        <span className="hw-icon fa-solid fa-signal" aria-hidden="true" />
+        {!data.receiving_data
+          ? "No signal"
+          : failedSince
+            ? `Offline since ${formatClock(since(failedSince))}`
+            : `Updated ${fetchedAt ? formatClock(fetchedAt) : "--"}`}
+      </span>
+      {sim !== null && (
+        <span className={styles.statusItem} role="group" aria-label="Ward clock">
+          <span className={styles.statusLabel}>Ward clock</span>
+          <span className={styles.statusValue}><Flip>{formatSimClock(sim)}</Flip></span>
+        </span>
+      )}
+    </>
+  );
 
+  return (
+    <AppShell session={session} onSignOut={onSignOut} title={`Ward ${data.ward}`} status={status}>
       {failedSince && (
-        <p className={styles.offline} role="status">
-          Cannot reach the ward server since {formatClock(since(failedSince))}. Showing data from{" "}
-          {fetchedAt ? formatClock(fetchedAt) : "--"}; ages below stand at that time. {retry}
+        <p className={`hw-alert hw-alert--warning ${styles.offline}`} role="status">
+          <span className="hw-alert__icon hw-icon fa-solid fa-triangle-exclamation" aria-hidden="true" />
+          <span className="hw-alert__body">
+            Cannot reach the ward server since {formatClock(since(failedSince))}. Showing data from{" "}
+            {fetchedAt ? formatClock(fetchedAt) : "--"}; ages below stand at that time. {retry}
+          </span>
         </p>
       )}
       <SimulatedNote />
+      <div className={styles.container}>
 
-      {/* Summary cards */}
-      <div className={styles.summary}>
-        <div className={styles.summaryInner}>
-          <div className={styles.summaryCard} data-tone={high > 0 ? "alert" : undefined}>
-            <span className={styles.summaryNumber}><Flip>{high}</Flip></span>
-            <span className={styles.summaryLabel}>High risk &middot; NEWS2 7+</span>
+        {/* Summary: one stat per question a charge nurse asks on arrival. */}
+        <div className={styles.summary}>
+          <div className={`hw-stat ${styles.stat}`} data-tone={high > 0 ? "alert" : undefined}>
+            <span className="hw-stat__value"><Flip>{high}</Flip></span>
+            <span className="hw-stat__label">High risk &middot; NEWS2 7+</span>
           </div>
-          <div className={styles.summaryCard} data-tone={medium > 0 ? "alert-soft" : undefined}>
-            <span className={styles.summaryNumber}><Flip>{medium}</Flip></span>
-            <span className={styles.summaryLabel}>Medium &middot; 5&ndash;6 / single 3</span>
+          <div className={`hw-stat ${styles.stat}`} data-tone={medium > 0 ? "urgent" : undefined}>
+            <span className="hw-stat__value"><Flip>{medium}</Flip></span>
+            <span className="hw-stat__label">Medium &middot; 5&ndash;6 / single 3</span>
           </div>
-          <div className={styles.summaryCard}>
-            <span className={styles.summaryNumber}><Flip>{rising}</Flip></span>
-            <span className={styles.summaryLabel}>Rising</span>
+          <div className={`hw-stat ${styles.stat}`}>
+            <span className="hw-stat__value"><Flip>{rising}</Flip></span>
+            <span className="hw-stat__label">Rising</span>
           </div>
-          <div className={styles.summaryCard} data-tone={data.abstained.length > 0 ? "secondary" : undefined}>
-            <span className={styles.summaryNumber}><Flip>{data.abstained.length}</Flip></span>
-            <span className={styles.summaryLabel}>Not ranked &middot; act</span>
+          <div className={`hw-stat ${styles.stat}`} data-tone={data.abstained.length > 0 ? "act" : undefined}>
+            <span className="hw-stat__value"><Flip>{data.abstained.length}</Flip></span>
+            <span className="hw-stat__label">Not ranked &middot; act</span>
           </div>
-          <div className={styles.summaryCard} data-tone={overdue > 0 ? "alert-soft" : undefined}>
-            <span className={styles.summaryNumber}><Flip>{overdue}</Flip></span>
-            <span className={styles.summaryLabel}>Obs overdue</span>
+          <div className={`hw-stat ${styles.stat}`} data-tone={overdue > 0 ? "urgent" : undefined}>
+            <span className="hw-stat__value"><Flip>{overdue}</Flip></span>
+            <span className="hw-stat__label">Obs overdue</span>
           </div>
         </div>
-      </div>
 
-      {/* Main content */}
-      <main className={styles.container}>
         <div className={styles.sectionHeader}>
-          <p className={styles.eyebrow}>Priority queue</p>
+          <h1 className={styles.eyebrow}>Priority queue</h1>
           <p className={styles.sortInfo}>
             Sorted on {liveTiers.map((t) => t.label).join(", ") || "NEWS2"}
           </p>
         </div>
 
         {readOnly && (
-          <p className={styles.notice}>
-            Read-only. Views are recorded in the audit log.{" "}
-            <button type="button" className={styles.noticeClose} onClick={refresh}>Refresh</button>
+          <p className={`hw-alert ${styles.block}`}>
+            <span className="hw-alert__body">Read-only. Views are recorded in the audit log.</span>{" "}
+            <button type="button" className="hw-button hw-button--sm" onClick={refresh}>Refresh</button>
           </p>
         )}
 
         {alerts.length > 0 && (
           <div className={styles.alerts}>
             {alerts.map((a) => (
-              <div key={a.id} className={styles.alert} role="alert">
-                <span>
+              <div key={a.id} className={`hw-alert hw-alert--danger ${styles.alert}`} role="alert">
+                <span className="hw-alert__icon hw-icon fa-solid fa-bell" aria-hidden="true" />
+                <span className="hw-alert__body">
                   <strong>NEWS2 {a.score}</strong> &middot; Bed {a.bed} &middot;{" "}
                   <Link to={`/patient/${a.id}`}>{a.name}</Link>
                 </span>
-                <button type="button" className={styles.alertAck} onClick={() => acknowledge(a.id, a.score)}>
+                <button type="button" className="hw-button hw-button--primary hw-button--sm" onClick={() => acknowledge(a.id, a.score)}>
                   Acknowledge
                 </button>
               </div>
@@ -263,9 +240,9 @@ export function Ward({ session, onSignOut }: Props) {
         )}
 
         {notice !== null && (
-          <p className={styles.notice} role="status">
-            {notice}{" "}
-            <button type="button" className={styles.noticeClose} onClick={() => setNotice(null)}>
+          <p className={`hw-alert ${styles.block}`} role="status">
+            <span className="hw-alert__body">{notice}</span>{" "}
+            <button type="button" className="hw-button hw-button--ghost hw-button--sm" onClick={() => setNotice(null)}>
               Dismiss
             </button>
           </p>
@@ -285,12 +262,12 @@ export function Ward({ session, onSignOut }: Props) {
           readOnly={readOnly}
           onRecorded={handleRecorded}
         />
-      </main>
 
-      <footer className={styles.footer}>
-        Advisory only. BioSentry does not replace a monitor alarm. Views are
-        logged for audit under {session.clinician_id}.
-      </footer>
-    </div>
+        <p className={styles.footer}>
+          Advisory only. BioSentry does not replace a monitor alarm. Views are
+          logged for audit under {session.clinician_id}.
+        </p>
+      </div>
+    </AppShell>
   );
 }

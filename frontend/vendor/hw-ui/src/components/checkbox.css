@@ -1,0 +1,43 @@
+@layer hw.components {
+  /* Markup: label.hw-checkbox > input[type=checkbox].hw-checkbox__input + span.hw-checkbox__box + text */
+  .hw-checkbox {
+    display: inline-flex;
+    gap: var(--hw-space-3);
+    align-items: center;
+    min-height: 24px;
+    font-size: var(--hw-font-size-14);
+    cursor: pointer;
+  }
+  .hw-checkbox__input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  .hw-checkbox__box {
+    position: relative;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    background: var(--hw-color-surface);
+    border: 1px solid var(--hw-color-border);
+    border-radius: var(--hw-radius-xs);
+    transition: background-color var(--hw-duration-2), border-color var(--hw-duration-2);
+  }
+  .hw-checkbox__box::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 8px;
+    height: 4px;
+    border-bottom: 2px solid var(--hw-color-on-accent);
+    border-left: 2px solid var(--hw-color-on-accent);
+    transform: rotate(-45deg) scale(0);
+    transition: transform var(--hw-duration-1) var(--hw-ease-decelerate);
+  }
+  .hw-checkbox:hover .hw-checkbox__box { border-color: var(--hw-color-border-strong); }
+  .hw-checkbox__input:checked + .hw-checkbox__box,
+  .hw-checkbox__input:indeterminate + .hw-checkbox__box { background: var(--hw-color-accent); border-color: var(--hw-color-accent); }
+  .hw-checkbox__input:checked + .hw-checkbox__box::after { transform: rotate(-45deg) scale(1); }
+  .hw-checkbox__input:indeterminate + .hw-checkbox__box::after { top: 6px; height: 0; border-left: 0; transform: none; }
+  .hw-checkbox__input:focus-visible + .hw-checkbox__box { box-shadow: var(--hw-focus-ring); }
+  .hw-checkbox:has(:disabled) { cursor: not-allowed; color: var(--hw-color-text-subtle); }
+  .hw-checkbox__input:disabled + .hw-checkbox__box { background: var(--hw-color-fill-hover); border-color: var(--hw-color-border-subtle); }
+  .hw-checkbox__input:disabled:checked + .hw-checkbox__box { background: var(--hw-color-border); border-color: var(--hw-color-border); }
+}

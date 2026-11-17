@@ -1,0 +1,23 @@
+@layer hw.components {
+  /* Markup: label.hw-upload > input[type=file].hw-visually-hidden + content. Add [data-dragover] while dragging. */
+  .hw-upload {
+    display: flex;
+    flex-direction: column;
+    gap: var(--hw-space-3);
+    align-items: center;
+    padding: var(--hw-space-7) var(--hw-space-6);
+    color: var(--hw-color-text-muted);
+    text-align: center;
+    cursor: pointer;
+    background: var(--hw-color-surface);
+    border: 1px dashed var(--hw-color-border);
+    border-radius: var(--hw-radius-lg);
+    transition: border-color var(--hw-duration-2), background-color var(--hw-duration-2);
+  }
+  .hw-upload:hover, .hw-upload[data-dragover] { background: var(--hw-color-fill-hover); border-color: var(--hw-color-border-strong); }
+  .hw-upload:focus-within { box-shadow: var(--hw-focus-ring); }
+  .hw-upload__title { font-weight: var(--hw-weight-semibold); color: var(--hw-color-text); }
+  .hw-upload__browse { color: var(--hw-color-link); text-decoration: underline; }
+  .hw-file { display: flex; gap: var(--hw-space-4); align-items: center; padding: var(--hw-space-3) var(--hw-space-4); border-radius: var(--hw-control-radius); }
+  .hw-file:hover { background: var(--hw-color-fill-hover); }
+}

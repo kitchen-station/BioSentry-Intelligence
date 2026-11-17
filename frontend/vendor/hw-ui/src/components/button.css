@@ -1,0 +1,108 @@
+@layer hw.components {
+  .hw-button {
+    --hw-button-bg: var(--hw-color-surface);
+    --hw-button-bg-hover: var(--hw-color-fill-hover);
+    --hw-button-bg-active: var(--hw-color-fill-hover);
+    --hw-button-fg: var(--hw-color-text);
+    --hw-button-border: var(--hw-color-border);
+    --hw-button-border-hover: var(--hw-color-border-strong);
+    --hw-button-height: var(--hw-control-height);
+    --hw-button-pad: 20px;
+    --hw-button-font: var(--hw-font-size-14);
+
+    display: inline-flex;
+    gap: var(--hw-space-3);
+    align-items: center;
+    justify-content: center;
+    height: var(--hw-button-height);
+    padding: 0 var(--hw-button-pad);
+    font-size: var(--hw-button-font);
+    font-weight: var(--hw-weight-regular);
+    color: var(--hw-button-fg);
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+    background: var(--hw-button-bg);
+    border: 1px solid var(--hw-button-border);
+    border-radius: var(--hw-button-radius);
+    transition:
+      background-color var(--hw-duration-2),
+      border-color var(--hw-duration-2),
+      color var(--hw-duration-2),
+      transform var(--hw-motion-micro) var(--hw-ease-move);
+  }
+  .hw-button:hover { background: var(--hw-button-bg-hover); border-color: var(--hw-button-border-hover); color: var(--hw-button-fg); }
+  .hw-button:active { background: var(--hw-button-bg-active); }
+  .hw-button:active:not(:disabled, [aria-disabled="true"]) { transform: scale(var(--hw-press-scale)); }
+  .hw-button:disabled, .hw-button[aria-disabled="true"] {
+    cursor: not-allowed;
+    color: var(--hw-color-text-subtle);
+    background: var(--hw-color-fill-hover);
+    border-color: var(--hw-color-border-subtle);
+  }
+
+  .hw-button--primary {
+    --hw-button-bg: var(--hw-color-primary);
+    --hw-button-bg-hover: var(--hw-color-primary-hover);
+    --hw-button-bg-active: var(--hw-color-primary-active);
+    --hw-button-fg: var(--hw-color-on-primary);
+    --hw-button-border: transparent;
+    --hw-button-border-hover: transparent;
+  }
+  .hw-button--accent {
+    --hw-button-bg: var(--hw-color-accent);
+    --hw-button-bg-hover: var(--hw-color-accent-hover);
+    --hw-button-bg-active: var(--hw-color-accent);
+    --hw-button-fg: var(--hw-color-on-accent);
+    --hw-button-border: transparent;
+    --hw-button-border-hover: transparent;
+  }
+  .hw-button--secondary {
+    --hw-button-bg: transparent;
+    --hw-button-bg-hover: var(--hw-color-brand);
+    --hw-button-bg-active: var(--hw-color-brand-active);
+    --hw-button-fg: var(--hw-color-brand-text);
+    --hw-button-border: var(--hw-color-brand);
+    --hw-button-border-hover: var(--hw-color-brand);
+  }
+  .hw-button--secondary:hover { --hw-button-fg: var(--hw-color-text-on-brand); }
+  .hw-button--ghost {
+    --hw-button-bg: transparent;
+    --hw-button-border: transparent;
+    --hw-button-border-hover: transparent;
+  }
+  .hw-button--danger {
+    --hw-button-bg: transparent;
+    --hw-button-fg: var(--hw-color-danger-fg);
+    --hw-button-border: var(--hw-color-danger-border);
+    --hw-button-border-hover: var(--hw-color-danger);
+    --hw-button-bg-hover: var(--hw-color-danger-bg);
+  }
+  .hw-button--pill { border-radius: var(--hw-radius-full); }
+  .hw-button--sm { --hw-button-height: var(--hw-control-height-sm); --hw-button-pad: 16px; }
+  .hw-button--lg { --hw-button-height: var(--hw-control-height-lg); --hw-button-pad: 24px; --hw-button-font: var(--hw-font-size-16); }
+  .hw-button--icon { width: var(--hw-button-height); padding: 0; }
+  .hw-button--block { width: 100%; }
+
+  /* Text CTA: "Learn more ›" */
+  .hw-link-cta {
+    display: inline-flex;
+    gap: var(--hw-space-2);
+    align-items: center;
+    color: var(--hw-color-brand-text);
+    text-decoration: none;
+  }
+  .hw-link-cta::after {
+    content: "›";
+    transition: transform var(--hw-duration-2) var(--hw-ease-standard);
+  }
+  .hw-link-cta:hover { color: var(--hw-color-brand-text); }
+  .hw-link-cta:hover::after { transform: translateX(4px); }
+
+  .hw-button-group { display: inline-flex; }
+  .hw-button-group > .hw-button:not(:first-child) { margin-left: -1px; }
+  .hw-button-group > .hw-button:not(:first-child, :last-child) { border-radius: 0; }
+  .hw-button-group > .hw-button:first-child:not(:last-child) { border-start-end-radius: 0; border-end-end-radius: 0; }
+  .hw-button-group > .hw-button:last-child:not(:first-child) { border-start-start-radius: 0; border-end-start-radius: 0; }
+  .hw-button-group > .hw-button:hover, .hw-button-group > .hw-button:focus-visible { isolation: isolate; }
+}

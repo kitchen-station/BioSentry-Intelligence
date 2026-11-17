@@ -1,139 +1,84 @@
-/* ============================================================
-   Session menu -- clinician dropdown in status bar
-   ============================================================ */
-
-.wrapper {
-  position: relative;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--sp-3);
-}
-
-.place {
-  font-size: 12px;
-  color: inherit;
-  text-decoration: none;
-  padding: 2px 10px;
-  border: 1px solid transparent; /* the selected tab draws it; no shift between pages */
-  border-radius: 999px;
-}
+/* Placement in the app shell's grid (AppShell.module.css names the areas) and the account trigger.
+   The look of the links and the panel is the kit's: hw-sidenav, hw-menu. */
 
 .nav {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--sp-1);
+  grid-area: nav;
+  position: sticky;
+  top: 56px;
+  align-self: start;
+  height: calc(100vh - 56px);
+  overflow-y: auto;
 }
 
-/* The page you are on reads as a selected tab, not as a link that does nothing. currentColor keeps it right on the dark and the light bar. */
-.place[aria-current="page"] {
-  font-weight: 600;
-  border-color: currentColor;
-  background: color-mix(in srgb, currentColor 18%, transparent);
-  cursor: default;
-}
-
-.place:not([aria-current="page"]):hover {
-  text-decoration: underline;
+.account {
+  grid-area: account;
+  align-self: center;
+  justify-self: end;
 }
 
 .trigger {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 500;
-  color: inherit;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--hw-space-3);
+  min-height: var(--hw-control-height-sm);
+  padding: 0 var(--hw-space-3) 0 var(--hw-space-2);
+  font-size: var(--hw-text-body);
+  font-weight: var(--hw-weight-medium);
+  cursor: pointer;
+  background: none;
+  border: 1px solid var(--hw-color-border-subtle);
+  border-radius: var(--hw-radius-full);
+  transition: background-color var(--hw-motion-micro);
 }
 
-.trigger:hover {
-  opacity: 0.8;
+.trigger:hover,
+.trigger[aria-expanded="true"] {
+  background: var(--hw-color-fill-hover);
 }
 
-.caret {
-  font-size: 10px;
-  opacity: 0.6;
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+  color: var(--hw-color-on-accent);
+  background: var(--hw-color-accent);
+  border-radius: 50%;
 }
 
-.backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 899;
-}
-
-.dropdown {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 900;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  min-width: 200px;
+.panel {
+  width: 280px;
 }
 
 .info {
-  padding: var(--sp-2) var(--sp-3);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  padding: var(--hw-space-3) var(--hw-space-5);
 }
 
 .role {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--ink);
+  font-weight: var(--hw-weight-semibold);
 }
 
 .ward {
-  font-family: var(--font-sans);
-  font-size: 11px;
-  color: var(--label);
-}
-
-.divider {
-  height: 1px;
-  background: var(--border);
-}
-
-.menuItem {
-  display: block;
-  width: 100%;
-  text-align: left;
-  font-family: var(--font-sans);
-  font-size: 13px;
-  color: var(--ink);
-  text-decoration: none;
-  background: none;
-  border: none;
-  padding: var(--sp-2) var(--sp-3);
-  cursor: pointer;
-}
-
-.menuItem:hover {
-  background: var(--ground);
-}
-
-/* ---- Responsive: phone ---- */
-
-@media (max-width: 480px) {
-  .dropdown {
-    right: -8px;
-    min-width: 180px;
-    max-width: calc(100vw - 32px);
-  }
+  font-size: var(--hw-text-caption);
+  color: var(--hw-color-text-muted);
 }
 
 .notice {
-  margin: 0;
-  padding: 0 var(--sp-3) var(--sp-2);
-  font-family: var(--font-sans);
-  font-size: 11px;
-  color: var(--label);
+  padding: 0 var(--hw-space-5) var(--hw-space-3);
+  font-size: var(--hw-text-caption);
+  line-height: 1.5;
+  color: var(--hw-color-text-muted);
+}
+
+@media (width < 576px) {
+  /* The id is on the account panel; the bar keeps the avatar and the chevron. */
+  .trigger {
+    max-width: 40vw;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
 }

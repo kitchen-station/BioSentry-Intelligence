@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 import { LabFrame, SimulatedNote } from "./LabFrame";
@@ -15,7 +15,7 @@ describe("LabFrame", () => {
         </LabFrame>
       </MemoryRouter>,
     );
-    expect(screen.getByText(/BioSentry . Simulation lab/)).toBeTruthy();
+    expect(within(screen.getByRole("banner")).getByText("Simulation lab")).toBeTruthy();
     expect(screen.getByRole("note").textContent).toBe("Simulation lab: not the ward. Nothing here changes a patient's rank.");
     expect(screen.getByRole("link", { name: "Ward" }).getAttribute("href")).toBe("/ward");
     expect(screen.getByText("inside")).toBeTruthy();
@@ -31,7 +31,7 @@ describe("LabFrame, the clinician's wording", () => {
         </LabFrame>
       </MemoryRouter>,
     );
-    expect(screen.getByText(/BioSentry . What-if runs/)).toBeTruthy();
+    expect(within(screen.getByRole("banner")).getByText("What-if runs")).toBeTruthy();
     expect(screen.getByRole("note").textContent).toBe("Simulated trials only. Nothing here changes a patient's rank.");
     expect(screen.queryByText(/Simulation lab/)).toBeNull();
   });

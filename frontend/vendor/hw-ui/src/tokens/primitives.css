@@ -1,0 +1,50 @@
+/* Tier 1 — primitives. Raw values only. Never used directly by components.
+   Values extracted from huawei.com (hwp) and Huawei Cloud (por), Nov 2026. */
+@layer hw.tokens {
+  :root {
+    /* Red (brand) */
+    --hw-red-05: #fee7e8; --hw-red-10: #fabdc1; --hw-red-20: #f59297; --hw-red-30: #ee696f;
+    --hw-red-40: #e7434a; --hw-red-50: #e02128; --hw-red-60: #c7000b; --hw-red-70: #850f12;
+    --hw-red-80: #59080a; --hw-red-90: #350305;
+
+    /* Gray */
+    --hw-gray-0: #fff; --hw-gray-05: #f3f3f3; --hw-gray-10: #dfdfdf; --hw-gray-20: #c9c9c9;
+    --hw-gray-30: #aeaeae; --hw-gray-40: #939393; --hw-gray-45: #767676; --hw-gray-60: #595959;
+    --hw-gray-70: #393939; --hw-gray-80: #2a2a2a; --hw-gray-90: #191919; --hw-gray-100: #000;
+    --hw-gray-canvas: #f7f8fa;
+
+    /* Supporting hues (05 tint / 10 border / 50 base / 70 text) */
+    --hw-blue-05: #eef3fe; --hw-blue-10: #d0d8fd; --hw-blue-50: #0a59f7; --hw-blue-40: #3979f9;
+    --hw-blue-60: #0950de; --hw-blue-70: #1f55b5; --hw-blue-info: #2070f3; --hw-blue-20: #9dbdfc;
+    --hw-mint-05: #e7fbf2; --hw-mint-10: #bcf2db; --hw-mint-30: #63d5a8; --hw-mint-50: #09aa71; --hw-mint-70: #036142;
+    --hw-orange-05: #fef5e8; --hw-orange-10: #fde2bd; --hw-orange-50: #f4840c; --hw-orange-70: #954304;
+    --hw-yellow-50: #fcc800; --hw-yellow-80: #614500;
+    --hw-indigo-50: #715afb; --hw-indigo-40: #8f7dfc; --hw-orange-60: #d9720a;
+
+    /* Scales */
+    --hw-space-0: 0; --hw-space-1: 2px; --hw-space-2: 4px; --hw-space-3: 8px; --hw-space-4: 12px;
+    --hw-space-5: 16px; --hw-space-6: 24px; --hw-space-7: 32px; --hw-space-8: 48px; --hw-space-9: 64px;
+    --hw-size-xs: 24px; --hw-size-sm: 32px; --hw-size-md: 40px; --hw-size-lg: 48px;
+    --hw-radius-xs: 4px; --hw-radius-sm: 6px; --hw-radius-md: 8px; --hw-radius-lg: 12px;
+    --hw-radius-xl: 16px; --hw-radius-full: 9999px;
+
+    --hw-font-size-11: 11px; --hw-font-size-12: 12px; --hw-font-size-14: 14px; --hw-font-size-16: 16px;
+    --hw-font-size-18: 18px; --hw-font-size-20: 20px; --hw-font-size-24: 24px; --hw-font-size-32: 32px;
+    --hw-font-size-40: 40px; --hw-font-size-48: 48px;
+    --hw-weight-light: 300; --hw-weight-regular: 400; --hw-weight-medium: 500; --hw-weight-semibold: 600; --hw-weight-bold: 700;
+
+    --hw-shadow-1: 0 1px 6px rgb(0 0 0 / 8%);
+    --hw-shadow-2: 0 4px 12px rgb(0 0 0 / 16%);
+    --hw-shadow-3: 0 8px 24px rgb(0 0 0 / 8%);
+    --hw-shadow-4: 0 8px 24px rgb(0 0 0 / 16%);
+    --hw-shadow-5: 0 16px 48px rgb(0 0 0 / 16%);
+
+    --hw-duration-1: 150ms; --hw-duration-2: 200ms; --hw-duration-3: 300ms; --hw-duration-4: 400ms;
+    --hw-duration-5: 600ms;
+    --hw-ease-standard: cubic-bezier(.4, 0, .2, 1);
+    --hw-ease-decelerate: cubic-bezier(0, 0, .2, 1);
+    --hw-ease-entrance: cubic-bezier(0, .59, .375, 1);
+    --hw-ease-out-circ: cubic-bezier(.075, .82, .165, 1);
+    --hw-ease-accelerate: cubic-bezier(.4, 0, 1, 1);
+  }
+}

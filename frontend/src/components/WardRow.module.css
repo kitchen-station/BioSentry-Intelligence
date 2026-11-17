@@ -1,328 +1,227 @@
-/* ============================================================
-   Ward row -- single ranked patient in the priority queue
-   ============================================================ */
+/* Ward row: one ranked patient. The card, tags and hover come from hw-ui; this file is the grid
+   and the clinical colour, which only marks where action is due:
+   high (NEWS2 7+) = emergency red, medium or a single 3 = urgent orange, low = grey. */
 
 .link {
-  text-decoration: none;
-  color: inherit;
   display: block;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--hw-card-radius);
 }
-
 .link:hover { text-decoration: none; }
 
-.link:focus-visible .row {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
-
-/* ---- Row grid ---- */
-
 .row {
+  --band: transparent;
+
+  position: relative;
   display: grid;
-  grid-template-columns: 80px 1fr minmax(200px, 260px) 120px;
-  gap: 0;
+  grid-template-columns: 84px minmax(0, 1fr) minmax(200px, 250px) 140px;
   align-items: start;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-left: 4px solid transparent;
-  border-radius: var(--radius);
-  padding: var(--sp-3) 0;
-  transition: border-color 0.15s;
+  padding: var(--hw-space-5) 0;
+  overflow: hidden;
+  border: 1px solid var(--hw-color-border-subtle);
 }
 
-.row:hover {
-  border-top-color: var(--secondary);
-  border-right-color: var(--secondary);
-  border-bottom-color: var(--secondary);
+/* The band edge. */
+.row::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--band);
 }
 
-/* Colour only where action is due: high = solid red, medium and single-parameter = red edge. */
-.row[data-band="high"] { border-left-color: var(--alert); }
+.row[data-band="high"] { --band: var(--hw-graph-emergency); }
 .row[data-band="medium"],
-.row[data-band="low-medium"] { border-left-color: var(--alert-edge); }
+.row[data-band="low-medium"] { --band: var(--hw-graph-urgent); }
 
-/* ---- Rank and score column ---- */
+/* ---- Rank and score ---- */
 
 .rankCol {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--sp-1);
-  padding-top: 2px;
+  gap: var(--hw-space-2);
 }
 
 .rank {
-  font-family: var(--font-mono);
-  font-weight: 500;
-  font-size: 11px;
-  color: var(--label);
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  font-size: var(--hw-text-caption);
+  color: var(--hw-color-text-subtle);
 }
 
 .scoreBlock {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 2px;
 }
 
 .score {
-  font-family: var(--font-mono);
-  font-weight: 600;
-  font-size: 18px;
+  display: inline-grid;
+  place-items: center;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 var(--hw-space-2);
+  font-size: var(--hw-font-size-20);
+  font-weight: var(--hw-weight-bold);
   line-height: 1;
-  min-width: 36px;
-  height: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius);
-  background: var(--primary-tint);
-  color: var(--primary);
+  color: var(--hw-color-text);
+  background: var(--hw-color-surface-subtle);
+  border-radius: var(--hw-control-radius);
 }
 
-.row[data-band="high"] .score { background: var(--alert); color: var(--button-ink); }
+.row[data-band="high"] .score { color: var(--hw-color-text-on-brand); background: var(--hw-graph-emergency); }
 .row[data-band="medium"] .score,
-.row[data-band="low-medium"] .score { background: var(--alert-tint); color: var(--alert); }
+.row[data-band="low-medium"] .score {
+  color: var(--hw-graph-urgent-text);
+  background: var(--hw-color-surface);
+  box-shadow: inset 0 0 0 2px var(--hw-graph-urgent);
+}
 
 .trend {
-  font-family: var(--font-sans);
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--label);
+  min-width: 14px;
+  font-size: var(--hw-font-size-14);
+  font-weight: var(--hw-weight-semibold);
+  color: var(--hw-color-text-subtle);
 }
+.trend[data-trend="rising"] { color: var(--hw-color-danger-fg); } /* NEWS2 rising = worse */
+.trend[data-trend="falling"] { color: var(--hw-color-text-muted); }
 
-/* NEWS2 rising = worse. */
-.trend[data-trend="rising"] { color: var(--alert); }
-.trend[data-trend="falling"] { color: var(--ok); }
-
-.response {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--primary);
-  margin-top: var(--sp-1);
-}
-
-.row[data-band="high"] .response { color: var(--alert); }
-
-/* ---- Info column ---- */
+/* ---- Patient ---- */
 
 .infoCol {
-  padding: 0 var(--sp-3);
   min-width: 0;
+  padding: 0 var(--hw-space-5);
 }
 
 .nameRow {
   display: flex;
-  align-items: center;
-  gap: var(--sp-2);
   flex-wrap: wrap;
-}
-
-.signalLow {
-  font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--alert);
+  align-items: center;
+  gap: var(--hw-space-2) var(--hw-space-3);
 }
 
 .name {
-  font-family: var(--font-display);
-  font-weight: 500;
-  font-size: 15px;
+  font-size: var(--hw-font-size-16);
+  font-weight: var(--hw-weight-semibold);
 }
 
 .detail {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  color: var(--label);
+  font-size: var(--hw-text-caption);
+  color: var(--hw-color-text-muted);
 }
 
-.updateTag {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--label);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0 6px;
-  margin-left: auto;
-}
-
+.updateTag:last-child { margin-left: auto; }
 .updateTag[data-stale] {
-  color: var(--alert);
-  border-color: var(--alert);
-  font-weight: 500;
+  --hw-tag-fg: var(--hw-color-danger-fg);
+  --hw-tag-bg: var(--hw-color-danger-bg);
+
+  font-weight: var(--hw-weight-medium);
 }
 
 .context {
-  font-size: 13px;
-  margin-top: 2px;
-  color: var(--ink);
+  margin-top: var(--hw-space-2);
+  font-size: var(--hw-font-size-14);
 }
 
-.mechanism {
-  font-size: 13px;
-  font-style: italic;
-  color: var(--label);
-  margin-top: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.response {
+  margin-top: var(--hw-space-2);
+  font-size: var(--hw-text-caption);
+  font-weight: var(--hw-weight-semibold);
 }
+.row[data-band="high"] .response { color: var(--hw-graph-emergency-text); }
+.row[data-band="medium"] .response,
+.row[data-band="low-medium"] .response { color: var(--hw-graph-urgent-text); }
 
 .reasonLine {
-  font-family: var(--font-sans);
-  font-size: 11px;
-  color: var(--label);
   margin-top: 2px;
-  font-style: italic;
+  font-size: var(--hw-text-caption);
+  color: var(--hw-color-text-muted);
 }
 
-/* ---- Sparklines column ---- */
+/* ---- Sparklines ---- */
 
-.sparkCol {
+.sparkCol,
+.metaCol {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 0 var(--sp-3);
-  border-left: 1px solid var(--border);
+  gap: var(--hw-space-2);
+  padding: 0 var(--hw-space-5);
+  border-left: 1px solid var(--hw-color-border-subtle);
 }
 
 .sparkRow {
   display: flex;
   align-items: center;
-  gap: var(--sp-2);
+  gap: var(--hw-space-3);
 }
 
-.sparkLabel {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--label);
+.sparkLabel,
+.nurseLabel {
+  min-width: 32px;
+  font-size: var(--hw-font-size-11);
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  min-width: 28px;
+  color: var(--hw-color-text-subtle);
 }
 
 .sparkVal {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  min-width: 32px;
+  min-width: 36px;
+  font-size: var(--hw-font-size-14);
+  font-weight: var(--hw-weight-medium);
   text-align: right;
 }
 
 /* A vital that adds NEWS2 points turns red (bold at 2+), so the eye finds what drives the score. */
 .sparkRow[data-points="1"] .sparkVal,
-.nursePair[data-points="1"] { color: var(--alert); }
+.nursePair[data-points="1"] { color: var(--hw-color-danger-fg); }
 .sparkRow[data-points="2"] .sparkVal,
 .sparkRow[data-points="3"] .sparkVal,
 .nursePair[data-points="2"],
-.nursePair[data-points="3"] { color: var(--alert); font-weight: 500; }
+.nursePair[data-points="3"] { color: var(--hw-color-danger-fg); font-weight: var(--hw-weight-bold); }
 
-/* ---- Meta column ---- */
+/* ---- Meta ---- */
 
-.metaCol {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-  padding: 0 var(--sp-3);
-  border-left: 1px solid var(--border);
-  font-size: 13px;
-}
+.metaCol { font-size: var(--hw-font-size-14); }
 
 .nursePair {
   display: flex;
   align-items: baseline;
-  gap: var(--sp-2);
+  gap: var(--hw-space-3);
 }
 
-.nurseLabel {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--label);
-  text-transform: uppercase;
-  min-width: 32px;
-}
-
-.labLine {
-  font-family: var(--font-sans);
-  font-size: 11px;
-  color: var(--label);
-  margin-top: var(--sp-1);
-}
-
-
-/* ---- Responsive: tablet ---- */
-
-@media (max-width: 768px) {
-  .row {
-    grid-template-columns: 60px 1fr 120px;
-  }
-
-  .sparkCol {
-    display: none;
-  }
-
-  .metaCol {
-    border-left: 1px solid var(--border);
-  }
-}
-
-/* ---- Responsive: phone ---- */
-
-@media (max-width: 480px) {
-  .row {
-    grid-template-columns: 1fr;
-    gap: var(--sp-2);
-    padding: var(--sp-3);
-  }
-
-  .rankCol {
-    flex-direction: row;
-    justify-content: flex-start;
-    gap: var(--sp-2);
-    padding-top: 0;
-  }
-
-  .infoCol {
-    padding: 0;
-  }
-
-  .sparkCol {
-    display: none;
-  }
-
-  .metaCol {
-    border-left: none;
-    border-top: 1px solid var(--border);
-    padding: var(--sp-2) 0 0;
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: var(--sp-2);
-  }
-
-  .nursePair {
-    flex: 1;
-    min-width: 80px;
-  }
-
-  .labLine {
-    width: 100%;
-    margin-top: 0;
-  }
-}
-
+.labLine,
 .obsDue {
-  font-family: var(--font-sans);
-  font-size: 11px;
-  color: var(--label);
-  margin-top: var(--sp-1);
+  font-size: var(--hw-text-caption);
+  color: var(--hw-color-text-muted);
 }
 
 .obsDue[data-overdue] {
-  color: var(--alert);
-  font-weight: 500;
+  font-weight: var(--hw-weight-semibold);
+  color: var(--hw-color-danger-fg);
+}
+
+/* ---- Tablet: the sparklines go; the numbers stay ---- */
+@media (width < 992px) {
+  .row { grid-template-columns: 72px minmax(0, 1fr) 140px; }
+  .sparkCol { display: none; }
+}
+
+/* ---- Phone: one column ---- */
+@media (width < 576px) {
+  .row {
+    grid-template-columns: 1fr;
+    gap: var(--hw-space-3);
+    padding: var(--hw-space-4) var(--hw-space-4) var(--hw-space-4) var(--hw-space-5);
+  }
+  .rankCol { flex-direction: row; gap: var(--hw-space-3); }
+  .infoCol { padding: 0; }
+  .updateTag:last-child { margin-left: 0; }
+  .metaCol {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--hw-space-2) var(--hw-space-5);
+    padding: var(--hw-space-3) 0 0;
+    border-top: 1px solid var(--hw-color-border-subtle);
+    border-left: 0;
+  }
 }

@@ -48,7 +48,7 @@ describe("lab index", () => {
   it("gives a physician no link to a developer page, and calls the page What-if runs", () => {
     lab();
     expect(screen.getByRole("heading", { level: 1, name: "What-if runs" })).toBeTruthy();
-    expect(screen.getByText(/BioSentry . What-if runs/)).toBeTruthy();
+    expect(within(screen.getByRole("banner")).getByText("What-if runs")).toBeTruthy();
     expect(screen.getByRole("note").textContent).toBe("Simulated trials only. Nothing here changes a patient's rank.");
     expect(screen.queryByText(/Simulation lab/)).toBeNull();
     for (const name of ["Research numbers", "The research agent's questions and answers", "The pipeline"]) {

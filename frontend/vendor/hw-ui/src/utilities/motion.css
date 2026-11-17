@@ -1,0 +1,15 @@
+@layer hw.utilities {
+  /* Scroll reveal, driven by js/reveal.js. Markup: data-hw-reveal on an element, or
+     data-hw-reveal="stagger" on a parent to reveal its children one after another.
+     JS only hides what is below the fold, so content is never lost without JS or with reduced motion. */
+  [data-hw-reveal-state="out"] { opacity: 0; transform: translate3d(0, var(--hw-reveal-distance), 0); }
+  [data-hw-reveal-state="in"] {
+    animation: hw-fade-in-up var(--hw-motion-reveal) var(--hw-ease-entrance) both;
+    animation-delay: calc(var(--hw-reveal-index, 0) * var(--hw-reveal-stagger));
+  }
+
+  /* One-off entrance helpers for things that appear after load (new rows, swapped content) */
+  .hw-anim-fade-in { animation: hw-fade-in var(--hw-motion-enter) var(--hw-ease-enter) both; }
+  .hw-anim-fade-in-up { animation: hw-fade-in-up var(--hw-motion-enter) var(--hw-ease-entrance) both; }
+  .hw-anim-pop-in { animation: hw-pop-in var(--hw-motion-micro) var(--hw-ease-enter) both; }
+}

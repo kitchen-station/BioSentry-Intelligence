@@ -1,0 +1,10 @@
+@layer hw.components {
+  .hw-field { display: flex; flex-direction: column; gap: 6px; max-width: 20rem; }
+  .hw-field--full { max-width: none; }
+  .hw-field__label { font-size: var(--hw-font-size-14); color: var(--hw-color-text); }
+  .hw-field__required { margin-left: 2px; color: var(--hw-color-brand-text); }
+  .hw-field__help { font-size: var(--hw-text-caption); color: var(--hw-color-text-muted); }
+  .hw-field__error { font-size: var(--hw-text-caption); color: var(--hw-color-danger-fg); }
+
+  @media (width < 576px) { .hw-field { max-width: none; } }
+}

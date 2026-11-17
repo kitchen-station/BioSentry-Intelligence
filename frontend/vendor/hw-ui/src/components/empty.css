@@ -1,0 +1,5 @@
+@layer hw.components {
+  .hw-empty { display: flex; flex-direction: column; gap: var(--hw-space-3); align-items: center; padding: var(--hw-space-8) var(--hw-space-6); color: var(--hw-color-text-muted); text-align: center; }
+  .hw-empty__art { display: grid; place-items: center; width: 64px; height: 64px; font-size: var(--hw-font-size-24); background: var(--hw-color-surface-subtle); border-radius: 50%; }
+  .hw-empty__title { margin: 0; font-size: var(--hw-font-size-16); font-weight: var(--hw-weight-semibold); color: var(--hw-color-text); }
+}

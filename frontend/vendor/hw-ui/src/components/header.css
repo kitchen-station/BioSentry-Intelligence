@@ -1,0 +1,42 @@
+@layer hw.components {
+  /* Two-tier sticky header (Corporate family). The mark slot holds OUR product mark only. */
+  /* Sticky with a negative top: the 28px utility row scrolls away, the main bar stays (huawei.com behaviour). */
+  .hw-header { position: sticky; top: -28px; z-index: var(--hw-z-sticky); }
+  .hw-header__utility {
+    display: flex;
+    gap: var(--hw-space-5);
+    align-items: center;
+    justify-content: flex-end;
+    height: 28px;
+    padding: 0 var(--hw-space-8);
+    font-size: var(--hw-text-caption);
+    color: var(--hw-color-text-muted);
+    background: var(--hw-color-surface);
+  }
+  .hw-header__bar {
+    display: flex;
+    gap: var(--hw-space-8);
+    align-items: center;
+    height: 78px;
+    padding: 0 var(--hw-space-8);
+    background: color-mix(in srgb, var(--hw-color-surface) 60%, transparent);
+    border-bottom: 1px solid var(--hw-color-border-subtle);
+    backdrop-filter: blur(50px);
+  }
+  .hw-header__mark { font-size: var(--hw-font-size-20); font-weight: var(--hw-weight-semibold); color: var(--hw-color-text); text-decoration: none; }
+  .hw-header__nav { display: flex; gap: var(--hw-space-7); margin: 0 auto; padding: 0; list-style: none; }
+  .hw-header__link { position: relative; display: block; line-height: 78px; color: var(--hw-color-text); text-decoration: none; }
+  .hw-header__link::after { content: ""; position: absolute; right: 0; bottom: 0; left: 0; height: 2px; background: transparent; transition: background-color var(--hw-duration-2); }
+  .hw-header__link:hover, .hw-header__link[aria-current="page"] { color: var(--hw-color-text); }
+  .hw-header__link:hover::after, .hw-header__link[aria-current="page"]::after { background: var(--hw-color-brand); }
+
+  @media (width < 768px) {
+    .hw-header { top: 0; }
+    .hw-header__utility { display: none; }
+    .hw-header__bar { padding: 0 var(--hw-space-5); }
+    .hw-header__nav { display: none; }
+  }
+
+  .hw-header__menu { display: none; }
+  @media (width < 768px) { .hw-header__menu { display: grid; margin-left: auto; } }
+}

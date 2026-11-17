@@ -1,0 +1,119 @@
+/* Tier 2 — semantic tokens. The ONLY tokens components may read.
+   Themes, families and density change these, never the components. */
+@layer hw.tokens {
+  :root {
+    color-scheme: light;
+
+    /* Surfaces */
+    --hw-color-canvas: var(--hw-gray-canvas);
+    --hw-color-surface: var(--hw-gray-0);
+    --hw-color-surface-subtle: var(--hw-gray-05);
+    --hw-color-surface-inverse: var(--hw-gray-90);
+    --hw-color-overlay: rgb(25 25 25 / 30%);
+    --hw-color-fill-hover: rgb(25 25 25 / 5%);
+    --hw-color-fill-disabled: var(--hw-gray-10);
+    --hw-color-skeleton: var(--hw-gray-05);
+    --hw-color-skeleton-shine: var(--hw-gray-10);
+
+    /* Text */
+    --hw-color-text: var(--hw-gray-90);
+    --hw-color-text-muted: var(--hw-gray-60);   /* 7.0:1 on white */
+    --hw-color-text-subtle: var(--hw-gray-45);  /* 4.5:1: placeholders, disabled */
+    --hw-color-text-inverse: var(--hw-gray-0);
+    --hw-color-text-on-brand: var(--hw-gray-0);
+    --hw-color-on-primary: var(--hw-color-text-on-brand); /* text on the primary button; follows the family */
+
+    /* Borders */
+    --hw-color-border: var(--hw-gray-20);
+    --hw-color-border-strong: var(--hw-gray-90);
+    --hw-color-border-subtle: var(--hw-gray-10);
+
+    /* Brand (emphasis) and accent (selection) */
+    --hw-color-brand: var(--hw-red-60);
+    --hw-color-brand-hover: var(--hw-red-50);
+    --hw-color-brand-active: var(--hw-red-70);
+    --hw-color-brand-subtle: var(--hw-red-05);
+    --hw-color-brand-text: var(--hw-red-60);    /* red used as text/icon */
+    --hw-color-accent: var(--hw-gray-90);
+    --hw-color-accent-hover: var(--hw-gray-60);
+    --hw-color-on-accent: var(--hw-gray-0);
+    --hw-color-primary: var(--hw-color-brand);         /* fill of the main button */
+    --hw-color-primary-hover: var(--hw-color-brand-hover);
+    --hw-color-primary-active: var(--hw-color-brand-active);
+
+    /* Links & focus */
+    --hw-color-link: var(--hw-blue-50);
+    --hw-color-link-hover: var(--hw-blue-40);
+    --hw-color-focus: var(--hw-blue-50);
+
+    /* Status: fg = text/icon, bg = tint, border = tint edge */
+    --hw-color-info-fg: var(--hw-blue-70);    --hw-color-info-bg: var(--hw-blue-05);    --hw-color-info-border: var(--hw-blue-10);
+    --hw-color-success-fg: var(--hw-mint-70); --hw-color-success-bg: var(--hw-mint-05); --hw-color-success-border: var(--hw-mint-10);
+    --hw-color-warning-fg: var(--hw-orange-70); --hw-color-warning-bg: var(--hw-orange-05); --hw-color-warning-border: var(--hw-orange-10);
+    --hw-color-danger-fg: var(--hw-red-60);   --hw-color-danger-bg: var(--hw-red-05);   --hw-color-danger-border: var(--hw-red-10);
+    --hw-color-danger: var(--hw-red-50);      /* error borders */
+    --hw-color-success: var(--hw-mint-50);    /* success borders */
+    --hw-color-toast-ok: var(--hw-mint-30);   /* glyphs on the dark toast */
+    --hw-color-toast-bad: var(--hw-red-30);
+
+    /* Typography */
+    --hw-font-sans: "HarmonyOS Sans", "HarmonyOS Sans SC", Inter, Arial, "Segoe UI", "Microsoft YaHei", sans-serif;
+    --hw-font-mono: "HarmonyOS Sans Mono", "Fira Code", Consolas, Menlo, monospace;
+    --hw-text-body: var(--hw-font-size-14);
+    --hw-text-caption: var(--hw-font-size-12);
+    --hw-line-height: 1.5;
+
+    /* Shape & size */
+    --hw-control-height: var(--hw-size-md);
+    --hw-control-height-sm: var(--hw-size-sm);
+    --hw-control-height-lg: var(--hw-size-lg);
+    --hw-control-radius: var(--hw-radius-sm);
+    --hw-button-radius: var(--hw-radius-sm);
+    --hw-card-radius: var(--hw-radius-xl);
+    --hw-popup-radius: var(--hw-radius-md);
+
+    /* Elevation */
+    --hw-elevation-popup: var(--hw-shadow-2);
+    --hw-elevation-raised: var(--hw-shadow-3);
+    --hw-elevation-overlay: var(--hw-shadow-4);
+    --hw-elevation-dialog: var(--hw-shadow-5);
+    --hw-elevation-knob: var(--hw-shadow-1);
+
+    /* Focus ring */
+    --hw-focus-ring: 0 0 0 2px var(--hw-color-surface), 0 0 0 4px var(--hw-color-focus);
+
+    /* Motion: components read these, never raw durations. Exits are quicker than entrances. */
+    --hw-motion-micro: var(--hw-duration-1);      /* press, hover, small popups */
+    --hw-motion-enter: var(--hw-duration-3);      /* dialogs, sheets, tab indicator, accordion */
+    --hw-motion-exit: var(--hw-duration-2);
+    --hw-motion-reveal: var(--hw-duration-5);     /* scroll reveal */
+    --hw-ease-enter: var(--hw-ease-decelerate);
+    --hw-ease-exit: var(--hw-ease-accelerate);
+    --hw-ease-move: var(--hw-ease-standard);      /* things that move from A to B */
+    --hw-press-scale: .97;
+    --hw-reveal-distance: 24px;
+    --hw-reveal-stagger: 60ms;
+
+    /* Icons (Font Awesome Free sizes itself in em, so these follow the text) */
+    --hw-icon-size-sm: 12px; --hw-icon-size-md: 16px; --hw-icon-size-lg: 20px; --hw-icon-size-xl: 32px;
+
+    /* Graphs (js/graph/, components/graph.css). Every colour has one job. */
+    --hw-graph-highlight: var(--hw-color-brand);          /* the one thing to look at */
+    --hw-graph-context: var(--hw-gray-40);                /* everything else */
+    --hw-graph-context-strong: var(--hw-gray-60);
+    --hw-graph-context-soft: var(--hw-gray-20);
+    --hw-graph-grid: var(--hw-gray-10);
+    --hw-graph-baseline: var(--hw-color-text);
+    --hw-graph-band: rgb(25 25 25 / 18%);                 /* a usual range */
+    --hw-graph-surface: var(--hw-color-surface);
+    --hw-graph-urgent: var(--hw-orange-50);   --hw-graph-urgent-text: var(--hw-orange-70);
+    --hw-graph-emergency: var(--hw-red-60);   --hw-graph-emergency-text: var(--hw-red-60);
+    /* Compare set: only when every series matters equally. Four at most, in this order (checked for
+       colour-blind readers), and always with labels: orange is under 3:1 on white. */
+    --hw-graph-compare-1: var(--hw-blue-50); --hw-graph-compare-2: var(--hw-orange-50);
+    --hw-graph-compare-3: var(--hw-indigo-50); --hw-graph-compare-4: var(--hw-mint-50);
+
+    /* Layering */
+    --hw-z-sticky: 50; --hw-z-dropdown: 100; --hw-z-popup: 1000; --hw-z-modal: 1100; --hw-z-toast: 1200;
+  }
+}

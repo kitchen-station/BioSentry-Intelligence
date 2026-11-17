@@ -1,0 +1,90 @@
+{
+  "extends": [
+    "stylelint-config-standard"
+  ],
+  "rules": {
+    "selector-class-pattern": [
+      "^hw-[a-z0-9]+(?:-[a-z0-9]+)*(?:__[a-z0-9]+(?:-[a-z0-9]+)*)?(?:--[a-z0-9]+(?:-[a-z0-9]+)*)?$",
+      {
+        "message": "Use BEM with the hw- prefix: .hw-block__element--modifier"
+      }
+    ],
+    "custom-property-pattern": [
+      "^(hw|_)-[a-z0-9-]+$",
+      {
+        "message": "Custom properties start with --hw-"
+      }
+    ],
+    "keyframes-name-pattern": "^hw-[a-z0-9-]+$",
+    "selector-max-id": 0,
+    "selector-max-specificity": "0,4,0",
+    "declaration-no-important": [
+      true,
+      {
+        "severity": "warning"
+      }
+    ],
+    "declaration-property-value-disallowed-list": {
+      "transition": [
+        "/\\ball\\b/"
+      ],
+      "transition-property": [
+        "all"
+      ]
+    },
+    "declaration-block-no-redundant-longhand-properties": null,
+    "no-descending-specificity": null,
+    "declaration-empty-line-before": null,
+    "custom-property-empty-line-before": null,
+    "rule-empty-line-before": null,
+    "comment-empty-line-before": null,
+    "selector-not-notation": null,
+    "media-feature-range-notation": "context",
+    "import-notation": "url",
+    "at-rule-empty-line-before": null,
+    "value-keyword-case": [
+      "lower",
+      {
+        "ignoreProperties": [
+          "/^--hw-font/"
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "src/components/**/*.css",
+        "src/base/**/*.css",
+        "src/utilities/**/*.css"
+      ],
+      "rules": {
+        "color-no-hex": [
+          true,
+          {
+            "message": "Components read semantic tokens only. Add a token in tokens/semantic.css."
+          }
+        ],
+        "color-named": [
+          "never",
+          {
+            "ignore": [
+              "inside-function"
+            ]
+          }
+        ],
+        "function-disallowed-list": [
+          [
+            "rgb",
+            "rgba",
+            "hsl",
+            "hsla"
+          ],
+          {
+            "message": "No raw colors in components; use a semantic token."
+          }
+        ]
+      }
+    }
+  ]
+}
