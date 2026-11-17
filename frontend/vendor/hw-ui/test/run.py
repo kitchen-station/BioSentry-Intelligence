@@ -213,7 +213,39 @@ with sync_playwright() as p:
     check('share: tapping a part highlights it', rd('#g-share')[0] == '28%' and pg.locator('#g-share .hw-graph__part[aria-pressed=true]').count() == 1)
 
     check('stat: number, sparkline, and a change with its arrow', pg.locator('#g-stat-1 .hw-stat__value').inner_text() == '0.13' and pg.locator('#g-stat-1 .hw-stat__line').count() == 1 and pg.locator('#g-stat-1 .hw-stat__change .fa-arrow-down').count() == 1)
-    check('graphs: every graph is a labelled figure', pg.evaluate('[...document.querySelectorAll(".hw-graph")].every(g => g.getAttribute("role") === "figure" && document.getElementById(g.getAttribute("aria-labelledby")))') and pg.locator('.hw-graph').count() == 7)
+    check('graphs: every graph is a labelled figure', pg.evaluate('[...document.querySelectorAll(".hw-graph")].every(g => g.getAttribute("role") === "figure" && document.getElementById(g.getAttribute("aria-labelledby")))') and pg.locator('.hw-graph').count() == 9)
+    old_bars = pg.evaluate("""(() => { const g = document.getElementById("g-bars"), t = g.querySelector(".hw-graph__track"), b = g.querySelector(".hw-graph__bar").getBoundingClientRect(),
+        v = g.querySelector(".hw-graph__bar-value").getBoundingClientRect(), tr = t.getBoundingClientRect();
+      return [g.hasAttribute("data-diverging"), g.querySelectorAll(".hw-graph__interval, [data-sign], .hw-graph__sides, .hw-graph__scale-mark[data-base]").length,
+              ["--hw-graph-start", "--hw-graph-label"].map(p => t.style.getPropertyValue(p)).join(""), Math.round(b.left - tr.left), Math.round(v.left - b.right)]; })()""")
+    check('bars: an old-style config (no diverging, no interval) draws as before: from zero, value 8px past the bar', old_bars == [False, 0, '', 0, 8], str(old_bars))
+
+    # ---- Research (0.10 Phase 4): bars diverging with a labelled zero line, and an interval whisker per item ----
+    pg.locator('#g-diverging').scroll_into_view_if_needed(); pg.wait_for_timeout(200)
+    dv = pg.evaluate("""(() => { const g = document.getElementById("g-diverging"), r = (e) => e.getBoundingClientRect(), cs = getComputedStyle;
+      const rows = [...g.querySelectorAll(".hw-graph__row")].map(row => { const z = r(row.querySelector(".hw-graph__rule[data-base]")), b = r(row.querySelector(".hw-graph__bar")),
+          w = r(row.querySelector(".hw-graph__interval")), v = r(row.querySelector(".hw-graph__bar-value"));
+        return { zero: z.left + z.width / 2, left: b.left, right: b.right, wl: w.left, wr: w.right, vl: v.left, vr: v.right, fill: cs(row.querySelector(".hw-graph__bar")).backgroundColor,
+                 sign: row.querySelector(".hw-graph__track").dataset.sign }; });
+      const zm = g.querySelector(".hw-graph__scale-mark[data-base]"), sides = [...g.querySelectorAll(".hw-graph__side")].map(s => [s.textContent, r(s).left, r(s).right]);
+      return { rows, zeroMark: [zm.textContent, cs(zm).fontWeight, r(zm).left + r(zm).width / 2], sides, gl: r(g).left }; })()""")
+    rows = dv['rows']; z = rows[0]['zero']
+    check('bars diverging: one zero line, gains start at it and run right, losses end at it and run left', all(abs(x['zero'] - z) < 0.5 for x in rows)
+          and abs(rows[0]['left'] - z) < 1 and rows[0]['right'] > z + 20 and all(abs(x['right'] - z) < 1 and x['left'] < z - 20 for x in rows[1:])
+          and [x['sign'] for x in rows] == ['positive', 'negative', 'negative'], str(rows))
+    check('bars diverging: the zero line is labelled in bold under it, a loss to its left and a gain to its right', dv['zeroMark'][:2] == ['0 · NEWS2 alone', '700'] and abs(dv['zeroMark'][2] - z) < 1
+          and dv['sides'][0][0] == 'a loss' and dv['sides'][0][2] < z and dv['sides'][1][0] == 'a gain' and dv['sides'][1][1] > z, str([dv['zeroMark'], dv['sides'], z]))
+    check('bars interval: each whisker spans its interval around the bar end, the value sits past its far end', all(x['wl'] < (x['right'] if x['sign'] == 'positive' else x['left']) < x['wr'] for x in rows)
+          and rows[0]['vl'] >= rows[0]['wr'] + 7 and all(x['vr'] <= x['wl'] - 7 for x in rows[1:]) and rows[2]['wr'] <= z + 0.6 and dv['gl'] <= min(x['vl'] for x in rows), str(rows))
+    check('bars diverging: the highlighted bar is info blue in the research space, the rest grey', [x['fill'] for x in rows] == ['rgb(31, 85, 181)', 'rgb(147, 147, 147)', 'rgb(147, 147, 147)'], str([x['fill'] for x in rows]))
+    check('bars interval: the readout reads the value and its interval', rd('#g-diverging') == ['+0.018', 'NEWS2 + checked student', '98.33% interval +0.008 to +0.029'], str(rd('#g-diverging')))
+    pg.locator('#g-diverging .hw-graph__row[aria-pressed=true]').focus(); pg.keyboard.press('ArrowDown')
+    check('bars diverging: arrow keys read a loss', rd('#g-diverging') == ['−0.040', 'NEWS2 + student', '98.33% interval −0.054 to −0.025'], str(rd('#g-diverging')))
+    iv = pg.evaluate("""(() => { const g = document.getElementById("g-interval"), r = (e) => e.getBoundingClientRect();
+      return [...g.querySelectorAll(".hw-graph__row")].map(row => { const t = r(row.querySelector(".hw-graph__track")), b = r(row.querySelector(".hw-graph__bar")), w = r(row.querySelector(".hw-graph__interval")), v = r(row.querySelector(".hw-graph__bar-value"));
+        return [Math.round(b.left - t.left), w.left < b.right && b.right < w.right, Math.round(v.left - w.right)]; }); })()""")
+    check('bars interval: on a zero-based graph too, bars start at zero and the value clears the whisker', iv == [[0, True, 8], [0, True, 8]], str(iv))
+    check('bars interval: the readout adds the interval to the comparison', rd('#g-interval')[2].startswith('95% interval 0.42 to 0.43. ') and rd('#g-interval')[2].endswith('more than NEWS2'), str(rd('#g-interval')))
 
     # ---- Ward components (0.10): score, filter, bell and tray, search, ranklist, notice, banner ----
     EMERGENCY, URGENT, URGENT_TEXT, WHITE, INK, GREY = 'rgb(199, 0, 11)', 'rgb(244, 132, 12)', 'rgb(149, 67, 4)', 'rgb(255, 255, 255)', 'rgb(25, 25, 25)', 'rgb(223, 223, 223)'
@@ -391,6 +423,13 @@ with sync_playwright() as p:
     check('mobile: swipe down closes the bottom sheet', True)
     pg.evaluate('document.querySelector("#g-trend").scrollIntoView()'); pg.wait_for_timeout(300)
     check('mobile: graphs fit the phone width', pg.evaluate('[...document.querySelectorAll(".hw-graph")].every(g => g.getBoundingClientRect().right <= innerWidth && g.scrollWidth <= g.clientWidth + 1)'))
+    ph_dv = pg.evaluate("""(() => { const g = document.getElementById("g-diverging"), r = (e) => e.getBoundingClientRect(), gr = r(g);
+      const shown = [...g.querySelectorAll(".hw-graph__bar-value, .hw-graph__side, .hw-graph__scale-mark")].filter(e => r(e).width > 0);
+      return [shown.every(e => r(e).left >= gr.left - 0.5 && r(e).right <= gr.right + 0.5),
+              [...g.querySelectorAll(".hw-graph__row")].every(row => r(row.querySelector(".hw-graph__name")).bottom <= r(row.querySelector(".hw-graph__track")).top + 0.5),
+              shown.filter(e => e.classList.contains("hw-graph__scale-mark")).map(e => e.textContent)]; })()""")
+    check('mobile: a diverging graph keeps every value and label inside its box, names above the bars, only the ends and zero on its scale',
+          ph_dv[0] and ph_dv[1] and ph_dv[2] == ['−0.060', '0 · NEWS2 alone', '+0.060'], str(ph_dv))
     check('mobile: trend drops end labels and keeps the keys', pg.locator('#g-trend .hw-graph__end').count() == 0 and pg.locator('#g-trend .hw-graph__key').count() == 3)
     nar = pg.evaluate('(() => { const g = document.getElementById("g-hr"); return [g.querySelectorAll(".hw-graph__limit-label--inside").length, g.querySelectorAll(".hw-graph__band-label--inside").length, g.querySelectorAll(".hw-graph__end").length]; })()')
     check('mobile: a narrow trend names its limits and band inside the plot', nar == [3, 1, 0], str(nar))

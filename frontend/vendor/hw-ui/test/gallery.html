@@ -580,6 +580,12 @@
   <section class="hw-card" style="max-width:900px"><div id="g-hr"></div></section>
   </div>
 
+  <h2 class="hw-section-title" id="h-research">Research (0.10 Phase 4)</h2>
+  <div class="g-wide hw-stack" style="--hw-stack-gap:var(--hw-space-5)" data-hw-space="research">
+    <section class="hw-card" style="max-width:900px"><div id="g-diverging"></div></section>
+    <section class="hw-card" style="max-width:900px"><div id="g-interval"></div></section>
+  </div>
+
   <h2 class="hw-section-title" id="h-graphs">Graphs</h2>
   <div class="hw-grid g-grid" data-hw-reveal="stagger">
     <section class="hw-card">
@@ -690,6 +696,23 @@
     title: 'Both models catch more deteriorations than NEWS2 alone', subtitle: 'Share of deteriorations flagged early, held-out wards',
     items: [{ name: 'NEWS2 alone', value: 36 }, { name: 'Student model', value: 56 }, { name: 'Checked student', value: 57 }],
     highlight: 2, baseline: 0, unit: '%', max: 100, label: (item) => `flagged early by ${item.name}`,
+  });
+  // Research: changes against NEWS2 alone, losses left of zero, each with its interval; then a plain bars graph
+  // (zero-based) where one item carries an interval.
+  bars(document.getElementById('g-diverging'), {
+    title: 'Only the checked student, added to NEWS2, gained beyond chance', subtitle: 'Gain in excess over chance against NEWS2 alone, held-out set 2. Simulated wards.',
+    diverging: true, zeroLabel: '0 · NEWS2 alone', sides: ['a loss', 'a gain'], intervalLabel: '98.33% interval', highlight: 0,
+    format: (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(3)}`,
+    items: [
+      { name: 'NEWS2 + checked student', value: 0.0181, interval: [0.008, 0.0291] },
+      { name: 'NEWS2 + student', value: -0.0401, interval: [-0.0542, -0.0253] },
+      { name: 'NEWS2 + reward policy', value: -0.0127, interval: [-0.0245, -0.0001] },
+    ],
+  });
+  bars(document.getElementById('g-interval'), {
+    title: 'The student alerts about as often as NEWS2', subtitle: 'Alerts per patient per 12-hour shift, 95% interval. Simulated wards.',
+    items: [{ name: 'NEWS2', value: 0.415, interval: [0.411, 0.42] }, { name: 'Student', value: 0.425, interval: [0.42, 0.429] }],
+    highlight: 1, baseline: 0, intervalLabel: '95% interval',
   });
   share(document.getElementById('g-share'), {
     title: 'Most alerts start with a vital sign', subtitle: 'What raised each alert on Ward W4 this week. Sample data.',
