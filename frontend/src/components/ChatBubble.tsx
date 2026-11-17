@@ -1,9 +1,10 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Link, useLocation, useMatch } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import type { Session } from "../types";
 import { hasLabQuestions, hasPatientQuestions } from "../api";
 import { Thread } from "./Thread";
 import { OPEN_CHAT, asksWard } from "./roles";
+import { useAskScope } from "./useAskScope";
 import styles from "./ChatBubble.module.css";
 
 const FOCUSABLE = "a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), summary";
@@ -15,7 +16,8 @@ const FOCUSABLE = "a[href], button:not([disabled]), input:not([disabled]), texta
  */
 export function ChatBubble({ session, onSignOut }: { session: Session; onSignOut: () => void }) {
   const { pathname } = useLocation();
-  const patientId = useMatch("/patient/:id")?.params.id; // decoded, and a trailing slash still matches, as the route does
+  const scope = useAskScope();
+  const patientId = scope.kind === "patient" ? scope.id : undefined;
   // The panel is open on the page it was opened on: leaving that page closes it, and coming back does not reopen it.
   const [openAt, setOpenAt] = useState<string | null>(null);
   if (openAt !== null && openAt !== pathname) setOpenAt(null); // state follows the route, set while rendering, with no effect
@@ -25,7 +27,7 @@ export function ChatBubble({ session, onSignOut }: { session: Session; onSignOut
 
   const asks = asksWard(session.role);
   const connected = patientId ? hasPatientQuestions : hasLabQuestions; // the fixture build has neither: no bubble
-  const shown = connected && pathname !== "/" && !pathname.startsWith("/ask") && (asks || (session.role === "rn" && patientId !== undefined));
+  const shown = connected && scope.kind !== "none" && !pathname.startsWith("/ask") && (asks || (session.role === "rn" && patientId !== undefined));
   const open = shown && openAt === pathname;
 
   // The patient page's own button opens the same panel.
@@ -88,7 +90,7 @@ export function ChatBubble({ session, onSignOut }: { session: Session; onSignOut
               )}
               <Thread
                 key={patientId ?? "ward"}
-                scope={patientId ? { kind: "patient", id: patientId } : { kind: "ward" }}
+                scope={scope.kind === "patient" ? scope : { kind: "ward" }}
                 clinicianId={session.clinician_id}
                 onSignOut={onSignOut}
               />
