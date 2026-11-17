@@ -1580,6 +1580,7 @@ def live(api: Api, who: str) -> dict[str, Any]:
     assert response.status_code == 200, response.text
     body: dict[str, Any] = response.json()
     assert isinstance(body.pop("can_control"), bool)  # what it says is its own test, below
+    assert isinstance(body.pop("can_steer_run"), bool)
     body.pop("now")  # ward time as served: its own test, below
     return body
 
@@ -1871,6 +1872,17 @@ def test_only_an_md_or_the_charge_nurse_is_told_they_can_control_the_sim(api: Ap
     ):  # fmt: skip
         response = api.client.get("/wards/W4/live", headers=api.as_(who))
         assert response.json()["can_control"] is allowed, who
+
+
+def test_only_rn_manalo_and_md_santos_are_told_they_can_steer_the_whole_run(api: Api) -> None:
+    start(api)
+    for who, steer in (
+        ("md-santos", True), ("rn-manalo", True), ("md-aquino", False), ("rn-delacruz", False), ("rn-reyes", False),
+    ):  # fmt: skip
+        body = api.client.get("/wards/W4/live", headers=api.as_(who)).json()
+        assert body["can_steer_run"] is steer, who
+        if steer:
+            assert body["can_control"] is True  # the flag never says more than can_control does
 
 
 def test_a_command_goes_on_the_feed_in_order_with_what_it_says_and_who_sent_it(api: Api) -> None:

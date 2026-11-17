@@ -448,6 +448,7 @@ export interface components {
          */
         readonly LiveWard: {
             readonly can_control: boolean;
+            readonly can_steer_run: boolean;
             /** Format: date-time */
             readonly now: string;
             readonly patients: readonly components["schemas"]["PatientView"][];

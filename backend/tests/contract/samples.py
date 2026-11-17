@@ -501,7 +501,7 @@ _BUILDERS: dict[type[BaseModel], Any] = {
         "label": "Each patient against their own baseline. Research view: synthetic, not validated. NEWS2 alone orders the list.",
         "ranked": [_BUILDERS[ResearchRow]()], "abstained": [_BUILDERS[ResearchAbstained]()],
     },
-    LiveWard: lambda: {"shared": {"clockS": 90}, "patients": [], "can_control": False, "now": "2026-09-03T07:00:00Z"},
+    LiveWard: lambda: {"shared": {"clockS": 90}, "patients": [], "can_control": False, "can_steer_run": False, "now": "2026-09-03T07:00:00Z"},
     OverviewPatient: lambda: {
         "bed": "4A",
         "state": "ranked",

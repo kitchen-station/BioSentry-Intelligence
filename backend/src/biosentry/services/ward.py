@@ -436,6 +436,7 @@ class WardService:
                 **view,
                 "patients": [p for p in view["patients"] if p["id"] in visible],
                 "can_control": self._store.can_control(clinician_id),
+                "can_steer_run": self._store.can_control(clinician_id) and self._store.can_steer_run(clinician_id),
                 "now": whole(self._store.now()),
             }
         )
