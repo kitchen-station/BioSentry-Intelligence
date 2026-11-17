@@ -358,6 +358,27 @@ with sync_playwright() as p:
       return [Math.abs(b[0].width - 2 * b[1].width) < 3, Math.abs(b[1].width - b[2].width) < 0.5, b.map(r => r.height), c.position, c.paddingBottom, c.borderTopColor]; })()""")
     check('actionbar: the first action takes two shares, 48px buttons, sticky with a top border', ab[0] and ab[1] and ab[2] == [48] * 3 and ab[3:] == ['sticky', '10px', GREY], str(ab))
 
+    # ---- Census (0.10 Phase 3): bed timeline; steps in ink ----
+    tl = pg.evaluate("""(() => { const cs = getComputedStyle, t = document.getElementById("timeline-beds"), box = (e) => e.getBoundingClientRect();
+      const tr = document.querySelector("#stay-discharged").parentElement, track = { left: box(tr).left, width: tr.clientWidth, right: box(tr).left + tr.clientWidth }, d = box(document.getElementById("stay-discharged")), o = box(document.getElementById("stay-open"));
+      const end = box(document.querySelector("#stay-discharged > .hw-timeline-beds__mark"));
+      const marks = [...t.querySelectorAll(".hw-timeline-beds__legend .hw-timeline-beds__mark")].map(m => [cs(m, "::before").content, cs(m).backgroundColor, cs(m).borderTopStyle, cs(m).borderRadius]);
+      return { legend: [...t.querySelectorAll(".hw-timeline-beds__key")].map(k => k.textContent.trim()), marks,
+        left: Math.abs(d.left - track.left) < 0.5, width: Math.abs(d.width - 0.3 * track.width) < 0.5 && Math.abs(box(document.getElementById("stay-short")).width - 0.01 * track.width) < 0.5, toNow: Math.abs(o.right - track.right) < 0.5,
+        endMark: Math.abs((end.left + end.right) / 2 - d.right) < 0.5, open: cs(document.getElementById("stay-open")).backgroundColor,
+        ended: cs(document.getElementById("stay-discharged")).backgroundColor, named: [...t.querySelectorAll(".hw-timeline-beds__stay")].every(s => s.getAttribute("role") === "img" && s.getAttribute("aria-label")),
+        hidden: [...t.querySelectorAll(".hw-timeline-beds__mark")].every(m => m.getAttribute("aria-hidden") === "true"),
+        over: (() => { const m = document.querySelector("#stay-before > .hw-timeline-beds__mark"), r = box(m); m.scrollIntoView({ block: "center" }); const q = box(m); return document.elementFromPoint(q.right - 3, (q.top + q.bottom) / 2) === m && r.right > o.left; })() }; })()""")
+    check('timeline-beds: the legend names on the ward and all four outcomes', tl['legend'] == ['On the ward', 'Discharged', 'Transferred', 'Higher care', 'Died'], str(tl['legend']))
+    check('timeline-beds: D in a box, T in a dashed box, H in a filled box, died a filled disc', [m[0] for m in tl['marks']] == ['"D"', '"T"', '"H"', 'none'] and tl['marks'][1][2] == 'dashed' and tl['marks'][2][1] == INK and tl['marks'][3][1] == INK and tl['marks'][3][3] == '50%', str(tl['marks']))
+    check('timeline-beds: stays sit at their percentage of the window, a short one too; an open stay runs to Now', tl['left'] and tl['width'] and tl['toNow'], str(tl))
+    check('timeline-beds: an ended stay is closed by its mark, centred on its end', tl['endMark'], str(tl))
+    check('timeline-beds: the mark stays on top of a stay that starts where it ended', tl['over'], str(tl))
+    check('timeline-beds: on the ward is ink (never red), ended stays soft grey', tl['open'] == INK and tl['ended'] == 'rgb(201, 201, 201)', str([tl['open'], tl['ended']]))
+    check('timeline-beds: every stay is a named image and every mark is hidden from readers', tl['named'] and tl['hidden'])
+    sa = pg.evaluate('[...document.querySelectorAll("#steps-accent .hw-steps__step")].map(s => getComputedStyle(s, "::before").backgroundColor)')
+    check('steps: --accent draws the current step in ink, not brand red', sa[1] == INK and sa[0] == INK, str(sa))
+
     pg.evaluate('window.hw.destroy()')
     trig.click()
     check('destroy(): listeners removed', trig.get_attribute('aria-expanded') == 'false')
@@ -440,6 +461,8 @@ with sync_playwright() as p:
     check('mobile: pager hides the key hints, position above two equal buttons', mp[0] == 'none' and mp[1] and mp[2], str(mp))
     check('mobile: decision strip stacks into one column', mp[3] == 1 and mp[4], str(mp))
     check('mobile: action bar buttons stay 48px on touch', mp[5] == [48] * 3, str(mp))
+    tm = pg.evaluate('(() => { const s = document.querySelector("#timeline-beds .hw-timeline-beds__scroll"); return [s.scrollWidth > s.clientWidth, s.getBoundingClientRect().right <= innerWidth, document.documentElement.scrollWidth <= innerWidth]; })()')
+    check('mobile: the bed timeline scrolls sideways inside its region, not the page', tm == [True, True, True], str(tm))
     pg.locator('#g-columns .hw-graph__column').nth(5).tap()
     check('mobile: tapping a column reads it', pg.locator('#g-columns .hw-graph__label').inner_text() == 'alerts on 8 Nov')
     pg.locator('#toast-btn').tap(); pg.wait_for_timeout(300)

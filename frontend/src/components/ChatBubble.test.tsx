@@ -59,7 +59,7 @@ describe("where the top bar's Assistant button shows", () => {
     expect(within(screen.getByRole("banner")).getByRole("button", { name: "Assistant" })).toBeTruthy();
     expect(screen.queryByRole("dialog")).toBeNull();
     cleanup();
-    at("/station", "charge_rn");
+    at("/admit", "charge_rn");
     expect(bubble()).toBeTruthy();
   });
 

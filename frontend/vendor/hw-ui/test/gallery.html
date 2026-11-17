@@ -580,6 +580,53 @@
   <section class="hw-card" style="max-width:900px"><div id="g-hr"></div></section>
   </div>
 
+  <h2 class="hw-section-title" id="h-census">Census (0.10 Phase 3)</h2>
+  <div class="g-wide hw-stack" style="--hw-stack-gap:var(--hw-space-5)">
+  <section class="hw-card hw-stack" aria-labelledby="h-beds">
+    <h3 id="h-beds" class="hw-heading hw-heading--4">Bed use, last 14 days</h3>
+    <p class="hw-caption">Sample data. Every stay is placed as a percentage of the window; ended stays close with their outcome.</p>
+    <div class="hw-timeline-beds" id="timeline-beds">
+      <ul class="hw-timeline-beds__legend" aria-label="Legend">
+        <li class="hw-timeline-beds__key"><span class="hw-timeline-beds__swatch" aria-hidden="true"></span>On the ward</li>
+        <li class="hw-timeline-beds__key"><span class="hw-timeline-beds__mark" data-outcome="discharged" aria-hidden="true"></span>Discharged</li>
+        <li class="hw-timeline-beds__key"><span class="hw-timeline-beds__mark" data-outcome="transferred" aria-hidden="true"></span>Transferred</li>
+        <li class="hw-timeline-beds__key"><span class="hw-timeline-beds__mark" data-outcome="higher_care" aria-hidden="true"></span>Higher care</li>
+        <li class="hw-timeline-beds__key"><span class="hw-timeline-beds__mark" data-outcome="died" aria-hidden="true"></span>Died</li>
+      </ul>
+      <div class="hw-timeline-beds__scroll" tabindex="0" role="region" aria-label="Bed timeline">
+        <div class="hw-timeline-beds__chart">
+          <div class="hw-timeline-beds__row"><span class="hw-timeline-beds__bed">2B</span><div class="hw-timeline-beds__track">
+            <span class="hw-timeline-beds__stay" role="img" aria-label="Reyes, Carlos, bed 2B, Higher care" data-outcome="higher_care" style="--hw-timeline-beds-left: 10%; --hw-timeline-beds-width: 40%" id="stay-before"><span class="hw-timeline-beds__name">Reyes</span><span class="hw-timeline-beds__mark" data-outcome="higher_care" aria-hidden="true"></span></span>
+            <span class="hw-timeline-beds__stay" role="img" aria-label="Mendoza, Ana, bed 2B, on the ward" style="--hw-timeline-beds-left: 50%; --hw-timeline-beds-width: 50%" id="stay-open"><span class="hw-timeline-beds__name">Mendoza</span></span>
+          </div></div>
+          <div class="hw-timeline-beds__row"><span class="hw-timeline-beds__bed">3A</span><div class="hw-timeline-beds__track">
+            <span class="hw-timeline-beds__stay" role="img" aria-label="Santiago, Imelda, bed 3A, Discharged" data-outcome="discharged" style="--hw-timeline-beds-left: 0%; --hw-timeline-beds-width: 30%" id="stay-discharged"><span class="hw-timeline-beds__name">Santiago</span><span class="hw-timeline-beds__mark" data-outcome="discharged" aria-hidden="true"></span></span>
+            <span class="hw-timeline-beds__stay" role="img" aria-label="Bautista, Elena, bed 3A, Transferred" data-outcome="transferred" style="--hw-timeline-beds-left: 35%; --hw-timeline-beds-width: 25%"><span class="hw-timeline-beds__name">Bautista</span><span class="hw-timeline-beds__mark" data-outcome="transferred" aria-hidden="true"></span></span>
+          </div></div>
+          <div class="hw-timeline-beds__row"><span class="hw-timeline-beds__bed">10B</span><div class="hw-timeline-beds__track">
+            <span class="hw-timeline-beds__stay" role="img" aria-label="Cruz, Rogelio, bed 10B, Died" data-outcome="died" style="--hw-timeline-beds-left: 20%; --hw-timeline-beds-width: 1%" id="stay-short"><span class="hw-timeline-beds__mark" data-outcome="died" aria-hidden="true"></span></span>
+            <span class="hw-timeline-beds__stay" role="img" aria-label="Lim, Francis, bed 10B, on the ward" style="--hw-timeline-beds-left: 70%; --hw-timeline-beds-width: 30%"><span class="hw-timeline-beds__name">Lim</span></span>
+          </div></div>
+          <div class="hw-timeline-beds__axis" aria-hidden="true">
+            <span class="hw-timeline-beds__tick" style="--hw-timeline-beds-left: 0%">4 Nov</span>
+            <span class="hw-timeline-beds__tick" style="--hw-timeline-beds-left: 14.29%">6</span>
+            <span class="hw-timeline-beds__tick" style="--hw-timeline-beds-left: 28.57%">8</span>
+            <span class="hw-timeline-beds__tick" style="--hw-timeline-beds-left: 42.86%">10</span>
+            <span class="hw-timeline-beds__tick" style="--hw-timeline-beds-left: 57.14%">12</span>
+            <span class="hw-timeline-beds__tick" style="--hw-timeline-beds-left: 71.43%">14</span>
+            <span class="hw-timeline-beds__tick" style="--hw-timeline-beds-left: 85.71%">16</span>
+            <span class="hw-timeline-beds__now">Now</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="hw-card hw-stack" aria-labelledby="h-steps-accent">
+    <h3 id="h-steps-accent" class="hw-heading hw-heading--4">Steps in ink (<code>hw-steps--accent</code>)</h3>
+    <ol class="hw-steps hw-steps--accent" aria-label="Steps" id="steps-accent"><li class="hw-steps__step" data-status="done">Identity</li><li class="hw-steps__step" data-status="current" aria-current="step">Admission</li><li class="hw-steps__step">Initial assessment</li><li class="hw-steps__step">Review</li></ol>
+  </section>
+  </div>
+
   <h2 class="hw-section-title" id="h-research">Research (0.10 Phase 4)</h2>
   <div class="g-wide hw-stack" style="--hw-stack-gap:var(--hw-space-5)" data-hw-space="research">
     <section class="hw-card" style="max-width:900px"><div id="g-diverging"></div></section>

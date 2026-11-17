@@ -31,6 +31,10 @@ declare module "hw-ui" {
     intervalLabel?: string;
   }
   export function bars(el: HTMLElement, config: BarsConfig): Graph;
+  /** One measure over time; the picked column (default the latest) is read against the average. */
+  export function columns(el: HTMLElement, config: Common & {
+    x: string[]; values: number[]; highlight?: number; average?: boolean; averageLabel?: string; noun?: [string, string];
+  }): Graph;
   export function range(el: HTMLElement, config: Common & {
     items: { label: string; value: number | null; unit?: string; usual: [number, number]; scale?: [number, number] }[];
   }): Graph;

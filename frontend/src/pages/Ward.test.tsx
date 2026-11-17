@@ -513,7 +513,7 @@ describe("an empty unit, and the loading skeleton", () => {
     page();
     await loaded();
     expect(screen.getByText("No patients on Ward W4")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Admit a patient" }).getAttribute("href")).toBe("/station");
+    expect(screen.getByRole("link", { name: "Admit a patient" }).getAttribute("href")).toBe("/admit");
     cleanup();
     page({ ...session, role: "rn" });
     await loaded();

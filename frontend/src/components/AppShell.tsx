@@ -1,5 +1,5 @@
 import { useId, useSyncExternalStore, type ReactNode } from "react";
-import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import type { Session } from "../types";
 import { AlertTray } from "./AlertTray";
 import { PatientSearch } from "./PatientSearch";
@@ -34,13 +34,12 @@ export function Mark() {
 
 // ---- Where each role can go ----
 
-interface Tab { label: string; to: string; icon: string; current: (path: string, tab: string | null) => boolean }
+interface Tab { label: string; to: string; icon: string }
 
-const WARD: Tab = { label: "Ward", to: "/ward", icon: "list-ol", current: (p) => p === "/ward" };
-// Until Census and Admit have their own pages, each opens the Station on its matching tab.
-const CENSUS: Tab = { label: "Census", to: "/station?tab=flow", icon: "chart-column", current: (p, t) => p === "/station" && t === "flow" };
-const ADMIT: Tab = { label: "Admit", to: "/station", icon: "user-plus", current: (p, t) => p === "/station" && t !== "flow" };
-const OVERVIEW: Tab = { label: "Overview", to: "/overview", icon: "gauge-high", current: (p) => p === "/overview" };
+const WARD: Tab = { label: "Ward", to: "/ward", icon: "list-ol" };
+const CENSUS: Tab = { label: "Census", to: "/census", icon: "chart-column" };
+const ADMIT: Tab = { label: "Admit", to: "/admit", icon: "user-plus" };
+const OVERVIEW: Tab = { label: "Overview", to: "/overview", icon: "gauge-high" };
 
 const TABS: Record<string, readonly Tab[]> = { md: [WARD, CENSUS, ADMIT], charge_rn: [WARD, CENSUS, ADMIT], admin: [OVERVIEW, WARD] };
 
@@ -201,8 +200,6 @@ export function AppShell({ session, onSignOut, title, status, detail = false, ch
   const feed = useWardFeed();
   const assistant = useAssistant();
   const { pathname } = useLocation();
-  const [params] = useSearchParams();
-  const tab = params.get("tab");
   const tabs = TABS[session.role] ?? [];
   const items = researchItems(session.role);
   const menuLabel = session.role === "admin" ? "Lab" : "Research";
@@ -212,7 +209,7 @@ export function AppShell({ session, onSignOut, title, status, detail = false, ch
 
   const tabLinks = (className: string, icon: boolean) =>
     tabs.map((t) => (
-      <Link key={t.label} to={t.to} className={className} aria-current={t.current(pathname, tab) ? "page" : undefined}>
+      <Link key={t.label} to={t.to} className={className} aria-current={pathname === t.to ? "page" : undefined}>
         {icon && <span className={`hw-bottomnav__icon hw-icon fa-solid fa-${t.icon}`} aria-hidden="true" />}
         {t.label}
       </Link>

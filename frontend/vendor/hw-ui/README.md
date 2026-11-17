@@ -161,6 +161,21 @@ New tokens (component tier, pointing at semantic tokens): `--hw-pager-position-w
 `-bg`, `-line`, `-cols`, `-pad`, `-score-size`, `-step-size`; `--hw-actionbar-pad-y`, `-pad-x`, `-gap`, `-bg`,
 `-border`, `-button-height`. No new semantic tokens; the spaces override `--hw-graph-highlight`.
 
+### Phase 3 (0.10.0-biosentry.3): Census and Admit
+
+One new component, CSS only, and one modifier. Census also uses `columns` (with `data-hw-space="clinical"`, so its
+highlight is ink), `stat`, `filter` and `table`; Admit uses `steps`, `field`, `native-select`, `segmented--accent`,
+`checkbox`, `upload` and `tag`. `test/gallery.html` (section "Census (0.10 Phase 3)") has working markup for both.
+
+| Component | Contract |
+|---|---|
+| `hw-timeline-beds` (`timeline-beds.css`) | `div.hw-timeline-beds > ul.hw-timeline-beds__legend[aria-label="Legend"] > li.hw-timeline-beds__key (span.hw-timeline-beds__swatch "On the ward" \| span.hw-timeline-beds__mark[data-outcome] + name)` `+ div.hw-timeline-beds__scroll[tabindex=0][role=region][aria-label] > div.hw-timeline-beds__chart > div.hw-timeline-beds__row* (span.hw-timeline-beds__bed + div.hw-timeline-beds__track > span.hw-timeline-beds__stay[role=img][aria-label][data-outcome][style="--hw-timeline-beds-left: 12%; --hw-timeline-beds-width: 30%"] > span.hw-timeline-beds__name + span.hw-timeline-beds__mark[data-outcome][aria-hidden])` `+ div.hw-timeline-beds__axis[aria-hidden] > span.hw-timeline-beds__tick[style="--hw-timeline-beds-left: …"]* + span.hw-timeline-beds__now`. The window ends now (the track's right edge, ruled in ink). A stay with no `data-outcome` is on the ward: a solid ink bar (ink is the highlight; never red). An ended stay (`data-outcome=discharged\|transferred\|higher_care\|died`) is soft grey, closed by its mark: D in a box, T in a dashed box, H in a filled box, a filled disc for died. The kit draws the letters, so marks are always `aria-hidden`; the stay's label and the legend (all five) carry the outcome. The chart keeps 720px (640px below 576px) and scrolls sideways in its region. |
+| `hw-steps--accent` (`steps.css`) | The current step in ink instead of brand red, for products where red is clinical (as `hw-segmented--accent`). |
+
+New tokens (component tier): `--hw-timeline-beds-bed-width`, `-row-height`, `-bar-height`, `-min-width`, `-open-bg`,
+`-open-fg`, `-ended-bg`, `-ended-fg`, `-rule`, `-now`, `-mark-size`, and per mark `-mark-bg`, `-mark-fg`, `-mark-border`,
+`-mark-style`, `-mark-radius`; per stay `-left` and `-width` (set by the app). No new semantic tokens.
+
 ### Phase 4 (0.10.0-biosentry.4): Research
 
 `bars` gains two options; nothing else changes. `test/gallery.html` (section "Research (0.10 Phase 4)", inside
@@ -199,7 +214,7 @@ New tokens: none. Component custom properties set by the script: `--hw-graph-sta
 ```bash
 npm install          # dev tools + Font Awesome Free (the only runtime peer dependency; the font is bundled)
 npm run lint         # CSS architecture rules + JS lint
-npm test             # Playwright: 164 checks (keyboard, form states, link names, motion, graphs, reduced motion, axe in 5 modes)
+npm test             # Playwright: 173 checks (keyboard, form states, link names, motion, graphs, reduced motion, axe in 5 modes)
 ```
 
 ## Adding a component
