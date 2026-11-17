@@ -23,7 +23,7 @@
 | The data | Use | Notes |
 |---|---|---|
 | Lines over time, up to 4 series | `trend` | `dashed: true` tells two context lines apart; `range`, `limits`, `band` and `highlightWhere` for a vital sign |
-| A few things compared | `bars` | `baseline` makes the readout say "21 points more than …" |
+| A few things compared | `bars` | `baseline` makes the readout say "21 points more than …"; `diverging` for changes against a reference; `interval` per item |
 | One measure over time | `columns` | highlighted column is read against the average |
 | A score taken at set times | `steps` | `limits` name the thresholds; `null` is a gap |
 | A value against its usual range | `range` | one row per measure, each with its own little axis |
@@ -45,8 +45,9 @@ trend(el, { title, subtitle, x: ['Week 1', …], xLabel: 'Week',
             series: [{ name, values: [0.42, …], dashed: false }, …], highlight: 'Checked student' });
             // + range, limits, band, bandLabel, highlightWhere: see "Trend: clinical options" below
 
-bars(el, { title, subtitle, items: [{ name, value }, …], highlight: 2, baseline: 0, unit: '%', max: 100,
+bars(el, { title, subtitle, items: [{ name, value, interval: [lo, hi] }, …], highlight: 2, baseline: 0, unit: '%', max: 100,
            label: (item) => `flagged early by ${item.name}` });
+           // + diverging, zeroLabel, sides, intervalLabel: see "Bars: diverging and intervals" below
 
 columns(el, { title, subtitle, x: ['3 Nov', …], values: [9, 7, …], averageLabel: '14-day average',
               noun: ['alert', 'alerts'] });
@@ -96,6 +97,36 @@ trend(el, {
 // SpO2 range [85, 100], limit 96, highlightWhere (v) => v < 96 (scale 1).
 ```
 
+### Bars: diverging and intervals
+
+Both optional. Without them a bars graph draws exactly as before (zero-based, bars from the left, no whiskers).
+
+| Option | Type | What it does |
+|---|---|---|
+| `diverging` | `true` | A change against a reference: the zero line sits in the middle (ink, like every baseline), losses run left of it and gains right. The scale is one nice half-scale mirrored around zero, so equal changes have equal lengths. A loss's value sits before its bar. Default numbers carry their sign (`+0.02`); `format` takes over as usual. Below 576px each name sits above its bar and the scale keeps only its two ends and zero. |
+| `zeroLabel` | string | The zero mark's text, in bold (default the formatted 0). Say what zero is: `'0 · NEWS2 alone'`. |
+| `sides` | `[loss, gain]` | Two words under the scale, either side of zero: `['a loss', 'a gain']`. |
+| `interval` (per item) | `[lo, hi]` | A whisker with end caps across the bar, in ink with a surface halo. The value moves past the whisker's far end. Works with or without `diverging`; the scale grows to include it. |
+| `intervalLabel` | string | Names the interval in the readout: "98.33% interval +0.008 to +0.029" (default `Interval`). |
+
+The readout reads the value, then the interval, then the `baseline` comparison if there is one. The whiskers are
+drawn for the eye only (`aria-hidden`); the readout says them.
+
+```js
+// The headline finding of a research page: gain in excess over chance against NEWS2 alone, with the declared intervals.
+bars(el, {
+  title: 'Only the checked student, added to NEWS2, gained beyond chance',
+  subtitle: 'Gain in excess over chance against NEWS2 alone, held-out set 2',
+  diverging: true, zeroLabel: '0 · NEWS2 alone', sides: ['a loss', 'a gain'], intervalLabel: '98.33% interval',
+  items: [
+    { name: 'NEWS2 + checked student', value: 0.0181, interval: [0.008, 0.0291] },
+    { name: 'NEWS2 + student', value: -0.0401, interval: [-0.0542, -0.0253] },
+    { name: 'NEWS2 + reward policy', value: -0.0127, interval: [-0.0245, -0.0001] },
+  ],
+  highlight: 0, format: (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(3)}`,
+});
+```
+
 Declarative, picked up by `initAll()` (no function options):
 
 ```html
@@ -110,7 +141,7 @@ Put a graph on any surface (a `.hw-card`, a dialog, the page). The graph brings 
   a polite live region. "Show as a table" swaps the plot for a real table of every value. With `limits` or `band`,
   the plot's name lists them.
 - `bars`, `columns`, `share`: the marks are buttons in one group with a single tab stop; arrow keys move
-  the highlight (`aria-pressed`).
+  the highlight (`aria-pressed`). A bar's interval is read in the readout, not drawn into its name.
 - `steps`: the plot is an image whose label lists every reading; the values are also printed under it.
 - `range`: a list; each row says its value and how far outside its usual range it is, in words.
 

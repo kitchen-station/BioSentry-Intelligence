@@ -159,6 +159,36 @@ describe("SignIn", () => {
   );
 });
 
+describe("the front door", () => {
+  it("in the sample build: the product line, a Sample data badge, and the evidence one click away, readable before sign-in", async () => {
+    page();
+    expect(screen.getByText("A ranked early-warning list for hospital wards in the Philippines.")).toBeTruthy();
+    expect(screen.getByText("This is not a diagnosis system. It ranks and displays. A human decides.")).toBeTruthy();
+    expect(screen.getByText("Sample data")).toBeTruthy();
+    expect(screen.getByText("Synthetic, not validated.")).toBeTruthy();
+    const evidence = screen.getByRole("link", { name: "See the evidence from the simulated trials" });
+    expect(evidence.getAttribute("href")).toBe("/lab/research");
+    expect(screen.getByRole("heading", { level: 1, name: "Sign in" })).toBeTruthy(); // the steps keep their heading
+    expect(screen.getByText(/Public demo: synthetic data, no server, no real sign-in/)).toBeTruthy();
+    expect(screen.getByText("Set in HarmonyOS Sans")).toBeTruthy();
+    expect(document.querySelector("b, i, u, s")).toBeNull(); // icons are spans
+    await userEvent.click(evidence);
+    expect(screen.getByText("at /lab/research")).toBeTruthy();
+    expect(api.signIn).not.toHaveBeenCalled(); // nothing was signed in to get there
+  });
+
+  it("with the API: the product line only, no Sample data badge and no evidence link", () => {
+    api.usesServer = true;
+    page();
+    expect(screen.getByText("A ranked early-warning list for hospital wards in the Philippines.")).toBeTruthy();
+    expect(screen.queryByText("Sample data")).toBeNull();
+    expect(screen.queryByText("Synthetic, not validated.")).toBeNull();
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.getByText(/Pilot build: synthetic data only\. Not for real patients\./)).toBeTruthy();
+    expect(screen.getByText("Set in HarmonyOS Sans")).toBeTruthy();
+  });
+});
+
 describe("the public demo (no server)", () => {
   it("prefills a passphrase and says plainly that nothing is checked", async () => {
     page();

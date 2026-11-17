@@ -179,13 +179,34 @@ export const RUN_COMPARISON: readonly { id: string; name: string; v1: RunSide; v
 // read once on 2026-11-14). Gain in excess over chance of "NEWS2 or X" against NEWS2 alone, episodes not cut short;
 // the unit is the trial; interval 98.33% (three comparisons); windows added are of 1,601 (1,350, 1,313, 1,326 against 1,257).
 export const HELD_OUT_2 = {
+  source: "models/held_out_2/analysis.json",
   trials: 400,
   episodes: 1743,
   notCutShort: 1601,
   date: "2026-11-14",
+  interval: "98.33%", // bootstrap.tail_per_side "98.33": 1/120, Bonferroni for three comparisons; the verdict reads this one
   rows: [
     { id: "news2_or_student", name: "student", gain: -0.0401, lo: -0.0542, hi: -0.0253, alertRatio: 1.254, windowsAdded: 93, verdict: "a loss is shown" },
     { id: "news2_or_student_checked", name: "student with the confidence check", gain: 0.0181, lo: 0.0080, hi: 0.0291, alertRatio: 1.048, windowsAdded: 56, verdict: "a gain beyond chance is shown" },
     { id: "news2_or_reward_final", name: "reward-learned policy", gain: -0.0127, lo: -0.0245, hi: -0.0001, alertRatio: 1.131, windowsAdded: 69, verdict: "a loss is shown" },
   ],
 } as const;
+
+/** One alerting rule alone on held-out set 2, as printed. */
+export interface AloneResult {
+  timeInAlert: number; // patient-bins alerting / patient-bins, 3 decimals
+  newAlert: Frac; // episodes with a NEW alert in the window / evaluated
+  alertsPerCaught: number; // alerts per episode with a new alert (number needed to evaluate)
+  leadMedianMin: number; // lead time median, minutes, episodes with a new alert (n = newAlert.n)
+}
+
+// Transcribed from models/tier_c/student_vitals/held_out_2.txt (held-out set 2, seeds 1001 to 1400, read once; the
+// rules alone): "held-out patients", and for the columns news2_chart_trigger and student the rows "time in alert",
+// "episodes with a NEW alert in the window / evaluated", "alerts per episode with a new alert (number needed to
+// evaluate)" and "lead time median, minutes (episodes with a new alert)". The README's Results table repeats them.
+export const HELD_OUT_2_ALONE = {
+  source: "models/tier_c/student_vitals/held_out_2.txt",
+  patients: 37062,
+  news2: { timeInAlert: 0.166, newAlert: f(854, 1743, 0.49), alertsPerCaught: 151.0, leadMedianMin: 46.6 },
+  student: { timeInAlert: 0.065, newAlert: f(1048, 1743, 0.601), alertsPerCaught: 125.8, leadMedianMin: 82.9 },
+} as const satisfies { source: string; patients: number; news2: AloneResult; student: AloneResult };

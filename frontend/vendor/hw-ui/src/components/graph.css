@@ -85,14 +85,30 @@
   .hw-graph__track { position: relative; display: block; height: 52px; margin-right: 56px; }
   .hw-graph__rule { position: absolute; top: 0; bottom: 0; left: var(--hw-graph-at); width: 1px; background: var(--hw-graph-grid); }
   .hw-graph__rule[data-base] { background: var(--hw-graph-baseline); }
-  .hw-graph__bar { position: absolute; top: 15px; left: 0; width: var(--hw-graph-size); height: 22px; background: var(--hw-graph-context); border-radius: 0 4px 4px 0; }
+  .hw-graph__bar { --hw-graph-bar-radius: 0 4px 4px 0; position: absolute; top: 15px; left: var(--hw-graph-start, 0); width: var(--hw-graph-size); height: 22px; background: var(--hw-graph-context); border-radius: var(--hw-graph-bar-radius); }
   .hw-graph__row[aria-pressed="true"] .hw-graph__bar { background: var(--hw-graph-highlight); }
-  .hw-graph__bar-value { position: absolute; top: 15px; left: var(--hw-graph-size); margin-left: var(--hw-space-3); font-variant-numeric: tabular-nums; font-weight: var(--hw-weight-bold); line-height: 22px; white-space: nowrap; }
+  .hw-graph__bar-value { position: absolute; top: 15px; left: var(--hw-graph-label, var(--hw-graph-size)); margin-left: var(--hw-space-3); font-variant-numeric: tabular-nums; font-weight: var(--hw-weight-bold); line-height: 22px; white-space: nowrap; }
   .hw-graph__scale { font-size: var(--hw-text-caption); color: var(--hw-color-text-muted); }
   .hw-graph__scale > .hw-graph__track { height: 22px; }
   .hw-graph__scale-mark { position: absolute; top: 4px; left: var(--hw-graph-at); white-space: nowrap; transform: translateX(-50%); }
   .hw-graph__scale-mark[data-edge="start"] { transform: none; }
   .hw-graph__scale-mark[data-edge="end"] { transform: translateX(-100%); }
+  /* Bars, diverging (data-diverging on the graph): losses run left of the zero line, gains right; room for a value at
+     either end. A negative bar is rounded on its left and its value sits before it. The zero mark is ink and bold. */
+  .hw-graph[data-diverging] .hw-graph__track { margin-left: 56px; }
+  .hw-graph__track[data-sign="negative"] > .hw-graph__bar { --hw-graph-bar-radius: 4px 0 0 4px; }
+  .hw-graph__track[data-sign="negative"] > .hw-graph__bar-value { margin-left: 0; transform: translateX(calc(-100% - var(--hw-space-3))); }
+  .hw-graph__scale-mark[data-base] { font-weight: var(--hw-weight-bold); color: var(--hw-color-text); }
+  .hw-graph__sides { margin-top: var(--hw-space-1); }
+  .hw-graph__side { position: absolute; top: 0; white-space: nowrap; }
+  .hw-graph__side[data-side="loss"] { right: calc(100% - var(--hw-graph-at) + var(--hw-space-3)); }
+  .hw-graph__side[data-side="gain"] { left: calc(var(--hw-graph-at) + var(--hw-space-3)); }
+  /* An interval: an ink whisker with end caps across the middle of its bar, haloed in the surface so it stays
+     visible on a highlighted bar in either theme. */
+  .hw-graph__interval { position: absolute; top: 25px; left: var(--hw-graph-start); width: var(--hw-graph-size); height: 2px; background: var(--hw-color-text); box-shadow: 0 0 0 1px var(--hw-graph-surface); }
+  .hw-graph__interval::before, .hw-graph__interval::after { content: ""; position: absolute; top: -6px; width: 2px; height: 14px; background: var(--hw-color-text); box-shadow: 0 0 0 1px var(--hw-graph-surface); }
+  .hw-graph__interval::before { left: -1px; }
+  .hw-graph__interval::after { right: -1px; }
 
   /* Columns */
   .hw-graph__columns { position: relative; display: flex; gap: 6px; align-items: flex-end; height: var(--hw-graph-height, 210px); margin-top: var(--hw-space-4); padding-left: 28px; border-bottom: 1px solid var(--hw-graph-baseline); }
@@ -172,6 +188,10 @@
   @media (width < 576px) {
     .hw-graph__value { font-size: 36px; }
     .hw-graph__row, .hw-graph__scale { --hw-graph-label-width: 104px; column-gap: var(--hw-space-4); }
+    /* Diverging on a phone: each name above its bar, so the bars get the full width; the scale keeps its ends and zero. */
+    .hw-graph[data-diverging] :is(.hw-graph__row, .hw-graph__scale) { grid-template-columns: minmax(0, 1fr); }
+    .hw-graph[data-diverging] .hw-graph__row { padding-top: var(--hw-space-3); }
+    .hw-graph[data-diverging] .hw-graph__scale-mark:not([data-base], [data-edge]) { display: none; }
     .hw-graph__item { row-gap: 0; padding: var(--hw-space-3) 0; grid-template-columns: minmax(0, 1fr) auto; }
     .hw-graph__item-track { margin: var(--hw-space-2) 9px; grid-column: 1 / -1; }
     .hw-graph__item-note { white-space: normal; grid-column: 1 / -1; }

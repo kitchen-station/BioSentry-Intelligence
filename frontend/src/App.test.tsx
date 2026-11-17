@@ -73,7 +73,7 @@ vi.mock("./pages/AskChat", () => ({
   AskChat: ({ session }: { session: Session }) => <p>ask page for {session.clinician_id}</p>,
 }));
 vi.mock("./pages/Research", () => ({
-  Research: ({ session }: { session: Session }) => <p>research page for {session.clinician_id}</p>,
+  Research: ({ session }: { session: Session | null }) => <p>research page for {session?.clinician_id ?? "nobody signed in"}</p>,
 }));
 vi.mock("./pages/Pipeline", () => ({
   Pipeline: ({ session }: { session: Session }) => <p>pipeline page for {session.clinician_id}</p>,
@@ -340,9 +340,24 @@ describe("route guards", () => {
     expect(screen.queryByText(/ward research page/)).toBeNull();
   });
 
-  it("sends a signed-out visitor of the lab to sign-in, remembering where", () => {
+  it("sends a signed-out visitor of the evidence to sign-in in the live build, remembering where", () => {
     at("/lab/research");
     expect(screen.getByText("sign-in page from /lab/research")).toBeTruthy();
+    expect(screen.queryByText(/research page/)).toBeNull();
+  });
+
+  it("opens the evidence before sign-in in the sample build only, with no session around it, and no other lab page", () => {
+    api.usesServer = false;
+    at("/lab/research");
+    expect(screen.getByText("research page for nobody signed in")).toBeTruthy();
+    expect(document.querySelector("[data-feed]")).toBeNull(); // no ward read before sign-in
+    cleanup();
+    for (const path of ["/lab", "/lab/pipeline", "/what-if", "/ask"]) {
+      const { unmount } = at(path);
+      expect(screen.getByText(`sign-in page from ${path}`)).toBeTruthy();
+      unmount();
+    }
+    api.usesServer = true;
   });
 
   it("sends a signed-out visitor of an old address to sign-in", () => {

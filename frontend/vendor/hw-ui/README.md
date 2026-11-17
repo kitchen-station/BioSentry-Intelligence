@@ -176,6 +176,18 @@ New tokens (component tier): `--hw-timeline-beds-bed-width`, `-row-height`, `-ba
 `-open-fg`, `-ended-bg`, `-ended-fg`, `-rule`, `-now`, `-mark-size`, and per mark `-mark-bg`, `-mark-fg`, `-mark-border`,
 `-mark-style`, `-mark-radius`; per stay `-left` and `-width` (set by the app). No new semantic tokens.
 
+### Phase 4 (0.10.0-biosentry.4): Research
+
+`bars` gains two options; nothing else changes. `test/gallery.html` (section "Research (0.10 Phase 4)", inside
+`data-hw-space="research"`) draws both.
+
+| Component | Contract |
+|---|---|
+| `bars` (`js/graph/bars.js`) | `diverging: true` puts a labelled zero line in the middle (`zeroLabel`, bold; optional `sides: [loss, gain]` under it): losses run left of it, gains right, on a symmetric scale; the graph carries `data-diverging`, each track `data-sign=positive\|negative`. Per item, `interval: [lo, hi]` draws `span.hw-graph__interval[aria-hidden]`, an ink whisker with end caps (haloed in the surface), and the value moves past its far end; `intervalLabel` names it in the readout ("98.33% interval +0.008 to +0.029"). Both optional: an old config draws exactly as before. Below 576px a diverging graph puts each name above its bar and keeps only the scale's ends and zero. API: [docs/graphs.md](docs/graphs.md#bars-diverging-and-intervals). |
+
+New tokens: none. Component custom properties set by the script: `--hw-graph-start` (a bar's or whisker's left edge),
+`--hw-graph-label` (where the value sits), `--hw-graph-bar-radius`.
+
 ## Rules (enforced by `npm run lint`)
 
 1. **Cascade layers** `hw.tokens → hw.base → hw.components → hw.utilities`. Later layers win regardless of
@@ -202,7 +214,7 @@ New tokens (component tier): `--hw-timeline-beds-bed-width`, `-row-height`, `-ba
 ```bash
 npm install          # dev tools + Font Awesome Free (the only runtime peer dependency; the font is bundled)
 npm run lint         # CSS architecture rules + JS lint
-npm test             # Playwright: 163 checks (keyboard, form states, link names, motion, graphs, reduced motion, axe in 5 modes)
+npm test             # Playwright: 173 checks (keyboard, form states, link names, motion, graphs, reduced motion, axe in 5 modes)
 ```
 
 ## Adding a component

@@ -4,15 +4,15 @@ import type { ResearchAbstained, ResearchRow, Session, WardResearch as Answer } 
 import { ApiError, getWardResearch, hasLabQuestions } from "../api";
 import { REASONS, shown } from "../components/BaselinePanel";
 import { formatAge, formatClock } from "../components/format";
-import { AppShell } from "../components/AppShell";
-import { SimulatedNote } from "../components/LabFrame";
+import { LabFrame } from "../components/LabFrame";
 import { ENTRIES, modelWords } from "../components/ResearchModels";
 import research from "./Research.module.css";
 
+// Each with the clinical y-range the Patient page's trends use, for the drawing of the value against its own band.
 const VITALS = [
-  ["heart_rate", "Heart rate"],
-  ["respiratory_rate", "Breathing rate"],
-  ["spo2", "SpO2"],
+  ["heart_rate", "Heart rate", [40, 140]],
+  ["respiratory_rate", "Breathing rate", [8, 30]],
+  ["spo2", "SpO2", [85, 100]],
 ] as const;
 const LEVEL: Record<ResearchRow["level"], string> = {
   low: "Low",
@@ -36,6 +36,23 @@ function vitalCell(row: ResearchRow, vital: string): string {
     return REASONS[v.reason].replace(/^./, (c) => c.toUpperCase());
   }
   return "No own baseline for this patient now.";
+}
+
+/**
+ * The latest value drawn against the patient's own band on the vital's clinical range: a shaded band and a dot, filled in
+ * the highlight when it sits outside the band. For the eye only: the words under it say the same numbers.
+ */
+function Band({ row, vital, range: [lo, hi] }: { row: ResearchRow; vital: string; range: readonly [number, number] }) {
+  const v = row.baseline.find((b) => b.vital === vital);
+  if (v?.status !== "computed") return null;
+  const at = (x: number) => Math.max(0, Math.min(100, ((x - lo) / (hi - lo)) * 100));
+  return (
+    <svg className={`hw-graph__svg ${research.band}`} aria-hidden="true">
+      <line className="hw-graph__gridline" x1="0" x2="100%" y1="8" y2="8" />
+      <rect className="hw-graph__band" x={`${at(v.band_low)}%`} width={`${at(v.band_high) - at(v.band_low)}%`} y="2" height="12" rx="3" />
+      <circle className="hw-graph__dot" data-on={v.latest < v.band_low || v.latest > v.band_high ? "" : undefined} cx={`${at(v.latest)}%`} cy="8" r="6" />
+    </svg>
+  );
 }
 
 function alertCell(row: ResearchRow): string {
@@ -90,8 +107,7 @@ export function WardResearch({ session, onSignOut }: { session: Session; onSignO
   useEffect(load, [load]);
 
   return (
-    <AppShell session={session} onSignOut={onSignOut} title={<>Ward research &middot; Ward {session.ward}</>}>
-      <SimulatedNote />
+    <LabFrame session={session} onSignOut={onSignOut} title={<>Ward research &middot; Ward {session.ward}</>}>
       <div className={research.main}>
         <h1 className="hw-heading hw-heading--3">Ward research</h1>
         {data && <p className="hw-text-muted">{data.label}</p>}
@@ -129,7 +145,7 @@ export function WardResearch({ session, onSignOut }: { session: Session; onSignO
                     <td className="hw-table__num">{r.rank}</td>
                     <th scope="row"><Who row={r} /></th>
                     <td className={research.level} data-level={r.level}>{r.score}, {LEVEL[r.level]}</td>
-                    {VITALS.map(([key]) => <td key={key}>{vitalCell(r, key)}</td>)}
+                    {VITALS.map(([key, , range]) => <td key={key}><Band row={r} vital={key} range={range} />{vitalCell(r, key)}</td>)}
                     <td>
                       {ENTRIES.map(([key, name]) => (
                         <div key={key}>{name}: {modelWords(r.models[key])}</div>
@@ -141,6 +157,9 @@ export function WardResearch({ session, onSignOut }: { session: Session; onSignO
               </tbody>
             </table>
           </div>
+        )}
+        {data && data.ranked.length > 0 && (
+          <p className="hw-caption">Shaded: the patient&apos;s own baseline band, on the vital&apos;s clinical range. Dot: the latest value, filled when it sits outside the band.</p>
         )}
         {data && data.abstained.length > 0 && (
           <section aria-labelledby="not-ranked" className={`hw-card hw-card--outlined ${research.card}`}>
@@ -159,6 +178,6 @@ export function WardResearch({ session, onSignOut }: { session: Session; onSignO
           {hasLabQuestions && <li><Link to="/ask">Ask the research agent</Link></li>}
         </ul>
       </div>
-    </AppShell>
+    </LabFrame>
   );
 }

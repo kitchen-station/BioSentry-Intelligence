@@ -27,7 +27,7 @@ const SOURCE = {
   failed: "Ward read failed: every state is from the page's own record.",
 };
 
-/** The eight stages and what each one does today. Only the NEWS2 state is read from the ward. */
+/** The eight stages as a vertical stepper, each with what it does today. Only the NEWS2 state is read from the ward. */
 export function Pipeline({ session, onSignOut }: Props) {
   const [tiers, setTiers] = useState<Tiers>("loading");
 
@@ -49,13 +49,10 @@ export function Pipeline({ session, onSignOut }: Props) {
   };
 
   return (
-    <LabFrame session={session} onSignOut={onSignOut}>
+    <LabFrame session={session} onSignOut={onSignOut} title="The pipeline">
       <div className={research.main}>
+        {/* "Synthetic, not validated." is the research strip's, above. */}
         <h1 className="hw-heading hw-heading--3">The pipeline</h1>
-        <p role="note" className="hw-alert">
-          <span className="hw-alert__icon hw-icon fa-solid fa-circle-info" aria-hidden="true" />
-          <span className="hw-alert__body">Synthetic, not validated.</span>
-        </p>
         <p className="hw-caption">
           {tiers === "loading" ? SOURCE.loading : tiers === "failed" ? SOURCE.failed : SOURCE.ok}
         </p>
@@ -63,13 +60,17 @@ export function Pipeline({ session, onSignOut }: Props) {
           {PIPELINE.map((s, i) => {
             const state = stateOf(s.tier, s.state);
             return (
-              <li key={s.id} className={`hw-card hw-card--outlined ${research.card} ${styles.stage}`} data-decides={s.decides}>
-                <h2 className={`hw-heading hw-heading--4 ${styles.name}`}>
-                  <span aria-hidden="true" className={styles.num}>{i + 1}</span>
-                  {s.name}
-                </h2>
-                <span className={TAG[state]}>{state}</span>
-                {s.text.map((t) => <p key={t}>{t}</p>)}
+              <li key={s.id} className={styles.stage} data-state={state} data-decides={s.decides}>
+                <div className={`hw-card hw-card--outlined ${research.card} ${styles.card}`}>
+                  <div className={styles.head}>
+                    <h2 className="hw-heading hw-heading--4">
+                      <span aria-hidden="true" className={styles.num}>{i + 1}</span>
+                      {s.name}
+                    </h2>
+                    <span className={TAG[state]}>{state}</span>
+                  </div>
+                  {s.text.map((t) => <p key={t}>{t}</p>)}
+                </div>
               </li>
             );
           })}

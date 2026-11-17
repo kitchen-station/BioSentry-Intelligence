@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ApiError, clearSession, signIn, usesServer } from "../api";
 import type { Session, SessionRole } from "../types";
 import { ROLE_LABELS } from "../components/SessionMenu";
@@ -187,11 +187,29 @@ export function SignIn({ onSignIn }: Props) {
 
   return (
     <main className={styles.page}>
+      {/* The front door: what this is, before anyone signs in. The sample build adds what a judge needs: that the data is a
+          sample, and the evidence, readable without signing in. */}
       <section className={styles.brand}>
-        <Mark />
+        <div className={styles.markRow}>
+          <Mark />
+          {!usesServer && (
+            <>
+              <span className="hw-tag hw-tag--round">Sample data</span>
+              <span className="hw-text-muted">Synthetic, not validated.</span>
+            </>
+          )}
+        </div>
         <div className={styles.pitch}>
-          <p className="hw-heading hw-heading--4">A ranked early-warning list for hospital wards in the Philippines.</p>
+          <p className="hw-heading hw-heading--2">A ranked early-warning list for hospital wards in the Philippines.</p>
           <p className="hw-text-muted">This is not a diagnosis system. It ranks and displays. A human decides.</p>
+          {!usesServer && (
+            <p className={styles.evidence}>
+              {/* A link in link blue, not the kit's red call to action: red is clinical here. */}
+              <Link to="/lab/research">
+                See the evidence from the simulated trials <span className="hw-icon fa-solid fa-arrow-right" aria-hidden="true" />
+              </Link>
+            </p>
+          )}
         </div>
       </section>
 

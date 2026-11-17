@@ -108,7 +108,37 @@ describe("ward research: the table", () => {
     expect(within(table).getByText("Every patient of the ward, in the NEWS2 order")).toBeTruthy();
     expect(within(table).getAllByRole("columnheader").map((h) => h.getAttribute("scope"))).toEqual(Array(8).fill("col"));
     expect(within(table).getAllByRole("rowheader").length).toBe(5);
-    expect(screen.getByText("Simulated patients until a hospital is connected.")).toBeTruthy();
+    expect(screen.getByRole("note").textContent).toBe("Research · Synthetic, not validated. Nothing here changes a patient's rank.");
+    expect(region.closest("[data-hw-space='research']")).toBeTruthy(); // its marks highlight in info blue
+  });
+
+  it("draws each computed value against the patient's own band on the vital's clinical range, and nothing for the rest", async () => {
+    api.getWardResearch.mockResolvedValue({
+      ...ANSWER,
+      ranked: [row({
+        baseline: [
+          { ...computed("heart_rate", 92, 70, 22, true, "bpm"), band_low: 60, band_high: 80 } as Vital,
+          { ...computed("respiratory_rate", 16, 15, 1, false, "/min"), band_low: 14, band_high: 18 } as Vital,
+          { ...computed("spo2", 80, 96, -16, true, "%"), band_low: 94, band_high: 99 } as Vital,
+        ],
+      }), ANSWER.ranked[1]],
+    });
+    await loaded();
+    const marks = (r: number) => within(screen.getAllByRole("row")[r]).getAllByRole("cell").slice(2, 5).map((c) => {
+      const svg = c.querySelector("svg");
+      if (!svg) return null;
+      const band = svg.querySelector(".hw-graph__band")!, dot = svg.querySelector(".hw-graph__dot")!;
+      return [svg.getAttribute("aria-hidden"), band.getAttribute("x"), band.getAttribute("width"), dot.getAttribute("cx"), dot.hasAttribute("data-on")];
+    });
+    // HR 40-140: band 60-80 is 20%-40%, 92 is 52%, outside. RR 8-30: 14-18, 16 inside. SpO2 85-100: 80 is below the range, drawn on its edge.
+    expect(marks(1)).toEqual([
+      ["true", "20%", "20%", "52%", true],
+      ["true", `${(6 / 22) * 100}%`, `${(4 / 22) * 100}%`, `${(8 / 22) * 100}%`, false],
+      ["true", `${(9 / 15) * 100}%`, `${(5 / 15) * 100}%`, "0%", true],
+    ]);
+    expect(marks(2)).toEqual([null, null, null]); // not the reader's patient: the flag only, no numbers drawn
+    expect(within(screen.getAllByRole("row")[1]).getAllByRole("cell")[2].textContent).toBe("92 vs 70 bpm (+22) · 1 min ago · Flagged");
+    expect(screen.getByText(/Shaded: the patient's own baseline band/)).toBeTruthy();
   });
 
   it("shows each patient's own row as a link and a patient who is not the reader's by bed alone", async () => {

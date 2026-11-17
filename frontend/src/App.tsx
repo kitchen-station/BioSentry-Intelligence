@@ -155,9 +155,10 @@ export function App() {
         element={session ? (developer ? <Lab session={session} onSignOut={signOut} /> : clinician ? <Navigate to="/what-if" replace /> : toWard) : <ToSignIn gone={gone} />}
       />
       <Route path="/lab/ask" element={session ? (clinician ? <Navigate to="/ask" replace /> : toWard) : <ToSignIn gone={gone} />} />
+      {/* The owner's decision: in the sample build (no server, no real patient) the evidence is readable before sign-in. The live build keeps it signed in. */}
       <Route
         path="/lab/research"
-        element={session ? (developer ? <Research session={session} onSignOut={signOut} /> : toWard) : <ToSignIn gone={gone} />}
+        element={session ? (developer ? <Research session={session} onSignOut={signOut} /> : toWard) : !usesServer ? <Research session={null} onSignOut={signOut} /> : <ToSignIn gone={gone} />}
       />
       <Route
         path="/lab/pipeline"
