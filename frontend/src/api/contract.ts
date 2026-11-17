@@ -5,6 +5,7 @@
  */
 
 import type {
+  AssistantMessage,
   AbstainedRow,
   Acknowledgement,
   AdmitPatientInput,
@@ -34,6 +35,9 @@ import type {
 } from "../types";
 
 export interface ApiProvider {
+  getAssistantHistory(patientId: string): Promise<AssistantMessage[]>;
+  getPatientRuns(patientId: string): Promise<LabRunItem[]>;
+  getPatientRun(patientId: string, runId: number): Promise<LabRunDetail>;
   getWard(): Promise<WardResponse>;
   getPatient(id: string): Promise<PatientDetail | null>;
   /**

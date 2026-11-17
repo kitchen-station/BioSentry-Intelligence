@@ -193,6 +193,15 @@ export interface components {
             readonly to_minute: number;
             readonly transferred_out: number | null;
         };
+        /** AssistantMessage */
+        readonly AssistantMessage: {
+            readonly created_at: string;
+            readonly id: number;
+            readonly lab_run_id: number | null;
+            /** @enum {string} */
+            readonly role: "user" | "assistant";
+            readonly text: string;
+        };
         /** BaselineComputed */
         readonly BaselineComputed: {
             /** @enum {string} */
@@ -624,6 +633,12 @@ export interface components {
             readonly unit: string;
             readonly vitals: components["schemas"]["OpenVitals"] | null;
         };
+        /** OpenEr */
+        readonly OpenEr: {
+            readonly awaiting_icu: number | null;
+            readonly beds_in_use: number;
+            readonly capacity: number | null;
+        };
         /**
          * OpenHistory
          * @description The last 12 hours of the five vitals of a ranked bed, oldest first, at most 49 points each.
@@ -706,6 +721,7 @@ export interface components {
          * @description One unit of the run, as anyone may read it: no count, no clinician, no person.
          */
         readonly OpenUnit: {
+            readonly capacity: number | null;
             readonly floor: number | null;
             readonly id: string;
             /** @enum {string} */
@@ -750,12 +766,19 @@ export interface components {
          * @description What anyone may watch with no sign-in (GET /wards/{ward}/open-view).
          */
         readonly OpenWard: {
+            readonly awaiting_icu: number | null;
             readonly beds: readonly components["schemas"]["OpenBed"][];
             /** @constant */
             readonly can_control: false;
+            readonly capacity: number | null;
+            readonly deaths_24h: number | null;
+            readonly er: components["schemas"]["OpenEr"] | null;
+            readonly nurses_on_duty: number | null;
+            readonly outliers: number | null;
             readonly sim: components["schemas"]["OpenSim"] | null;
             /** @constant */
             readonly synthetic: true;
+            readonly transfers_24h: number | null;
             readonly ward: string;
         };
         /**
@@ -1448,6 +1471,7 @@ export type AlertCounted = components['schemas']['AlertCounted'];
 export type AlertUnavailable = components['schemas']['AlertUnavailable'];
 export type AnalyticsHour = components['schemas']['AnalyticsHour'];
 export type AnalyticsShift = components['schemas']['AnalyticsShift'];
+export type AssistantMessage = components['schemas']['AssistantMessage'];
 export type BaselineComputed = components['schemas']['BaselineComputed'];
 export type BaselineFlagged = components['schemas']['BaselineFlagged'];
 export type BaselineForming = components['schemas']['BaselineForming'];
@@ -1485,6 +1509,7 @@ export type NumberPresent = components['schemas']['NumberPresent'];
 export type NurseVitalsInput = components['schemas']['NurseVitalsInput'];
 export type OpenBed = components['schemas']['OpenBed'];
 export type OpenBedCard = components['schemas']['OpenBedCard'];
+export type OpenEr = components['schemas']['OpenEr'];
 export type OpenHistory = components['schemas']['OpenHistory'];
 export type OpenMove = components['schemas']['OpenMove'];
 export type OpenPoint = components['schemas']['OpenPoint'];
