@@ -161,6 +161,35 @@ export interface components {
             /** @constant */
             readonly status: "unavailable";
         };
+        /**
+         * AnalyticsHour
+         * @description One hour ending at to_minute. Events use (from, to]; occupancy and NEWS2 are
+         *     snapshots at to. NEWS2 uses the latest stored bin ending in the preceding 15 minutes;
+         *     absent, unrebuildable or unranked-unit scores count as not_ranked.
+         */
+        readonly AnalyticsHour: {
+            readonly admitted: number;
+            readonly beds_in_use: number;
+            readonly discharged: number;
+            readonly from_minute: number;
+            readonly news2: components["schemas"]["News2Counts"];
+            readonly to_minute: number;
+            readonly transferred_in: number;
+            readonly transferred_out: number;
+        };
+        /**
+         * AnalyticsShift
+         * @description Run-relative 12-hour shifts, clipped to the requested window. Alerts count scored
+         *     patient bins ending in (from, to] with NEWS2 >=5 or a single parameter at 3, not runs of them.
+         *     Patient-minutes sum stay overlap, including unranked patients. Unknown arrival times
+         *     contribute from the window start; they are not counted as admissions.
+         */
+        readonly AnalyticsShift: {
+            readonly alerts: number;
+            readonly from_minute: number;
+            readonly patient_minutes: number;
+            readonly to_minute: number;
+        };
         /** BaselineComputed */
         readonly BaselineComputed: {
             /** @enum {string} */
@@ -288,6 +317,16 @@ export interface components {
          * @enum {string}
          */
         readonly FindingDirection: "rising" | "falling" | "stable" | "new";
+        /**
+         * FinishedStayCount
+         * @description Finished stays grouped by arrival/departure minute, never individual identifiers.
+         *     Includes every exit outcome in the window; an unknown arrival remains null.
+         */
+        readonly FinishedStayCount: {
+            readonly count: number;
+            readonly in_minute: number | null;
+            readonly out_minute: number;
+        };
         /** FlagMeasurement */
         readonly FlagMeasurement: {
             readonly data: components["schemas"]["FlagPresent"] | components["schemas"]["MeasurementAbsent"];
@@ -509,6 +548,13 @@ export interface components {
         readonly NewQuestion: {
             readonly question: string;
         };
+        /** News2Counts */
+        readonly News2Counts: {
+            readonly five_to_six: number;
+            readonly not_ranked: number;
+            readonly seven_plus: number;
+            readonly zero_to_four: number;
+        };
         /** NumberMeasurement */
         readonly NumberMeasurement: {
             readonly data: components["schemas"]["NumberPresent"] | components["schemas"]["MeasurementAbsent"];
@@ -679,6 +725,21 @@ export interface components {
             /** @constant */
             readonly synthetic: true;
             readonly ward: string;
+        };
+        /**
+         * OpenWardAnalytics
+         * @description Last hours of ward time, oldest first, with zero-filled buckets. Transfers in are
+         *     arrivals linked by person, time and destination to a transferred stay in this run;
+         *     other known arrivals are admissions. Discharged counts only the discharged outcome.
+         */
+        readonly OpenWardAnalytics: {
+            readonly finished_stays: readonly components["schemas"]["FinishedStayCount"][];
+            readonly hourly: readonly components["schemas"]["AnalyticsHour"][];
+            /** Format: date-time */
+            readonly origin: string;
+            readonly shifts: readonly components["schemas"]["AnalyticsShift"][];
+            /** @constant */
+            readonly synthetic: true;
         };
         /**
          * OverviewActivity
@@ -1333,6 +1394,8 @@ export type AdmissionRoute = components['schemas']['AdmissionRoute'];
 export type AdmitPatientInput = components['schemas']['AdmitPatientInput'];
 export type AlertCounted = components['schemas']['AlertCounted'];
 export type AlertUnavailable = components['schemas']['AlertUnavailable'];
+export type AnalyticsHour = components['schemas']['AnalyticsHour'];
+export type AnalyticsShift = components['schemas']['AnalyticsShift'];
 export type BaselineComputed = components['schemas']['BaselineComputed'];
 export type BaselineFlagged = components['schemas']['BaselineFlagged'];
 export type BaselineForming = components['schemas']['BaselineForming'];
@@ -1347,6 +1410,7 @@ export type ClinicalNote = components['schemas']['ClinicalNote'];
 export type EscalationReason = components['schemas']['EscalationReason'];
 export type EscalationRule = components['schemas']['EscalationRule'];
 export type FindingDirection = components['schemas']['FindingDirection'];
+export type FinishedStayCount = components['schemas']['FinishedStayCount'];
 export type FlagMeasurement = components['schemas']['FlagMeasurement'];
 export type FlagPresent = components['schemas']['FlagPresent'];
 export type HistoryEvent = components['schemas']['HistoryEvent'];
@@ -1364,6 +1428,7 @@ export type NewLabRun = components['schemas']['NewLabRun'];
 export type NewNote = components['schemas']['NewNote'];
 export type NewPatientQuestion = components['schemas']['NewPatientQuestion'];
 export type NewQuestion = components['schemas']['NewQuestion'];
+export type News2Counts = components['schemas']['News2Counts'];
 export type NumberMeasurement = components['schemas']['NumberMeasurement'];
 export type NumberPresent = components['schemas']['NumberPresent'];
 export type NurseVitalsInput = components['schemas']['NurseVitalsInput'];
@@ -1378,6 +1443,7 @@ export type OpenUnits = components['schemas']['OpenUnits'];
 export type OpenVital = components['schemas']['OpenVital'];
 export type OpenVitals = components['schemas']['OpenVitals'];
 export type OpenWard = components['schemas']['OpenWard'];
+export type OpenWardAnalytics = components['schemas']['OpenWardAnalytics'];
 export type OverviewActivity = components['schemas']['OverviewActivity'];
 export type OverviewClinician = components['schemas']['OverviewClinician'];
 export type OverviewPatient = components['schemas']['OverviewPatient'];
