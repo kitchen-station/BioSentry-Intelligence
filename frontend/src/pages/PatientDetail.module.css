@@ -17,6 +17,16 @@
   color: var(--hw-color-text-muted);
 }
 
+.abstainedPage {
+  display: grid;
+  gap: var(--hw-space-5);
+  margin-top: var(--hw-space-6);
+}
+
+.abstainedPage > :global(.hw-card) { padding: var(--hw-space-5); }
+.abstainedReason { margin: var(--hw-space-4) 0 var(--hw-space-2); font-weight: var(--hw-weight-semibold); }
+.historyList { display: grid; gap: var(--hw-space-5); }
+
 /* ---- Status in the shell bar (as on the ward) ---- */
 
 .statusItem {

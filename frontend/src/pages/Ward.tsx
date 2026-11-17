@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import type { AbstainedRow as AbstainedRowType, Session, VitalsRecorded, WardResponse } from "../types";
+import type { AbstainedRow as AbstainedRowType, OpenUnit, Session, VitalsRecorded, WardResponse } from "../types";
 import {
   acknowledge as saveAcknowledgement,
   getAcknowledgements,
+  getOpenUnits,
   getWard,
   usesServer,
 } from "../api";
@@ -45,6 +46,8 @@ function setTitle(title: string): void {
 export function Ward({ session, onSignOut }: Props) {
   // An admin reads the ward: loaded once and on Refresh, no timer, no alerts, no write control.
   const readOnly = session.role === "admin";
+  const [unit, setUnit] = useState(session.ward);
+  const [units, setUnits] = useState<readonly OpenUnit[]>([]);
   const [data, setData] = useState<WardResponse | null>(null);
   const [fetchedAt, setFetchedAt] = useState<number | null>(null);
   const [failedSince, setFailedSince] = useState<number | null>(null);
@@ -62,7 +65,7 @@ export function Ward({ session, onSignOut }: Props) {
   const load = useCallback(async () => {
     const n = ++issued.current;
     try {
-      const w = await getWard();
+      const w = await getWard(unit);
       if (n > applied.current) {
         applied.current = n;
         syncWardNow(w.now, !usesServer);
@@ -75,9 +78,18 @@ export function Ward({ session, onSignOut }: Props) {
       if (n > applied.current) setFailedSince((t) => t ?? Date.now());
       return false;
     }
+  }, [unit]);
+  useEffect(() => {
+    let active = true;
+    getOpenUnits().then((result) => {
+      if (active) setUnits(result.units);
+    }).catch(() => {
+      // The optional public list can be disabled; the clinician's own unit remains available.
+    });
+    return () => { active = false; };
   }, []);
   // The speed comes from the live view read in the same round: see useLivePoll.
-  const { sim, refresh, pollMs } = useLivePoll(load, !readOnly);
+  const { sim, refresh, pollMs } = useLivePoll(load, !readOnly, false, unit);
 
   // A recorded value changes a patient's standing, which only the server can compute: say
   // what it said, then fetch the ward again so the ranking on screen is the server's.
@@ -150,6 +162,10 @@ export function Ward({ session, onSignOut }: Props) {
   const high = bands.filter((b) => b === "high").length;
   const medium = bands.filter((b) => b === "medium" || b === "low-medium").length;
   const rising = data.ranked.filter((r) => r.trend === "rising").length;
+  const selectedUnit = units.find((entry) => entry.id === unit);
+  const choices = units.some((entry) => entry.id === unit) ? units : [
+    { id: unit, name: data.name ?? unit }, ...units,
+  ];
 
   const status = (
     <>
@@ -183,6 +199,20 @@ export function Ward({ session, onSignOut }: Props) {
       )}
       <SimulatedNote />
       <div className={styles.container}>
+        <div className={styles.unitPicker}>
+          <div className="hw-field">
+            <label className="hw-field__label" htmlFor="ward-unit">Unit</label>
+            <select id="ward-unit" className="hw-native-select" value={unit} onChange={(event) => {
+              setData(null);
+              setUnit(event.target.value);
+            }}>
+              {choices.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
+            </select>
+          </div>
+          <p className={styles.sortInfo}>
+            {selectedUnit?.floor != null || data.floor != null ? `Floor ${selectedUnit?.floor ?? data.floor}` : "Floor unavailable"}
+          </p>
+        </div>
 
         {/* Summary: one stat per question a charge nurse asks on arrival. */}
         <div className={styles.summary}>
@@ -200,7 +230,7 @@ export function Ward({ session, onSignOut }: Props) {
           </div>
           <div className={`hw-stat ${styles.stat}`} data-tone={data.abstained.length > 0 ? "act" : undefined}>
             <span className="hw-stat__value"><Flip>{data.abstained.length}</Flip></span>
-            <span className="hw-stat__label">Not ranked &middot; act</span>
+            <span className="hw-stat__label">Not ranked{data.kind === "ranked" || !data.kind ? " · act" : ""}</span>
           </div>
           <div className={`hw-stat ${styles.stat}`} data-tone={overdue > 0 ? "urgent" : undefined}>
             <span className="hw-stat__value"><Flip>{overdue}</Flip></span>
@@ -211,7 +241,7 @@ export function Ward({ session, onSignOut }: Props) {
         <div className={styles.sectionHeader}>
           <h1 className={styles.eyebrow}>Priority queue</h1>
           <p className={styles.sortInfo}>
-            Sorted on {liveTiers.map((t) => t.label).join(", ") || "NEWS2"}
+            {selectedUnit?.score_note ?? data.score_note ?? (data.kind === "unranked" ? "This unit is not ranked" : `Sorted on ${liveTiers.map((t) => t.label).join(", ") || "NEWS2"}`)}
           </p>
         </div>
 
@@ -251,7 +281,7 @@ export function Ward({ session, onSignOut }: Props) {
         <div className={styles.rowList}>
           {data.ranked.map((row) => (
             <div key={row.id} ref={moveRef(row.id)}>
-              <WardRow row={row} role={session.role} now={now} ageOffsetS={ageOffsetS} />
+              <WardRow row={row} role={session.role} now={now} ageOffsetS={ageOffsetS} fallbackUnit={data.ward} />
             </div>
           ))}
         </div>
@@ -261,6 +291,8 @@ export function Ward({ session, onSignOut }: Props) {
           clinicianId={session.clinician_id}
           readOnly={readOnly}
           onRecorded={handleRecorded}
+          fallbackUnit={data.ward}
+          unitKind={data.kind}
         />
 
         <p className={styles.footer}>

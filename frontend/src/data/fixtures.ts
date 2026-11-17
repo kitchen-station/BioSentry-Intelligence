@@ -8,6 +8,7 @@ import pastStays from "./stays.json";
 import { DIASTOLIC_BOUNDS, SYSTOLIC_BOUNDS } from "../api/bounds";
 import type {
   AbstainedRow,
+  AbstainedDetail,
   Acknowledgement,
   AdmitPatientInput,
   ClinicalNote,
@@ -29,6 +30,7 @@ interface SyntheticWard {
   readonly clinicians: Record<string, { readonly role: string; readonly patients: string[] }>;
   readonly ranked: ScoreRow[];
   readonly abstained: AbstainedRow[];
+  readonly unscored: readonly { readonly id: string; readonly vital_history: VitalHistoryFull }[];
   readonly details: Record<
     string,
     {
@@ -365,8 +367,14 @@ export async function listAllPatients(): Promise<Array<{ id: string; name: strin
   ];
 }
 
-export async function getPatient(id: string): Promise<PatientDetail | null> {
+export async function getPatient(id: string): Promise<PatientDetail | AbstainedDetail | null> {
   if (!visiblePatientIds().has(id)) return null;
+  const unranked = abstained.find((r) => r.id === id);
+  if (unranked) {
+    // Every committed abstained row has a matching unscored source record.
+    const stored = data.unscored.find((source) => source.id === id)!;
+    return { ...unranked, now: new Date().toISOString(), vital_history: stored.vital_history };
+  }
   const row = ranked.find((r) => r.id === id);
   const detail = data.details[id];
   if (!row || !detail) return null;

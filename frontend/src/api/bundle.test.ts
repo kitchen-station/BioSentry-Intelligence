@@ -69,7 +69,7 @@ describe("the built bundle", () => {
     // The fixture provider's own strings are gone too, not only the data.
     expect(containing(chunks, "the frontend never computes a score")).toEqual([]);
     // The HTTP client is what is there instead.
-    expect(containing(chunks, "/wards/W4/rows").length).toBeGreaterThan(0);
+    expect(containing(chunks, "/open-view").length).toBeGreaterThan(0);
   }, 60_000);
 
   it("keeps the dataset out of the entry chunk in fixture mode (loaded on first use)", async () => {

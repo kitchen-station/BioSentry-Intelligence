@@ -17,6 +17,8 @@ import type {
   LiveWard,
   NewLabRun,
   NurseVitalsInput,
+  OpenUnits,
+  AbstainedDetail,
   PartialLabInput,
   PatientDetail,
   PatientExtractionResult,
@@ -33,8 +35,9 @@ import type {
 } from "../types";
 
 export interface ApiProvider {
-  getWard(): Promise<WardResponse>;
-  getPatient(id: string): Promise<PatientDetail | null>;
+  getWard(unit?: string): Promise<WardResponse>;
+  getOpenUnits(): Promise<OpenUnits>;
+  getPatient(id: string): Promise<PatientDetail | AbstainedDetail | null>;
   /**
    * The patient's change-from-own-baseline finding (Tier B, research, never ranks). Null when the
    * provider has none to give (fixture mode); a missing or not-yours patient rejects.
@@ -54,7 +57,7 @@ export interface ApiProvider {
   /** Every stay the caller may see, on the ward now or already gone. */
   getStays(): Promise<PatientStay[]>;
   /** What the ward simulator last published, for the caller. Null when there is no simulator (fixture mode). */
-  getLiveWard(): Promise<LiveWard | null>;
+  getLiveWard(unit?: string): Promise<LiveWard | null>;
   /** The admin's read-only ward overview. Only the API has one; any other caller is refused (403). */
   getOverview(): Promise<WardOverview>;
   admitPatient(input: AdmitPatientInput): Promise<AbstainedRow>;

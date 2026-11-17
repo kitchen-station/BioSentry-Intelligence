@@ -25,6 +25,7 @@ import type {
 } from "./generated";
 
 export type {
+  AbstainedDetail,
   AbstainedRow,
   Acknowledgement,
   Acvpu,
@@ -50,6 +51,8 @@ export type {
   NewPatientQuestion,
   NewQuestion,
   NurseVitalsInput,
+  OpenUnit,
+  OpenUnits,
   PartialAdmitPatientInput,
   PartialLabInput,
   HistoryEvent,

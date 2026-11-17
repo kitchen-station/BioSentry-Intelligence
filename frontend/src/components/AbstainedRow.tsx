@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import type { AbstainedRow as AbstainedRowType, VitalsRecorded } from "../types";
 import styles from "./AbstainedRow.module.css";
 import { formatAge, formatBloodPressure, formatClockDay } from "./format";
@@ -14,7 +15,7 @@ const SEEN = [
 ] as const;
 
 /** The last stored values, each with where it came from and when. Shown only: no score reads them (I1). */
-function LastSeen({ seen, now }: { seen: NonNullable<AbstainedRowType["last_seen"]>; now: number }) {
+export function LastSeen({ seen, now }: { seen: NonNullable<AbstainedRowType["last_seen"]>; now: number }) {
   const items = SEEN.flatMap(([code, label]) => {
     const m = seen[code];
     if (!m.data.present) return [];
@@ -38,9 +39,10 @@ interface Props {
   /** Who is recording (shown in the echo of what will be stored). */
   clinicianId?: string;
   onRecorded?: (row: AbstainedRowType, recorded: VitalsRecorded) => void;
+  fallbackUnit?: string;
 }
 
-export function AbstainedRow({ row, canRecord = false, clinicianId = "", onRecorded }: Props) {
+export function AbstainedRow({ row, canRecord = false, clinicianId = "", onRecorded, fallbackUnit }: Props) {
   const [entering, setEntering] = useState(false);
   const now = useWardNow();
   return (
@@ -50,9 +52,9 @@ export function AbstainedRow({ row, canRecord = false, clinicianId = "", onRecor
       </div>
       <div className={styles.infoCol}>
         <div className={styles.nameRow}>
-          <span className={styles.name}>{row.name}</span>
+          <Link className={styles.name} to={`/patient/${encodeURIComponent(row.id)}`}>{row.name}</Link>
           <span className={styles.detail}>
-            {row.age ?? "--"}{row.sex ? ` ${row.sex}` : ""} &middot; Bed {row.bed}
+            {row.age ?? "--"}{row.sex ? ` ${row.sex}` : ""} &middot; {row.unit ?? fallbackUnit ?? "Unit unavailable"} &middot; {row.floor == null ? "Floor unavailable" : `Floor ${row.floor}`} &middot; Bed {row.bed}
           </span>
         </div>
         <div className={styles.context}>{row.admitting_context}</div>

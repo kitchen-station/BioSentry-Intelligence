@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AbstainedRow } from "../types";
 import { NotRankedSection } from "./NotRankedSection";
@@ -25,7 +26,7 @@ const row = (id: string, name: string): AbstainedRow => ({
 });
 const rows = [row("p-004", "Flores, Ramon"), row("p-005", "de Leon, Isabel")];
 const html = (list: readonly AbstainedRow[] = rows) =>
-  renderToStaticMarkup(<NotRankedSection rows={list} clinicianId="rn-delacruz" onRecorded={() => undefined} />);
+  renderToStaticMarkup(<MemoryRouter><NotRankedSection rows={list} clinicianId="rn-delacruz" onRecorded={() => undefined} /></MemoryRouter>);
 
 beforeEach(() => {
   build.canRecordVitals = false;

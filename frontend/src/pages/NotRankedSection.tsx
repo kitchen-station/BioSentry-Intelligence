@@ -8,25 +8,28 @@ interface Props {
   readonly clinicianId: string;
   readonly readOnly?: boolean;
   readonly onRecorded: (row: AbstainedRowType, recorded: VitalsRecorded) => void;
+  readonly fallbackUnit?: string;
+  readonly unitKind?: "ranked" | "shown" | "unranked" | null;
 }
 
 /**
  * The NOT RANKED list. Whether a row offers vitals entry is decided here, once, from the
  * build's capability: only the API can re-rank, so the fixture build offers none (D4).
  */
-export function NotRankedSection({ rows, clinicianId, readOnly = false, onRecorded }: Props) {
+export function NotRankedSection({ rows, clinicianId, readOnly = false, onRecorded, fallbackUnit, unitKind }: Props) {
   if (rows.length === 0) return null;
   return (
     <>
       <div className={styles.sectionHeader}>
         <h2 className={styles.eyebrow}>Not ranked ({rows.length})</h2>
-        <p className={styles.sortInfo}>Action required to enable scoring</p>
+        <p className={styles.sortInfo}>{unitKind && unitKind !== "ranked" ? "This unit has no priority ranking" : "Action required to enable scoring"}</p>
       </div>
       <div className={styles.rowList}>
         {rows.map((row) => (
           <AbstainedRow
             key={row.id}
             row={row}
+            fallbackUnit={fallbackUnit}
             canRecord={canRecordVitals && !readOnly}
             clinicianId={clinicianId}
             onRecorded={onRecorded}

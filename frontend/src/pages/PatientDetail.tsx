@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useParams, Link } from "react-router-dom";
 import { closeDialog } from "hw-ui";
-import type { ClinicalNote, PatientDetail as PatientDetailType, Session, SessionRole, VitalsRecorded } from "../types";
+import type { AbstainedDetail, ClinicalNote, PatientDetail as PatientDetailType, Session, SessionRole, VitalsRecorded } from "../types";
 import { getPatient, getNotes, addNote, canRecordVitals, hasHistory, hasPatientQuestions, usesServer } from "../api";
 import { Flip } from "../components/Flip";
 import { AppShell } from "../components/AppShell";
@@ -13,6 +13,7 @@ import { BaselinePanel, BaselineRange, bands } from "../components/BaselinePanel
 import { ResearchModels } from "../components/ResearchModels";
 import { useBaseline } from "../components/useBaseline";
 import { CurrentVitals, VitalRow } from "../components/CurrentVitals";
+import { LastSeen } from "../components/AbstainedRow";
 import { TrendChart } from "../components/TrendChart";
 import { formatClock, formatClockSeconds, formatSimClock, patchInUse } from "../components/format";
 import { useLivePoll } from "../components/useLivePoll";
@@ -93,13 +94,52 @@ function Bare({ session, onSignOut, children }: { session: Session; onSignOut: (
 
 // --- Main component ---
 
+function AbstainedPatientPage({ patient, session, onSignOut }: { patient: AbstainedDetail; session: Session; onSignOut: () => void }) {
+  const history = patient.vital_history;
+  const hasHistory = Object.values(history).some((points) => points.length > 0);
+  return (
+    <AppShell session={session} onSignOut={onSignOut} title={patient.name}>
+      <SimulatedNote />
+      <div className={styles.container}>
+        <Crumbs current={patient.name} />
+        <div className={styles.abstainedPage}>
+          <header>
+            <h1 className={styles.patientName}>{patient.name}</h1>
+            <p className={styles.patientSub}>
+              {patient.unit ?? "Unit unavailable"} · {patient.floor == null ? "Floor unavailable" : `Floor ${patient.floor}`} · Bed {patient.bed}
+            </p>
+            <p className={styles.patientSub}>{patient.age ?? "Age unavailable"}{patient.sex ? ` · ${patient.sex}` : ""}</p>
+          </header>
+          <section className="hw-card" aria-label="Not ranked details">
+            <span className="hw-tag">NOT RANKED</span>
+            <p className={styles.abstainedReason}>{patient.reason}</p>
+            <p>{patient.instruction}</p>
+            <p className={styles.patientSub}>{patient.admitting_context}</p>
+            {patient.last_seen && <LastSeen seen={patient.last_seen} now={Date.parse(patient.now)} />}
+          </section>
+          <section className="hw-card" aria-label="Stored vital history">
+            <h2 className={styles.eyebrow}>Stored vital history</h2>
+            {hasHistory ? (
+              <div className={styles.historyList}>
+                <TrendChart data={history.heart_rate} label="Heart rate" unit="bpm" />
+                <TrendChart data={history.respiratory_rate} label="Respiratory rate" unit="/min" />
+                <TrendChart data={history.spo2} label="SpO2" unit="%" />
+              </div>
+            ) : <p className={styles.quiet}>No stored history available.</p>}
+          </section>
+        </div>
+      </div>
+    </AppShell>
+  );
+}
+
 export function PatientDetail({ session, onSignOut }: { session: Session; onSignOut: () => void }) {
   const role = session.role;
   const readOnly = role === "admin"; // an admin reads the page: every write control is absent
   const { id } = useParams<{ id: string }>();
   const [saves, setSaves] = useState(0);
   const baseline = useBaseline(id, saves);
-  const [patient, setPatient] = useState<PatientDetailType | null>(null);
+  const [patient, setPatient] = useState<PatientDetailType | AbstainedDetail | null>(null);
   const [notFound, setNotFound] = useState(false);
   const now = useWardNow(); // ward time as served at the last good read
   const [notes, setNotes] = useState<ClinicalNote[]>([]);
@@ -189,14 +229,16 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
   };
 
   const handleRecorded = (recorded: VitalsRecorded) => {
-    // A patient who is now NOT RANKED has no patient read: it would 404 and say "not found".
     if (!id) return;
     setRefreshFailed(false);
     setSaves((n) => n + 1);
     if (recorded.ranked) {
       setUnranked(null);
       void loadPatient().then((ok) => ok === false && setRefreshFailed(true));
-    } else setUnranked(`Recorded. ${standing(recorded)}`);
+    } else {
+      setUnranked(`Recorded. ${standing(recorded)}`);
+      void loadPatient().then((ok) => ok === false && setRefreshFailed(true));
+    }
   };
 
   const toggleDrawer = (d: Drawer) => setDrawer((prev) => prev === d ? null : d);
@@ -204,7 +246,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
   if (notFound) {
     return (
       <Bare session={session} onSignOut={onSignOut}>
-        <p className={styles.bare}>Patient not found.</p>
+        <p className={styles.bare}>This patient is unavailable.</p>
         <Link to="/ward">Back to ward</Link>
       </Bare>
     );
@@ -220,6 +262,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
   }
 
   if (!patient) return <Bare session={session} onSignOut={onSignOut} />;
+  if ("reason" in patient) return <AbstainedPatientPage patient={patient} session={session} onSignOut={onSignOut} />;
 
   // The patient's own band for each charted vital, from the answer the page already loaded.
   const own = bands(baseline);

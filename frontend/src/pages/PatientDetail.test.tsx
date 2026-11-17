@@ -10,7 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import synthetic from "../data/synthetic.json";
-import type { BaselineComputed, BaselineResponse, ClinicalNote, LabPanel, PatientDetail as Detail, Session, SessionRole } from "../types";
+import type { AbstainedDetail, BaselineComputed, BaselineResponse, ClinicalNote, LabPanel, PatientDetail as Detail, Session, SessionRole } from "../types";
 import { ChatBubble } from "../components/ChatBubble";
 import { formatClock, formatClockSeconds } from "../components/format";
 import { PatientDetail } from "./PatientDetail";
@@ -291,12 +291,31 @@ describe("PatientDetail", () => {
     expect(screen.getByText("Own baseline")).toBeTruthy();
   });
 
-  it("shows not found for a patient that is missing or not yours", async () => {
+  it("shows unavailable for a patient that is missing or not yours", async () => {
     api.getPatient.mockResolvedValue(null);
     page();
-    expect(await screen.findByText("Patient not found.")).toBeTruthy();
+    expect(await screen.findByText("This patient is unavailable.")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Back to ward" }).getAttribute("href")).toBe("/ward");
     expectLabEntry();
+  });
+
+  it("renders a not-ranked patient's reason, instruction, location and stored history", async () => {
+    const row = synthetic.abstained[0];
+    api.getPatient.mockResolvedValue({
+      ...row,
+      unit: "W4",
+      floor: 4,
+      now: "2026-09-03T07:00:00Z",
+      vital_history: { heart_rate: [], respiratory_rate: [], spo2: [] },
+    } as AbstainedDetail);
+    page("rn", `/patient/${row.id}`);
+    expect((await loaded()).textContent).toBe(row.name);
+    expect(screen.getByText("NOT RANKED")).toBeTruthy();
+    expect(screen.getByText(row.reason)).toBeTruthy();
+    expect(screen.getByText(row.instruction)).toBeTruthy();
+    expect(screen.getByText(/W4 · Floor 4 · Bed/)).toBeTruthy();
+    expect(screen.getByText("No stored history available.")).toBeTruthy();
+    expect(screen.queryByText("Patient not found.")).toBeNull();
   });
 
   it("shows an error when the patient cannot be loaded", async () => {
@@ -471,7 +490,7 @@ describe("PatientDetail", () => {
       await save(user);
       expect(await screen.findByText(/Recorded. Still not ranked. No device data./)).toBeTruthy();
       expect(screen.getByRole("link", { name: "Back to ward" }).getAttribute("href")).toBe("/ward");
-      expect(api.getPatient).toHaveBeenCalledTimes(1);
+      expect(api.getPatient).toHaveBeenCalledTimes(2);
     });
 
     it("says so when the patient cannot be read again", async () => {

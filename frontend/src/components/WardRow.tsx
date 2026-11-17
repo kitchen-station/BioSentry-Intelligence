@@ -22,6 +22,7 @@ interface Props {
   now: number;
   /** Seconds since the ward was fetched, added to the server's data age so it keeps ticking. */
   ageOffsetS: number;
+  fallbackUnit?: string;
 }
 
 function ObsDue({ due, now, noPatch }: { due: number | "continuous"; now: number; noPatch: boolean }) {
@@ -36,7 +37,7 @@ function ObsDue({ due, now, noPatch }: { due: number | "continuous"; now: number
   );
 }
 
-export function WardRow({ row, role, now, ageOffsetS }: Props) {
+export function WardRow({ row, role, now, ageOffsetS, fallbackUnit }: Props) {
   const b = band(row);
   const p = news2Points(row.vitals);
   // Either figure can be null on a row ranked from nurse entries: never compute with a null.
@@ -60,7 +61,7 @@ export function WardRow({ row, role, now, ageOffsetS }: Props) {
           <div className={styles.nameRow}>
             <span className={styles.name}>{row.name}</span>
             <span className={styles.detail}>
-              {row.age ?? "--"}{row.sex ? ` ${row.sex}` : ""} &middot; Bed {row.bed}
+              {row.age ?? "--"}{row.sex ? ` ${row.sex}` : ""} &middot; {row.unit ?? fallbackUnit ?? "Unit unavailable"} &middot; {row.floor == null ? "Floor unavailable" : `Floor ${row.floor}`} &middot; Bed {row.bed}
             </span>
             {nurse !== null && <span className={`hw-tag ${styles.updateTag}`}>{nurse}</span>}
             {patch && row.signal_quality !== null && row.signal_quality <= 90 && (

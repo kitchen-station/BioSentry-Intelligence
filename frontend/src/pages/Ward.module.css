@@ -10,6 +10,14 @@
   color: var(--hw-color-text-muted);
 }
 
+.unitPicker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--hw-space-3);
+  margin-bottom: var(--hw-space-6);
+}
+
 /* ---- Status in the shell bar ---- */
 
 .statusItem {

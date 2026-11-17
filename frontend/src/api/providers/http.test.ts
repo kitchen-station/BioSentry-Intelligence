@@ -30,9 +30,9 @@ describe("httpProvider.getPatient", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("/patients/p-001");
   });
 
-  it("returns null for a NOT RANKED patient: the page has no view of one yet", async () => {
+  it("returns the NOT RANKED detail", async () => {
     fetchMock.mockResolvedValue(reply(200, { id: "p-005", reason: "No device data" }));
-    await expect(httpProvider.getPatient("p-005")).resolves.toBeNull();
+    await expect(httpProvider.getPatient("p-005")).resolves.toEqual({ id: "p-005", reason: "No device data" });
   });
 
   it("returns null on 404 (missing and not-yours look the same)", async () => {
@@ -87,6 +87,14 @@ describe("openSession", () => {
 });
 
 describe("httpProvider requests", () => {
+  it("reads open-view units and the selected unit's rows", async () => {
+    fetchMock.mockResolvedValueOnce(reply(200, { synthetic: true, units: [] }))
+      .mockResolvedValueOnce(reply(200, { ward: "ER", ranked: [], abstained: [] }));
+    await expect(httpProvider.getOpenUnits()).resolves.toEqual({ synthetic: true, units: [] });
+    expect(fetchMock.mock.calls[0][0]).toBe("/open-view");
+    await httpProvider.getWard("ER");
+    expect(fetchMock.mock.calls[1][0]).toBe("/wards/ER/rows");
+  });
   it("reads the ward's stays", async () => {
     setAuthToken("rn-manalo");
     fetchMock.mockResolvedValue(reply(200, []));
