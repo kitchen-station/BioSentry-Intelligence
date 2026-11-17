@@ -409,6 +409,7 @@ describe("the fixture provider", () => {
 
   it("has no overview: it needs the API", async () => {
     await expect(fixtureProvider.getOverview()).rejects.toThrow("The overview needs the API");
+    await expect(fixtureProvider.getUnits()).rejects.toThrow("The unit list needs the API");
   });
 });
 
