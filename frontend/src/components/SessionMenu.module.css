@@ -12,7 +12,8 @@
 
 .account {
   grid-area: account;
-  align-self: center;
+  display: flex;
+  align-items: center; /* the anchor fills the 56px bar row, so the panel opens below the bar */
   justify-self: end;
 }
 
