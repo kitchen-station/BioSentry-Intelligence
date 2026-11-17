@@ -41,6 +41,7 @@ import type {
   QuestionItem,
   VitalsRecorded,
   WardOverview,
+  WardUnit,
   PatientStay,
   WardResponse,
 } from "../../types";
@@ -68,8 +69,12 @@ export const httpProvider: ApiProvider = {
     return fetchJson<LiveWard>("/wards/W4/live");
   },
 
-  getOverview(): Promise<WardOverview> {
-    return fetchJson<WardOverview>("/wards/W4/overview");
+  getOverview(ward = "W4"): Promise<WardOverview> {
+    return fetchJson<WardOverview>(`/wards/${encodeURIComponent(ward)}/overview`);
+  },
+
+  getUnits(): Promise<WardUnit[]> {
+    return fetchJson<WardUnit[]>("/wards");
   },
 
   requestLabRun(input: NewLabRun): Promise<LabRunItem> {

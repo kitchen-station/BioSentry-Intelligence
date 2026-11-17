@@ -18,13 +18,14 @@ const SEP = new Date(Date.UTC(2026, 8, 3)).toLocaleDateString("en-GB", { month: 
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const api = vi.hoisted(() => ({ hasOverview: true, getOverview: vi.fn() }));
+const api = vi.hoisted(() => ({ hasOverview: true, getOverview: vi.fn(), getUnits: vi.fn() }));
 vi.mock("../api", async () => ({
   ApiError: (await vi.importActual<typeof import("../api/client")>("../api/client")).ApiError,
   get hasOverview() {
     return api.hasOverview;
   },
   getOverview: api.getOverview,
+  getUnits: api.getUnits,
 }));
 
 const session = { clinician_id: "admin-ruiz", ward: "W4", role: "admin" } as const;
@@ -63,6 +64,7 @@ const show = (who: Session = session, onSignOut: () => void = () => {}) =>
 beforeEach(() => {
   api.hasOverview = true;
   api.getOverview.mockReset().mockResolvedValue(overview());
+  api.getUnits.mockReset().mockResolvedValue([]);
 });
 afterEach(() => {
   cleanup();
@@ -270,5 +272,29 @@ describe("Overview", () => {
     expect(screen.getByText("The overview needs the live API. This demo has no server.")).toBeTruthy();
     expect(api.getOverview).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Refresh" })).toBeNull();
+  });
+
+  it("lists the floors from the ground floor up, and reads the unit that is picked", async () => {
+    const u = (id: string, name: string, floor: number) => ({ id, name, floor, kind: "ranked" as const, patients: 1 });
+    api.getUnits.mockResolvedValue([u("SURG5A", "Surgery 5A", 5), u("ER", "Emergency Room", 0), u("W4", "Ward W4", 4)]);
+    show();
+    const picker = await screen.findByRole("combobox", { name: /Floor/ });
+    expect(within(picker).getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "Ground floor: Emergency Room",
+      "4th floor: Ward W4",
+      "5th floor: Surgery 5A",
+    ]);
+    expect((picker as HTMLSelectElement).value).toBe("W4");
+    expect(api.getOverview).toHaveBeenLastCalledWith(undefined);
+    await userEvent.selectOptions(picker, "ER");
+    await screen.findByText(AS_OF);
+    expect(api.getOverview).toHaveBeenLastCalledWith("ER");
+  });
+
+  it("shows no picker when the units cannot be read", async () => {
+    api.getUnits.mockRejectedValue(new ApiError(403, "Forbidden", null));
+    show();
+    await screen.findByText(AS_OF);
+    expect(screen.queryByRole("combobox")).toBeNull();
   });
 });

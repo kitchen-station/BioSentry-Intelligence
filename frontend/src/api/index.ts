@@ -44,7 +44,8 @@ function lazyFixtureProvider(): ApiProvider {
     listAllPatients: () => fixtures().then((m) => m.fixtureProvider.listAllPatients()),
     getStays: () => fixtures().then((m) => m.fixtureProvider.getStays()),
     getLiveWard: () => fixtures().then((m) => m.fixtureProvider.getLiveWard()),
-    getOverview: () => fixtures().then((m) => m.fixtureProvider.getOverview()),
+    getOverview: (ward) => fixtures().then((m) => m.fixtureProvider.getOverview(ward)),
+    getUnits: () => fixtures().then((m) => m.fixtureProvider.getUnits()),
     admitPatient: (input) => fixtures().then((m) => m.fixtureProvider.admitPatient(input)),
     enterLabResults: (patientId, labs) =>
       fixtures().then((m) => m.fixtureProvider.enterLabResults(patientId, labs)),
@@ -87,6 +88,7 @@ export const listAllPatients = provider.listAllPatients;
 export const getStays = provider.getStays;
 export const getLiveWard = provider.getLiveWard;
 export const getOverview = provider.getOverview;
+export const getUnits = provider.getUnits;
 export const admitPatient = provider.admitPatient;
 export const enterLabResults = provider.enterLabResults;
 export const recordVitals = provider.recordVitals;
