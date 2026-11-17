@@ -34,7 +34,6 @@ function lazyFixtureProvider(): ApiProvider {
     getPatientRuns: (patientId) => fixtures().then((m) => m.fixtureProvider.getPatientRuns(patientId)),
     getPatientRun: (patientId, runId) => fixtures().then((m) => m.fixtureProvider.getPatientRun(patientId, runId)),
     getWard: (unit) => fixtures().then((m) => m.fixtureProvider.getWard(unit)),
-    getOpenUnits: () => fixtures().then((m) => m.fixtureProvider.getOpenUnits()),
     getPatient: (id) => fixtures().then((m) => m.fixtureProvider.getPatient(id)),
     getBaseline: (patientId) => fixtures().then((m) => m.fixtureProvider.getBaseline(patientId)),
     getNotes: (patientId) => fixtures().then((m) => m.fixtureProvider.getNotes(patientId)),
@@ -80,7 +79,6 @@ export const getAssistantHistory = provider.getAssistantHistory;
 export const getPatientRuns = provider.getPatientRuns;
 export const getPatientRun = provider.getPatientRun;
 export const getWard = provider.getWard;
-export const getOpenUnits = provider.getOpenUnits;
 export const getPatient = provider.getPatient;
 export const getBaseline = provider.getBaseline;
 export const getNotes = provider.getNotes;

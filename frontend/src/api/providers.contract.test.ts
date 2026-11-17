@@ -214,9 +214,6 @@ describe.each(harnesses)("$name", ({ provider, signIn }) => {
     }
   });
 
-  it("does not claim the fixture contains an open-view unit list", async () => {
-    await expect(fixtureProvider.getOpenUnits()).rejects.toThrow("Open unit list needs the API");
-  });
 
   it("a note round-trips: newest first, synthetic, and deletable", async () => {
     signIn("rn-manalo");

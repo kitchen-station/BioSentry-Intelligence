@@ -24,7 +24,7 @@ import { Ward } from "../pages/Ward";
 const api = vi.hoisted(() => ({
   recordVitals: vi.fn(),
   getWard: vi.fn(),
-  getOpenUnits: vi.fn(async () => ({ synthetic: true, units: [] })),
+  getUnits: vi.fn(async () => []),
   getAcknowledgements: vi.fn(),
   acknowledge: vi.fn(),
   getLiveWard: vi.fn(),
@@ -32,7 +32,7 @@ const api = vi.hoisted(() => ({
 vi.mock("../api", () => ({
   recordVitals: api.recordVitals,
   getWard: api.getWard,
-  getOpenUnits: api.getOpenUnits,
+  getUnits: api.getUnits,
   getAcknowledgements: api.getAcknowledgements,
   acknowledge: api.acknowledge,
   getLiveWard: api.getLiveWard,

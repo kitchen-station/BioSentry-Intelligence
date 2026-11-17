@@ -87,11 +87,11 @@ describe("openSession", () => {
 });
 
 describe("httpProvider requests", () => {
-  it("reads open-view units and the selected unit's rows", async () => {
-    fetchMock.mockResolvedValueOnce(reply(200, { synthetic: true, units: [] }))
+  it("reads the signed-in unit list and the selected unit's rows", async () => {
+    fetchMock.mockResolvedValueOnce(reply(200, []))
       .mockResolvedValueOnce(reply(200, { ward: "ER", ranked: [], abstained: [] }));
-    await expect(httpProvider.getOpenUnits()).resolves.toEqual({ synthetic: true, units: [] });
-    expect(fetchMock.mock.calls[0][0]).toBe("/open-view");
+    await expect(httpProvider.getUnits()).resolves.toEqual([]);
+    expect(fetchMock.mock.calls[0][0]).toBe("/wards");
     await httpProvider.getWard("ER");
     expect(fetchMock.mock.calls[1][0]).toBe("/wards/ER/rows");
   });

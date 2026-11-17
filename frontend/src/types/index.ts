@@ -52,8 +52,6 @@ export type {
   NewPatientQuestion,
   NewQuestion,
   NurseVitalsInput,
-  OpenUnit,
-  OpenUnits,
   PartialAdmitPatientInput,
   PartialLabInput,
   HistoryEvent,

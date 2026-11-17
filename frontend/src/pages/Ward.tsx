@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import type { AbstainedRow as AbstainedRowType, OpenUnit, ScoreRow, Session, VitalsRecorded } from "../types";
-import { canRecordVitals, getOpenUnits } from "../api";
+import type { AbstainedRow as AbstainedRowType, ScoreRow, Session, VitalsRecorded, WardUnit } from "../types";
+import { canRecordVitals, getUnits } from "../api";
 import { AppShell, OfflineBanner } from "../components/AppShell";
 import { Flip, useMoveOnReorder } from "../components/Flip";
 import { formatBloodPressure, formatClock, formatSimClock } from "../components/format";
@@ -90,13 +90,13 @@ export function Ward(props: Props) {
 
 function WardPage({ session, onSignOut, feed }: Props & { feed: WardFeed }) {
   const { data, fetchedAt, failedSince, sim, refresh, pollMs, readOnly, alerts, acknowledge, setNotice, unit, setUnit } = feed;
-  const [units, setUnits] = useState<readonly OpenUnit[]>([]);
+  const [units, setUnits] = useState<readonly WardUnit[]>([]);
   useEffect(() => {
     let active = true;
-    getOpenUnits().then((result) => {
-      if (active) setUnits(result.units);
+    getUnits().then((result) => {
+      if (active) setUnits(result);
     }).catch(() => {
-      // The optional public list can be disabled; the clinician's own unit remains available.
+      // No list (the fixture build, or a refusal): the clinician's own unit remains available.
     });
     return () => { active = false; };
   }, []);

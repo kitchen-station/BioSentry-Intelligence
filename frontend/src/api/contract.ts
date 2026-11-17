@@ -18,7 +18,6 @@ import type {
   LiveWard,
   NewLabRun,
   NurseVitalsInput,
-  OpenUnits,
   AbstainedDetail,
   PartialLabInput,
   PatientDetail,
@@ -41,7 +40,6 @@ export interface ApiProvider {
   getPatientRuns(patientId: string): Promise<LabRunItem[]>;
   getPatientRun(patientId: string, runId: number): Promise<LabRunDetail>;
   getWard(unit?: string): Promise<WardResponse>;
-  getOpenUnits(): Promise<OpenUnits>;
   getPatient(id: string): Promise<PatientDetail | AbstainedDetail | null>;
   /**
    * The patient's change-from-own-baseline finding (Tier B, research, never ranks). Null when the

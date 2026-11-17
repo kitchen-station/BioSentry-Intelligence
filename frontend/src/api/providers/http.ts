@@ -30,7 +30,6 @@ import type {
   NewPatientQuestion,
   NewQuestion,
   NurseVitalsInput,
-  OpenUnits,
   AbstainedDetail,
   PartialLabInput,
   PatientDetail,
@@ -61,10 +60,6 @@ export const httpProvider: ApiProvider = {
   getPatientRun: (patientId, runId) => fetchJson<LabRunDetail>(`/patients/${encodeURIComponent(patientId)}/lab/runs/${runId}`),
   getWard(unit = "W4"): Promise<WardResponse> {
     return fetchJson<WardResponse>(`/wards/${encodeURIComponent(unit)}/rows`);
-  },
-
-  getOpenUnits(): Promise<OpenUnits> {
-    return fetchJson<OpenUnits>("/open-view");
   },
 
   getStays(): Promise<PatientStay[]> {
