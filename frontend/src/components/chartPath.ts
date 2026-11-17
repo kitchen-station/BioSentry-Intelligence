@@ -1,5 +1,5 @@
 /**
- * Pure geometry for the trend charts.
+ * Pure geometry for the ward sparklines.
  *
  * A null value is a gap (I1: missing is missing): the line breaks there, nothing is
  * bridged or interpolated, and no point is drawn for it. A stretch of one point between
@@ -61,41 +61,9 @@ export function xByIndex(i: number, n: number, left: number, width: number): num
   return n <= 1 ? left : left + (i / (n - 1)) * width;
 }
 
-/**
- * x for each timestamp (ms), proportional to elapsed time across [left, left + width].
- * Returns null unless the times are finite and strictly increasing, so the caller falls
- * back to even spacing instead of drawing from nonsense.
- */
-export function xByTime(times: readonly number[], left: number, width: number): number[] | null {
-  if (times.length < 2) return null;
-  for (let i = 0; i < times.length; i++) {
-    if (!Number.isFinite(times[i])) return null;
-    if (i > 0 && times[i] <= times[i - 1]) return null;
-  }
-  const t0 = times[0];
-  const span = times[times.length - 1] - t0;
-  return times.map((t) => left + ((t - t0) / span) * width);
-}
-
-/** "now", "-45m", "-3h", "-5h45m": how long before the latest bin, whole minutes. */
-export function agoLabel(minutes: number): string {
-  const m = Math.max(0, Math.round(minutes));
-  if (m === 0) return "now";
-  if (m < 60) return `-${m}m`;
-  const h = Math.floor(m / 60);
-  const rest = m % 60;
-  return rest === 0 ? `-${h}h` : `-${h}h${rest}m`;
-}
-
 /** The non-null values, in order. */
 export function present(values: readonly (number | null)[]): number[] {
   return values.filter((v): v is number => v !== null);
-}
-
-/** Indexes of the bins that get an axis label: first, middle, last, without repeats. */
-export function labelIndexes(n: number): number[] {
-  if (n <= 0) return [];
-  return [...new Set([0, Math.floor(n / 2), n - 1])];
 }
 
 /**

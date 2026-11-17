@@ -1,371 +1,256 @@
-/* ============================================================
-   Patient detail -- two-column layout with vitals, findings, notes
-   ============================================================ */
+/* Patient: layout and the clinical colour only. The look comes from hw-ui (hw-stat, hw-card, hw-tag,
+   hw-alert, hw-dialog, hw-breadcrumb, hw-timeline). Colour marks where action is due, as on the ward:
+   high (NEWS2 7+) emergency red, medium or a single 3 urgent orange, a value that adds points danger red. */
 
-.page {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-/* ---- Status strip ---- */
-
-.statusStrip {
-  background: var(--primary);
-  color: var(--button-ink);
-  padding: 0 var(--sp-4);
-}
-
-.stripInner {
+.container {
   max-width: var(--page-max);
   margin: 0 auto;
+  padding: var(--hw-space-5) var(--hw-space-5) var(--hw-space-8);
+}
+
+.bare {
+  margin: var(--hw-space-5) 0 var(--hw-space-3);
+}
+
+.quiet {
+  font-size: var(--hw-font-size-14);
+  color: var(--hw-color-text-muted);
+}
+
+/* ---- Status in the shell bar (as on the ward) ---- */
+
+.statusItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hw-space-2);
+}
+
+.statusItem[data-tone="warn"] {
+  font-weight: var(--hw-weight-medium);
+  color: var(--hw-color-warning-fg);
+}
+
+.statusLabel {
+  font-size: var(--hw-font-size-11);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.statusValue {
+  font-weight: var(--hw-weight-semibold);
+  color: var(--hw-color-text);
+}
+
+/* ---- Top: the way back, and the two drawers ---- */
+
+.top {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  min-height: 36px;
+  gap: var(--hw-space-3) var(--hw-space-5);
+  margin-bottom: var(--hw-space-6);
 }
 
-.back {
-  font-family: var(--font-sans);
-  font-size: 13px;
-  color: var(--button-ink);
-  text-decoration: none;
-  opacity: 0.8;
+.crumbs {
+  min-width: 0;
 }
 
-.back:hover {
-  opacity: 1;
-  text-decoration: none;
-}
-
-.stripRight {
+.actions {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  align-items: center;
-  gap: var(--sp-3);
-  font-family: var(--font-sans);
-  font-size: 12px;
+  gap: var(--hw-space-3);
 }
 
-.stripSignal { display: flex; align-items: center; gap: 0.35em; } /* the label and its value are two items */
-.stripUpdate { opacity: 0.6; }
-.stripId { opacity: 0.4; }
-
-/* ---- Summary bar ---- */
+/* ---- Summary: one stat per question ---- */
 
 .summaryBar {
-  border-bottom: 1px solid var(--border);
-  padding: var(--sp-3) var(--sp-4);
-  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--hw-space-3);
+  margin-bottom: var(--hw-space-6);
 }
 
-.summaryRow {
-  max-width: var(--page-max);
-  margin: 0 auto;
-  display: flex;
+.line {
   align-items: center;
-  justify-content: space-between;
 }
 
-.summaryInner {
+.readOnly {
+  margin-bottom: var(--hw-space-5);
+}
+
+.summary {
   display: flex;
-  gap: var(--sp-2);
-  width: fit-content;
-  align-items: stretch;
-}
-
-.summaryBlock {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--sp-2) var(--sp-4);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 2px;
-  min-width: 100px;
-}
-
-/* Colour only where action is due (same rule as the ward list). */
-.summaryBlock[data-band="high"] { background: var(--alert); border-color: var(--alert); }
-.summaryBlock[data-band="high"] .summaryLabel,
-.summaryBlock[data-band="high"] .summaryBig,
-.summaryBlock[data-band="high"] .responseText { color: var(--button-ink); }
-.summaryBlock[data-band="medium"],
-.summaryBlock[data-band="low-medium"] { background: var(--alert-tint); border-color: var(--alert-edge); }
-.summaryBlock[data-band="medium"] .summaryBig,
-.summaryBlock[data-band="low-medium"] .summaryBig,
-.summaryBlock[data-band="medium"] .responseText,
-.summaryBlock[data-band="low-medium"] .responseText { color: var(--alert); }
-.summaryBlock[data-kind="response"] { max-width: 240px; }
-.summaryBlock[data-signal="good"] .summaryBig { color: var(--ok); }
-.summaryBlock[data-signal="none"] .summaryBig { font-size: 13px; }
-.summaryBlock[data-signal="degraded"] { background: var(--alert-tint); }
-.summaryBlock[data-signal="degraded"] .summaryBig { color: var(--alert); }
-
-.responseText {
-  font-family: var(--font-sans);
-  font-weight: 500;
-  font-size: 13px;
-  line-height: 1.3;
-}
-
-.summaryLabel {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--label);
-}
-
-.summaryBig {
-  font-family: var(--font-mono);
-  font-weight: 600;
-  font-size: 20px;
-  line-height: 1;
-}
-
-/* ---- Escalation reasons ---- */
-
-.reasonBlock {
-  padding: var(--sp-2) var(--sp-4);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 200px;
-}
-
-.reasonList {
-  display: flex;
-  gap: var(--sp-1);
   flex-wrap: wrap;
+  gap: var(--hw-space-5) var(--hw-space-6);
 }
 
-.reasonTag {
-  font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--ink);
-  background: var(--primary-tint);
-  color: var(--primary);
-  border-radius: 4px;
-  padding: 2px 8px;
+.stat { flex: 1 1 120px; }
+.stat[data-kind="response"] { flex: 2 1 200px; }
+.why { flex: 3 1 260px; }
+
+.stat :global(.hw-stat__label) {
+  font-size: var(--hw-font-size-14);
 }
 
-.reasonPathway {
-  font-weight: 400;
-  color: var(--label);
+.big {
+  margin-top: var(--hw-space-3);
+  font-size: 48px;
 }
 
-.reasonNone {
-  font-family: var(--font-sans);
-  font-size: 11px;
-  color: var(--label);
-}
-
-/* ---- Drawer toggle buttons ---- */
-
-.drawerButtons {
-  display: flex;
-  gap: var(--sp-2);
-}
-
-.drawerBtn {
-  white-space: nowrap;
-  border-radius: var(--radius);
-  font-family: var(--font-sans);
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--label);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  padding: var(--sp-1) var(--sp-3);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.drawerBtn:hover {
-  color: var(--ink);
-  border-color: var(--primary);
-}
-
-.drawerBtnActive {
-  color: var(--button-ink);
-  background: var(--primary);
-  border-color: var(--primary);
-}
-
-/* ---- Overlay panel ---- */
-
-.overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 100;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 80px;
-}
-
-.overlayBackdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(28, 25, 22, 0.4); /* Cast iron */
-}
-
-.overlayPanel {
-  position: relative;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  width: 640px;
-  max-width: 90vw;
-  max-height: 70vh;
-  overflow-y: auto;
-  padding: var(--sp-4) var(--sp-5);
-}
-
-.overlayHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--sp-3);
-}
-
-.overlayTitle {
-  font-family: var(--font-mono);
-  font-weight: 500;
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--label);
-}
-
-.overlayClose {
-  font-family: var(--font-sans);
-  font-size: 18px;
-  color: var(--label);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  line-height: 1;
-}
-
-.overlayClose:hover {
-  color: var(--ink);
-}
-
-/* ---- Layout ---- */
-
-.layout {
-  max-width: var(--page-max);
-  margin: 0 auto;
-  width: 100%;
-  flex: 1;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--sp-3);
-  padding: var(--sp-3) var(--sp-4) var(--sp-6);
-  align-items: start;
-}
-
-.sidebar,
-.main {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-}
-
-/* ---- Panels (always open — no collapsing) ---- */
-
-.panel {
-  padding: var(--sp-4) var(--sp-5);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-
-.panelEyebrow {
-  font-family: var(--font-mono);
-  font-weight: 500;
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--label);
-  margin-bottom: var(--sp-3);
-}
-
-.patientName {
-  font-family: var(--font-display);
-  font-size: 24px;
-  font-weight: 400;
-  line-height: 1.2;
-}
-
-.patientSub {
-  font-family: var(--font-sans);
-  font-size: 13px;
-  color: var(--label);
-  margin-top: var(--sp-1);
-}
-
-.admitting {
-  font-size: 15px;
-  margin-top: var(--sp-2);
+.step {
+  margin-top: var(--hw-space-3);
+  font-size: var(--hw-font-size-16);
+  font-weight: var(--hw-weight-semibold);
   line-height: 1.4;
 }
 
-/* ---- Score ---- */
+/* The score and the step take their band's colour, number and rule both. */
+.stat[data-band="high"] { border-top-color: var(--hw-graph-emergency); }
+.stat[data-band="high"] .big,
+.stat[data-band="high"] .step { color: var(--hw-graph-emergency-text); }
+.stat[data-band="medium"],
+.stat[data-band="low-medium"] { border-top-color: var(--hw-graph-urgent); }
+.stat[data-band="medium"] .big,
+.stat[data-band="low-medium"] .big,
+.stat[data-band="medium"] .step,
+.stat[data-band="low-medium"] .step { color: var(--hw-graph-urgent-text); }
+
+.stat[data-signal="good"] .big { color: var(--hw-color-text-muted); }
+.stat[data-signal="none"] .big { font-size: var(--hw-font-size-20); font-weight: var(--hw-weight-regular); }
+.stat[data-signal="degraded"] .big { color: var(--hw-color-warning-fg); }
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hw-space-2);
+  margin-top: var(--hw-space-3);
+}
+
+/* A reason can be a sentence: it wraps instead of running off a phone. */
+.reason {
+  height: auto;
+  min-height: 22px;
+  padding-block: var(--hw-space-1);
+  white-space: normal;
+}
+
+.pathway {
+  color: var(--hw-color-text-muted);
+}
+
+.none {
+  margin-top: var(--hw-space-3);
+  font-size: var(--hw-font-size-14);
+  color: var(--hw-color-text-muted);
+}
+
+.modelLabel {
+  margin-top: var(--hw-space-4);
+}
+
+/* ---- Drawer (notes, charts) ---- */
+
+.drawerBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hw-space-6);
+  padding-bottom: var(--hw-space-6);
+}
+
+.noteInput {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--hw-space-3);
+}
+
+.noteInput > :global(.hw-textarea) {
+  align-self: stretch;
+}
+
+.noteMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hw-space-3);
+  margin-top: var(--hw-space-1);
+}
+
+.noteAuthor {
+  font-weight: var(--hw-weight-medium);
+  color: var(--hw-color-text);
+}
+
+.noteContent {
+  margin-top: var(--hw-space-2);
+  line-height: 1.5;
+  color: var(--hw-color-text);
+}
+
+/* ---- Two columns of cards ---- */
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--hw-space-5);
+  align-items: start;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hw-space-5);
+  min-width: 0;
+}
+
+.eyebrow {
+  margin-bottom: var(--hw-space-4);
+  font-size: var(--hw-text-caption);
+  font-weight: var(--hw-weight-medium);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--hw-color-text-muted);
+}
+
+.patientName {
+  font-size: var(--hw-font-size-24);
+  font-weight: var(--hw-weight-semibold);
+  line-height: 1.25;
+}
+
+.patientSub {
+  margin-top: var(--hw-space-2);
+  font-size: var(--hw-font-size-14);
+  color: var(--hw-color-text-muted);
+}
+
+.admitting {
+  margin-top: var(--hw-space-3);
+  line-height: 1.5;
+}
 
 .scoreBlock {
   display: flex;
   align-items: baseline;
-  gap: var(--sp-3);
-  margin-bottom: var(--sp-3);
+  gap: var(--hw-space-3);
 }
 
 .scoreValue {
-  font-family: var(--font-mono);
-  font-size: 36px;
-  font-weight: 600;
+  font-size: 40px;
+  font-weight: var(--hw-weight-light);
   line-height: 1;
 }
 
+.scoreBlock[data-band="high"] .scoreValue { color: var(--hw-graph-emergency-text); }
+.scoreBlock[data-band="medium"] .scoreValue,
+.scoreBlock[data-band="low-medium"] .scoreValue { color: var(--hw-graph-urgent-text); }
+
 .scoreLabel {
-  font-family: var(--font-sans);
-  font-size: 13px;
-  color: var(--label);
+  font-size: var(--hw-font-size-14);
+  color: var(--hw-color-text-muted);
 }
 
-.pending {
-  font-family: var(--font-sans);
-  font-size: 13px;
-  color: var(--label);
-}
-
-/* ---- Charts (stacked vertically to avoid overflow) ---- */
-
-.chartGrid {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-5);
-}
-
-.chartGrid > div {
-  width: 100%;
-}
-
-.chartGrid > div svg {
-  width: 100%;
-  height: auto;
-}
-
-/* ---- Vitals grid ---- */
+/* ---- Vitals and labs: a two-column definition list ---- */
 
 .vitalsGrid {
   display: flex;
@@ -374,266 +259,62 @@
 
 .vitalRow {
   display: grid;
-  grid-template-columns: 140px 1fr auto;
+  grid-template-columns: 140px minmax(0, 1fr) auto;
   align-items: baseline;
-  gap: var(--sp-3);
-  padding: var(--sp-2) 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 15px;
+  gap: var(--hw-space-4);
+  padding: var(--hw-space-3) 0;
+  border-bottom: 1px solid var(--hw-color-border-subtle);
 }
 
 .vitalRow:last-child {
-  border-bottom: none;
+  border-bottom: 0;
 }
 
 .vitalLabel {
-  font-family: var(--font-sans);
-  font-size: 13px;
-  color: var(--label);
+  font-size: var(--hw-font-size-14);
+  color: var(--hw-color-text-muted);
 }
 
 .vitalValue {
-  font-family: var(--font-mono);
-  font-size: 15px;
+  min-width: 0;
+  font-size: var(--hw-font-size-16);
+  color: var(--hw-color-text);
 }
 
-/* Per-parameter NEWS2 points: 3 = solid red, 1-2 = red tint, 0 = nothing shown. */
-.vitalPoints {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 600;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--alert-tint);
-  color: var(--alert);
+.nurseNote {
+  font-size: var(--hw-text-caption);
+  font-weight: var(--hw-weight-regular);
+  color: var(--hw-color-text-muted);
 }
 
-.vitalRow[data-points="3"] .vitalPoints { background: var(--alert); color: var(--button-ink); }
+/* A value that adds NEWS2 points turns red (bold at 2+), so the eye finds what drives the score. */
+.vitalRow[data-points="1"] .vitalValue { color: var(--hw-color-danger-fg); }
 .vitalRow[data-points="2"] .vitalValue,
-.vitalRow[data-points="3"] .vitalValue { color: var(--alert); font-weight: 500; }
+.vitalRow[data-points="3"] .vitalValue { font-weight: var(--hw-weight-bold); color: var(--hw-color-danger-fg); }
 
-/* ---- Clinical notes ---- */
-
-.noteInput {
-  display: flex;
-  gap: var(--sp-2);
-  margin-bottom: var(--sp-3);
+.vitalPoints {
+  align-self: center;
 }
 
-.noteTextarea {
-  flex: 1;
-  font-family: var(--font-sans);
-  font-size: 13px;
-  padding: var(--sp-2);
-  border: 1px solid var(--border);
-  background: var(--ground);
-  color: var(--ink);
-  resize: vertical;
-  min-height: 60px;
-  border-radius: 0;
+.record {
+  margin-top: var(--hw-space-4);
 }
 
-.noteTextarea:focus {
-  outline: none;
-  border-color: var(--primary);
+.after {
+  margin-top: var(--hw-space-4);
 }
 
-.noteTextarea::placeholder {
-  color: var(--label);
+/* ---- Desk: two columns ---- */
+@media (width >= 1200px) {
+  .layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }
 
-.noteSubmit {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  background: var(--primary);
-  color: var(--button-ink);
-  border: none;
-  padding: var(--sp-2) var(--sp-3);
-  cursor: pointer;
-  align-self: flex-end;
-  white-space: nowrap;
-}
-
-.noteSubmit:hover {
-  opacity: 0.85;
-}
-
-.noteSubmit:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.notesList {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.noteItem {
-  padding: var(--sp-2) 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.noteItem:last-child {
-  border-bottom: none;
-}
-
-.noteMeta {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  margin-bottom: 4px;
-}
-
-.noteAuthor {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.noteRole {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--label);
-  border: 1px solid var(--border);
-  padding: 0 4px;
-}
-
-.noteTime {
-  font-family: var(--font-sans);
-  font-size: 11px;
-  color: var(--label);
-  margin-left: auto;
-}
-
-.noteDelete {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--label);
-  background: none;
-  border: 1px solid var(--border);
-  padding: 0 6px;
-  cursor: pointer;
-  margin-left: var(--sp-2);
-}
-
-.noteDelete:hover {
-  color: var(--alert);
-  border-color: var(--alert);
-}
-
-.noteContent {
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--ink);
-  margin: 0;
-}
-
-/* ---- Responsive: tablet ---- */
-
-@media (max-width: 768px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-
-  .sidebar {
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .overlayPanel {
-    width: 100%;
-    max-width: 100vw;
-  }
-
-  .summaryRow {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--sp-2);
-  }
-
-  .summaryInner {
-    flex-wrap: wrap;
-  }
-
-  .drawerButtons {
-    flex-wrap: wrap;
-  }
-
-  .findingRow {
-    grid-template-columns: 100px 1fr;
-  }
-}
-
-/* ---- Responsive: phone ---- */
-
-@media (max-width: 480px) {
-  .summaryBar {
-    padding: var(--sp-2) var(--sp-3);
-  }
-
-  .panel {
-    padding: var(--sp-3);
-  }
-
-  .patientName {
-    font-size: 20px;
-  }
-
-  .scoreValue {
-    font-size: 28px;
-  }
-
-  .findingRow {
-    grid-template-columns: 1fr;
-    gap: var(--sp-1);
-  }
-
-  .vitalRow {
-    grid-template-columns: 100px 1fr;
-    gap: var(--sp-2);
-  }
-
-  .noteInput {
-    flex-direction: column;
-  }
-
-  .noteSubmit {
-    align-self: stretch;
-    text-align: center;
-  }
-
-  .noteMeta {
-    flex-wrap: wrap;
-    gap: var(--sp-1);
-  }
-
-  .noteTime {
-    margin-left: 0;
-    width: 100%;
-  }
-
-  .stripInner {
-    padding: 0 var(--sp-2);
-  }
-
-  .overlayPanel {
-    padding: var(--sp-3);
-  }
-
-  .overlay {
-    padding-top: 40px;
-  }
-}
-
-.readOnly {
-  margin: 8px 16px;
-  font-size: 0.85rem;
+/* ---- Phone ---- */
+@media (width < 576px) {
+  .statusItem[data-wide] { display: none; } /* the shell bar has two lines here: the clock and the id give way */
+  .container { padding-inline: var(--hw-space-4); }
+  .summary { gap: var(--hw-space-5) var(--hw-space-4); }
+  .big { font-size: 32px; }
+  .patientName { font-size: var(--hw-font-size-20); }
+  .vitalRow { grid-template-columns: 110px minmax(0, 1fr) auto; gap: var(--hw-space-3); }
 }

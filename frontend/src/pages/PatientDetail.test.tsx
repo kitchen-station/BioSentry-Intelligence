@@ -5,7 +5,7 @@
  * charts, and the not-found / load-error states.
  */
 
-import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -154,7 +154,8 @@ describe("PatientDetail", () => {
     await loaded();
     expect(screen.getAllByText("Simulated patients until a hospital is connected.")).toHaveLength(1);
     expect(screen.getByRole("link", { name: "Ward" }).getAttribute("aria-current")).toBeNull();
-    expect(screen.getByRole("link", { name: "← Ward view" })).toBeTruthy();
+    const crumbs = screen.getByRole("navigation", { name: "Breadcrumb" });
+    expect(within(crumbs).getByRole("link", { name: "Ward view" }).getAttribute("href")).toBe("/ward");
     expect(screen.getByRole("button", { name: /rn-manalo/ })).toBeTruthy();
   });
 
@@ -254,6 +255,9 @@ describe("PatientDetail", () => {
     const tierB = region.parentElement!;
     expect(within(tierB).getByText("Own baseline")).toBeTruthy();
     expect(tierB.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_CONTAINED_BY).toBeTruthy();
+    // The band as a graph above the list: heart rate 90 against its own 58.1 to 81.9.
+    const graph = within(tierB).getByRole("figure", { name: "1 of 1 vital is outside its own band" });
+    expect(graph.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.queryByText("Own baseline: getting ready.")).toBeNull();
   });
 
@@ -374,30 +378,35 @@ describe("PatientDetail", () => {
     expect((await screen.findByRole("alert")).textContent).toBe("Notes could not be loaded.");
   });
 
-  it("opens the charts drawer and closes drawers by toggle, close button or backdrop", async () => {
+  it("opens the charts drawer and closes drawers by toggle, close button, Esc or backdrop", async () => {
     const user = userEvent.setup();
-    const { container } = page();
+    page();
     await loaded();
     const charts = screen.getByRole("button", { name: "Charts" });
 
     await user.click(charts);
-    const title = screen.getByText("Vital trends \u00b7 5 h");
-    const panel = title.closest("div")!.parentElement!;
+    const panel = screen.getByRole("dialog", { name: "Vital trends · 5 h" });
+    expect(charts.getAttribute("aria-expanded")).toBe("true");
     for (const label of ["Heart rate", "Respiratory rate", "SpO2"]) {
-      expect(within(panel).getAllByText(label).length).toBeGreaterThan(0);
+      expect(within(panel).getByRole("heading", { level: 3, name: new RegExp(`^${label} `) })).toBeTruthy();
     }
     expect(within(panel).getByText("Charts show patch data only. Values entered by a nurse are not plotted.")).toBeTruthy();
     await user.click(charts); // same button again closes it
-    expect(screen.queryByText("Vital trends \u00b7 5 h")).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
 
     await user.click(charts);
-    await user.click(screen.getByRole("button", { name: "×" }));
-    expect(screen.queryByText("Vital trends \u00b7 5 h")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Close charts" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    await user.click(charts);
+    fireEvent(screen.getByRole("dialog"), new Event("cancel", { cancelable: true })); // Esc
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 
     await user.click(screen.getByRole("button", { name: "Notes" }));
-    const backdrop = container.querySelector('[class*="overlayBackdrop"]') as HTMLElement;
-    await user.click(backdrop);
-    expect(screen.queryByPlaceholderText("Add a clinical note...")).toBeNull();
+    await user.click(screen.getByPlaceholderText("Add a clinical note...")); // inside: stays open
+    expect(screen.getByRole("dialog", { name: "Clinical notes" })).toBeTruthy();
+    await user.click(screen.getByRole("dialog")); // the backdrop is the dialog itself
+    await waitFor(() => expect(screen.queryByPlaceholderText("Add a clinical note...")).toBeNull());
   });
 
   it("says there is no patch signal, and who entered the values, when the row has none", async () => {
@@ -646,8 +655,9 @@ describe("PatientDetail for an administrator (read only)", () => {
 describe("PatientDetail own baseline on the charts", () => {
   const hr = baseline.vitals[0] as BaselineComputed;
   const withVitals = (...vitals: BaselineResponse["vitals"]): BaselineResponse => ({ ...baseline, vitals });
-  const bands = () => document.querySelectorAll('[data-testid="own-baseline-band"]');
-  const SHADED = "Shaded: this patient's own baseline (synthetic, not validated). Not a normal range.";
+  // The kit graph draws no band: each chart says it in its subtitle.
+  const bands = () => within(screen.getByRole("dialog")).queryAllByText(/Own baseline \d/);
+  const SHADED = "Own baseline: this patient's own baseline (synthetic, not validated). Not a normal range.";
   const openCharts = async (role?: SessionRole) => {
     const user = userEvent.setup();
     page(role);
@@ -833,8 +843,7 @@ describe("PatientDetail follows the ward's speed", () => {
     await user.click(screen.getByRole("button", { name: /Charts/ }));
     api.getPatient.mockRejectedValue(new Error("down"));
     await advance(2_100);
-    const overlay = document.querySelector('[class*="overlayHeader"]') as HTMLElement;
-    await waitFor(() => expect(within(overlay).getByText(/Cannot reach the ward server since/)).toBeTruthy());
+    await waitFor(() => expect(within(screen.getByRole("dialog")).getByText(/Cannot reach the ward server since/)).toBeTruthy());
   });
 
   it("keeps the band across a timed read of the patient", async () => {
@@ -844,10 +853,10 @@ describe("PatientDetail follows the ward's speed", () => {
     await loaded();
     await screen.findByRole("region", { name: "Change from own baseline" });
     await user.click(screen.getByRole("button", { name: /Charts/ }));
-    const grid = document.querySelector('[class*="chartGrid"]');
+    const drawer = screen.getByRole("dialog");
     await advance(2_100);
-    expect(document.querySelector('[class*="chartGrid"]')).toBe(grid);
-    expect(document.querySelectorAll('[data-testid="own-baseline-band"]')).toHaveLength(1);
+    expect(screen.getByRole("dialog")).toBe(drawer);
+    expect(within(drawer).getAllByText(/Own baseline 58\.1 to 81\.9 bpm/)).toHaveLength(1);
   });
 
   it("leaves the open charts drawer alone while the data does not change", async () => {
@@ -855,13 +864,13 @@ describe("PatientDetail follows the ward's speed", () => {
     page();
     await loaded();
     await user.click(screen.getByRole("button", { name: /Charts/ }));
-    await advance(900); // the first draw-on (700 ms) has finished
-    const grid = document.querySelector('[class*="chartGrid"]') as HTMLElement;
-    const before = grid.innerHTML;
+    await advance(900);
+    const drawer = screen.getByRole("dialog");
+    const before = drawer.innerHTML;
     await advance(4_200);
     expect(api.getPatient.mock.calls.length).toBeGreaterThanOrEqual(3);
-    expect(document.querySelector('[class*="chartGrid"]')).toBe(grid);
-    expect(grid.innerHTML).toBe(before);
+    expect(screen.getByRole("dialog")).toBe(drawer);
+    expect(drawer.innerHTML).toBe(before); // the graphs are not rebuilt
   });
 
   it("drops a slow old answer that lands after a newer one", async () => {
@@ -881,10 +890,10 @@ describe("PatientDetail follows the ward's speed", () => {
     await user.click(screen.getByRole("button", { name: "Record vitals" }));
     await user.type(screen.getByLabelText("Heart rate (bpm)"), "118");
     await user.click(screen.getByRole("button", { name: "Record" })); // the save's read is answered first
-    expect(await screen.findByText("Newer, Pat")).toBeTruthy();
+    expect(await screen.findByRole("heading", { level: 1, name: "Newer, Pat" })).toBeTruthy();
     await act(async () => late({ ...base, name: "Older, Pat" }));
     expect(screen.queryByText("Older, Pat")).toBeNull();
-    expect(screen.getByText("Newer, Pat")).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "Newer, Pat" })).toBeTruthy();
   });
 
   it("after null, recorded vitals and ranked again, the stale line is gone and the timer reads again", async () => {
