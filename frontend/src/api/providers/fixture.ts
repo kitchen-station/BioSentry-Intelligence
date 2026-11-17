@@ -10,6 +10,9 @@ import * as fixtures from "../../data/fixtures";
 export const setActiveClinician = fixtures.setActiveClinician;
 
 export const fixtureProvider: ApiProvider = {
+  getAssistantHistory: () => Promise.resolve([]),
+  getPatientRuns: () => Promise.resolve([]),
+  getPatientRun: () => Promise.reject(new Error("Simulated runs need the server")),
   getWard: fixtures.getWard,
   getPatient: fixtures.getPatient,
   // The frontend never computes a finding (D4), so fixture mode has none to show.

@@ -7,6 +7,7 @@ import { getPatient, getNotes, addNote, canRecordVitals, hasHistory, hasPatientQ
 import { Flip } from "../components/Flip";
 import { AppShell, OfflineBanner, usePhone } from "../components/AppShell";
 import { SimulatedNote } from "../components/LabFrame";
+import { PatientHistoryArea } from "../components/PatientHistoryArea";
 import { StayPanel } from "../components/StayPanel";
 import { since, syncWardNow, useWardNow } from "../components/wardNow";
 import { BaselinePanel, BaselineRange, bands } from "../components/BaselinePanel";
@@ -670,6 +671,8 @@ function Patient({ id, session, onSignOut }: Props & { id: string | undefined })
             </p>
           </>
         )}
+
+        <PatientHistoryArea key={`${patient.id}-${session.clinician_id}`} patientId={patient.id} onSignOut={onSignOut} />
 
         {/* The full list of notes and the note box: a drawer from the right (full screen on a phone) */}
         {notesOpen && (

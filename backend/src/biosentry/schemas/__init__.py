@@ -3,6 +3,7 @@ generated TypeScript types (PLAN D2). Importing this package has no side effects
 
 from pydantic import BaseModel
 
+from .assistant import AssistantMessage
 from .admission import (
     AdmissionCondition,
     AdmissionRoute,
@@ -103,6 +104,7 @@ from .tiers import (
 
 # Every model that is part of the contract. Enums are pulled in by reference.
 CONTRACT_MODELS: tuple[type[BaseModel], ...] = (
+    AssistantMessage,
     Provenance,
     BloodPressure,
     MeasurementAbsent,
@@ -197,6 +199,7 @@ INPUT_MODELS: frozenset[type[BaseModel]] = frozenset(
 
 __all__ = [
     "CONTRACT_MODELS",
+    "AssistantMessage",
     "INPUT_MODELS",
     "AbstainedDetail",
     "AbstainedRow",

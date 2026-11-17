@@ -193,6 +193,15 @@ export interface components {
             readonly to_minute: number;
             readonly transferred_out: number | null;
         };
+        /** AssistantMessage */
+        readonly AssistantMessage: {
+            readonly created_at: string;
+            readonly id: number;
+            readonly lab_run_id: number | null;
+            /** @enum {string} */
+            readonly role: "user" | "assistant";
+            readonly text: string;
+        };
         /** BaselineComputed */
         readonly BaselineComputed: {
             /** @enum {string} */
@@ -1448,6 +1457,7 @@ export type AlertCounted = components['schemas']['AlertCounted'];
 export type AlertUnavailable = components['schemas']['AlertUnavailable'];
 export type AnalyticsHour = components['schemas']['AnalyticsHour'];
 export type AnalyticsShift = components['schemas']['AnalyticsShift'];
+export type AssistantMessage = components['schemas']['AssistantMessage'];
 export type BaselineComputed = components['schemas']['BaselineComputed'];
 export type BaselineFlagged = components['schemas']['BaselineFlagged'];
 export type BaselineForming = components['schemas']['BaselineForming'];

@@ -25,6 +25,7 @@ import type {
 } from "./generated";
 
 export type {
+  AssistantMessage,
   AbstainedRow,
   Acknowledgement,
   Acvpu,

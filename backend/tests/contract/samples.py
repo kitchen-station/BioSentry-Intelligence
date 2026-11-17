@@ -10,6 +10,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from biosentry.schemas import (
+    AssistantMessage,
     AlertCounted,
     AlertUnavailable,
     ResearchAbstained,
@@ -617,6 +618,7 @@ _BUILDERS: dict[type[BaseModel], Any] = {
         "not_ranked_reason": None,
         "not_ranked_instruction": None,
     },
+    AssistantMessage: lambda: {"id": 1, "role": "assistant", "text": "Synthetic answer", "lab_run_id": 1, "created_at": "2026-10-14T12:00:00Z"},
     UnscoredPatient: lambda: unscored(),
     AdmitPatientInput: admit_input,
     PartialAdmitPatientInput: lambda: {"lastName": "Santos"},

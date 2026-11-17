@@ -780,6 +780,46 @@
         "title": "AnalyticsShift",
         "type": "object"
       },
+      "AssistantMessage": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "lab_run_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "role": {
+            "enum": [
+              "user",
+              "assistant"
+            ],
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "text",
+          "lab_run_id",
+          "created_at"
+        ],
+        "title": "AssistantMessage",
+        "type": "object"
+      },
       "BaselineComputed": {
         "additionalProperties": false,
         "properties": {

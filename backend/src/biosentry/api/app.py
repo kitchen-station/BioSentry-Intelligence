@@ -48,6 +48,9 @@ from biosentry.core.cache import TtlCache
 from biosentry.core.config import Settings, restricted
 from biosentry.db.passphrase import Busy, verify
 from biosentry.db.seed import ensure
+from biosentry.repositories.assistant import AssistantRepository
+from biosentry.repositories.patient_runs import patient_runs
+from biosentry.schemas.assistant import AssistantMessage
 from biosentry.repositories.postgres import Conn, PostgresStore, connect
 from biosentry.schemas import (
     AbstainedDetail,
@@ -678,6 +681,42 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
         if found is None:
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return found
+
+    def history_scope(ctx: Context, who: str, patient_id: str, action: str) -> None:
+        if patient_id not in ctx.wards.visible(who):
+            ctx.audit.append(who, action, patient_id, "not_found")
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+
+    @app.get("/patients/{patient_id}/assistant/history", response_model=list[AssistantMessage])
+    def assistant_history(patient_id: str, ctx: Ctx, who: Who) -> list[AssistantMessage]:
+        action = "view_assistant_history"
+        history_scope(ctx, who, patient_id, action)
+        rows = AssistantRepository(ctx.conn).recent(who, ctx.store.run_id, patient_id, ctx.store.clock())
+        ctx.audit.append(who, action, patient_id, "ok")
+        return [AssistantMessage.model_validate(row) for row in rows]
+
+    @app.get("/patients/{patient_id}/lab/runs", response_model=list[LabRunItem])
+    def patient_lab_runs(patient_id: str, ctx: Ctx, who: Who) -> list[LabRunItem]:
+        action = "view_patient_lab_runs"
+        history_scope(ctx, who, patient_id, action)
+        rows = patient_runs(ctx.store, patient_id)
+        ctx.audit.append(who, action, patient_id, "ok")
+        return [LabRunItem.model_validate(lab._item(row)) for row in rows]
+
+    @app.get("/patients/{patient_id}/lab/runs/{lab_run_id}", response_model=LabRunDetail)
+    def patient_lab_run(patient_id: str, lab_run_id: str, ctx: Ctx, who: Who) -> LabRunDetail:
+        action = "view_patient_lab_run"
+        history_scope(ctx, who, patient_id, action)
+        rid = row_id(lab_run_id)
+        rows = [] if rid is None else patient_runs(ctx.store, patient_id, rid)
+        if not rows:
+            ctx.audit.append(who, action, patient_id, "not_found")
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        ctx.audit.append(who, action, patient_id, "ok")
+        row = rows[0]
+        return LabRunDetail.model_validate(
+            {**lab._item(row), "report": row["report"], "report_text": row["report_text"]}
+        )
 
     @app.post(
         "/patients/{patient_id}/questions", response_model=PatientQuestionItem, status_code=201

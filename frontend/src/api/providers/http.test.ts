@@ -273,3 +273,14 @@ describe("httpProvider lab questions", () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ question: "What if we alerted at 7?" });
   });
 });
+
+it("reads patient history and results through encoded patient-scoped routes", async () => {
+  fetchMock.mockImplementation(async () => reply(200, []));
+  await httpProvider.getAssistantHistory("p/?");
+  await httpProvider.getPatientRuns("p/?");
+  await httpProvider.getPatientRun("p/?", 7);
+  expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+    "/patients/p%2F%3F/assistant/history", "/patients/p%2F%3F/lab/runs", "/patients/p%2F%3F/lab/runs/7",
+  ]);
+  expect(fetchMock.mock.calls.every((call) => !call[1]?.method || call[1].method === "GET")).toBe(true);
+});

@@ -15,6 +15,7 @@
 
 import type { ApiProvider } from "../contract";
 import type {
+  AssistantMessage,
   AbstainedRow,
   Acknowledgement,
   AdmitPatientInput,
@@ -52,6 +53,9 @@ import {
 } from "../client";
 
 export const httpProvider: ApiProvider = {
+  getAssistantHistory: (patientId) => fetchJson<AssistantMessage[]>(`/patients/${encodeURIComponent(patientId)}/assistant/history`),
+  getPatientRuns: (patientId) => fetchJson<LabRunItem[]>(`/patients/${encodeURIComponent(patientId)}/lab/runs`),
+  getPatientRun: (patientId, runId) => fetchJson<LabRunDetail>(`/patients/${encodeURIComponent(patientId)}/lab/runs/${runId}`),
   getWard(): Promise<WardResponse> {
     return fetchJson<WardResponse>("/wards/W4/rows");
   },

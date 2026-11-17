@@ -375,6 +375,7 @@ READS = [("GET", p) for p in (
     "/wards/{ward}/lab/questions/{lab_run_id}", "/patients",
     "/patients/{patient_id}", "/patients/{patient_id}/baseline", "/patients/{patient_id}/history",
     "/patients/{patient_id}/notes", "/patients/{patient_id}/questions", "/patients/{patient_id}/questions/{question_id}",
+    "/patients/{patient_id}/assistant/history", "/patients/{patient_id}/lab/runs", "/patients/{patient_id}/lab/runs/{lab_run_id}",
     "/acknowledgements", "/audit",
 )]
 PATIENT_READS = {
