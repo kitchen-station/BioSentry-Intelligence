@@ -1,8 +1,0 @@
-/* The patient page's Ask panel: its heading and the button that opens the chat. */
-
-.heading {
-  margin-bottom: var(--hw-space-4);
-  font-size: var(--hw-font-size-16);
-  font-weight: var(--hw-weight-semibold);
-  color: var(--hw-color-text);
-}
