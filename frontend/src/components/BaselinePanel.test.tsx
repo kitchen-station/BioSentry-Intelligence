@@ -8,7 +8,7 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { BaselineComputed, BaselineResponse } from "../types";
-import { BaselinePanel } from "./BaselinePanel";
+import { BaselinePanel, BaselineRange } from "./BaselinePanel";
 import type { BaselineState } from "./useBaseline";
 import { formatClock, formatDay } from "./format";
 
@@ -377,5 +377,51 @@ describe("BaselinePanel: display rounding of latest", () => {
     show(response([computed({ vital: vital as never, latest, unit: "u", significant: false, run_bins: 0, z: 0 })]));
     const value = screen.getByTitle(String(latest));
     expect(value.textContent).toBe(`${expected} u`);
+  });
+});
+
+describe("BaselineRange: the latest value against the own band, as a graph", () => {
+  const draw = (baseline: BaselineState | unknown) => render(<BaselineRange baseline={baseline as BaselineState} />);
+  const rows = () => screen.getAllByRole("listitem").map((li) => li.textContent);
+  const spo2 = quiet({ vital: "spo2", unit: "%", latest: 97.04, baseline_median: 97, band_low: 94.2, band_high: 99.8 });
+
+  it("draws each computed vital with a band, rounded as the list is, and says how many are outside", () => {
+    draw(response([computed({ latest: 90.04 }), spo2, { vital: "respiratory_rate", status: "forming", bins_valid: 1, bins_needed: 24 }]));
+    const graph = screen.getByRole("figure", { name: "1 of 2 vitals is outside its own band" });
+    expect(within(graph).getByRole("heading", { level: 2 })).toBeTruthy();
+    expect(within(graph).getByText(/Synthetic, not validated\.$/)).toBeTruthy();
+    expect(rows()).toEqual(["Heart rate90 bpm8.1 above usual 58.1 to 81.9", "SpO297 %usual 94.2 to 99.8"]);
+  });
+
+  it.each([
+    [[spo2], "No vital is outside its own band"],
+    [[computed()], "1 of 1 vital is outside its own band"],
+    [[computed(), computed({ vital: "respiratory_rate", unit: "/min", latest: 8, band_low: 12, band_high: 20 })], "2 of 2 vitals are outside their own band"],
+  ])("titles the count", (vitals, title) => {
+    draw(response(vitals));
+    expect(screen.getByRole("figure", { name: title })).toBeTruthy();
+  });
+
+  it.each([
+    ["loading", undefined],
+    ["fixture mode", null],
+    ["a failed read", "failed"],
+    ["an odd body", "oops"],
+    ["no vitals list", response([computed()], { vitals: "x" })],
+    ["only a forming vital", response([{ vital: "spo2", status: "forming", bins_valid: 1, bins_needed: 24 }])],
+    ["a server without the band", response([{ ...computed(), band_low: undefined }])],
+    ["an unknown vital", response([{ ...computed(), vital: "glucose" }])],
+  ])("draws nothing for %s", (_name, baseline) => {
+    const { container } = draw(baseline);
+    expect(container.innerHTML).toBe("");
+  });
+
+  it("is not rebuilt by a refetch with the same figures, and goes when the band does", () => {
+    const { container, rerender } = draw(response([computed()]));
+    const heading = screen.getByRole("heading");
+    rerender(<BaselineRange baseline={response([computed()])} />);
+    expect(screen.getByRole("heading")).toBe(heading);
+    rerender(<BaselineRange baseline={null} />);
+    expect(container.innerHTML).toBe("");
   });
 });

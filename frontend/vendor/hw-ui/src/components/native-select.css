@@ -1,0 +1,63 @@
+@layer hw.components {
+  /* A real <select>, styled. No wrapper, no JS: <select class="hw-native-select">.
+     Use it when the platform picker is the better fit (phones, long lists, plain forms).
+     Use .hw-select (js/select.js) when options need tags, groups with icons, or search.
+     It sizes to its options; inside .hw-field it fills the field. --block fills any container. */
+  .hw-native-select {
+    --hw-native-select-height: var(--hw-control-height);
+    --hw-native-select-border: var(--hw-color-border);
+    --hw-native-select-mark: var(--hw-color-text-muted);
+
+    max-width: 100%;
+    height: var(--hw-native-select-height);
+    padding: 0 36px 0 var(--hw-space-4);
+    font-size: var(--hw-font-size-16); /* 16px stops iOS zoom-on-focus */
+    text-overflow: ellipsis;
+    cursor: pointer;
+    appearance: none;
+    background-color: var(--hw-color-surface);
+
+    /* The chevron is two diagonal strokes, so it takes its colour from a token and needs no image. */
+    background-image:
+      linear-gradient(45deg, transparent calc(50% - 1px), var(--hw-native-select-mark) calc(50% - 0.5px), var(--hw-native-select-mark) calc(50% + 0.5px), transparent calc(50% + 1px)),
+      linear-gradient(-45deg, transparent calc(50% - 1px), var(--hw-native-select-mark) calc(50% - 0.5px), var(--hw-native-select-mark) calc(50% + 0.5px), transparent calc(50% + 1px));
+    background-repeat: no-repeat;
+    background-position: right 18px top 50%, right 13px top 50%;
+    background-size: 5px 5px;
+    border: 1px solid var(--hw-native-select-border);
+    border-radius: var(--hw-control-radius);
+    opacity: 1; /* some browsers fade a disabled select; the kit greys it instead */
+    transition: border-color var(--hw-duration-2), box-shadow var(--hw-duration-2);
+  }
+  .hw-native-select:hover, .hw-native-select:focus-visible { --hw-native-select-border: var(--hw-color-border-strong); }
+
+  /* Red only after the person has used the control, or when the app says so. Never on load. */
+  .hw-native-select:user-invalid, .hw-native-select[aria-invalid="true"] { --hw-native-select-border: var(--hw-color-danger); }
+
+  /* The control's own disabled state. A disabled <option> inside does not count. */
+  .hw-native-select:disabled {
+    --hw-native-select-border: var(--hw-color-border-subtle);
+    --hw-native-select-mark: var(--hw-color-text-subtle);
+
+    color: var(--hw-color-text-subtle);
+    cursor: not-allowed;
+    background-color: var(--hw-color-fill-hover);
+  }
+
+  /* An empty first option ("Choose a shift") reads as a placeholder until something is chosen. */
+  .hw-native-select:has(option[value=""]:checked) { color: var(--hw-color-text-subtle); }
+  .hw-native-select option { color: var(--hw-color-text); }
+  .hw-native-select option:disabled { color: var(--hw-color-text-subtle); }
+
+  .hw-native-select--sm { --hw-native-select-height: var(--hw-control-height-sm); }
+  .hw-native-select--lg { --hw-native-select-height: var(--hw-control-height-lg); }
+  .hw-native-select--block { width: 100%; }
+
+  /* A list box (multiple, or size above 1) shows its options in place: no fixed height, no chevron. */
+  .hw-native-select:is([multiple], [size]:not([size="1"])) {
+    height: auto;
+    padding: var(--hw-space-2);
+    cursor: default;
+    background-image: none;
+  }
+}

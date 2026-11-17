@@ -19,7 +19,7 @@ export function NotRankedSection({ rows, clinicianId, readOnly = false, onRecord
   return (
     <>
       <div className={styles.sectionHeader}>
-        <p className={styles.eyebrow}>Not ranked ({rows.length})</p>
+        <h2 className={styles.eyebrow}>Not ranked ({rows.length})</h2>
         <p className={styles.sortInfo}>Action required to enable scoring</p>
       </div>
       <div className={styles.rowList}>

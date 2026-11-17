@@ -1,0 +1,51 @@
+@layer hw.components {
+  /* Created by js/toast.js inside a single .hw-toast-region[role=status] */
+  .hw-toast-region {
+    position: fixed;
+    top: var(--hw-space-6);
+    left: 50%;
+    z-index: var(--hw-z-toast);
+    display: flex;
+    flex-direction: column;
+    gap: var(--hw-space-3);
+    align-items: center;
+    transform: translateX(-50%);
+    pointer-events: none;
+
+    --hw-toast-offset: -8px; /* slides from the edge it lives on */
+  }
+  .hw-toast {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    min-height: 40px;
+    max-width: min(480px, calc(100vw - 32px));
+    padding: 10px var(--hw-space-5);
+    font-size: var(--hw-font-size-14);
+    color: var(--hw-color-text-inverse);
+    background: var(--hw-color-surface-inverse);
+    border-radius: var(--hw-popup-radius);
+    box-shadow: var(--hw-elevation-overlay);
+    pointer-events: auto;
+    animation: hw-toast-in 250ms var(--hw-ease-enter);
+  }
+  .hw-toast[data-hw-leaving] { animation: hw-toast-out var(--hw-motion-exit) var(--hw-ease-exit) forwards; }
+  .hw-toast__icon--success { color: var(--hw-color-toast-ok); }
+  .hw-toast__icon--danger { color: var(--hw-color-toast-bad); }
+  .hw-toast__action {
+    margin-left: var(--hw-space-3);
+    font-weight: var(--hw-weight-semibold);
+    color: inherit;
+    cursor: pointer;
+    background: none;
+    border: 0;
+  }
+
+  @media (width < 576px) {
+    .hw-toast-region { top: auto; right: var(--hw-space-4); bottom: calc(var(--hw-space-4) + env(safe-area-inset-bottom)); left: var(--hw-space-4); transform: none;
+
+      --hw-toast-offset: 8px;
+    }
+    .hw-toast { width: 100%; max-width: none; }
+  }
+}

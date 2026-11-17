@@ -20,8 +20,8 @@ function Row<T>({
 }: RowProps<T> & { format?: (value: T) => string }): ReactElement {
   return (
     <div className={styles.vitalRow} data-points={points}>
-      <span className={styles.vitalLabel}>{label}</span>
-      <span className={styles.vitalValue}>
+      <dt className={styles.vitalLabel}>{label}</dt>
+      <dd className={styles.vitalValue}>
         {/* The overloads on VitalRow enforce a format() for structured values. */}
         <Flip still={!flip}>
           <MeasurementDisplay
@@ -32,15 +32,17 @@ function Row<T>({
           />
         </Flip>
         {measurement.data.present && measurement.provenance.source === "nurse" && (
-          <span className={styles.vitalLabel}>
+          <span className={styles.nurseNote}>
             {" "}{enteredByNurse(Date.parse(measurement.provenance.observed_at), now)}
           </span>
         )}
-      </span>
+      </dd>
       {points !== undefined && points > 0 && (
-        <span className={styles.vitalPoints} title="NEWS2 points for this parameter">
-          +{points}
-        </span>
+        <dd className={styles.vitalPoints}>
+          <span className="hw-tag hw-tag--danger hw-tag--round" title="NEWS2 points for this parameter">
+            +{points}
+          </span>
+        </dd>
       )}
     </div>
   );
@@ -51,7 +53,7 @@ export const VitalRow = Row as {
   <T>(props: RowProps<T> & { format: (value: T) => string }): ReactElement;
 };
 
-/** The CURRENT VITALS block of the patient detail page. */
+/** The CURRENT VITALS block of the patient detail page: rows of a <dl>, which the page provides. */
 export function CurrentVitals({ vitals, now }: { vitals: Vitals; now: number }): ReactElement {
   const p = news2Points(vitals);
   return (

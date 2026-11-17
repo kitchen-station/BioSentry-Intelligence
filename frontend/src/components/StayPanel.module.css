@@ -1,36 +1,32 @@
-/* The stay: a strip of marks, then the list that says the same in words. */
+/* The stay: a kit accordion item (native <details>) holding a strip of marks, then the list that says
+   the same in words. The strip's colour is the clinical colour: emergency red for high, urgent orange
+   for medium and a single 3, context grey for everything else. */
 
 .panel {
-  font-family: var(--font-sans);
-  font-size: 14px;
-  color: var(--ink);
+  border-bottom: 0; /* the card around it is the edge */
 }
 
 .summary {
-  font-family: var(--font-mono);
-  font-weight: 500;
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--label);
-  cursor: pointer;
+  padding-block: 0;
 }
 
 .body {
-  margin-top: var(--sp-3);
+  padding-top: var(--hw-space-4);
+  padding-bottom: 0;
+  font-size: var(--hw-font-size-14);
 }
 
 .quiet {
-  font-size: 13px;
+  margin: 0 0 var(--hw-space-2);
+  font-size: var(--hw-text-caption);
   line-height: 1.5;
-  color: var(--label);
-  margin: 0 0 var(--sp-2);
+  color: var(--hw-color-text-muted);
 }
 
 .error {
-  margin: 0 0 var(--sp-2);
-  font-size: 13px;
-  color: var(--alert);
+  margin: 0 0 var(--hw-space-2);
+  font-size: var(--hw-text-caption);
+  color: var(--hw-color-danger-fg);
 }
 
 .strip {
@@ -42,62 +38,43 @@
 .ends {
   display: flex;
   justify-content: space-between;
-  gap: var(--sp-2);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--label);
-  margin-bottom: var(--sp-2);
+  gap: var(--hw-space-2);
+  margin-bottom: var(--hw-space-3);
+  font-size: var(--hw-font-size-11);
+  font-variant-numeric: tabular-nums;
+  color: var(--hw-color-text-muted);
 }
 
-.high { fill: var(--alert); }
-.medium { fill: var(--alert-edge); }
-.single { fill: var(--alert-tint); stroke: var(--alert); stroke-width: 1; }
-.hatch { stroke: var(--label); stroke-width: 1.5; }
-.hatchBox { stroke: var(--label); stroke-width: 1; }
-.dashed { fill: none; stroke: var(--label); stroke-width: 1; stroke-dasharray: 3 2; }
-.tick { fill: var(--ink); }
-.letter { font-family: var(--font-mono); font-size: 11px; font-weight: 700; fill: var(--ink); text-anchor: middle; dominant-baseline: central; }
-.letterHigh { fill: var(--button-ink); }
+.high { fill: var(--hw-graph-emergency); }
+.medium { fill: var(--hw-graph-urgent); }
+.single { fill: var(--hw-color-surface); stroke: var(--hw-graph-urgent); stroke-width: 1.5; }
+.hatch { stroke: var(--hw-graph-context); stroke-width: 1.5; }
+.hatchBox { stroke: var(--hw-graph-context); stroke-width: 1; }
+.dashed { fill: none; stroke: var(--hw-graph-context); stroke-width: 1; stroke-dasharray: 3 2; }
+.tick { fill: var(--hw-graph-context-strong); }
+.letter { font-size: var(--hw-font-size-11); font-weight: var(--hw-weight-bold); fill: var(--hw-color-text); text-anchor: middle; dominant-baseline: central; }
+.letterHigh { fill: var(--hw-color-text-on-brand); }
+.episode { fill: none; stroke: var(--hw-graph-context); stroke-width: 1; stroke-dasharray: 1 2; }
 
 .list {
   list-style: none;
-  margin: 0;
-  padding: 0;
 }
 
 .item {
-  padding: var(--sp-1) 0;
-  border-top: 1px solid var(--border);
+  padding: var(--hw-space-3) 0;
   line-height: 1.5;
+  color: var(--hw-color-text);
   overflow-wrap: anywhere;
+  border-top: 1px solid var(--hw-color-border-subtle);
 }
 
 .nested {
+  padding: var(--hw-space-1) 0 0 var(--hw-space-5);
   list-style: none;
-  margin: 0;
-  padding: 0 0 0 var(--sp-3);
-  font-size: 13px;
-  color: var(--label);
-}
-
-.button {
-  padding: var(--sp-1) var(--sp-3);
-  font-family: var(--font-sans);
-  font-size: 13px;
-  color: var(--button-ink);
-  background: var(--button);
-  border: none;
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-
-.button[aria-disabled="true"] {
-  opacity: 0.6;
-  cursor: default;
+  font-size: var(--hw-text-caption);
+  color: var(--hw-color-text-muted);
 }
 
 .foot {
-  margin-top: var(--sp-2);
+  margin-top: var(--hw-space-3);
 }
-
-.episode { fill: none; stroke: var(--label); stroke-width: 1; stroke-dasharray: 1 2; }

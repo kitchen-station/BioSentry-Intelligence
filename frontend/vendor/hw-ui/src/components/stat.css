@@ -1,0 +1,17 @@
+@layer hw.components {
+  /* Stat (js/graph/stat.js): one number with its trend and what changed.
+     .hw-stat > .hw-stat__label + .hw-stat__main (.hw-stat__value + svg.hw-stat__spark) + .hw-stat__change + .hw-stat__note */
+  .hw-stat { display: flex; flex-direction: column; min-width: 0; padding-top: 14px; border-top: 2px solid var(--hw-color-text); }
+  .hw-stat__label { color: var(--hw-color-text-muted); }
+  .hw-stat__main { display: flex; flex-wrap: wrap; gap: var(--hw-space-2) var(--hw-space-5); align-items: flex-end; justify-content: space-between; margin-top: 6px; }
+  .hw-stat__value { font-size: 64px; font-weight: var(--hw-weight-light); font-variant-numeric: tabular-nums; line-height: 1; white-space: nowrap; }
+  .hw-stat__spark { display: block; flex-shrink: 0; margin-bottom: 6px; overflow: visible; }
+  .hw-stat__line { fill: none; stroke: var(--hw-graph-context); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .hw-stat__dot { fill: var(--hw-graph-highlight); stroke: var(--hw-graph-surface); stroke-width: 2; }
+  .hw-stat__change { display: flex; gap: var(--hw-space-3); align-items: center; margin-top: 14px; font-weight: var(--hw-weight-medium); }
+  .hw-stat__note { font-size: 13px; color: var(--hw-color-text-muted); }
+
+  @media (width < 576px) {
+    .hw-stat__value { font-size: 48px; }
+  }
+}

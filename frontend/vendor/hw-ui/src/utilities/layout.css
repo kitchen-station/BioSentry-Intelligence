@@ -1,0 +1,31 @@
+/* Layout primitives. Breakpoints (CSS can't read custom properties in @media, so these are literal):
+   sm 576 · md 768 · lg 992 · xl 1200 · 2xl 1440. Mobile-first: base styles are the phone layout. */
+@layer hw.utilities {
+  .hw-container { width: 100%; max-width: 1240px; margin-inline: auto; padding-inline: var(--hw-space-5); }
+  @media (width >= 768px) { .hw-container { padding-inline: var(--hw-space-6); } }
+
+  .hw-stack { display: flex; flex-direction: column; gap: var(--hw-stack-gap, var(--hw-space-5)); }
+  .hw-cluster { display: flex; flex-wrap: wrap; gap: var(--hw-cluster-gap, var(--hw-space-4)); align-items: center; }
+
+  /* Auto-fitting grid: as many columns of at least --hw-grid-min as fit. Phones get 1 column for free. */
+  .hw-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(var(--hw-grid-min, 280px), 100%), 1fr)); gap: var(--hw-grid-gap, var(--hw-space-5)); }
+
+  /* App shell: side nav on desktop, app bar + bottom nav on phones */
+  .hw-shell { display: grid; min-height: 100vh; grid-template-columns: 1fr; }
+  .hw-shell__side { display: none; }
+  .hw-shell__main { min-width: 0; }
+  @media (width >= 992px) {
+    .hw-shell { grid-template-columns: auto 1fr; }
+    .hw-shell__side { display: block; }
+  }
+
+  .hw-section { padding-block: var(--hw-space-8); }
+  @media (width >= 992px) { .hw-section { padding-block: 76px; } }
+
+  /* stylelint-disable declaration-no-important -- visibility utilities must win over components */
+  /* Show/hide by viewport. Use sparingly: prefer one responsive component over two copies. */
+  @media (width < 768px) { .hw-hide-mobile { display: none !important; } }
+  @media (width >= 768px) { .hw-only-mobile { display: none !important; } }
+  @media (width >= 992px) { .hw-only-compact { display: none !important; } }
+  /* stylelint-enable declaration-no-important */
+}

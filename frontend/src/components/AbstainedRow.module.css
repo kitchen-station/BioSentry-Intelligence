@@ -1,129 +1,85 @@
-/* ============================================================
-   Abstained row -- NOT RANKED patients (I4)
-   ============================================================ */
+/* NOT RANKED rows (I4): a kit card per patient; the tag is the accent "act" state, never a risk colour. */
 
 .row {
   display: grid;
-  grid-template-columns: 112px 1fr 1fr;
-  gap: 0;
+  grid-template-columns: 120px minmax(0, 1fr) minmax(0, 1fr);
   align-items: start;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: var(--sp-3) 0;
+  padding: var(--hw-space-5) 0;
+  border: 1px dashed var(--hw-color-border);
 }
 
 .tagCol {
   display: flex;
-  align-items: flex-start;
   justify-content: center;
-  padding-top: 2px;
 }
 
 .tag {
-  font-family: var(--font-mono);
-  font-weight: 500;
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--label);
-  border: 1px solid var(--border);
-  padding: 2px 8px;
+  --hw-tag-fg: var(--hw-color-on-accent);
+  --hw-tag-bg: var(--hw-color-accent);
+
+  font-weight: var(--hw-weight-semibold);
+  letter-spacing: 0.06em;
 }
 
-.infoCol {
-  padding: 0 var(--sp-3);
+.infoCol,
+.reasonCol {
+  min-width: 0;
+  padding: 0 var(--hw-space-5);
 }
+
+.reasonCol { border-left: 1px solid var(--hw-color-border-subtle); }
 
 .nameRow {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: var(--sp-2);
+  gap: var(--hw-space-2) var(--hw-space-3);
 }
 
 .name {
-  font-weight: 500;
-  font-size: 15px;
+  font-size: var(--hw-font-size-16);
+  font-weight: var(--hw-weight-semibold);
 }
 
-.detail {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  color: var(--label);
-}
-
-.context {
-  font-size: 14px;
-  margin-top: 2px;
-  color: var(--ink);
-}
-
-.reasonCol {
-  padding: 0 var(--sp-3);
-  border-left: 1px solid var(--border);
-}
-
-.reason {
-  font-size: 14px;
-}
-
-.instruction {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  color: var(--label);
-  margin-top: 2px;
-}
-
+.detail,
+.instruction,
 .seen {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  color: var(--label);
-  margin-top: var(--sp-1);
+  font-size: var(--hw-text-caption);
+  color: var(--hw-color-text-muted);
 }
 
-.action {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  color: var(--ink);
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 0;
-  padding: var(--sp-1) var(--sp-3);
-  margin-top: var(--sp-2);
-  cursor: pointer;
-}
+.context,
+.reason { font-size: var(--hw-font-size-14); }
 
-.action:hover {
-  border-color: var(--ink);
-}
+.context,
+.instruction { margin-top: 2px; }
+
+.reason { font-weight: var(--hw-weight-medium); }
+
+.seen { margin-top: var(--hw-space-2); }
+
+.action { margin-top: var(--hw-space-3); }
 
 /* The entry form opens under the row, across all three columns. */
 .entry {
   grid-column: 1 / -1;
-  padding: var(--sp-3) var(--sp-3) 0;
+  margin-top: var(--hw-space-5);
+  padding: var(--hw-space-5) var(--hw-space-5) 0;
+  border-top: 1px solid var(--hw-color-border-subtle);
 }
 
-/* ---- Responsive: phone ---- */
-
-@media (max-width: 480px) {
+@media (width < 576px) {
   .row {
     grid-template-columns: 1fr;
-    gap: var(--sp-2);
-    padding: var(--sp-3);
+    gap: var(--hw-space-3);
+    padding: var(--hw-space-4);
   }
-
-  .tagCol {
-    justify-content: flex-start;
-  }
-
-  .infoCol {
-    padding: 0;
-  }
-
+  .tagCol { justify-content: flex-start; }
+  .infoCol, .reasonCol { padding: 0; }
   .reasonCol {
-    border-left: none;
-    border-top: 1px solid var(--border);
-    padding: var(--sp-2) 0 0;
+    padding-top: var(--hw-space-3);
+    border-top: 1px solid var(--hw-color-border-subtle);
+    border-left: 0;
   }
+  .entry { padding-inline: 0; }
 }

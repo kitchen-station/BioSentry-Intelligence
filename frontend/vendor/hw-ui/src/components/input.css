@@ -1,0 +1,115 @@
+@layer hw.components {
+  /* Wrapper so icons/affixes sit inside the border. The <input> itself is borderless. */
+  .hw-input {
+    --hw-input-height: var(--hw-control-height);
+    --hw-input-border: var(--hw-color-border);
+
+    display: flex;
+    gap: var(--hw-space-3);
+    align-items: center;
+    width: 100%;
+    height: var(--hw-input-height);
+    padding: 0 var(--hw-space-4);
+    background: var(--hw-color-surface);
+    border: 1px solid var(--hw-input-border);
+    border-radius: var(--hw-control-radius);
+    transition: border-color var(--hw-duration-2), box-shadow var(--hw-duration-2);
+  }
+  .hw-input:hover, .hw-input:focus-within { --hw-input-border: var(--hw-color-border-strong); }
+  .hw-input:focus-within { box-shadow: var(--hw-focus-ring); }
+
+  /* Red only after the person has used the field (:user-invalid), or when the app sets aria-invalid.
+     Plain :invalid would mark every empty required field red before anyone has typed. */
+  .hw-input:has(.hw-input__control:user-invalid), .hw-input:has([aria-invalid="true"]) { --hw-input-border: var(--hw-color-danger); }
+
+  /* Only the control's own disabled state greys the wrapper: a bare :has(:disabled) also matches a
+     disabled <option> or a disabled clear button. */
+  .hw-input:has(.hw-input__control:disabled) { cursor: not-allowed; background: var(--hw-color-fill-hover); --hw-input-border: var(--hw-color-border-subtle); }
+  .hw-input--sm { --hw-input-height: var(--hw-control-height-sm); }
+  .hw-input--lg { --hw-input-height: var(--hw-control-height-lg); }
+
+  .hw-input__control {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    font-size: var(--hw-font-size-16); /* 16px stops iOS zoom-on-focus */
+    background: transparent;
+    border: 0;
+    outline: 0;
+  }
+  .hw-input__control:focus-visible { box-shadow: none; }
+  .hw-input__control::placeholder { color: var(--hw-color-text-subtle); }
+  .hw-input__control:disabled { cursor: not-allowed; color: var(--hw-color-text-subtle); }
+  .hw-input__icon, .hw-input__affix { flex-shrink: 0; color: var(--hw-color-text-muted); }
+  .hw-input__clear {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    color: var(--hw-color-text-muted);
+    cursor: pointer;
+    background: none;
+    border: 0;
+    border-radius: var(--hw-radius-xs);
+  }
+  .hw-input__clear:hover { color: var(--hw-color-text); background: var(--hw-color-fill-hover); }
+  .hw-input:has(.hw-input__control:placeholder-shown) .hw-input__clear { visibility: hidden; }
+
+  .hw-textarea {
+    position: relative;
+    background: var(--hw-color-surface);
+    border: 1px solid var(--hw-color-border);
+    border-radius: var(--hw-control-radius);
+    transition: border-color var(--hw-duration-2);
+  }
+  .hw-textarea:hover, .hw-textarea:focus-within { border-color: var(--hw-color-border-strong); }
+  .hw-textarea:focus-within { box-shadow: var(--hw-focus-ring); }
+  .hw-textarea__control {
+    display: block;
+    width: 100%;
+    min-height: 96px;
+    padding: var(--hw-space-3) var(--hw-space-4) var(--hw-space-6);
+    font-size: var(--hw-font-size-16);
+    line-height: 1.5;
+    resize: vertical;
+    background: transparent;
+    border: 0;
+    outline: 0;
+  }
+  .hw-textarea__control:focus-visible { box-shadow: none; }
+  .hw-textarea__control::placeholder { color: var(--hw-color-text-subtle); }
+  .hw-textarea__count { position: absolute; right: var(--hw-space-4); bottom: 6px; font-size: var(--hw-text-caption); color: var(--hw-color-text-muted); }
+  .hw-textarea__count[data-over] { color: var(--hw-color-danger-fg); }
+
+  .hw-number {
+    display: inline-flex;
+    width: fit-content;
+    height: var(--hw-control-height);
+    overflow: hidden;
+    background: var(--hw-color-surface);
+    border: 1px solid var(--hw-color-border);
+    border-radius: var(--hw-control-radius);
+  }
+  .hw-number__step {
+    width: var(--hw-control-height);
+    font-size: var(--hw-font-size-18);
+    cursor: pointer;
+    background: none;
+    border: 0;
+    transition: background-color var(--hw-duration-1);
+  }
+  .hw-number__step:hover { background: var(--hw-color-fill-hover); }
+  .hw-number__step:disabled { cursor: not-allowed; color: var(--hw-color-text-subtle); background: none; }
+  .hw-number__value {
+    width: 64px;
+    font-size: var(--hw-font-size-16);
+    text-align: center;
+    background: transparent;
+    border: 0;
+    border-inline: 1px solid var(--hw-color-border-subtle);
+    outline: 0;
+    appearance: textfield;
+  }
+  .hw-number__value::-webkit-inner-spin-button, .hw-number__value::-webkit-outer-spin-button { appearance: none; margin: 0; }
+}

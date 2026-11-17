@@ -1,62 +1,50 @@
+/* Simulated runs: layout only. Fields, buttons, tags, the table and the accordion are hw-ui. */
+
 .form {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: var(--sp-3);
-  margin-bottom: var(--sp-3);
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  align-items: start;
+  gap: var(--hw-space-4) var(--hw-space-5);
 }
 
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-  min-width: 0;
-  font-size: 12px;
-  color: var(--label);
-}
+.form > * { max-width: none; } /* a field fills its grid cell */
 
-.field select,
-.field input {
-  width: 100%;
-  padding: var(--sp-2);
-  font-family: inherit;
-  font-size: 14px;
-  color: var(--ink);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 0;
-}
+.submit { margin-top: var(--hw-space-5); }
+
+.nowrap { white-space: nowrap; }
+
+/* Stacked on a phone the cell is a flex row: a long state drops under its label instead of overflowing. */
+.state { flex-wrap: wrap; }
 
 .dl {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
-  gap: var(--sp-1) var(--sp-3);
-  margin: 0 0 var(--sp-3);
-  font-size: 13px;
+  gap: var(--hw-space-2) var(--hw-space-5);
+  font-size: var(--hw-text-caption);
 }
 
 .dl dt {
-  font-family: var(--font-mono);
-  color: var(--label);
+  font-family: var(--hw-font-mono);
+  color: var(--hw-color-text-muted);
 }
 
-.dl dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
+.dl dd { overflow-wrap: anywhere; }
+
+.row { display: contents; }
 
 /* A report is wide fixed-width text: it scrolls inside its own box, never the page. */
 .pre {
   max-width: 100%;
-  margin: 0 0 var(--sp-3);
-  padding: var(--sp-2);
+  padding: var(--hw-space-4);
   overflow: auto;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 1.4;
-  background: var(--panel);
-  border-radius: var(--radius);
+  font-family: var(--hw-font-mono);
+  font-size: var(--hw-text-caption);
+  line-height: 1.5;
+  background: var(--hw-color-surface-subtle);
+  border-radius: var(--hw-radius-md);
 }
 
-.row {
-  display: contents;
+@media (width < 576px) {
+  .dl { grid-template-columns: minmax(0, 1fr); }
+  .dl dd + dt { margin-top: var(--hw-space-2); }
 }

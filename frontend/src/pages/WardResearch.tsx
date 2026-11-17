@@ -4,12 +4,10 @@ import type { ResearchAbstained, ResearchRow, Session, WardResearch as Answer } 
 import { ApiError, getWardResearch, hasLabQuestions } from "../api";
 import { REASONS, shown } from "../components/BaselinePanel";
 import { formatAge, formatClock } from "../components/format";
+import { AppShell } from "../components/AppShell";
 import { SimulatedNote } from "../components/LabFrame";
 import { ENTRIES, modelWords } from "../components/ResearchModels";
-import { SessionMenu } from "../components/SessionMenu";
-import overview from "./Overview.module.css";
 import research from "./Research.module.css";
-import styles from "./Ward.module.css";
 
 const VITALS = [
   ["heart_rate", "Heart rate"],
@@ -92,34 +90,29 @@ export function WardResearch({ session, onSignOut }: { session: Session; onSignO
   useEffect(load, [load]);
 
   return (
-    <div className={styles.page}>
-      <div className={styles.statusBar}>
-        <div className={styles.statusInner}>
-          <div className={styles.statusLeft}>
-            <span className={styles.statusItem}>
-              <span className={styles.statusLabel}>BioSentry</span>
-              <span className={styles.statusValue}>Ward research &middot; Ward {session.ward}</span>
-            </span>
-          </div>
-          <div className={styles.statusRight}>
-            <SessionMenu session={session} onSignOut={onSignOut} />
-          </div>
-        </div>
-      </div>
+    <AppShell session={session} onSignOut={onSignOut} title={<>Ward research &middot; Ward {session.ward}</>}>
       <SimulatedNote />
-      <main className={research.main}>
-        <h1 className={research.title}>Ward research</h1>
-        {data && <p>{data.label}</p>}
-        {error && <p role="alert" className={overview.warn}>{error}</p>}
-        <p>
+      <div className={research.main}>
+        <h1 className="hw-heading hw-heading--3">Ward research</h1>
+        {data && <p className="hw-text-muted">{data.label}</p>}
+        {error && (
+          <p role="alert" className="hw-alert hw-alert--danger">
+            <span className="hw-alert__icon hw-icon fa-solid fa-triangle-exclamation" aria-hidden="true" />
+            {error}
+          </p>
+        )}
+        <p className={`${research.toolbar} hw-caption`}>
           {data && <>Read at {formatClock(Date.parse(data.now))} </>}
-          <button type="button" className={overview.refresh} onClick={load}>Refresh</button>
+          <button type="button" className="hw-button hw-button--sm" onClick={load}>
+            <span className="hw-icon fa-solid fa-rotate" aria-hidden="true" />
+            Refresh
+          </button>
         </p>
-        {data && data.ranked.length === 0 && data.abstained.length === 0 && <p>No patients on this ward.</p>}
+        {data && data.ranked.length === 0 && data.abstained.length === 0 && <p className="hw-text-muted">No patients on this ward.</p>}
         {data && data.ranked.length > 0 && (
-          <div className={research.scroll} tabIndex={0} role="region" aria-label="Ward research table">
-            <table className={`${research.table} ${overview.text}`}>
-              <caption>Every patient of the ward, in the NEWS2 order</caption>
+          <div className={`hw-card hw-card--outlined hw-table-wrap ${research.tableCard}`} tabIndex={0} role="region" aria-label="Ward research table">
+            <table className={`hw-table ${research.nowrap}`}>
+              <caption className={`hw-caption ${research.caption}`}>Every patient of the ward, in the NEWS2 order</caption>
               <thead>
                 <tr>
                   <th scope="col">Rank</th>
@@ -133,9 +126,9 @@ export function WardResearch({ session, onSignOut }: { session: Session; onSignO
               <tbody>
                 {data.ranked.map((r) => (
                   <tr key={`${r.rank}-${r.bed}`}>
-                    <td>{r.rank}</td>
+                    <td className="hw-table__num">{r.rank}</td>
                     <th scope="row"><Who row={r} /></th>
-                    <td>{r.score}, {LEVEL[r.level]}</td>
+                    <td className={research.level} data-level={r.level}>{r.score}, {LEVEL[r.level]}</td>
                     {VITALS.map(([key]) => <td key={key}>{vitalCell(r, key)}</td>)}
                     <td>
                       {ENTRIES.map(([key, name]) => (
@@ -150,8 +143,8 @@ export function WardResearch({ session, onSignOut }: { session: Session; onSignO
           </div>
         )}
         {data && data.abstained.length > 0 && (
-          <section aria-labelledby="not-ranked">
-            <h2 id="not-ranked" className={research.heading}>Not ranked</h2>
+          <section aria-labelledby="not-ranked" className={`hw-card hw-card--outlined ${research.card}`}>
+            <h2 id="not-ranked" className="hw-heading hw-heading--4">Not ranked</h2>
             <ul>
               {data.abstained.map((a) => (
                 <li key={a.bed}>
@@ -161,11 +154,11 @@ export function WardResearch({ session, onSignOut }: { session: Session; onSignO
             </ul>
           </section>
         )}
-        <ul>
+        <ul className={research.links}>
           <li><Link to="/lab">Simulated compare runs</Link></li>
           {hasLabQuestions && <li><Link to="/ask">Ask the research agent</Link></li>}
         </ul>
-      </main>
-    </div>
+      </div>
+    </AppShell>
   );
 }

@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { Session, WardOverview } from "../types";
 import { ApiError, getOverview, hasOverview } from "../api";
+import { AppShell } from "../components/AppShell";
 import { SimulatedNote } from "../components/LabFrame";
-import { ROLE_LABELS, SessionMenu } from "../components/SessionMenu";
+import { ROLE_LABELS } from "../components/SessionMenu";
 import { formatSimClock, simStatus } from "../components/format";
 import research from "./Research.module.css";
 import styles from "./Overview.module.css";
@@ -70,23 +71,19 @@ export function Overview({ session, onSignOut }: { session: Session; onSignOut: 
   for (const a of data?.activity ?? []) byClinician.set(a.clinician_id, [...(byClinician.get(a.clinician_id) ?? []), a]);
 
   return (
-    <div className={styles.page}>
-      <div className={styles.bar}>
-        <span>BioSentry &middot; Administration</span>
-        <SessionMenu session={session} onSignOut={onSignOut} />
-      </div>
+    <AppShell session={session} onSignOut={onSignOut} title="Administration">
       <SimulatedNote />
-      <main className={research.main}>
-        <h1 className={research.title}>Ward overview</h1>
+      <div className={research.main}>
+        <h1 className="hw-heading hw-heading--3">Ward overview</h1>
 
         {!admin ? (
-          <p>Not available for this account.</p>
+          <p className="hw-text-muted">Not available for this account.</p>
         ) : !hasOverview ? (
-          <p>The overview needs the live API. This demo has no server.</p>
+          <p className="hw-text-muted">The overview needs the live API. This demo has no server.</p>
         ) : (
           <>
-            <p className={research.small}>Read-only. Every view is recorded in the audit log.</p>
-            <div className={styles.status}>
+            <p className="hw-caption">Read-only. Every view is recorded in the audit log.</p>
+            <div className={`${research.toolbar} hw-caption`}>
               {data && <p>As of {when(data.as_of)}</p>}
               {sim && (
                 <p>
@@ -94,22 +91,33 @@ export function Overview({ session, onSignOut }: { session: Session; onSignOut: 
                   {sim.counts.rejected} rejected &middot; {sim.counts.abstained} abstained
                 </p>
               )}
-              {data && !data.receiving_data && <p className={styles.warn}>Not receiving data</p>}
+              {data && !data.receiving_data && (
+                <p className={styles.warn}>
+                  <span className="hw-icon fa-solid fa-signal" aria-hidden="true" />
+                  Not receiving data
+                </p>
+              )}
               <Link to="/ward">Ward list</Link>
-              <button type="button" className={styles.refresh} onClick={() => { setLoading(true); show(); }} disabled={loading}>
+              <button type="button" className="hw-button hw-button--sm" onClick={() => { setLoading(true); show(); }} disabled={loading}>
+                <span className="hw-icon fa-solid fa-rotate" aria-hidden="true" />
                 Refresh
               </button>
             </div>
-            {error && <p role="alert" className={styles.warn}>{error}</p>}
+            {error && (
+              <p role="alert" className="hw-alert hw-alert--danger">
+                <span className="hw-alert__icon hw-icon fa-solid fa-triangle-exclamation" aria-hidden="true" />
+                {error}
+              </p>
+            )}
           </>
         )}
 
         {data && (
           <>
-            <section className={research.card} aria-labelledby="patients">
-              <h2 id="patients" className={research.heading}>Patients</h2>
-              <div className={research.scroll} tabIndex={0} role="region" aria-labelledby="patients">
-                <table className={`${research.table} ${styles.text}`}>
+            <section className={`hw-card hw-card--outlined ${research.card}`} aria-labelledby="patients">
+              <h2 id="patients" className="hw-heading hw-heading--4">Patients</h2>
+              <div className="hw-table-wrap" tabIndex={0} role="region" aria-labelledby="patients">
+                <table className={`hw-table ${research.nowrap}`}>
                   <thead>
                     <tr><th scope="col">Bed</th><th scope="col">State</th><th scope="col">Nurse</th><th scope="col">Physician</th></tr>
                   </thead>
@@ -119,7 +127,7 @@ export function Overview({ session, onSignOut }: { session: Session; onSignOut: 
                         <th scope="row">{p.bed}</th>
                         <td>
                           {p.state === "ranked" ? `NEWS2 ${p.score}` : `NOT RANKED: ${p.reason}`}
-                          {p.synthetic && <span className={research.sub}> Synthetic</span>}
+                          {p.synthetic && <> <span className="hw-tag">Synthetic</span></>}
                         </td>
                         <td>{nurses(p.care)}</td>
                         <td>{physicians(p.care)}</td>
@@ -128,22 +136,22 @@ export function Overview({ session, onSignOut }: { session: Session; onSignOut: 
                   </tbody>
                 </table>
               </div>
-              {chargeAll && <p>The charge nurse is assigned to every patient.</p>}
+              {chargeAll && <p className="hw-caption">The charge nurse is assigned to every patient.</p>}
             </section>
 
-            <section className={research.card} aria-labelledby="clinicians">
-              <h2 id="clinicians" className={research.heading}>Clinicians</h2>
-              <div className={research.scroll} tabIndex={0} role="region" aria-labelledby="clinicians">
-                <table className={`${research.table} ${styles.text}`}>
+            <section className={`hw-card hw-card--outlined ${research.card}`} aria-labelledby="clinicians">
+              <h2 id="clinicians" className="hw-heading hw-heading--4">Clinicians</h2>
+              <div className="hw-table-wrap" tabIndex={0} role="region" aria-labelledby="clinicians">
+                <table className={`hw-table ${research.nowrap}`}>
                   <thead>
-                    <tr><th scope="col">Clinician</th><th scope="col">Role</th><th scope="col">Patients</th></tr>
+                    <tr><th scope="col">Clinician</th><th scope="col">Role</th><th scope="col" className="hw-table__num">Patients</th></tr>
                   </thead>
                   <tbody>
                     {data.clinicians.map((c) => (
                       <tr key={c.id}>
                         <th scope="row">{c.id}</th>
                         <td>{ROLE_LABELS[c.role] ?? c.role}</td>
-                        <td>{c.patients}</td>
+                        <td className="hw-table__num">{c.patients}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -151,26 +159,30 @@ export function Overview({ session, onSignOut }: { session: Session; onSignOut: 
               </div>
             </section>
 
-            <section className={research.card} aria-labelledby="activity">
-              <h2 id="activity" className={research.heading}>Activity in the last 24 hours</h2>
-              <p className={research.small}>
+            <section className={`hw-card hw-card--outlined ${research.card}`} aria-labelledby="activity">
+              <h2 id="activity" className="hw-heading hw-heading--4">Activity in the last 24 hours</h2>
+              <p className="hw-caption">
                 Activity is shown for oversight, not performance review. Counts only: no patient and no time is shown.
               </p>
-              {byClinician.size === 0 && <p>No activity in the last 24 hours.</p>}
-              {[...byClinician].map(([id, rows]) => (
-                <div key={id} className={styles.group}>
-                  <h3>{id}</h3>
-                  <ul>
-                    {rows.map((a) => (
-                      <li key={`${a.action} ${a.outcome}`}>{a.action} {a.outcome}: {a.count}</li>
-                    ))}
-                  </ul>
+              {byClinician.size === 0 && <p className="hw-text-muted">No activity in the last 24 hours.</p>}
+              {byClinician.size > 0 && (
+                <div className={styles.groups}>
+                  {[...byClinician].map(([id, rows]) => (
+                    <div key={id} className={styles.group}>
+                      <h3 className={styles.who}>{id}</h3>
+                      <ul>
+                        {rows.map((a) => (
+                          <li key={`${a.action} ${a.outcome}`}>{a.action} {a.outcome}: {a.count}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </section>
           </>
         )}
-      </main>
-    </div>
+      </div>
+    </AppShell>
   );
 }

@@ -1,104 +1,93 @@
+/* Lab and admin pages: layout only. The look comes from hw-ui (hw-card, hw-table, hw-alert, hw-tag,
+   hw-heading, hw-caption). Shared by Lab, LabRuns, Research, ResearchAgentSection, Pipeline, Overview
+   and WardResearch. */
+
 .main {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--sp-4);
-  max-width: 1040px;
+  align-content: start;
+  gap: var(--hw-space-5);
+  max-width: var(--ward-max);
   margin: 0 auto;
-  padding: var(--sp-5) var(--sp-4);
+  padding: var(--hw-space-6) var(--hw-space-5) var(--hw-space-8);
 }
 
-.title {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 20px;
-  font-weight: 400;
-  line-height: 1.2;
-}
-
-.banner {
-  margin: 0;
-  padding: var(--sp-2) var(--sp-3);
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--alert);
-  background: var(--alert-tint);
-  border-radius: var(--radius);
-}
-
-.card {
-  padding: var(--sp-4);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-
-.heading {
-  margin: 0 0 var(--sp-2);
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.card p,
-.card li {
-  margin: 0 0 var(--sp-2);
-  font-size: 13px;
-  line-height: 1.5;
-}
-
+/* A kit card that holds running text: space between its blocks, and room for list markers. */
+.card > * + * { margin-top: var(--hw-space-3); }
 .card ul,
-.card ol {
-  margin: 0;
-  padding-left: var(--sp-4);
+.card ol { display: grid; gap: var(--hw-space-2); padding-left: var(--hw-space-6); }
+
+/* A row of facts and actions: Read at, As of, Refresh. */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hw-space-2) var(--hw-space-4);
 }
 
-.scroll {
-  overflow-x: auto;
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-}
-
-.table caption {
-  padding-bottom: var(--sp-2);
-  font-size: 12px;
+/* Tables: the kit table; these only place the caption and keep the first column readable. */
+.caption {
+  padding-bottom: var(--hw-space-3);
   text-align: left;
-  color: var(--label);
 }
 
-.table th {
-  padding: 0 var(--sp-3) var(--sp-2) 0;
-  font-size: 11px;
-  font-weight: 500;
-  text-align: right;
-  vertical-align: bottom;
-  color: var(--label);
+/* Research tables: wide enough that a header wraps by phrase, not by word; the region scrolls. The
+   caption keeps to the region's visible width (the region is the query container). */
+.wrap { container-type: inline-size; }
+.wrap .caption > span { display: block; max-width: 100cqi; }
+.table { min-width: 760px; }
+.table thead th { vertical-align: bottom; }
+.table thead th:first-child,
+.table tbody th { min-width: 180px; }
+
+/* Words, not figures: on one line; a long row scrolls inside the table's own region. */
+.nowrap th,
+.nowrap td { white-space: nowrap; }
+
+/* A table that is the card itself: the card's padding goes, so the header band reaches its edges. */
+.tableCard {
+  --hw-card-pad: 0;
+}
+.tableCard .caption { padding: var(--hw-space-4) var(--hw-space-5) var(--hw-space-3); }
+
+.sub { color: var(--hw-color-text-subtle); }
+
+/* NEWS2 level, in words and in the clinical colour: 7+ emergency, 5-6 or a single 3 urgent. */
+.level[data-level="high"],
+.level[data-level="medium"],
+.level[data-level="low_medium"] { font-weight: var(--hw-weight-semibold); }
+.level[data-level="high"] { color: var(--hw-graph-emergency-text); }
+.level[data-level="medium"],
+.level[data-level="low_medium"] { color: var(--hw-graph-urgent-text); }
+
+/* The lab's places, as kit tiles. */
+.places {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--hw-space-4);
+  list-style: none;
+}
+.places:empty { display: none; }
+.places > li { display: grid; } /* the tile fills its cell: one row, one height */
+.places a:hover { text-decoration: none; }
+
+/* A plain list of links under a page. */
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hw-space-2) var(--hw-space-5);
+  list-style: none;
 }
 
-.table td,
-.table tbody th {
-  padding: var(--sp-2) var(--sp-3) var(--sp-2) 0;
-  border-top: 1px solid var(--border);
-  text-align: right;
+@media (width < 576px) {
+  .main { padding-inline: var(--hw-space-4); }
 }
 
-.table th:first-child,
-.table tbody th {
-  min-width: 180px;
-  text-align: left;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ink);
-}
-
-.sub {
-  color: var(--label);
-}
-
-.small {
-  font-size: 12px;
-  color: var(--label);
+/* The research agent's questions and proposals: one entry per item, a rule between them. */
+.card .entries { gap: 0; }
+.entries > li { display: grid; gap: var(--hw-space-2); padding: var(--hw-space-4) 0; }
+.entries > li + li { border-top: 1px solid var(--hw-color-border-subtle); }
+.question {
+  font-weight: var(--hw-weight-medium);
+  color: var(--hw-color-text);
 }

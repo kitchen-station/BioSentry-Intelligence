@@ -30,14 +30,14 @@ const str = (v: unknown): string | undefined => (v == null ? undefined : typeof 
 function Experiment({ report }: { report: unknown }) {
   const e = rec(rec(report).experiment);
   const [template, tool, args] = [str(e.template), str(e.tool), str(e.args)];
-  if (template === undefined && tool === undefined && args === undefined) return <p className={styles.meta}>The stored record names no experiment.</p>;
+  if (template === undefined && tool === undefined && args === undefined) return <p className="hw-caption">The stored record names no experiment.</p>;
   return (
     <>
-      {template !== undefined && <p className={styles.meta}>Template: {template}</p>}
-      {tool !== undefined && <p className={styles.meta}>Tool: {tool}</p>}
+      {template !== undefined && <p className="hw-caption">Template: {template}</p>}
+      {tool !== undefined && <p className="hw-caption">Tool: {tool}</p>}
       {args !== undefined && (
         <>
-          <p className={styles.meta}>Arguments:</p>
+          <p className="hw-caption">Arguments:</p>
           <pre className={styles.pre}>{args}</pre>
         </>
       )}
@@ -47,17 +47,19 @@ function Experiment({ report }: { report: unknown }) {
 
 function Basis({ scope, q, report }: { scope: Scope; q: QuestionItem; report: unknown }) {
   return (
-    <details className={styles.basis}>
-      <summary>What this is based on</summary>
-      {scope.kind === "ward" ? (
-        <>
-          <Experiment report={report} />
-          {rec(report).grounding === "ok" && <p className={styles.meta}>Every number in the answer was checked against this run&apos;s result.</p>}
-          <pre className={styles.pre} tabIndex={0} aria-label={`Stored record of question ${q.id}`}>{JSON.stringify(report, null, 2)}</pre>
-        </>
-      ) : (
-        <p className={styles.meta}>Answered from this patient&apos;s data.</p>
-      )}
+    <details className={`hw-accordion hw-accordion__item ${styles.basis}`}>
+      <summary className="hw-accordion__summary">What this is based on</summary>
+      <div className={`hw-accordion__body ${styles.basisBody}`}>
+        {scope.kind === "ward" ? (
+          <>
+            <Experiment report={report} />
+            {rec(report).grounding === "ok" && <p className="hw-caption">Every number in the answer was checked against this run&apos;s result.</p>}
+            <pre className={styles.pre} tabIndex={0} aria-label={`Stored record of question ${q.id}`}>{JSON.stringify(report, null, 2)}</pre>
+          </>
+        ) : (
+          <p className="hw-caption">Answered from this patient&apos;s data.</p>
+        )}
+      </div>
     </details>
   );
 }
@@ -85,13 +87,26 @@ export function Thread({ scope, clinicianId, onSignOut }: { scope: Scope; clinic
   const otherRunning = items.some((q) => q.state === "running");
 
   return (
-    <div>
-      <button type="button" className={styles.button} onClick={refresh}>Refresh</button>
-      {error && <p role="alert" className={styles.error}>{error}</p>}
+    <div className={styles.root}>
+      <div className={styles.toolbar}>
+        <button type="button" className="hw-button hw-button--sm" onClick={refresh}>
+          <span className="hw-icon fa-solid fa-rotate" aria-hidden="true" />
+          Refresh
+        </button>
+      </div>
+      {error && (
+        <p role="alert" className="hw-alert hw-alert--danger">
+          <span className="hw-alert__icon hw-icon fa-solid fa-triangle-exclamation" aria-hidden="true" />
+          <span className="hw-alert__body">{error}</span>
+        </p>
+      )}
       {turns.length === 0 ? (
-        <p className={styles.quiet}>No question yet.</p>
+        <div className="hw-empty">
+          <span className="hw-empty__art" aria-hidden="true"><span className="hw-icon fa-regular fa-comments" /></span>
+          <p className="hw-empty__title">No question yet.</p>
+        </div>
       ) : (
-        <ul role="list" className={styles.thread}>
+        <ul role="list" className={styles.turns}>
           {turns.map((q, i) => {
             const d = details[q.id];
             return (
@@ -101,18 +116,18 @@ export function Thread({ scope, clinicianId, onSignOut }: { scope: Scope; clinic
                   <p className={styles.text}>{q.question}</p>
                 </div>
                 <div className={styles.answer}>
-                  <p className={styles.who}>Research agent</p>
+                  <p className={styles.agent}>Research agent</p>
                   {/* Only the state line is announced: an answer is long, and the reader chose to be here. */}
-                  <p className={styles.text} aria-live="polite">{stateLine(q, now, otherRunning)}</p>
+                  <p className={styles.state} aria-live="polite">{stateLine(q, now, otherRunning)}</p>
                   {q.state === "done" &&
                     (d ? (
                       <>
-                        {d.answer ? <pre className={styles.reply}>{d.answer}</pre> : <p className={styles.meta}>No answer text was stored.</p>}
+                        {d.answer ? <pre className={styles.reply}>{d.answer}</pre> : <p className="hw-caption">No answer text was stored.</p>}
                         <Basis scope={scope} q={q} report={d.report} />
-                        <p className={styles.meta}>Synthetic, not validated.</p>
+                        <p className="hw-caption">Synthetic, not validated.</p>
                       </>
                     ) : (
-                      <button type="button" className={styles.button} onClick={() => void loadAnswer(q.id)}>Show answer</button>
+                      <button type="button" className={`hw-button hw-button--sm ${styles.show}`} onClick={() => void loadAnswer(q.id)}>Show answer</button>
                     ))}
                 </div>
               </li>
@@ -122,26 +137,32 @@ export function Thread({ scope, clinicianId, onSignOut }: { scope: Scope; clinic
       )}
 
       <form className={styles.composer} onSubmit={send}>
-        <p className={styles.warning}>
-          <strong>Warning. </strong>
-          {scope.kind === "ward"
-            ? "Do not type anything about a patient: no name, no bed, no id. Every clinician of this ward can read each question, and it is kept."
-            : "The agent sees this patient's data only, with no name. Do not type a name in your question."}
+        <p className="hw-alert hw-alert--warning">
+          <span className="hw-alert__icon hw-icon fa-solid fa-triangle-exclamation" aria-hidden="true" />
+          {/* The bold word and the text share one parent, so the sentence reads as one. */}
+          <span className="hw-alert__body">
+            <strong>Warning. </strong>
+            {scope.kind === "ward"
+              ? "Do not type anything about a patient: no name, no bed, no id. Every clinician of this ward can read each question, and it is kept."
+              : "The agent sees this patient's data only, with no name. Do not type a name in your question."}
+          </span>
         </p>
         {scope.kind === "ward" && (
-          <p className={styles.quiet}>
+          <p className="hw-caption">
             The agent answers from simulated trials only. For example: What if we alerted at a NEWS2 total of 7 or more?
           </p>
         )}
         <div className={styles.row}>
-          <label className={styles.field} htmlFor={`${id}-q`}>
-            Your question
-            <input id={`${id}-q`} type="text" maxLength={MAX} value={text} disabled={mine} onChange={(e) => setText(e.target.value)} />
-            <span className={styles.count} aria-hidden="true">{text.length}/{MAX}</span>
-          </label>
-          <button type="submit" className={styles.button} disabled={!question || sending || mine}>Send</button>
+          <div className={`hw-field hw-field--full ${styles.field}`}>
+            <label className="hw-field__label" htmlFor={`${id}-q`}>Your question</label>
+            <span className="hw-input">
+              <input id={`${id}-q`} className="hw-input__control" type="text" maxLength={MAX} value={text} disabled={mine} onChange={(e) => setText(e.target.value)} />
+              <span className="hw-input__affix hw-caption" aria-hidden="true">{text.length}/{MAX}</span>
+            </span>
+          </div>
+          <button type="submit" className="hw-button hw-button--primary" disabled={!question || sending || mine}>Send</button>
         </div>
-        {mine && <p className={styles.quiet}>Wait for the answer to your last question.</p>}
+        {mine && <p className="hw-caption">Wait for the answer to your last question.</p>}
       </form>
     </div>
   );

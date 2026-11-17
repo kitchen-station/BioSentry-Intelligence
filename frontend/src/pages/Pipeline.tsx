@@ -13,6 +13,14 @@ interface Props {
 
 type Tiers = readonly { tier: string; live: boolean }[] | "loading" | "failed";
 
+// Live in the ranking reads as done, research only as information; the rest stays grey.
+const TAG: Record<StageState, string> = {
+  "live in the ranking": "hw-tag hw-tag--success",
+  "shown, does not change the ranking": "hw-tag",
+  "research only, offline": "hw-tag hw-tag--info",
+  planned: "hw-tag",
+};
+
 const SOURCE = {
   loading: "Reading the ward's tier status.",
   ok: "NEWS2 state from this ward's tier status. Other states from the page's own record.",
@@ -42,25 +50,31 @@ export function Pipeline({ session, onSignOut }: Props) {
 
   return (
     <LabFrame session={session} onSignOut={onSignOut}>
-      <main className={research.main}>
-        <h1 className={research.title}>The pipeline</h1>
-        <p role="note" className={research.banner}>Synthetic, not validated.</p>
-        <p className={research.small}>
+      <div className={research.main}>
+        <h1 className="hw-heading hw-heading--3">The pipeline</h1>
+        <p role="note" className="hw-alert">
+          <span className="hw-alert__icon hw-icon fa-solid fa-circle-info" aria-hidden="true" />
+          <span className="hw-alert__body">Synthetic, not validated.</span>
+        </p>
+        <p className="hw-caption">
           {tiers === "loading" ? SOURCE.loading : tiers === "failed" ? SOURCE.failed : SOURCE.ok}
         </p>
         <ol role="list" className={styles.stages}>
-          {PIPELINE.map((s, i) => (
-            <li key={s.id} className={`${research.card} ${s.decides ? styles.decides : ""}`}>
-              <h2 className={research.heading}>
-                <span aria-hidden="true" className={styles.num}>{i + 1}</span>
-                {s.name}
-              </h2>
-              <span className={styles.state}>{stateOf(s.tier, s.state)}</span>
-              {s.text.map((t) => <p key={t}>{t}</p>)}
-            </li>
-          ))}
+          {PIPELINE.map((s, i) => {
+            const state = stateOf(s.tier, s.state);
+            return (
+              <li key={s.id} className={`hw-card hw-card--outlined ${research.card} ${styles.stage}`} data-decides={s.decides}>
+                <h2 className={`hw-heading hw-heading--4 ${styles.name}`}>
+                  <span aria-hidden="true" className={styles.num}>{i + 1}</span>
+                  {s.name}
+                </h2>
+                <span className={TAG[state]}>{state}</span>
+                {s.text.map((t) => <p key={t}>{t}</p>)}
+              </li>
+            );
+          })}
         </ol>
-      </main>
+      </div>
     </LabFrame>
   );
 }

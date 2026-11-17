@@ -72,26 +72,38 @@ export function ChatBubble({ session, onSignOut }: { session: Session; onSignOut
       {open && (
         <>
           <div className={styles.backdrop} data-testid="chat-backdrop" onClick={close} />
-          <div ref={panel} role="dialog" aria-modal="true" aria-labelledby={title} className={styles.panel}>
-            <div className={styles.head}>
-              <h2 id={title} className={styles.title}>{patientId ? "Ask about this patient" : "Ask about the ward"}</h2>
-              <button type="button" className={styles.close} aria-label="Close the chat" onClick={close}>&times;</button>
+          {/* The kit's drawer look on React's dialog: the focus, Escape and Tab handling above are its behaviour. */}
+          <div ref={panel} role="dialog" aria-modal="true" aria-labelledby={title} className={`hw-dialog hw-dialog--drawer ${styles.panel}`}>
+            <div className="hw-dialog__header">
+              <h2 id={title} className="hw-dialog__title">{patientId ? "Ask about this patient" : "Ask about the ward"}</h2>
+              <button type="button" className="hw-close" aria-label="Close the chat" onClick={close}>
+                <span className="hw-icon fa-solid fa-xmark" aria-hidden="true" />
+              </button>
             </div>
-            {asks && (
-              <p className={styles.link}>
-                <Link to={patientId ? `/ask/patient/${patientId}` : "/ask"}>Open as a page</Link>
-              </p>
-            )}
-            <Thread
-              key={patientId ?? "ward"}
-              scope={patientId ? { kind: "patient", id: patientId } : { kind: "ward" }}
-              clinicianId={session.clinician_id}
-              onSignOut={onSignOut}
-            />
+            <div className={`hw-dialog__body ${styles.body}`}>
+              {asks && (
+                <p className="hw-caption">
+                  <Link to={patientId ? `/ask/patient/${patientId}` : "/ask"}>Open as a page</Link>
+                </p>
+              )}
+              <Thread
+                key={patientId ?? "ward"}
+                scope={patientId ? { kind: "patient", id: patientId } : { kind: "ward" }}
+                clinicianId={session.clinician_id}
+                onSignOut={onSignOut}
+              />
+            </div>
           </div>
         </>
       )}
-      <button ref={trigger} type="button" className={styles.bubble} aria-expanded={open} onClick={() => (open ? close() : setOpenAt(pathname))}>
+      <button
+        ref={trigger}
+        type="button"
+        className={`hw-button hw-button--primary hw-button--lg ${styles.bubble}`}
+        aria-expanded={open}
+        onClick={() => (open ? close() : setOpenAt(pathname))}
+      >
+        <span className="hw-icon fa-solid fa-comments" aria-hidden="true" />
         Ask
       </button>
     </>

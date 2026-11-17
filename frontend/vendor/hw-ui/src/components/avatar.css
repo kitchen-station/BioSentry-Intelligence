@@ -1,0 +1,24 @@
+@layer hw.components {
+  .hw-avatar {
+    --hw-avatar-size: 32px;
+
+    display: inline-grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: var(--hw-avatar-size);
+    height: var(--hw-avatar-size);
+    overflow: hidden;
+    font-size: calc(var(--hw-avatar-size) * .4);
+    font-weight: var(--hw-weight-semibold);
+    color: var(--hw-color-text);
+    background: var(--hw-color-surface-subtle);
+    border-radius: 50%;
+  }
+  .hw-avatar--sm { --hw-avatar-size: 24px; }
+  .hw-avatar--lg { --hw-avatar-size: 48px; }
+  .hw-avatar--self { color: var(--hw-color-brand-text); background: var(--hw-color-brand-subtle); }
+  .hw-avatar > img { width: 100%; height: 100%; object-fit: cover; }
+  .hw-avatar-stack { display: flex; }
+  .hw-avatar-stack > .hw-avatar { box-shadow: 0 0 0 2px var(--hw-color-surface); }
+  .hw-avatar-stack > .hw-avatar + .hw-avatar { margin-left: -6px; }
+}

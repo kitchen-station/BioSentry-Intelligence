@@ -1,44 +1,39 @@
-/* The Ask page: its heading, the thread picker and one quiet line. The thread has its own styles. */
+/* Ask: layout only. Look comes from hw-ui (hw-button pills for the threads, hw-card around the thread). */
 
-.title {
-  margin: 0 0 var(--sp-3);
-  font-family: var(--font-display);
-  font-weight: 500;
-  font-size: 28px;
-  color: var(--ink);
+.container {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--hw-space-6) var(--hw-space-5) var(--hw-space-8);
 }
 
-.quiet {
-  font-family: var(--font-sans);
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--label);
+.threads {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hw-space-3);
+  margin: var(--hw-space-5) 0;
 }
 
 .picker {
   list-style: none;
-  margin: 0;
-  padding: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: var(--sp-2);
+  gap: var(--hw-space-3);
 }
 
-.pick {
-  display: inline-block;
-  padding: var(--sp-1) var(--sp-3);
-  font-family: var(--font-sans);
-  font-size: 13px;
-  color: var(--ink);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  text-decoration: none;
-  overflow-wrap: anywhere;
-}
+.pick:hover { text-decoration: none; }
 
-/* The current thread is told by a heavy border and bold type, not by colour alone. */
+/* The current thread is told by a heavier edge and semibold type, not by colour alone. */
 .pick[aria-current="page"] {
-  font-weight: 700;
-  border: 2px solid var(--primary);
+  --hw-button-border: var(--hw-color-text);
+  --hw-button-border-hover: var(--hw-color-text);
+
+  font-weight: var(--hw-weight-semibold);
+  box-shadow: inset 0 0 0 1px var(--hw-color-text);
+}
+
+/* The composer sticks to the bottom of the screen, flush with the card's edge. */
+.chat { padding-bottom: 0; }
+
+@media (width < 576px) {
+  .container { padding-inline: var(--hw-space-4); }
 }

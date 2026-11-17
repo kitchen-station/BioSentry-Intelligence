@@ -1,17 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useParams, Link } from "react-router-dom";
+import { closeDialog } from "hw-ui";
 import type { ClinicalNote, PatientDetail as PatientDetailType, Session, SessionRole, VitalsRecorded } from "../types";
 import { getPatient, getNotes, addNote, canRecordVitals, hasHistory, hasPatientQuestions, usesServer } from "../api";
 import { Flip } from "../components/Flip";
-import { SessionMenu } from "../components/SessionMenu";
+import { AppShell } from "../components/AppShell";
 import { SimulatedNote } from "../components/LabFrame";
 import { StayPanel } from "../components/StayPanel";
 import { since, syncWardNow, useWardNow } from "../components/wardNow";
 import { AskPatient } from "../components/AskPatient";
-import { BaselinePanel, isComputed, isObj, num } from "../components/BaselinePanel";
+import { BaselinePanel, BaselineRange, bands } from "../components/BaselinePanel";
 import { ResearchModels } from "../components/ResearchModels";
-import { useBaseline, type BaselineState } from "../components/useBaseline";
+import { useBaseline } from "../components/useBaseline";
 import { CurrentVitals, VitalRow } from "../components/CurrentVitals";
 import { TrendChart } from "../components/TrendChart";
 import { formatClock, formatClockSeconds, formatSimClock, patchInUse } from "../components/format";
@@ -23,23 +24,12 @@ import styles from "./PatientDetail.module.css";
 
 // --- Shared sub-components ---
 
-// The patient's own band for one vital, from the answer the page already loaded. An older server
-// without the two fields, a vital still forming, a build without the route and an answer of an
-// odd shape give no band (the panel words each case; the page never blanks).
-function bandOf(baseline: BaselineState, vital: string) {
-  const b: unknown = baseline;
-  if (!isObj(b) || !Array.isArray(b.vitals)) return undefined;
-  const v: unknown = b.vitals.find((x) => isObj(x) && x.vital === vital);
-  if (!isObj(v) || v.status !== "computed" || !isComputed(v) || !num(v.band_low) || !num(v.band_high)) return undefined;
-  return { low: v.band_low, high: v.band_high, flagged: v.significant };
-}
-
 // The read serves every stored bin, so the title says the span of what is drawn.
 function trendTitle(history: PatientDetailType["vital_history"]) {
   const ms = Object.values(history).flatMap((pts) => pts.map((p) => Date.parse(p.time))).filter(Number.isFinite);
   if (ms.length === 0) return "Vital trends";
   const h = Math.floor((Math.max(...ms) - Math.min(...ms)) / 3_600_000);
-  return `Vital trends \u00b7 ${h < 1 ? "under 1 h" : `${h} h`}`;
+  return `Vital trends · ${h < 1 ? "under 1 h" : `${h} h`}`;
 }
 
 // The lab rows the page draws, in order. Other lab keys the server may send have no row.
@@ -69,21 +59,35 @@ const MODEL_RULES = new Set<string>(["prediction_model_flag"]);
 
 const ROLE_LABEL: Record<SessionRole, string> = { rn: "RN", charge_rn: "Charge RN", md: "MD", admin: "Admin" };
 
-// The top strip and quiet line for the states with no patient to show.
+// An icon is a span, never <i>, and never carries meaning alone.
+const Icon = ({ name, alert }: { name: string; alert?: boolean }) => (
+  <span className={`${alert ? "hw-alert__icon " : ""}hw-icon fa-solid fa-${name}`} aria-hidden="true" />
+);
+
+// The way back to the ward, above the content.
+function Crumbs({ current }: { current: string }) {
+  return (
+    <nav aria-label="Breadcrumb" className={styles.crumbs}>
+      <ol className="hw-breadcrumb">
+        <li>
+          <Link to="/ward"><Icon name="arrow-left" /> Ward view</Link>
+        </li>
+        <li><span aria-current="page">{current}</span></li>
+      </ol>
+    </nav>
+  );
+}
+
+// The shell and quiet line for the states with no patient to show.
 function Bare({ session, onSignOut, children }: { session: Session; onSignOut: () => void; children?: ReactNode }) {
   return (
-    <div className={styles.page}>
-      <div className={styles.statusStrip}>
-        <div className={styles.stripInner}>
-          <Link to="/ward" className={styles.back}>&larr; Ward view</Link>
-          <div className={styles.stripRight}>
-            <SessionMenu session={session} onSignOut={onSignOut} />
-          </div>
-        </div>
-      </div>
+    <AppShell session={session} onSignOut={onSignOut} title="Patient">
       <SimulatedNote />
-      <main>{children}</main>
-    </div>
+      <div className={styles.container}>
+        <Crumbs current="Patient" />
+        {children}
+      </div>
+    </AppShell>
   );
 }
 
@@ -107,6 +111,8 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
   const [entering, setEntering] = useState(false);
   const [unranked, setUnranked] = useState<string | null>(null);
   const [refreshFailed, setRefreshFailed] = useState(false);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const drawerTitle = useId();
 
   // The first read decides "not found" or "could not be loaded". A timed read only replaces the
   // patient: it never touches the drawer, the note box or the vitals form, and says what went wrong
@@ -161,6 +167,11 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
     getNotes(id).then(setNotes).catch(() => setNoteError("Notes could not be loaded."));
   }, [readOnly, drawer, id]);
 
+  // The drawer is a native modal <dialog>: focus is held inside it and Esc closes it.
+  useEffect(() => {
+    if (drawer && dialog.current && !dialog.current.open) dialog.current.showModal();
+  }, [drawer]);
+
   const handleAddNote = async () => {
     if (!id || !noteText.trim() || submitting) return;
     setSubmitting(true);
@@ -193,7 +204,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
   if (notFound) {
     return (
       <Bare session={session} onSignOut={onSignOut}>
-        <p>Patient not found.</p>
+        <p className={styles.bare}>Patient not found.</p>
         <Link to="/ward">Back to ward</Link>
       </Bare>
     );
@@ -202,7 +213,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
   if (loadError) {
     return (
       <Bare session={session} onSignOut={onSignOut}>
-        <p role="alert">This patient could not be loaded. Check the connection and reload.</p>
+        <p role="alert" className={styles.bare}>This patient could not be loaded. Check the connection and reload.</p>
         <Link to="/ward">Back to ward</Link>
       </Bare>
     );
@@ -210,310 +221,346 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
 
   if (!patient) return <Bare session={session} onSignOut={onSignOut} />;
 
-  const hrBand = bandOf(baseline, "heart_rate");
-  const rrBand = bandOf(baseline, "respiratory_rate");
-  const spo2Band = bandOf(baseline, "spo2");
+  // The patient's own band for each charted vital, from the answer the page already loaded.
+  const own = bands(baseline);
+  const bandOf = (vital: string) => {
+    const v = own.find((x) => x.vital === vital);
+    return v && { low: v.band_low, high: v.band_high, flagged: v.significant };
+  };
+  const hrBand = bandOf("heart_rate");
+  const rrBand = bandOf("respiratory_rate");
+  const spo2Band = bandOf("spo2");
   // A model flag is a reason line on the row, but it does not put the patient where they are: the page
   // lists it apart, and "Sorted on NEWS2 only" stays true when no other reason exists.
   const reasons = patient.escalation_reasons.filter((r) => !MODEL_RULES.has(r.rule));
   const modelReasons = patient.escalation_reasons.filter((r) => MODEL_RULES.has(r.rule));
   const signal = patchInUse(patient.vitals) ? patient.signal_quality : null;
+  const level = band(patient);
+  const anyLab = LAB_ROWS.some(([key]) => patient.labs[key]);
+  const cannotReach = failedSince !== null && `Cannot reach the ward server since ${formatClock(since(failedSince))}.`;
+
+  const status = (
+    <>
+      {sim !== null && (
+        <span className={styles.statusItem} role="group" aria-label="Ward clock">
+          <span className={styles.statusLabel}>Ward clock</span>{" "}
+          <span className={styles.statusValue}><Flip>{formatSimClock(sim)}</Flip></span>
+        </span>
+      )}
+      <span className={styles.statusItem} data-tone={signal === null ? "warn" : undefined}>
+        <Icon name="signal" />
+        {signal === null ? "No patch signal" : `Signal ${signal}%`}
+      </span>
+      <span className={styles.statusItem} data-wide="">{formatClockSeconds(now)}</span>
+      <span className={styles.statusItem} data-wide="">{patient.id}</span>
+    </>
+  );
 
   return (
-    <div className={styles.page}>
-      {/* Status strip */}
-      <div className={styles.statusStrip}>
-        <div className={styles.stripInner}>
-          <Link to="/ward" className={styles.back}>&larr; Ward view</Link>
-          <div className={styles.stripRight}>
-            {sim !== null && (
-              <span className={styles.stripSignal} role="group" aria-label="Ward clock">
-                Ward clock <Flip>{formatSimClock(sim)}</Flip>
-              </span>
-            )}
-            <span className={styles.stripSignal}>
-              {signal === null ? "No patch signal" : `Signal ${signal}%`}
-            </span>
-            <span className={styles.stripUpdate}>
-              {formatClockSeconds(now)}
-            </span>
-            <span className={styles.stripId}>{patient.id}</span>
-            <SessionMenu session={session} onSignOut={onSignOut} />
+    <AppShell session={session} onSignOut={onSignOut} title={patient.name} status={status}>
+      <SimulatedNote />
+      <div className={styles.container}>
+        <div className={styles.top}>
+          <Crumbs current={patient.name} />
+          <div className={styles.actions}>
+            <button type="button" className="hw-button hw-button--sm" aria-expanded={drawer === "notes"} onClick={() => toggleDrawer("notes")}>
+              <Icon name="note-sticky" />
+              Notes{notes.length > 0 ? ` (${notes.length})` : ""}
+            </button>
+            <button type="button" className="hw-button hw-button--sm" aria-expanded={drawer === "charts"} onClick={() => toggleDrawer("charts")}>
+              <Icon name="chart-line" />
+              Charts
+            </button>
           </div>
         </div>
-      </div>
-      <SimulatedNote />
 
-      {/* Summary bar: NEWS2 + escalation reasons (no rank, no tier badge) */}
-      <div className={styles.summaryBar}>
-        {unranked !== null && (
-          <p className={styles.summaryLabel}>No longer ranked. The figures below are from before this entry.</p>
-        )}
-        {/* Here, not in a panel: the big score must not look current when it is not. */}
-        {failedSince !== null && (
-          <p className={styles.summaryLabel} role="status">Cannot reach the ward server since {formatClock(since(failedSince))}.</p>
-        )}
-        {staleSince !== null && unranked === null && (
-          <p className={styles.summaryLabel} role="status">
-            No longer on your ranked list. Figures from {formatClock(lastGood ?? since(staleSince))}.{" "}
-            <Link to="/ward">Back to ward</Link>
-          </p>
-        )}
-        <div className={styles.summaryRow}>
-          <div className={styles.summaryInner}>
-            <div className={styles.summaryBlock} data-band={band(patient)}>
-              <span className={styles.summaryLabel}>NEWS2</span>
-              <span className={styles.summaryBig}><Flip>{patient.score}</Flip></span>
+        {/* Summary: NEWS2, the next step, the signal and why the patient is up (no rank, no tier badge) */}
+        <div className={styles.summaryBar}>
+          {unranked !== null && (
+            <p className={`hw-alert ${styles.line}`}>
+              <span className="hw-alert__body">No longer ranked. The figures below are from before this entry.</span>
+            </p>
+          )}
+          {/* Here, not in a panel: the big score must not look current when it is not. */}
+          {cannotReach && (
+            <p className={`hw-alert hw-alert--warning ${styles.line}`} role="status">
+              <Icon name="triangle-exclamation" alert />
+              <span className="hw-alert__body">{cannotReach}</span>
+            </p>
+          )}
+          {staleSince !== null && unranked === null && (
+            <p className={`hw-alert hw-alert--warning ${styles.line}`} role="status">
+              <Icon name="triangle-exclamation" alert />
+              <span className="hw-alert__body">
+                No longer on your ranked list. Figures from {formatClock(lastGood ?? since(staleSince))}.{" "}
+                <Link to="/ward">Back to ward</Link>
+              </span>
+            </p>
+          )}
+          <div className={styles.summary}>
+            <div className={`hw-stat ${styles.stat}`} data-band={level}>
+              <span className="hw-stat__label">NEWS2</span>
+              <span className={`hw-stat__value ${styles.big}`}><Flip>{patient.score}</Flip></span>
             </div>
-            {band(patient) !== "low" && (
-              <div className={styles.summaryBlock} data-band={band(patient)} data-kind="response">
-                <span className={styles.summaryLabel}>Next step</span>
-                <span className={styles.responseText}>{response(band(patient), role)}</span>
+            {level !== "low" && (
+              <div className={`hw-stat ${styles.stat}`} data-band={level} data-kind="response">
+                <span className="hw-stat__label">Next step</span>
+                <span className={styles.step}>{response(level, role)}</span>
               </div>
             )}
-            {band(patient) === "low" && reasons.some((r) => r.rule === "tier_b_finding") && (
-              <div className={styles.summaryBlock} data-band="low" data-kind="response">
-                <span className={styles.summaryLabel}>Next step</span>
-                <span className={styles.responseText}>{driftResponse(role, patient.score)}</span>
+            {level === "low" && reasons.some((r) => r.rule === "tier_b_finding") && (
+              <div className={`hw-stat ${styles.stat}`} data-band="low" data-kind="response">
+                <span className="hw-stat__label">Next step</span>
+                <span className={styles.step}>{driftResponse(role, patient.score)}</span>
               </div>
             )}
-            <div className={styles.summaryBlock} data-signal={signal === null ? "none" : signal > 90 ? "good" : "degraded"}>
-              <span className={styles.summaryLabel}>Signal</span>
-              <span className={styles.summaryBig}>{signal === null ? "No patch" : `${signal}%`}</span>
+            <div className={`hw-stat ${styles.stat}`} data-signal={signal === null ? "none" : signal > 90 ? "good" : "degraded"}>
+              <span className="hw-stat__label">Signal</span>
+              <span className={`hw-stat__value ${styles.big}`}>{signal === null ? "No patch" : `${signal}%`}</span>
             </div>
-            <div className={styles.reasonBlock}>
-              <span className={styles.summaryLabel}>Why this patient is up</span>
+            <div className={`hw-stat ${styles.stat} ${styles.why}`}>
+              <span className="hw-stat__label">Why this patient is up</span>
               {reasons.length > 0 ? (
-                <div className={styles.reasonList}>
+                <div className={styles.tags}>
                   {reasons.map((r, i) => (
-                    <span key={i} className={styles.reasonTag}>
+                    <span key={i} className={`hw-tag ${styles.reason}`}>
                       {r.text}
-                      {r.pathway && <span className={styles.reasonPathway}> ({r.pathway})</span>}
+                      {r.pathway && <span className={styles.pathway}> ({r.pathway})</span>}
                     </span>
                   ))}
                 </div>
               ) : (
-                <span className={styles.reasonNone}>Sorted on NEWS2 only</span>
+                <span className={styles.none}>Sorted on NEWS2 only</span>
               )}
               {modelReasons.length > 0 && (
                 <>
-                  <span className={styles.summaryLabel}>Prediction models · rank unchanged</span>
-                  <div className={styles.reasonList}>
+                  <span className={`hw-stat__label ${styles.modelLabel}`}>Prediction models · rank unchanged</span>
+                  <div className={styles.tags}>
                     {modelReasons.map((r) => (
-                      <span key={r.rule} className={styles.reasonTag}>{r.text}</span>
+                      <span key={r.rule} className={`hw-tag ${styles.reason}`}>{r.text}</span>
                     ))}
                   </div>
                 </>
               )}
             </div>
           </div>
-          <div className={styles.drawerButtons}>
-            <button
-              type="button"
-              className={`${styles.drawerBtn} ${drawer === "notes" ? styles.drawerBtnActive : ""}`}
-              onClick={() => toggleDrawer("notes")}
-            >
-              Notes{notes.length > 0 ? ` (${notes.length})` : ""}
-            </button>
-            <button
-              type="button"
-              className={`${styles.drawerBtn} ${drawer === "charts" ? styles.drawerBtnActive : ""}`}
-              onClick={() => toggleDrawer("charts")}
-            >
-              Charts
-            </button>
-          </div>
         </div>
-      </div>
-      {readOnly && <p className={styles.readOnly}>Read-only. Views are recorded in the audit log.</p>}
+        {readOnly && (
+          <p className={`hw-alert ${styles.line} ${styles.readOnly}`}>
+            <span className="hw-alert__body">Read-only. Views are recorded in the audit log.</span>
+          </p>
+        )}
 
-      {/* Overlay panels */}
-      {drawer && (
-        <div className={styles.overlay}>
-          <div className={styles.overlayBackdrop} onClick={() => setDrawer(null)} />
-          <div className={styles.overlayPanel}>
-            <div className={styles.overlayHeader}>
-              <span className={styles.overlayTitle}>
-                {drawer === "notes" ? `Clinical notes${notes.length > 0 ? ` \u00b7 ${notes.length}` : ""}` : trendTitle(patient.vital_history)}
-              </span>
-              {failedSince !== null && (
-                <span>Cannot reach the ward server since {formatClock(since(failedSince))}.</span>
+        {/* Notes and charts: a drawer from the right (full screen on a phone) */}
+        {drawer && (
+          <dialog
+            ref={dialog}
+            className="hw-dialog hw-dialog--drawer"
+            aria-labelledby={drawerTitle}
+            onClose={() => setDrawer(null)}
+            onCancel={(e) => {
+              e.preventDefault(); // Esc: animate out, then close
+              void closeDialog(e.currentTarget);
+            }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) void closeDialog(e.currentTarget); // the backdrop
+            }}
+          >
+            <div className="hw-dialog__header">
+              <h2 id={drawerTitle} className="hw-dialog__title">
+                {drawer === "notes" ? `Clinical notes${notes.length > 0 ? ` · ${notes.length}` : ""}` : trendTitle(patient.vital_history)}
+              </h2>
+              <button type="button" className="hw-close" aria-label={`Close ${drawer}`} onClick={(e) => void closeDialog(e.currentTarget.closest("dialog"))}>
+                <Icon name="xmark" />
+              </button>
+            </div>
+            <div className={`hw-dialog__body ${styles.drawerBody}`}>
+              {cannotReach && (
+                <p className="hw-alert hw-alert--warning">
+                  <Icon name="triangle-exclamation" alert />
+                  <span className="hw-alert__body">{cannotReach}</span>
+                </p>
               )}
-              <button type="button" className={styles.overlayClose} onClick={() => setDrawer(null)}>&times;</button>
+
+              {drawer === "notes" && (
+                <>
+                  {!readOnly && (
+                    <div className={styles.noteInput}>
+                      <div className="hw-textarea">
+                        <textarea
+                          className="hw-textarea__control"
+                          placeholder="Add a clinical note..."
+                          value={noteText}
+                          onChange={(e) => setNoteText(e.target.value)}
+                          rows={2}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleAddNote();
+                          }}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className="hw-button hw-button--primary"
+                        onClick={handleAddNote}
+                        disabled={!noteText.trim() || submitting}
+                      >
+                        Add note
+                      </button>
+                    </div>
+                  )}
+                  {noteError !== null && <p role="alert" className="hw-alert hw-alert--danger"><span className="hw-alert__body">{noteError}</span></p>}
+                  {notes.length > 0 && (
+                    <ol className="hw-timeline">
+                      {notes.map((note) => (
+                        <li key={note.id} className="hw-timeline__item">
+                          <span className="hw-timeline__time">{formatClock(Date.parse(note.timestamp))}</span>
+                          <span className={styles.noteMeta}>
+                            <span className={styles.noteAuthor}>{note.author}</span>
+                            <span className="hw-tag">{note.role}</span>
+                          </span>
+                          <p className={styles.noteContent}>{note.content}</p>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </>
+              )}
+
+              {drawer === "charts" && (
+                <>
+                  <TrendChart
+                    data={patient.vital_history.heart_rate}
+                    label="Heart rate"
+                    unit="bpm"
+                    warningHigh={90}
+                    warningLow={51}
+                    band={hrBand}
+                  />
+                  <TrendChart
+                    data={patient.vital_history.respiratory_rate}
+                    label="Respiratory rate"
+                    unit="/min"
+                    warningHigh={20}
+                    warningLow={12}
+                    band={rrBand}
+                  />
+                  <TrendChart
+                    data={patient.vital_history.spo2}
+                    label="SpO2"
+                    unit="%"
+                    warningLow={94}
+                    band={spo2Band}
+                  />
+                  {(hrBand || rrBand || spo2Band) && (
+                    <p className="hw-caption">
+                      Own baseline: this patient's own baseline (synthetic, not validated). Not a normal range.
+                    </p>
+                  )}
+                  <p className="hw-caption">
+                    Charts show patch data only. Values entered by a nurse are not plotted.
+                  </p>
+                </>
+              )}
+            </div>
+          </dialog>
+        )}
+
+        <div className={styles.layout}>
+          {/* Left: identity, score and the research panels, all open (density over progressive disclosure) */}
+          <div className={styles.column}>
+            <div className="hw-card hw-card--outlined">
+              <p className={styles.eyebrow}>Patient</p>
+              <h1 className={styles.patientName}>{patient.name}</h1>
+              <p className={styles.patientSub}>
+                {patient.age ?? "--"} {patient.sex ?? "--"} &middot; Bed {patient.bed}
+              </p>
+              <p className={styles.admitting}>{patient.admitting_context}</p>
             </div>
 
-            {drawer === "notes" && (
-              <>
-                {!readOnly && <div className={styles.noteInput}>
-                  <textarea
-                    className={styles.noteTextarea}
-                    placeholder="Add a clinical note..."
-                    value={noteText}
-                    onChange={(e) => setNoteText(e.target.value)}
-                    rows={2}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleAddNote();
-                    }}
-                  />
-                  <button
-                    className={styles.noteSubmit}
-                    onClick={handleAddNote}
-                    disabled={!noteText.trim() || submitting}
-                  >
-                    Add note
-                  </button>
-                </div>}
-                {noteError !== null && <p role="alert">{noteError}</p>}
-                {notes.length > 0 && (
-                  <div className={styles.notesList}>
-                    {notes.map((note) => (
-                      <div key={note.id} className={styles.noteItem}>
-                        <div className={styles.noteMeta}>
-                          <span className={styles.noteAuthor}>{note.author}</span>
-                          <span className={styles.noteRole}>{note.role}</span>
-                          <span className={styles.noteTime}>
-                            {formatClock(Date.parse(note.timestamp))}
-                          </span>
-                        </div>
-                        <p className={styles.noteContent}>{note.content}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
+            <div className="hw-card hw-card--outlined">
+              <p className={styles.eyebrow}>NEWS2</p>
+              <p className={styles.scoreBlock} data-band={level}>
+                <span className={styles.scoreValue}>{patient.score}</span>
+                <span className={styles.scoreLabel}>NEWS2</span>
+              </p>
+            </div>
 
-            {drawer === "charts" && (
-              <div className={styles.chartGrid}>
-                <TrendChart
-                  data={patient.vital_history.heart_rate}
-                  label="Heart rate"
-                  color="var(--trace-hr)"
-                  unit="bpm"
-                  warningHigh={90}
-                  warningLow={51}
-                  band={hrBand}
+            <div className="hw-card hw-card--outlined">
+              <p className={styles.eyebrow}>Own baseline</p>
+              <BaselineRange baseline={baseline} />
+              <BaselinePanel baseline={baseline} />
+              <ResearchModels models={patient.models} />
+            </div>
+          </div>
+
+          {/* Right: vitals, the stay, asking, labs (always visible) */}
+          <div className={styles.column}>
+            <div className="hw-card hw-card--outlined">
+              <p className={styles.eyebrow}>Current vitals</p>
+              <dl className={styles.vitalsGrid}>
+                <CurrentVitals vitals={patient.vitals} now={now} />
+              </dl>
+              {canRecordVitals && !readOnly && (
+                <button type="button" className={`hw-button hw-button--sm ${styles.record}`} aria-expanded={entering} onClick={() => setEntering((open) => !open)}>
+                  <Icon name="heart-pulse" />
+                  Record vitals
+                </button>
+              )}
+              {canRecordVitals && !readOnly && entering && (
+                <VitalsEntry
+                  patientId={patient.id}
+                  patientName={patient.name}
+                  clinicianId={session.clinician_id}
+                  onRecorded={handleRecorded}
+                  onClose={() => setEntering(false)}
                 />
-                <TrendChart
-                  data={patient.vital_history.respiratory_rate}
-                  label="Respiratory rate"
-                  color="var(--trace-rr)"
-                  unit="/min"
-                  warningHigh={20}
-                  warningLow={12}
-                  band={rrBand}
-                />
-                <TrendChart
-                  data={patient.vital_history.spo2}
-                  label="SpO2"
-                  color="var(--trace-spo2)"
-                  unit="%"
-                  warningLow={94}
-                  band={spo2Band}
-                />
-                {(hrBand || rrBand || spo2Band) && (
-                  <p className={styles.pending}>
-                    Shaded: this patient's own baseline (synthetic, not validated). Not a normal range.
-                  </p>
-                )}
-                <p className={styles.pending}>
-                  Charts show patch data only. Values entered by a nurse are not plotted.
+              )}
+              {refreshFailed && (
+                <p role="alert" className={`hw-alert hw-alert--danger ${styles.after}`}>
+                  <span className="hw-alert__body">Recorded. The page could not refresh; reload to see the new score.</span>
                 </p>
+              )}
+              {unranked !== null && (
+                <p role="status" className={`hw-alert ${styles.after}`}>
+                  <span className="hw-alert__body">
+                    {unranked} <Link to="/ward">Back to ward</Link>
+                  </span>
+                </p>
+              )}
+            </div>
+
+            {hasHistory && (
+              <div className="hw-card hw-card--outlined">
+                <StayPanel key={patient.id} patientId={patient.id} onSignOut={onSignOut} now={now} />
               </div>
             )}
-          </div>
-        </div>
-      )}
 
-      <div className={styles.layout}>
-        {/* Left: identity + tiers — all panels always open (density over progressive disclosure) */}
-        <div className={styles.sidebar}>
-          <div className={styles.panel}>
-            <p className={styles.panelEyebrow}>Patient</p>
-            <h1 className={styles.patientName}>{patient.name}</h1>
-            <p className={styles.patientSub}>
-              {patient.age ?? "--"} {patient.sex ?? "--"} &middot; Bed {patient.bed}
-            </p>
-            <p className={styles.admitting}>{patient.admitting_context}</p>
-          </div>
-
-          <div className={styles.panel}>
-            <p className={styles.panelEyebrow}>NEWS2</p>
-            <div className={styles.scoreBlock}>
-              <span className={styles.scoreValue}>{patient.score}</span>
-              <span className={styles.scoreLabel}>NEWS2</span>
-            </div>
-          </div>
-
-          <div className={styles.panel}>
-            <p className={styles.panelEyebrow}>Own baseline</p>
-            <BaselinePanel baseline={baseline} />
-            <ResearchModels models={patient.models} />
-          </div>
-
-        </div>
-
-        {/* Right: vitals + labs (always visible) */}
-        <div className={styles.main}>
-          <div className={styles.panel}>
-            <p className={styles.panelEyebrow}>Current vitals</p>
-            <div className={styles.vitalsGrid}>
-              <CurrentVitals vitals={patient.vitals} now={now} />
-            </div>
-            {canRecordVitals && !readOnly && (
-              <button type="button" className={styles.drawerBtn} aria-expanded={entering} onClick={() => setEntering((open) => !open)}>
-                Record vitals
-              </button>
+            {hasPatientQuestions && !readOnly && (
+              <div className="hw-card hw-card--outlined">
+                <AskPatient />
+              </div>
             )}
-            {canRecordVitals && !readOnly && entering && (
-              <VitalsEntry
-                patientId={patient.id}
-                patientName={patient.name}
-                clinicianId={session.clinician_id}
-                onRecorded={handleRecorded}
-                onClose={() => setEntering(false)}
-              />
-            )}
-            {refreshFailed && (
-              <p role="alert">Recorded. The page could not refresh; reload to see the new score.</p>
-            )}
-            {unranked !== null && (
-              <p role="status">
-                {unranked} <Link to="/ward">Back to ward</Link>
+
+            <div className="hw-card hw-card--outlined">
+              <p className={styles.eyebrow}>
+                Labs
+                {patient.labs.freshness_hours !== null &&
+                  ` · ${patient.labs.freshness_hours}h since collection`}
               </p>
-            )}
-          </div>
-
-          {hasHistory && (
-            <div className={styles.panel}>
-              <StayPanel key={patient.id} patientId={patient.id} onSignOut={onSignOut} now={now} />
-            </div>
-          )}
-
-          {hasPatientQuestions && !readOnly && (
-            <div className={styles.panel}>
-              <AskPatient />
-            </div>
-          )}
-
-          <div className={styles.panel}>
-            <p className={styles.panelEyebrow}>
-              Labs
-              {patient.labs.freshness_hours !== null &&
-                ` \u00b7 ${patient.labs.freshness_hours}h since collection`}
-            </p>
-            <div className={styles.vitalsGrid}>
-              {LAB_ROWS.map(([key, label, unit]) => {
-                const m = patient.labs[key];
-                return m && <VitalRow key={key} now={now} label={label} measurement={m} unit={unit} />;
-              })}
-              {LAB_ROWS.every(([key]) => !patient.labs[key]) && (
-                <p className={styles.pending}>No lab result yet.</p>
+              {anyLab ? (
+                <dl className={styles.vitalsGrid}>
+                  {LAB_ROWS.map(([key, label, unit]) => {
+                    const m = patient.labs[key];
+                    return m && <VitalRow key={key} now={now} label={label} measurement={m} unit={unit} />;
+                  })}
+                </dl>
+              ) : (
+                <p className={styles.quiet}>No lab result yet.</p>
               )}
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </AppShell>
   );
 }

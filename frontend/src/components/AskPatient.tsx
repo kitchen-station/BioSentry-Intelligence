@@ -11,7 +11,10 @@ export function AskPatient() {
   return (
     <section aria-labelledby={heading}>
       <h2 id={heading} className={styles.heading}>Ask about this patient</h2>
-      <button type="button" className={styles.open} onClick={() => window.dispatchEvent(new Event(OPEN_CHAT))}>Open the chat</button>
+      <button type="button" className="hw-button" onClick={() => window.dispatchEvent(new Event(OPEN_CHAT))}>
+        <span className="hw-icon fa-solid fa-comments" aria-hidden="true" />
+        Open the chat
+      </button>
     </section>
   );
 }

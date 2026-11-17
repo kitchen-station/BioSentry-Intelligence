@@ -44,9 +44,9 @@ export function AbstainedRow({ row, canRecord = false, clinicianId = "", onRecor
   const [entering, setEntering] = useState(false);
   const now = useWardNow();
   return (
-    <div className={styles.row}>
+    <div className={`hw-card ${styles.row}`}>
       <div className={styles.tagCol}>
-        <span className={styles.tag}>NOT RANKED</span>
+        <span className={`hw-tag ${styles.tag}`}>NOT RANKED</span>
       </div>
       <div className={styles.infoCol}>
         <div className={styles.nameRow}>
@@ -64,7 +64,7 @@ export function AbstainedRow({ row, canRecord = false, clinicianId = "", onRecor
         {canRecord && (
           <button
             type="button"
-            className={styles.action}
+            className={`hw-button hw-button--sm ${styles.action}`}
             aria-expanded={entering}
             onClick={() => setEntering((open) => !open)}
           >

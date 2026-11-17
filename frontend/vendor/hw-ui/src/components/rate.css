@@ -1,0 +1,19 @@
+@layer hw.components {
+  /* Markup: fieldset.hw-rate > label > input[type=radio].hw-rate__input + span.hw-rate__item */
+  .hw-rate { display: inline-flex; gap: var(--hw-space-2); margin: 0; padding: 0; border: 0; }
+  .hw-rate__input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  .hw-rate__item {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    font-size: var(--hw-font-size-14);
+    color: var(--hw-color-text-muted);
+    cursor: pointer;
+    border-radius: var(--hw-control-radius);
+    transition: background-color var(--hw-duration-1), color var(--hw-duration-1);
+  }
+  .hw-rate__item:hover { color: var(--hw-color-text); background: var(--hw-color-fill-hover); }
+  .hw-rate__input:checked + .hw-rate__item { font-weight: var(--hw-weight-semibold); color: var(--hw-color-text-on-brand); background: var(--hw-color-brand); }
+  .hw-rate__input:focus-visible + .hw-rate__item { box-shadow: var(--hw-focus-ring); }
+}

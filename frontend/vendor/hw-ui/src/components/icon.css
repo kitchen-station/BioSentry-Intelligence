@@ -1,0 +1,31 @@
+@layer hw.components {
+  /* Icons come from Font Awesome Free (peer dependency): <i class="hw-icon fa-solid fa-bell" aria-hidden="true"></i>
+     .hw-icon only fixes box size and alignment so every icon lines up with text and sits centred in buttons. */
+  .hw-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 1.25em;
+    font-size: var(--hw-icon-size, var(--hw-icon-size-md));
+    line-height: 1;
+  }
+  .hw-icon--sm { --hw-icon-size: var(--hw-icon-size-sm); }
+  .hw-icon--lg { --hw-icon-size: var(--hw-icon-size-lg); }
+  .hw-icon--xl { --hw-icon-size: var(--hw-icon-size-xl); }
+  .hw-icon--brand { color: var(--hw-color-brand-text); }
+  .hw-icon--muted { color: var(--hw-color-text-muted); }
+
+  /* Icon inside a round tinted disc (feature lists, empty states, stat cards) */
+  .hw-icon-disc {
+    display: inline-grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    font-size: var(--hw-icon-size-lg);
+    color: var(--hw-icon-disc-fg, var(--hw-color-brand-text));
+    background: var(--hw-icon-disc-bg, var(--hw-color-fill-hover));
+    border-radius: var(--hw-radius-full);
+  }
+}

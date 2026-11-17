@@ -1,4 +1,5 @@
-import { useId, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
+import { range } from "hw-ui";
 import type { BaselineComputed } from "../types";
 import { STALE_AFTER_S, formatAge, formatClock, formatDay } from "./format";
 import type { BaselineState } from "./useBaseline";
@@ -112,7 +113,7 @@ function Computed({ v, k, p, anchor }: { v: BaselineComputed; k: number; p: numb
       {" · "}
       {v.significant ? (
         <>
-          <span className={styles.flag}>Flagged</span>
+          <span className={`hw-tag ${styles.flag}`}>Flagged</span>
           {direction && ` ${direction}`} for {bins} ({span(v.run_bins)})
           {v.since !== null && <>, since <Num>{when(v.since)}</Num></>}
         </>
@@ -186,4 +187,45 @@ export function BaselinePanel({ baseline }: { baseline: BaselineState }) {
       {shared !== null && <p className={styles.quiet}>{shared}</p>}
     </section>
   );
+}
+
+/**
+ * The computed vitals that carry the patient's own band, from the answer the page already loaded. An
+ * older server without the two fields, a vital still forming, a build without the route and an answer
+ * of an odd shape give none (the panel words each case; the page never blanks).
+ */
+export function bands(baseline: BaselineState): BaselineComputed[] {
+  const b: unknown = baseline;
+  if (!isObj(b) || !Array.isArray(b.vitals)) return [];
+  return b.vitals.filter(
+    (v): v is BaselineComputed =>
+      isObj(v) && v.status === "computed" && isComputed(v) && Object.hasOwn(NAMES, v.vital) && num(v.band_low) && num(v.band_high),
+  );
+}
+
+/** The latest value of each vital against its own band, on the kit's range graph. Nothing without a band. */
+export function BaselineRange({ baseline }: { baseline: BaselineState }) {
+  const root = useRef<HTMLDivElement>(null);
+  const at = (vital: string, x: number) => Number(shown(vital, x)); // the rounding the list shows
+  const items = bands(baseline).map((v) => ({
+    label: NAMES[v.vital],
+    value: at(v.vital, v.latest),
+    unit: ` ${v.unit}`,
+    usual: [at(v.vital, v.band_low), at(v.vital, v.band_high)] as [number, number],
+  }));
+  const spec = JSON.stringify(items); // a refetch with the same figures leaves the graph alone
+  useEffect(() => {
+    if (!root.current) return;
+    const list = JSON.parse(spec) as typeof items;
+    const off = list.filter((i) => i.value < i.usual[0] || i.value > i.usual[1]).length;
+    const n = `${off} of ${list.length} ${list.length === 1 ? "vital" : "vitals"}`;
+    const g = range(root.current, {
+      title: off === 0 ? "No vital is outside its own band" : `${n} ${off === 1 ? "is outside its" : "are outside their"} own band`,
+      subtitle: "Latest 15-minute set against this patient's own baseline band. Synthetic, not validated.",
+      level: 2,
+      items: list,
+    });
+    return () => g.destroy();
+  }, [spec]);
+  return items.length > 0 ? <div ref={root} className={styles.range} /> : null;
 }

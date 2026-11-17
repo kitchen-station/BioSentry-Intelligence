@@ -1,103 +1,84 @@
 /* ============================================================
-   BioSentry global tokens and resets
-   Design language: brand book foundation v1 (Paper, Char,
-   Ember, Slate for data, Scorch to warn). Colour only marks
-   what needs action. No dots. See README.
+   BioSentry app layer on hw-ui (vendor/hw-ui, Cloud console family).
+   The kit owns the look: tokens, type (HarmonyOS Sans), components.
+   This file only (1) puts a margin reset under the kit, (2) maps the
+   names the pages use onto kit tokens, (3) keeps the provenance cues.
+   Imported before the kit (main.tsx) so this layer order comes first.
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400&family=Spectral:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500;600&family=Hanken+Grotesk:wght@400;500&display=swap');
+/* Lowest first: `reset` loses to every kit layer; unlayered page CSS wins over all of them. */
+@layer reset, hw.tokens, hw.base, hw.components, hw.utilities;
 
-/* ---- Reset ---- */
-
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+@layer reset {
+  *, *::before, *::after { margin: 0; padding: 0; }
 }
 
-/* ---- Design tokens ---- */
+/* ---- App tokens: names the pages read, values from the kit ---- */
 
 :root {
-  /* Brand book "foundation v1": Paper and Char carry the page, Slate is data only (never
-     text), Scorch warns. No dots, shadows or gradients on this clinical surface. */
-  --ink:     #2a231e; /* Char */
-  --ground:  #f5f0e6; /* Paper */
-  --surface: #fbf8f2; /* Flour: cards */
-  --panel:   #ece4d6; /* Oat */
-  --border:  #ded4c3; /* Linen: hairlines */
-  --label:   #6f6457; /* Stone: quiet text */
+  --ink:     var(--hw-color-text);
+  --ground:  var(--hw-color-canvas);
+  --surface: var(--hw-color-surface);
+  --panel:   var(--hw-color-surface-subtle);
+  --border:  var(--hw-color-border-subtle);
+  --label:   var(--hw-color-text-muted);
 
-  --primary:        #1c1916; /* Cast iron: header, active states */
-  --primary-tint:   #ece4d6; /* Oat */
-  --secondary:      #cdb99a; /* Sand */
-  --secondary-tint: #f1e8d8;
-  --accent:         #a64b2a; /* Ember: lead accent, links */
-  --data:           #3f5a73; /* Slate: lines and fills, never text */
-  --button:         #a64b2a;
-  --button-ink:     #f5f0e6;
+  --primary:        var(--hw-color-accent);
+  --primary-tint:   var(--hw-color-surface-subtle);
+  --secondary:      var(--hw-color-border);
+  --secondary-tint: var(--hw-color-surface-subtle);
+  --accent:         var(--hw-color-link);
+  --data:           var(--hw-graph-context-strong);
+  --button:         var(--hw-color-primary);
+  --button-ink:     var(--hw-color-on-primary);
 
-  /* Clinical state: Scorch = act; sage = stable. Nothing else carries colour. */
-  --alert:      #9b3324; /* Scorch */
-  --alert-tint: #f3e3dc;
-  --alert-edge: #d9a99b;
-  --ok:         #6f6457; /* Stone: stable reads quiet; the brand has no green */
+  /* Clinical state, in the kit's graph roles: emergency red = act now (NEWS2 7+),
+     urgent orange = urgent review (5-6 or a single 3). Nothing else carries colour. */
+  --alert:      var(--hw-color-danger-fg);
+  --alert-tint: var(--hw-color-danger-bg);
+  --alert-edge: var(--hw-color-danger-border);
+  --urgent:     var(--hw-graph-urgent);
+  --urgent-text: var(--hw-graph-urgent-text);
+  --ok:         var(--hw-color-text-muted);
 
-  /* Chart lines only: bedside-monitor colours, darkened to >= 4:1 on Paper and Flour.
-     Never text, never a warning (Scorch alone means act). */
-  --trace-hr:   #1e8449; /* green   4.15:1 Paper */
-  --trace-spo2: #0e7c8c; /* cyan    4.32:1 */
-  --trace-rr:   #8f6e00; /* yellow  4.20:1 */
-  --trace-bp:   #c2185b; /* crimson 5.17:1, pinker than Scorch */
-  --trace-temp: #c25400; /* orange  4.05:1 */
+  /* Sparklines: one red thing per view, so every trace is context grey. */
+  --trace-hr:   var(--hw-graph-context-strong);
+  --trace-spo2: var(--hw-graph-context-strong);
+  --trace-rr:   var(--hw-graph-context-strong);
+  --trace-bp:   var(--hw-graph-context-strong);
+  --trace-temp: var(--hw-graph-context-strong);
 
-  --radius: 10px;
+  --radius: var(--hw-card-radius);
 
-  /* Spacing scale */
-  --sp-1: 4px;
-  --sp-2: 8px;
-  --sp-3: 16px;
-  --sp-4: 24px;
-  --sp-5: 32px;
-  --sp-6: 48px;
-  --sp-8: 64px;
+  --sp-1: var(--hw-space-2);
+  --sp-2: var(--hw-space-3);
+  --sp-3: var(--hw-space-5);
+  --sp-4: var(--hw-space-6);
+  --sp-5: var(--hw-space-7);
+  --sp-6: var(--hw-space-8);
+  --sp-8: var(--hw-space-9);
 
-  /* Layout widths */
-  --content-max: 640px;
-  --ward-max: 960px;
-  --page-max: 1200px;
+  --content-max: 720px;
+  --ward-max: 1080px;
+  --page-max: 1240px;
   --flip-ms: 320ms;
   --flip-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --move-ms: 420ms;
 
-  /* Typography */
-  --font-display: "Fraunces", Georgia, serif;
-  --font-serif: "Spectral", Georgia, serif;
-  --font-sans: "Hanken Grotesk", system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-display: var(--hw-font-sans);
+  --font-serif: var(--hw-font-sans);
+  --font-sans: var(--hw-font-sans);
+  --font-mono: var(--hw-font-mono);
 }
 
-/* ---- Base styles ---- */
+body { font-variant-numeric: tabular-nums; }
 
-body {
-  font-family: var(--font-serif);
-  font-size: 17px;
-  line-height: 1.6;
-  color: var(--ink);
-  background: var(--ground);
-}
-
-a {
-  color: var(--accent);
-  text-decoration: none;
-}
-a:hover {
-  text-decoration: underline;
-}
+a { text-decoration: none; }
+a:hover { text-decoration: underline; }
 
 /* ---- Provenance cues (I2) ---- */
 
 .nurse-entered {
-  font-family: var(--font-mono);
   font-size: 13px;
 }
 
@@ -106,7 +87,6 @@ a:hover {
 }
 
 .prov-tag {
-  font-family: var(--font-sans);
   font-size: 9px;
   color: var(--label);
   vertical-align: super;
@@ -114,25 +94,6 @@ a:hover {
 }
 
 .unit {
-  font-family: var(--font-sans);
   font-size: 11px;
   color: var(--label);
-}
-
-/* ---- Responsive ---- */
-
-@media (max-width: 768px) {
-  :root {
-    --page-max: 100%;
-    --ward-max: 100%;
-  }
-}
-
-@media (max-width: 480px) {
-  :root {
-    --sp-4: 16px;
-    --sp-5: 24px;
-    --sp-6: 32px;
-    --sp-8: 48px;
-  }
 }

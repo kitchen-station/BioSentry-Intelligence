@@ -1,0 +1,60 @@
+@layer hw.components {
+  /* Native <dialog class="hw-dialog">: focus trap, Esc, top layer and focus return come free. js/dialog.js wires open/close buttons. */
+  .hw-dialog {
+    --hw-dialog-width: 550px;
+
+    width: min(var(--hw-dialog-width), calc(100vw - 32px));
+    max-height: calc(100vh - 64px);
+    padding: 0;
+    color: var(--hw-color-text);
+    background: var(--hw-color-surface);
+    border: 0;
+    border-radius: var(--hw-popup-radius);
+    box-shadow: var(--hw-elevation-dialog);
+  }
+  .hw-dialog[open] { display: flex; flex-direction: column; animation: hw-dialog-in var(--hw-motion-enter) var(--hw-ease-enter); }
+  .hw-dialog::backdrop { background: var(--hw-color-overlay); animation: hw-fade-in var(--hw-motion-exit); }
+  .hw-dialog--sm { --hw-dialog-width: 400px; }
+  .hw-dialog--lg { --hw-dialog-width: 700px; }
+  .hw-dialog--xl { --hw-dialog-width: 900px; }
+
+  .hw-dialog--drawer {
+    --hw-dialog-width: 480px;
+
+    max-height: none;
+    height: 100vh;
+    margin: 0 0 0 auto;
+    border-radius: 0;
+  }
+  .hw-dialog--drawer[open] { animation: hw-drawer-in 350ms var(--hw-ease-move); }
+
+  /* Exits (js/dialog.js sets [data-hw-leaving] before calling close()) */
+  .hw-dialog[data-hw-leaving] { animation: hw-dialog-out var(--hw-motion-exit) var(--hw-ease-exit) forwards; }
+  .hw-dialog[data-hw-leaving]::backdrop { animation: hw-fade-out var(--hw-motion-exit) var(--hw-ease-exit) forwards; }
+  .hw-dialog--drawer[data-hw-leaving] { animation: hw-drawer-out 250ms var(--hw-ease-exit) forwards; }
+
+  .hw-dialog__header { display: flex; gap: var(--hw-space-4); align-items: center; justify-content: space-between; padding: var(--hw-space-6) var(--hw-space-6) var(--hw-space-4); }
+  .hw-dialog__title { margin: 0; font-size: var(--hw-font-size-20); font-weight: var(--hw-weight-semibold); line-height: 30px; }
+  .hw-dialog__body { flex: 1; padding: 0 var(--hw-space-6); overflow: auto; color: var(--hw-color-text-muted); }
+  .hw-dialog__footer { display: flex; gap: var(--hw-space-3); justify-content: flex-end; padding: var(--hw-space-6); }
+  .hw-close {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    font-size: var(--hw-font-size-18);
+    color: var(--hw-color-text-muted);
+    cursor: pointer;
+    background: none;
+    border: 0;
+    border-radius: var(--hw-control-radius);
+  }
+  .hw-close:hover { color: var(--hw-color-text); background: var(--hw-color-fill-hover); }
+
+  @media (width < 576px) {
+    .hw-dialog:not(.hw-dialog--sheet, .hw-dialog--nav) { width: 100vw; max-width: none; height: 100dvh; max-height: none; margin: 0; border-radius: 0; }
+    .hw-dialog__footer { flex-direction: column-reverse; }
+    .hw-dialog__footer > .hw-button { width: 100%; }
+  }
+}

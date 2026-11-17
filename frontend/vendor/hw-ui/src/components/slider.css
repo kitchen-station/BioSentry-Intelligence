@@ -1,0 +1,44 @@
+@layer hw.components {
+  /* Behaviour: js/slider.js keeps --hw-slider-value (0–100) and the <output> in sync. */
+  .hw-slider {
+    --hw-slider-value: 50;
+    --hw-slider-fill: var(--hw-color-accent);
+    --hw-slider-track: var(--hw-color-fill-disabled);
+
+    width: 100%;
+    height: 24px;
+    margin: 0;
+    cursor: pointer;
+    background: transparent;
+    appearance: none;
+  }
+  .hw-slider--brand { --hw-slider-fill: var(--hw-color-brand); }
+  .hw-slider:disabled { --hw-slider-fill: var(--hw-color-border); cursor: not-allowed; }
+  .hw-slider::-webkit-slider-runnable-track {
+    height: 4px;
+    background: linear-gradient(to right, var(--hw-slider-fill) calc(var(--hw-slider-value) * 1%), var(--hw-slider-track) 0);
+    border-radius: var(--hw-radius-full);
+  }
+  .hw-slider::-moz-range-track { height: 4px; background: var(--hw-slider-track); border-radius: var(--hw-radius-full); }
+  .hw-slider::-moz-range-progress { height: 4px; background: var(--hw-slider-fill); border-radius: var(--hw-radius-full); }
+  .hw-slider::-webkit-slider-thumb {
+    width: 16px;
+    height: 16px;
+    margin-top: -6px;
+    background: var(--hw-color-surface);
+    border: 2px solid var(--hw-slider-fill);
+    border-radius: 50%;
+    box-shadow: var(--hw-elevation-knob);
+    transition: transform var(--hw-duration-1);
+    appearance: none;
+  }
+  .hw-slider::-moz-range-thumb { width: 12px; height: 12px; background: var(--hw-color-surface); border: 2px solid var(--hw-slider-fill); border-radius: 50%; }
+  .hw-slider:hover::-webkit-slider-thumb, .hw-slider:active::-webkit-slider-thumb { transform: scale(1.2); }
+  .hw-slider:focus-visible { box-shadow: none; }
+  .hw-slider:focus-visible::-webkit-slider-thumb { box-shadow: var(--hw-focus-ring); }
+  .hw-slider:focus-visible::-moz-range-thumb { box-shadow: var(--hw-focus-ring); }
+
+  .hw-slider-field { display: flex; gap: var(--hw-space-4); align-items: center; }
+  .hw-slider-field__value { min-width: 40px; font-variant-numeric: tabular-nums; text-align: right; }
+  .hw-slider-field__ticks { display: flex; justify-content: space-between; margin-top: 2px; font-size: var(--hw-text-caption); color: var(--hw-color-text-muted); }
+}

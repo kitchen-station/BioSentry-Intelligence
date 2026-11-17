@@ -1,0 +1,9 @@
+@layer hw.components {
+  .hw-timeline { margin: 0; padding: 0; list-style: none; }
+  .hw-timeline__item { position: relative; padding: 0 0 20px 24px; font-size: var(--hw-font-size-14); }
+  .hw-timeline__item::before { content: ""; position: absolute; top: 6px; left: 4px; width: 8px; height: 8px; background: var(--hw-color-surface); border: 2px solid var(--hw-color-border); border-radius: 50%; }
+  .hw-timeline__item::after { content: ""; position: absolute; top: 18px; bottom: 0; left: 8px; width: 1px; background: var(--hw-color-border-subtle); }
+  .hw-timeline__item:last-child::after { display: none; }
+  .hw-timeline__item[data-tone="alert"]::before { background: var(--hw-color-brand); border-color: var(--hw-color-brand); }
+  .hw-timeline__time { display: block; font-size: var(--hw-text-caption); color: var(--hw-color-text-muted); }
+}
