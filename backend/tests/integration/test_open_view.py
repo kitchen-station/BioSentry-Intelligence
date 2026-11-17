@@ -25,7 +25,7 @@ from biosentry.services.scoring import decide
 
 NOT_FOUND = {"detail": "Not Found"}  # the framework's own, not the project's "Not found"
 URL = "/wards/W4/open-view"
-TOP = {"ward", "synthetic", "can_control", "sim", "beds"}
+TOP = {"ward", "synthetic", "can_control", "sim", "beds", "capacity", "nurses_on_duty", "awaiting_icu", "outliers", "er", "transfers_24h", "deaths_24h"}
 SIM = {"clockS", "speed", "ended", "staff", "moves"}
 STAFF = {"key", "role", "x", "y", "facing", "walking", "moved", "stage", "timer"}
 MOVE = {"seq", "bed", "kind"}
@@ -226,6 +226,8 @@ def test_the_answer_has_exactly_the_contracts_keys_at_every_level(watch: Api) ->
         "moves": [{"seq": 1, "bed": "9A", "kind": "out"}, {"seq": 2, "bed": "3B", "kind": "in"}],
     }  # fmt: skip
     assert (body["ward"], body["synthetic"], body["can_control"]) == ("W4", True, False)
+    assert (body["capacity"], body["nurses_on_duty"], body["awaiting_icu"], body["outliers"], body["er"]) == (None, None, None, None, None)
+    assert (body["transfers_24h"], body["deaths_24h"]) == (0, 0)
     assert body["beds"] == [{"bed": "9A", "state": "ranked", "rank": 1, "risk": "high"}]
 
 
@@ -429,9 +431,9 @@ def test_in_production_mode_the_app_starts_with_the_setting_on_and_warns(
     assert ("GET", "/wards/{ward}/open-view") in _route_table(app)
 
 
-def test_one_read_runs_three_statements_for_each_patient_and_five_of_its_own(watch: Api, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Five: the time zone, the run, the patients on the ward, the stored view, the audit count (a
-    sixth, the audit insert, once a minute). No statement belongs to a model."""
+def test_one_read_runs_three_statements_for_each_patient_and_seven_of_its_own(watch: Api, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Seven: the time zone, run, ward patients, stored view, operations, outcomes, and audit count
+    (an eighth, the audit insert, once a minute). No statement belongs to a model."""
     opened(watch)  # the minute's row is written
     seen = [0]
     real = psycopg.Connection.execute
@@ -442,7 +444,7 @@ def test_one_read_runs_three_statements_for_each_patient_and_five_of_its_own(wat
 
     monkeypatch.setattr(psycopg.Connection, "execute", counting)
     opened(watch)
-    assert seen[0] == 5 + 3 * 12  # the fixture ward holds 12 patients
+    assert seen[0] == 7 + 3 * 12  # the fixture ward holds 12 patients
 
 
 # --- The unit list: GET /open-view ----------------------------------------------------------------
@@ -483,7 +485,7 @@ def test_an_old_run_of_one_unit_answers_that_one_unit_with_exactly_the_contracts
     start(watch)  # a body with no units: one ranked unit, W4
     assert get(watch, UNITS_URL).json() == {
         "synthetic": True,
-        "units": [{"id": "W4", "name": "Ward W4", "floor": None, "kind": "ranked", "score_note": None}],
+        "units": [{"id": "W4", "name": "Ward W4", "floor": None, "kind": "ranked", "score_note": None, "capacity": None}],
     }
 
 
@@ -495,7 +497,7 @@ def test_the_unit_list_is_the_runs_units_in_order_and_holds_no_count_and_no_pers
     made = watch.post("/sim/runs", {**new_run(patients=patients), "units": HOSPITAL})
     assert made.status_code == 201, made.text
     response = get(watch, UNITS_URL)
-    assert response.json() == {"synthetic": True, "units": [{**u, "score_note": None} for u in HOSPITAL]}
+    assert response.json() == {"synthetic": True, "units": [{**u, "score_note": None, "capacity": None} for u in HOSPITAL]}
     for mark in ("MARK", "cn-er", "rn-delacruz", "md-santos", "patients", "clinician"):
         assert mark not in response.text, mark
 

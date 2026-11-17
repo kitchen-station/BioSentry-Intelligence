@@ -16,7 +16,7 @@ from typing import Annotated, Any, Literal, Self
 from pydantic import AfterValidator, AwareDatetime, Field, JsonValue, field_validator, model_validator
 
 from .admission import UNIT_ID
-from .base import Age, Contract, Flag, Num, Percent, ScoreNote
+from .base import Age, Contract, Flag, NonNegInt, Num, Percent, ScoreNote
 from .clinical import LabPanel
 from .common import ProvenanceSource, QualityLevel, Trend
 
@@ -134,6 +134,7 @@ class NewUnit(Contract):
     name: Annotated[str, Field(min_length=1, max_length=60)]
     floor: Annotated[int, Field(strict=True, ge=-5, le=200)] | None
     kind: Literal["ranked", "shown", "unranked"]
+    capacity: Annotated[int, Field(strict=True, ge=1, le=1000)] | None = None
     score_note: ScoreNote | None = None  # how to read this unit's NEWS2, served with the unit
 
 
@@ -174,6 +175,13 @@ class BatchPatient(Contract):
     last_sample_minute: Minute | None
 
 
+class UnitOperations(Contract):
+    unit: UnitId
+    nurses_on_duty: NonNegInt
+    awaiting_icu: NonNegInt
+    outliers: NonNegInt
+
+
 class Batch(Contract):
     minute: Minute
     ended: Flag
@@ -184,6 +192,14 @@ class Batch(Contract):
     events: Annotated[list[Event], Field(max_length=2_000)]
     admissions: Annotated[list[Admission], Field(max_length=200)] = []
     departures: Annotated[list[Departure], Field(max_length=200)] = []
+    operations: Annotated[list[UnitOperations], Field(max_length=12)] = []
+
+    @model_validator(mode="after")
+    def _unique_operations_units(self) -> Self:
+        units = [op.unit for op in self.operations]
+        if len(units) != len(set(units)):
+            raise ValueError("operations units must be unique")
+        return self
 
 
 VIEW_MAX = 65_536  # characters of compact JSON, per object
@@ -299,6 +315,12 @@ class OpenBed(Contract):
     risk: Literal["low", "low_medium", "medium", "high"] | None
 
 
+class OpenEr(Contract):
+    capacity: Annotated[int, Field(strict=True, ge=1, le=1000)] | None
+    beds_in_use: NonNegInt
+    awaiting_icu: NonNegInt | None
+
+
 class OpenWard(Contract):
     """What anyone may watch with no sign-in (GET /wards/{ward}/open-view)."""
 
@@ -307,6 +329,13 @@ class OpenWard(Contract):
     can_control: Literal[False]
     sim: OpenSim | None
     beds: Annotated[list[OpenBed], Field(max_length=OPEN_BEDS_MAX)]
+    capacity: Annotated[int, Field(strict=True, ge=1, le=1000)] | None
+    nurses_on_duty: NonNegInt | None
+    awaiting_icu: NonNegInt | None
+    outliers: NonNegInt | None
+    er: OpenEr | None
+    transfers_24h: NonNegInt | None
+    deaths_24h: NonNegInt | None
 
 
 class OpenVital(Contract):
@@ -394,6 +423,7 @@ class OpenUnit(Contract):
     name: str
     floor: int | None  # None: not known
     kind: Literal["ranked", "shown", "unranked"]
+    capacity: Annotated[int, Field(strict=True, ge=1, le=1000)] | None
     score_note: ScoreNote | None = None  # how to read this unit's NEWS2, when the run says
 
 
