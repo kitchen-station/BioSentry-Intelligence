@@ -22,6 +22,7 @@ export function ChatBubble({ session, onSignOut }: { session: Session; onSignOut
   const [openAt, setOpenAt] = useState<string | null>(null);
   if (openAt !== null && openAt !== pathname) setOpenAt(null); // state follows the route, set while rendering, with no effect
   const title = useId();
+  const scopeId = useId();
   const panel = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
 
@@ -75,9 +76,10 @@ export function ChatBubble({ session, onSignOut }: { session: Session; onSignOut
         <>
           <div className={styles.backdrop} data-testid="chat-backdrop" onClick={close} />
           {/* The kit's drawer look on React's dialog: the focus, Escape and Tab handling above are its behaviour. */}
-          <div ref={panel} role="dialog" aria-modal="true" aria-labelledby={title} className={`hw-dialog hw-dialog--drawer ${styles.panel}`}>
+          <div ref={panel} role="dialog" aria-modal="true" aria-labelledby={title} aria-describedby={scopeId} className={`hw-dialog hw-dialog--drawer ${styles.panel}`}>
             <div className="hw-dialog__header">
-              <h2 id={title} className="hw-dialog__title">{patientId ? "Ask about this patient" : "Ask about the ward"}</h2>
+              <h2 id={title} className="hw-dialog__title">Assistant</h2>
+              <span id={scopeId} className={`hw-tag ${styles.scope}`}>{patientId ? "This patient" : "The ward"}</span>
               <button type="button" className="hw-close" aria-label="Close the chat" onClick={close}>
                 <span className="hw-icon fa-solid fa-xmark" aria-hidden="true" />
               </button>

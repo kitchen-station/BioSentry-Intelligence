@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -73,8 +73,9 @@ describe("the panel", () => {
   it("opens the ward's thread as a labelled dialog and moves the focus into it", async () => {
     at("/ward");
     await userEvent.click(bubble());
-    const dialog = screen.getByRole("dialog", { name: "Ask about the ward" });
+    const dialog = screen.getByRole("dialog", { name: "Assistant" });
     expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(within(dialog).getByText("The ward")).toBeTruthy();
     expect(screen.getByRole("button", { name: "thread ward" })).toBeTruthy();
     expect(bubble().getAttribute("aria-expanded")).toBe("true");
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Close the chat" }));
@@ -83,7 +84,7 @@ describe("the panel", () => {
   it("opens that patient's thread on a patient's page", async () => {
     at("/patient/p-001");
     await userEvent.click(bubble());
-    expect(screen.getByRole("dialog", { name: "Ask about this patient" })).toBeTruthy();
+    expect(within(screen.getByRole("dialog", { name: "Assistant" })).getByText("This patient")).toBeTruthy();
     expect(screen.getByRole("button", { name: "thread p-001" })).toBeTruthy();
   });
 
@@ -151,7 +152,7 @@ describe("after the independent review", () => {
   it("reads the patient from the route: a trailing slash and an encoded id are the same patient page", async () => {
     at("/patient/p%20001/", "rn");
     await userEvent.click(bubble());
-    expect(screen.getByRole("dialog", { name: "Ask about this patient" })).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Assistant" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "thread p 001" })).toBeTruthy();
   });
 
@@ -190,7 +191,7 @@ describe("after the independent review", () => {
   it("opens when the patient page's own button asks, and only where the bubble is shown", async () => {
     at("/patient/p-001", "rn");
     act(() => void window.dispatchEvent(new Event(OPEN_CHAT)));
-    expect(screen.getByRole("dialog", { name: "Ask about this patient" })).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Assistant" })).toBeTruthy();
     cleanup();
     at("/patient/p-001", "admin");
     act(() => void window.dispatchEvent(new Event(OPEN_CHAT)));

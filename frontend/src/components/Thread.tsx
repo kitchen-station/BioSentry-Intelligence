@@ -20,7 +20,7 @@ const PATIENT_ERRORS = {
   ...COMMON,
   403: "You cannot ask about this patient.",
   404: "This patient is no longer on your list.",
-  429: "Question limit reached. Try again later.",
+  429: "Question limit reached: one open question each, twenty a day each, five waiting on the ward. Try again later.",
 };
 
 // The stored record comes from another machine, so every read here tolerates a missing key or a value of any type.
@@ -116,7 +116,7 @@ export function Thread({ scope, clinicianId, onSignOut }: { scope: Scope; clinic
                   <p className={styles.text}>{q.question}</p>
                 </div>
                 <div className={styles.answer}>
-                  <p className={styles.agent}>Research agent</p>
+                  <p className={styles.agent}>Assistant</p>
                   {/* Only the state line is announced: an answer is long, and the reader chose to be here. */}
                   <p className={styles.state} aria-live="polite">{stateLine(q, now, otherRunning)}</p>
                   {q.state === "done" &&

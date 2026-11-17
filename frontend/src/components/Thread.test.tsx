@@ -85,7 +85,7 @@ describe("the turns", () => {
     expect(rows[1].textContent).toContain("newer");
     expect(within(rows[0]).getByText(`You · ${clock(ASKED)}`)).toBeTruthy();
     expect(within(rows[1]).getByText(/^rn-manalo · /)).toBeTruthy();
-    for (const r of rows) expect(within(r).getByText("Research agent")).toBeTruthy();
+    for (const r of rows) expect(within(r).getByText("Assistant")).toBeTruthy();
     expect(screen.getByRole("list").getAttribute("role")).toBe("list");
   });
 
@@ -332,7 +332,7 @@ describe("the composer", () => {
     [WARD, 403, "Only a physician or a charge nurse can ask."],
     [WARD, 404, "This ward is not on this server."],
     [WARD, 422, "The question could not be sent. Use one line, up to 500 characters."],
-    [PATIENT, 429, "Question limit reached. Try again later."],
+    [PATIENT, 429, "Question limit reached: one open question each, twenty a day each, five waiting on the ward. Try again later."],
     [PATIENT, 403, "You cannot ask about this patient."],
     [PATIENT, 404, "This patient is no longer on your list."],
     [PATIENT, 500, "Cannot reach the ward server."],
