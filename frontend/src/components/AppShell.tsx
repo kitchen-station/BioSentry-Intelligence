@@ -227,7 +227,6 @@ export function AppShell({ session, onSignOut, title, status, detail = false, ch
           </div>
         ) : (
           <>
-            {tabs.length === 0 && <span className={styles.title}>Ward {session.ward}</span>}
             {(tabs.length > 0 || analyticsUrl) && (
               <nav aria-label="Main" className={`hw-header__nav ${styles.tabs}`}>
                 {tabLinks("hw-header__link", false)}

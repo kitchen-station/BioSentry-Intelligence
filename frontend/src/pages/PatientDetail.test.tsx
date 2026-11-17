@@ -168,7 +168,7 @@ describe("PatientDetail", () => {
     page("rn");
     await loaded();
     expect(screen.getAllByText("Simulated patients until a hospital is connected.")).toHaveLength(1);
-    expect(within(screen.getByRole("banner")).getByText("Ward W4")).toBeTruthy(); // a staff nurse has no tabs: the bar names the ward
+    expect(within(screen.getByRole("banner")).queryByText("Ward W4")).toBeNull(); // the breadcrumb names the ward, so the bar does not repeat it
     const crumbs = screen.getByRole("navigation", { name: "Breadcrumb" });
     expect(within(crumbs).getByRole("link", { name: "Ward W4" }).getAttribute("href")).toBe("/ward");
     expect(screen.getByRole("button", { name: /rn-manalo/ })).toBeTruthy();

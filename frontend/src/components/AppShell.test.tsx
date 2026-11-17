@@ -81,10 +81,10 @@ describe("the desk bar", () => {
     expect(research(menu).getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("gives a staff nurse no tabs and no menu: the bar names the ward", () => {
+  it("gives a staff nurse no tabs and no menu, and no second ward title: the page itself names the ward", () => {
     shell("rn");
     expect(screen.queryByRole("navigation", { name: "Main" })).toBeNull();
-    expect(within(screen.getByRole("banner")).getByText("Ward W4")).toBeTruthy();
+    expect(within(screen.getByRole("banner")).queryByText("Ward W4")).toBeNull();
     expect(screen.queryByRole("button", { name: "Research" })).toBeNull();
   });
 
