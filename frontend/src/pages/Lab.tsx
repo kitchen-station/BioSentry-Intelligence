@@ -24,7 +24,7 @@ export function Lab({ session, onSignOut }: { session: Session; onSignOut: () =>
       <div className={research.main}>
         <h1 className="hw-heading hw-heading--3">{admin ? "Simulation lab" : "What-if runs"}</h1>
         <ul className={research.places}>
-          {hasLabQuestions && !admin && <Place to="/ask" icon="comments">Ask the research agent</Place>}
+          {hasLabQuestions && !admin && <Place to="/ask" icon="comments">Ask the assistant</Place>}
           {admin && (
             <>
               <Place to="/lab/research" icon="chart-line">Research numbers</Place>

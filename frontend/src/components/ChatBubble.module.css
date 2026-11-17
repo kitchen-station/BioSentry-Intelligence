@@ -42,3 +42,8 @@
     bottom: var(--hw-space-5);
   }
 }
+
+/* The scope tag sits beside the title, not centred between it and the close button. */
+.scope {
+  margin-right: auto;
+}

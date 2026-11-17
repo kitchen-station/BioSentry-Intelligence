@@ -249,7 +249,7 @@ export function Research({ session, onSignOut }: Props) {
           </p>
         </section>
 
-        <ResearchAgentSection />
+        {session.role === "admin" && <ResearchAgentSection />}
 
         <p className="hw-caption">
           Source: evaluation on {P.date}, simulator commit {P.simCommit}, scenario {P.scenario}. {P.trials}. {P.tuning} {P.heldOutRead} Student model (run {P.studentRun}): {P.studentData}. Reward-learned policy (run {P.rewardRun}): {P.rewardData}. Confidence check (run {P.checkRun}): {P.checkData}. Earlier run: {P.previous}. NEWS2 itself is never

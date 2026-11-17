@@ -1,9 +1,10 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Link, useLocation, useMatch } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import type { Session } from "../types";
 import { hasLabQuestions, hasPatientQuestions } from "../api";
 import { Thread } from "./Thread";
 import { OPEN_CHAT, asksWard } from "./roles";
+import { useAskScope } from "./useAskScope";
 import styles from "./ChatBubble.module.css";
 
 const FOCUSABLE = "a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), summary";
@@ -15,17 +16,19 @@ const FOCUSABLE = "a[href], button:not([disabled]), input:not([disabled]), texta
  */
 export function ChatBubble({ session, onSignOut }: { session: Session; onSignOut: () => void }) {
   const { pathname } = useLocation();
-  const patientId = useMatch("/patient/:id")?.params.id; // decoded, and a trailing slash still matches, as the route does
+  const scope = useAskScope();
+  const patientId = scope.kind === "patient" ? scope.id : undefined;
   // The panel is open on the page it was opened on: leaving that page closes it, and coming back does not reopen it.
   const [openAt, setOpenAt] = useState<string | null>(null);
   if (openAt !== null && openAt !== pathname) setOpenAt(null); // state follows the route, set while rendering, with no effect
   const title = useId();
+  const scopeId = useId();
   const panel = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
 
   const asks = asksWard(session.role);
   const connected = patientId ? hasPatientQuestions : hasLabQuestions; // the fixture build has neither: no bubble
-  const shown = connected && pathname !== "/" && !pathname.startsWith("/ask") && (asks || (session.role === "rn" && patientId !== undefined));
+  const shown = connected && scope.kind !== "none" && !pathname.startsWith("/ask") && (asks || (session.role === "rn" && patientId !== undefined));
   const open = shown && openAt === pathname;
 
   // The patient page's own button opens the same panel.
@@ -73,9 +76,10 @@ export function ChatBubble({ session, onSignOut }: { session: Session; onSignOut
         <>
           <div className={styles.backdrop} data-testid="chat-backdrop" onClick={close} />
           {/* The kit's drawer look on React's dialog: the focus, Escape and Tab handling above are its behaviour. */}
-          <div ref={panel} role="dialog" aria-modal="true" aria-labelledby={title} className={`hw-dialog hw-dialog--drawer ${styles.panel}`}>
+          <div ref={panel} role="dialog" aria-modal="true" aria-labelledby={title} aria-describedby={scopeId} className={`hw-dialog hw-dialog--drawer ${styles.panel}`}>
             <div className="hw-dialog__header">
-              <h2 id={title} className="hw-dialog__title">{patientId ? "Ask about this patient" : "Ask about the ward"}</h2>
+              <h2 id={title} className="hw-dialog__title">Assistant</h2>
+              <span id={scopeId} className={`hw-tag ${styles.scope}`}>{patientId ? "This patient" : "The ward"}</span>
               <button type="button" className="hw-close" aria-label="Close the chat" onClick={close}>
                 <span className="hw-icon fa-solid fa-xmark" aria-hidden="true" />
               </button>
@@ -88,7 +92,7 @@ export function ChatBubble({ session, onSignOut }: { session: Session; onSignOut
               )}
               <Thread
                 key={patientId ?? "ward"}
-                scope={patientId ? { kind: "patient", id: patientId } : { kind: "ward" }}
+                scope={scope.kind === "patient" ? scope : { kind: "ward" }}
                 clinicianId={session.clinician_id}
                 onSignOut={onSignOut}
               />

@@ -65,7 +65,7 @@ describe("lab index", () => {
     expect(href("The pipeline")).toBe("/lab/pipeline");
     expect(screen.queryByText("Outside the lab")).toBeNull();
     expect(screen.queryByRole("link", { name: "Open the ward simulator" })).toBeNull();
-    expect(screen.queryByRole("link", { name: "Ask the research agent" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Ask the assistant" })).toBeNull();
   });
 
   it("links the Ask page first when the build has a server", () => {
@@ -73,14 +73,14 @@ describe("lab index", () => {
     lab();
     api.hasLabQuestions = false;
     const first = screen.getAllByRole("listitem")[0];
-    expect(within(first).getByRole("link", { name: "Ask the research agent" }).getAttribute("href")).toBe("/ask");
+    expect(within(first).getByRole("link", { name: "Ask the assistant" }).getAttribute("href")).toBe("/ask");
   });
 
   it("does not link the Ask page for an admin, who cannot open it", () => {
     api.hasLabQuestions = true;
     lab(admin);
     api.hasLabQuestions = false;
-    expect(screen.queryByRole("link", { name: "Ask the research agent" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Ask the assistant" })).toBeNull();
   });
 
   it("shows a physician no ward simulator link, a developer tool, on the one-address image", () => {
