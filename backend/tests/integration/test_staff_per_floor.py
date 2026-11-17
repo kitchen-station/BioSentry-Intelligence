@@ -191,5 +191,7 @@ def test_a_new_physician_still_sends_the_patient_commands_of_their_own_units_pat
     give_passphrase(api, *ALL_NEW)
     own = {"kind": "inject_deterioration", "patient_id": "e-2"}
     assert send(api, "md-sarmiento", "/wards/ER/sim/commands", own).status_code == 204  # their own patient, unchanged
+    live = get(api, "md-sarmiento", "/wards/ER/live").json()
+    assert (live["can_control"], live["can_steer_run"]) == (True, False)  # told they cannot steer the whole run
     assert send(api, "md-ocampo", "/wards/ER/sim/commands", own).status_code == 403  # another unit's physician
     assert send(api, "rn-pangilinan", "/wards/ER/sim/commands", own).status_code == 403  # a staff nurse

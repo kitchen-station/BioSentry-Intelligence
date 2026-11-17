@@ -245,6 +245,7 @@ class LiveWard(Contract):
     shared: View | None
     patients: list[PatientView]
     can_control: Flag  # whether this clinician's role may send the sim commands
+    can_steer_run: Flag  # whether this clinician may send the whole-run ones (speed, skip, reset): hide those buttons when false
     now: AwareDatetime  # ward time this answer was computed at: every age and due time on the page is measured against it
 
 

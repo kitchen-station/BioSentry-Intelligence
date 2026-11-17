@@ -2036,6 +2036,9 @@
           "can_control": {
             "type": "boolean"
           },
+          "can_steer_run": {
+            "type": "boolean"
+          },
           "now": {
             "format": "date-time",
             "type": "string"
@@ -2064,6 +2067,7 @@
           "shared",
           "patients",
           "can_control",
+          "can_steer_run",
           "now"
         ],
         "title": "LiveWard",
