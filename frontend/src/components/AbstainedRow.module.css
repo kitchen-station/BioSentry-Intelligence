@@ -1,33 +1,17 @@
-/* NOT RANKED rows (I4): a kit card per patient; the tag is the accent "act" state, never a risk colour. */
+/* One NOT RANKED patient inside the Ward's NOT RANKED strip (the strip is the dashed container). */
 
 .row {
   display: grid;
-  grid-template-columns: 120px minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
   align-items: start;
-  padding: var(--hw-space-5) 0;
-  border: 1px dashed var(--hw-color-border);
-}
-
-.tagCol {
-  display: flex;
-  justify-content: center;
-}
-
-.tag {
-  --hw-tag-fg: var(--hw-color-on-accent);
-  --hw-tag-bg: var(--hw-color-accent);
-
-  font-weight: var(--hw-weight-semibold);
-  letter-spacing: 0.06em;
+  gap: var(--hw-space-3) var(--hw-space-5);
+  padding: var(--hw-space-4) var(--hw-space-5);
+  background: var(--hw-color-surface-subtle);
+  border-radius: var(--hw-control-radius);
 }
 
 .infoCol,
-.reasonCol {
-  min-width: 0;
-  padding: 0 var(--hw-space-5);
-}
-
-.reasonCol { border-left: 1px solid var(--hw-color-border-subtle); }
+.reasonCol { min-width: 0; }
 
 .nameRow {
   display: flex;
@@ -39,6 +23,7 @@
 .name {
   font-size: var(--hw-font-size-16);
   font-weight: var(--hw-weight-semibold);
+  color: var(--hw-color-text);
 }
 
 .detail,
@@ -54,32 +39,19 @@
 .context,
 .instruction { margin-top: 2px; }
 
-.reason { font-weight: var(--hw-weight-medium); }
+.reason { font-weight: var(--hw-weight-bold); }
 
 .seen { margin-top: var(--hw-space-2); }
 
 .action { margin-top: var(--hw-space-3); }
 
-/* The entry form opens under the row, across all three columns. */
+/* The entry form opens under the row, across both columns. */
 .entry {
   grid-column: 1 / -1;
-  margin-top: var(--hw-space-5);
-  padding: var(--hw-space-5) var(--hw-space-5) 0;
+  padding-top: var(--hw-space-4);
   border-top: 1px solid var(--hw-color-border-subtle);
 }
 
 @media (width < 576px) {
-  .row {
-    grid-template-columns: 1fr;
-    gap: var(--hw-space-3);
-    padding: var(--hw-space-4);
-  }
-  .tagCol { justify-content: flex-start; }
-  .infoCol, .reasonCol { padding: 0; }
-  .reasonCol {
-    padding-top: var(--hw-space-3);
-    border-top: 1px solid var(--hw-color-border-subtle);
-    border-left: 0;
-  }
-  .entry { padding-inline: 0; }
+  .row { grid-template-columns: 1fr; }
 }

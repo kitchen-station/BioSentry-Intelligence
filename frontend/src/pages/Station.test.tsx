@@ -5,7 +5,7 @@
  * entered (trimmed, optional fields left out) and says what it saved.
  */
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -44,9 +44,9 @@ const admitted = (over: Partial<AbstainedRow> = {}): AbstainedRow => ({
   ...over,
 });
 
-const page = () =>
+const page = (path = "/station") =>
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[path]}>
       <Station session={session} onSignOut={() => undefined} />
     </MemoryRouter>,
   );
@@ -83,7 +83,7 @@ describe("Station tabs", () => {
   it("opens on admission, names the ward, and switches between the three sections", async () => {
     const user = userEvent.setup();
     page();
-    expect(screen.getByText(/Station · Ward W4/)).toBeTruthy();
+    expect(within(screen.getByRole("navigation", { name: "Main" })).getByRole("link", { name: "Admit" }).getAttribute("aria-current")).toBe("page");
     expect(screen.getByText(/New patients start NOT RANKED/)).toBeTruthy();
 
     await user.click(screen.getByRole("tab", { name: "Enter lab results" }));
@@ -94,6 +94,20 @@ describe("Station tabs", () => {
 
     await user.click(screen.getByRole("tab", { name: "Admit patient" }));
     expect(screen.getByText(/New patients start NOT RANKED/)).toBeTruthy();
+  });
+
+  it("opens on Patient flow from the bar's Census (?tab=flow), and the bar's Admit moves back to admission", async () => {
+    api.getStays.mockResolvedValue([]);
+    api.getWard.mockResolvedValue({ now: "2026-09-03T07:00:00Z" });
+    const user = userEvent.setup();
+    page("/station?tab=flow");
+    const bar = within(screen.getByRole("navigation", { name: "Main" }));
+    expect(screen.getByRole("tab", { name: "Patient flow" }).getAttribute("aria-selected")).toBe("true");
+    expect(bar.getByRole("link", { name: "Census" }).getAttribute("aria-current")).toBe("page");
+    await user.click(bar.getByRole("link", { name: "Admit" }));
+    expect(screen.getByRole("tab", { name: "Admit patient" }).getAttribute("aria-selected")).toBe("true");
+    await user.click(bar.getByRole("link", { name: "Census" }));
+    expect(screen.getByRole("tab", { name: "Patient flow" }).getAttribute("aria-selected")).toBe("true");
   });
 
   it("moves with the arrow keys, Home and End, keeping only the selected tab in the tab order", async () => {

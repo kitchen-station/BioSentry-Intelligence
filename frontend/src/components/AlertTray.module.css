@@ -1,0 +1,31 @@
+/* Layout inside the kit's hw-alert-tray. The bell, the tray and the items are the kit's. */
+
+.anchor { display: flex; }
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--hw-space-3);
+}
+
+.title {
+  flex: 1;
+  font-size: var(--hw-font-size-16);
+  font-weight: var(--hw-weight-medium);
+}
+
+.who {
+  display: flex;
+  flex: 1 1 150px;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.name { font-weight: var(--hw-weight-medium); }
+
+.line,
+.empty,
+.foot {
+  font-size: var(--hw-text-caption);
+  color: var(--hw-color-text-muted);
+}

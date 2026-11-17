@@ -144,7 +144,8 @@ describe("an own-baseline drift reason on the row", () => {
   it("shows both texts when there are two drift reasons", () => {
     const second = { ...drift, text: "Drifting from own baseline: SpO2, 2 h (synthetic, not validated)" };
     showFlag(2, "rn", [drift, second]);
-    expect(screen.getByText(`${drift.text} · ${second.text}`)).toBeTruthy();
+    expect(screen.getByText(drift.text).className).toContain("hw-tag"); // one reason chip each
+    expect(screen.getByText(second.text).className).toContain("hw-tag");
   });
 
   it("keeps the NEWS2 response and no role line on a medium row", () => {

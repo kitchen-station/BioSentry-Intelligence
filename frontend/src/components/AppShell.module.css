@@ -1,78 +1,113 @@
-/* The app shell grid. SessionMenu's two parts (nav, account) are grid items placed by area name.
-   Desk:  brand | bar     | account        Phone:  menu | bar  | account
-          nav   | main    | main                   main | main | main      */
+/* The app shell: one sticky top bar over the page. Layout only; the look is the kit's
+   (hw-header__nav and __link for the tabs, hw-menu, hw-bottomnav, hw-bell, hw-search). */
 
 .shell {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  grid-template-rows: minmax(56px, auto) 1fr auto;
-  grid-template-areas:
-    "menu  bar  account"
-    "main  main main"
-    "credit credit credit";
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
   background: var(--hw-color-canvas);
 }
 
-/* The sticky bar: one frosted strip behind bar, menu and account. */
-.shell::before {
-  content: "";
-  grid-area: 1 / 1 / 2 / -1;
+.bar {
   position: sticky;
   top: 0;
   z-index: var(--hw-z-sticky);
-  background: color-mix(in srgb, var(--hw-color-surface) 88%, transparent);
-  border-bottom: 1px solid var(--hw-color-border-subtle);
-  backdrop-filter: blur(20px);
-}
-
-.brand { display: none; }
-
-.menu {
-  grid-area: menu;
-  align-self: center;
-  margin-left: var(--hw-space-2);
-}
-
-.brand, .menu, .bar, .shell > :global(.hw-menu-anchor) {
-  position: sticky;
-  top: 0;
-  z-index: calc(var(--hw-z-sticky) + 1);
-}
-
-.bar {
-  grid-area: bar;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--hw-space-2) var(--hw-space-5);
-  min-width: 0;
-  min-height: 56px;
-  padding: var(--hw-space-2) var(--hw-space-4);
+  gap: var(--hw-space-2) var(--hw-space-7);
+  min-height: 64px;
+  padding: 0 var(--hw-space-7);
+  background: var(--hw-color-surface);
+  border-bottom: 1px solid var(--hw-color-border-subtle);
+}
+
+.home {
+  display: flex;
+  color: inherit;
+}
+.home:hover { text-decoration: none; }
+
+.title {
+  font-weight: var(--hw-weight-medium);
+  color: var(--hw-color-text);
+}
+
+/* The kit centres hw-header__nav; here the tabs follow the mark. */
+.tabs {
+  align-items: center;
+  margin: 0;
+}
+
+.tabs :global(.hw-header__link) { line-height: 64px; }
+
+.menuAnchor { display: flex; }
+
+.menuTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hw-space-2);
+  font: inherit;
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+.research {
+  width: 340px;
+  padding-top: 0;
+  overflow: hidden;
+}
+
+.researchNote {
+  border-width: 0 0 1px;
+  border-radius: 0;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+}
+
+.itemTitle { font-weight: var(--hw-weight-medium); }
+
+.itemSub {
   font-size: var(--hw-text-caption);
   color: var(--hw-color-text-muted);
 }
 
-.title {
-  font-size: var(--hw-font-size-16);
-  font-weight: var(--hw-weight-semibold);
-  color: var(--hw-color-text);
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hw-space-2) var(--hw-space-4);
+  margin-left: auto;
 }
 
-.shell > :global(.hw-menu-anchor) { margin-right: var(--hw-space-4); }
+.status {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hw-space-2) var(--hw-space-4);
+  font-size: var(--hw-text-caption);
+  color: var(--hw-color-text-muted);
+}
 
 .main {
-  grid-area: main;
+  flex: 1;
   min-width: 0;
 }
 
+.notice {
+  align-items: center;
+  max-width: var(--ward-max);
+  margin: var(--hw-space-4) auto 0;
+}
+
 .credit {
-  grid-area: credit;
-  /* The floating Ask button sits bottom-right on every page: room so the last row can scroll above it. */
-  padding: var(--hw-space-6) var(--hw-space-5) calc(88px + env(safe-area-inset-bottom));
+  padding: var(--hw-space-6) var(--hw-space-7);
   font-size: var(--hw-text-caption);
   color: var(--hw-color-text-subtle);
-  text-align: center;
 }
 
 .mark {
@@ -88,35 +123,43 @@
 .markIcon {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  font-size: 14px;
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
   color: var(--hw-color-on-accent);
   background: var(--hw-color-accent);
-  border-radius: 8px;
+  border-radius: 9px;
 }
 
-@media (width < 992px) {
-  /* The side nav lives in the drawer here. */
-  .shell > nav { display: none; }
-}
-
-@media (width >= 992px) {
-  .shell {
-    grid-template-columns: 240px minmax(0, 1fr) auto;
-    grid-template-areas:
-      "brand bar  account"
-      "nav   main main"
-      "nav   credit credit";
+/* ---- Phone: an app bar (mark, title over status, bell, account) and the bottom tabs ---- */
+@media (width < 768px) {
+  .bar {
+    flex-wrap: nowrap;
+    gap: var(--hw-space-3);
+    min-height: 56px;
+    padding: 0 var(--hw-space-2) 0 var(--hw-space-4);
   }
-  .menu { display: none; }
-  .brand {
-    grid-area: brand;
+  .markWord { display: none; }
+  .heading {
     display: flex;
-    align-items: center;
-    padding: 0 var(--hw-space-6);
-    background: var(--hw-color-surface);
-    border-right: 1px solid var(--hw-color-border-subtle);
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
   }
-  .credit { text-align: left; padding-inline: var(--hw-space-7); }
+  .heading .title,
+  .heading .status {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .heading .status { display: block; }
+  .tools { flex-wrap: nowrap; gap: var(--hw-space-2); }
+  .menuAnchor { display: grid; }
+  /* The bottom bar's menu opens upward. */
+  .up {
+    top: auto;
+    bottom: calc(100% + 4px);
+    width: min(340px, calc(100vw - 2 * var(--hw-space-4)));
+  }
+  .credit { text-align: center; }
 }

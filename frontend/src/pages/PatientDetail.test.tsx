@@ -149,11 +149,11 @@ describe("the header clock is ward time, as served", () => {
 });
 
 describe("PatientDetail", () => {
-  it("says the patients are simulated, once, and has the session menu", async () => {
+  it("says the patients are simulated, once, and has the top bar and the account", async () => {
     page("rn");
     await loaded();
     expect(screen.getAllByText("Simulated patients until a hospital is connected.")).toHaveLength(1);
-    expect(screen.getByRole("link", { name: "Ward" }).getAttribute("aria-current")).toBeNull();
+    expect(within(screen.getByRole("banner")).getByText("Ward W4")).toBeTruthy(); // a staff nurse has no tabs: the bar names the ward
     const crumbs = screen.getByRole("navigation", { name: "Breadcrumb" });
     expect(within(crumbs).getByRole("link", { name: "Ward view" }).getAttribute("href")).toBe("/ward");
     expect(screen.getByRole("button", { name: /rn-manalo/ })).toBeTruthy();
@@ -989,8 +989,8 @@ describe("PatientDetail: ask about this patient", () => {
     api.hasPatientQuestions = false;
   });
 
-  it("sits after Current vitals and before Labs, as a button that opens the chat panel, and reads no thread itself", async () => {
-    for (const role of ["rn", "md"] as const) {
+  it("sits after Current vitals and before Labs, as a link to the patient's thread, and reads no thread itself", async () => {
+    for (const role of ["charge_rn", "md"] as const) {
       page(role);
       await loaded();
       const heading = await screen.findByRole("heading", { level: 2, name: "Ask about this patient" });
@@ -998,7 +998,7 @@ describe("PatientDetail: ask about this patient", () => {
       const labs = screen.getByText(/^Labs/);
       expect(vitals.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(heading.compareDocumentPosition(labs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(screen.getByRole("button", { name: "Open the chat" })).toBeTruthy();
+      expect(screen.getByRole("link", { name: "Open the chat" }).getAttribute("href")).toBe("/ask/patient/p-001");
       expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
       cleanup();
     }
@@ -1006,11 +1006,13 @@ describe("PatientDetail: ask about this patient", () => {
     expect(api.getPatientQuestions).not.toHaveBeenCalled();
   });
 
-  it("is absent, with no call, for an admin and in the demo build", async () => {
-    page("admin");
-    await loaded();
-    expect(screen.queryByText("Ask about this patient")).toBeNull();
-    cleanup();
+  it("is absent, with no call, for an admin, for a staff nurse (who cannot open the Ask page) and in the demo build", async () => {
+    for (const role of ["admin", "rn"] as const) {
+      page(role);
+      await loaded();
+      expect(screen.queryByText("Ask about this patient")).toBeNull();
+      cleanup();
+    }
     api.hasPatientQuestions = false;
     page("rn");
     await loaded();
@@ -1039,7 +1041,7 @@ describe("PatientDetail: stay panel", () => {
     api.hasPatientQuestions = true;
     api.getPatientQuestions.mockResolvedValue([]);
     try {
-      page("rn");
+      page("md");
       await loaded();
       const summary = await screen.findByText("Stay");
       const vitals = screen.getByText("Current vitals");

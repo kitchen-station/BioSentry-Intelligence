@@ -10,6 +10,7 @@ import { SimulatedNote } from "../components/LabFrame";
 import { StayPanel } from "../components/StayPanel";
 import { since, syncWardNow, useWardNow } from "../components/wardNow";
 import { AskPatient } from "../components/AskPatient";
+import { asksWard } from "../components/roles";
 import { BaselinePanel, BaselineRange, bands } from "../components/BaselinePanel";
 import { ResearchModels } from "../components/ResearchModels";
 import { useBaseline } from "../components/useBaseline";
@@ -535,9 +536,10 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
               </div>
             )}
 
-            {hasPatientQuestions && !readOnly && (
+            {/* Only a role that can open the Ask page gets the link: a staff nurse and an admin do not. */}
+            {hasPatientQuestions && asksWard(role) && (
               <div className="hw-card hw-card--outlined">
-                <AskPatient />
+                <AskPatient patientId={patient.id} />
               </div>
             )}
 

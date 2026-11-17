@@ -1,0 +1,20 @@
+/* Layout inside the kit's hw-search results. */
+
+.search { position: relative; }
+
+.rank {
+  min-width: 28px;
+  color: var(--hw-color-text-muted);
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  font-weight: var(--hw-weight-medium);
+}
+
+.bed,
+.none {
+  font-size: var(--hw-text-caption);
+  color: var(--hw-color-text-muted);
+}

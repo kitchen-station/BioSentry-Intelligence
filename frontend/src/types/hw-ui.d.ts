@@ -11,4 +11,9 @@ declare module "hw-ui" {
     items: { label: string; value: number | null; unit?: string; usual: [number, number]; scale?: [number, number] }[];
   }): Graph;
   export function closeDialog(dialog: HTMLDialogElement | null, value?: string): Promise<void>;
+  /** One toast in the page's live region; returns a function that dismisses it. `timeout` 0 keeps it until dismissed. */
+  export function toast(input: string | {
+    message: string; tone?: "success" | "danger" | "warning" | "info"; icon?: string; timeout?: number;
+    action?: { label: string; onClick?: () => void };
+  }): () => void;
 }

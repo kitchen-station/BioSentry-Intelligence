@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import type { AbstainedRow as AbstainedRowType, VitalsRecorded } from "../types";
 import styles from "./AbstainedRow.module.css";
 import { formatAge, formatBloodPressure, formatClockDay } from "./format";
@@ -38,19 +39,18 @@ interface Props {
   /** Who is recording (shown in the echo of what will be stored). */
   clinicianId?: string;
   onRecorded?: (row: AbstainedRowType, recorded: VitalsRecorded) => void;
+  /** Offline: Record vitals waits until the connection is back. */
+  disabled?: boolean;
 }
 
-export function AbstainedRow({ row, canRecord = false, clinicianId = "", onRecorded }: Props) {
+export function AbstainedRow({ row, canRecord = false, clinicianId = "", onRecorded, disabled = false }: Props) {
   const [entering, setEntering] = useState(false);
   const now = useWardNow();
   return (
-    <div className={`hw-card ${styles.row}`}>
-      <div className={styles.tagCol}>
-        <span className={`hw-tag ${styles.tag}`}>NOT RANKED</span>
-      </div>
+    <div className={styles.row}>
       <div className={styles.infoCol}>
         <div className={styles.nameRow}>
-          <span className={styles.name}>{row.name}</span>
+          <Link to={`/patient/${row.id}`} className={styles.name}>{row.name}</Link>
           <span className={styles.detail}>
             {row.age ?? "--"}{row.sex ? ` ${row.sex}` : ""} &middot; Bed {row.bed}
           </span>
@@ -66,6 +66,7 @@ export function AbstainedRow({ row, canRecord = false, clinicianId = "", onRecor
             type="button"
             className={`hw-button hw-button--sm ${styles.action}`}
             aria-expanded={entering}
+            disabled={disabled && !entering}
             onClick={() => setEntering((open) => !open)}
           >
             {entering ? "Close" : "Record vitals"}

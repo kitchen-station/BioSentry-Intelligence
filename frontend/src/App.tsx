@@ -12,8 +12,8 @@ import { Lab } from "./pages/Lab";
 import { AskChat } from "./pages/AskChat";
 import { Overview } from "./pages/Overview";
 import { WardResearch } from "./pages/WardResearch";
-import { ChatBubble } from "./components/ChatBubble";
 import { asksWard } from "./components/roles";
+import { WardFeedProvider } from "./components/WardFeedProvider";
 
 // Per tab, gone when the tab closes. Only who is signed in is kept here, never a token: with the
 // API the token lives in memory, so a reload returns to sign-in (restoreSession says false). With
@@ -93,8 +93,7 @@ export function App() {
   const clinician = asksWard(session?.role); // the roles that may ask
   const toWard = <Navigate to="/ward" replace />;
 
-  return (
-    <>
+  const routes = (
     <Routes>
       <Route
         path="/"
@@ -156,7 +155,9 @@ export function App() {
       <Route path="/pipeline" element={session ? <Navigate to="/lab/pipeline" replace /> : <ToSignIn gone={gone} />} />
       <Route path="*" element={<Navigate to={session ? "/ward" : "/"} replace />} />
     </Routes>
-    {session && <ChatBubble session={session} onSignOut={signOut} />}
-    </>
   );
+
+  // A signed-in clinician's pages share one read of the ward: the Ward rows and the bell on every page show the same alerts.
+  // An administrator reads the ward only on the Ward page (it brings its own read), never in the background.
+  return session && session.role !== "admin" ? <WardFeedProvider key={session.clinician_id} session={session}>{routes}</WardFeedProvider> : routes;
 }
