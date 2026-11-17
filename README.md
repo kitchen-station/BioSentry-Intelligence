@@ -80,6 +80,10 @@ simulator makes the data and judges the alerts. The full tables and method are i
 
 ```mermaid
 flowchart LR
+  subgraph wardnet["Ward network: works with no internet"]
+    patch["Chest patch<br/>planned"]
+    gw["Ward gateway<br/>planned"]
+  end
   subgraph ward["Ward"]
     sim["Ward simulator, one ward or<br/>the whole hospital<br/>stands in for patch and monitor"]
     nurse["Nurse entry<br/>BP, consciousness, oxygen"]
@@ -98,7 +102,7 @@ flowchart LR
     ma["ModelArts<br/>training job"]
     obs["OBS<br/>model files, backups"]
     ecs["ECS<br/>hosts the server"]
-    iot["IoTDA<br/>device data"]
+    iot["IoTDA<br/>device management and cloud sync"]
   end
   sim -- "/sim/* with ingest key" --> api
   nurse --> web
@@ -112,11 +116,15 @@ flowchart LR
   ma -.-> ms
   ma -.-> obs
   ecs -.-> server
-  iot -.-> api
+  patch -. BLE .-> gw
+  gw -. ward Wi-Fi or cable .-> api
+  server -. sync when online .-> iot
   classDef used fill:#fdecea,stroke:#c7000b,color:#000
   classDef planned fill:#ffffff,stroke:#c7000b,stroke-dasharray:5 4,color:#000
   class ms,lite,nlp used
+  classDef ward fill:#ffffff,stroke:#767676,stroke-dasharray:5 4,color:#000
   class ma,obs,ecs,iot planned
+  class patch,gw ward
 ```
 
 Red: Huawei technology in use today. MindSpore 2.11 trains the student, and MindSpore Lite converts it
@@ -124,6 +132,15 @@ Red: Huawei technology in use today. MindSpore 2.11 trains the student, and Mind
 MindNLP 0.5.1 on MindSpore 2.7 LoRA-tunes the model that the lab question worker can use
 (`research/agent_tuning/`, `deploy/compose.tuned.yaml`). Dashed: Huawei Cloud services planned and not running yet. The API runs the student from its exported weights (`models/`), scores NEWS2 on
 every read, and stores no score.
+
+**Local first.** On a ward, nothing between the patient and the screen needs the internet. The chest patch
+(planned) sends over BLE to a ward gateway; the gateway sends over the hospital's own network (Wi-Fi or cable) to the
+edge server, which runs the API, the database, NEWS2 scoring and the arbiter; the dashboard reads it on the ward's
+screens. Together the gateway and the edge server are the ward hub. Slow or no internet stops nothing on the ward.
+Huawei Cloud sits on top and is never in that path: it gets a synced copy, backups, model files and training, only
+when a connection exists, and IoT Device Access is device management and cloud sync, not the way readings reach the
+API. Grey dashed: planned ward hardware. The team server and the Cloudflare sites that run BioSentry today are
+proof-of-concept hosting, not the ward deployment.
 
 ## Screenshots
 
@@ -446,11 +463,12 @@ active one: the seeded fixture ward, or a simulated ward posted to `/sim/*`.
 bad attempts stays locked for 15 minutes, whoever made them), cloud sync, a hash-chained audit log, Tier B beyond the
 own-baseline tie-break, a
 signal-quality model, conformal abstention, the models on ward edge hardware, anything measured on real
-patients, a sensor pipeline (IoT Device Access), document extraction, and a plain-language
+patients, the chest patch and ward gateway (BLE, then the ward network), cloud sync through IoT Device Access
+(device management and sync when online), document extraction, and a plain-language
 explanation of each ranked alert for the nurse or physician.
 
-**Next:** run the server on Huawei Cloud ECS, train on ModelArts with the data and outputs in OBS, and take
-device data through IoT Device Access. Not doing: federated learning, digital twins, reinforcement-learning
+**Next:** run the server on Huawei Cloud ECS, train on ModelArts with the data and outputs in OBS, and use IoT
+Device Access for device management and to sync the ward hub's data to the cloud when a connection exists. Not doing: federated learning, digital twins, reinforcement-learning
 assignment, ECG foundation models.
 
 This repository makes no claim about clinical performance. The scores are a published rule
@@ -465,7 +483,9 @@ applied to made-up patients.
 - **I5** No training on BioSentry patients: local data calibrates and validates only.
 - **I6** The synthetic flag propagates: every fixture record says `synthetic: true`.
 - **I7** Privacy (the technical safeguards of RA 10173; see [Privacy](#privacy)): one screen per clinician, their patients only, audit on every view. A repeated read of the same page by the same clinician is recorded at most once a minute; the first read, every write, and every refusal or not-found answer to a signed-in clinician are always recorded (the owner's decision for the automatic refresh).
-- **I8** Transport: BLE to a gateway, then Wi-Fi or 4G to the cloud. NB-IoT is excluded.
+- **I8** Transport: BLE from the patch to a ward gateway, then the hospital's local network (Wi-Fi or cable) to the
+  edge server. The ward never depends on the internet; the cloud gets a synced copy only when a connection exists.
+  NB-IoT is excluded.
 
 ## Design rules
 

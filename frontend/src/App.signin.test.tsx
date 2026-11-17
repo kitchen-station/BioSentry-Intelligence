@@ -41,7 +41,7 @@ const stub = (name: string) => ({ session, onSignOut }: StubProps) => (
 vi.mock("./components/WardFeedProvider", () => ({ WardFeedProvider: ({ children }: { children: unknown }) => children }));
 vi.mock("./pages/Ward", () => ({ Ward: (p: StubProps) => stub("ward")(p) }));
 vi.mock("./pages/PatientDetail", () => ({ PatientDetail: (p: StubProps) => stub("patient")(p) }));
-vi.mock("./pages/Station", () => ({ Station: (p: StubProps) => stub("station")(p) }));
+vi.mock("./pages/Admit", () => ({ Admit: (p: StubProps) => stub("admit")(p) }));
 vi.mock("./pages/Overview", () => ({ Overview: (p: StubProps) => stub("overview")(p) }));
 vi.mock("./pages/Lab", () => ({ Lab: (p: StubProps) => stub("lab")(p) }));
 vi.mock("./pages/Research", () => ({ Research: (p: StubProps) => stub("research")(p) }));
@@ -93,7 +93,7 @@ describe("where a sign-in lands", () => {
     expect(await screen.findByText("ward page for rn-delacruz")).toBeTruthy();
   });
 
-  it("a physician after another physician signed out on the lab: the station", async () => {
+  it("a physician after another physician signed out on the lab: the Station destination, which is Admit now", async () => {
     sessionStorage.setItem("biosentry.session", JSON.stringify(physician));
     start("/lab");
     await signOut();
@@ -101,7 +101,7 @@ describe("where a sign-in lands", () => {
     await click(/Dr\. Aquino/);
     await click("Continue");
     await click(/Station/);
-    expect(await screen.findByText("station page for md-aquino")).toBeTruthy();
+    expect(await screen.findByText("admit page for md-aquino")).toBeTruthy();
   });
 
   it("an admin after a clinician signed out on the lab: the overview", async () => {

@@ -2,52 +2,88 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Session } from "../types";
 import { LabFrame, SimulatedNote } from "./LabFrame";
 
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
 });
 const phone = () =>
   vi.spyOn(window, "matchMedia").mockImplementation((q) => ({ matches: true, media: q, addEventListener() {}, removeEventListener() {} }) as unknown as MediaQueryList);
 
-describe("LabFrame", () => {
-  const frame = () =>
-    render(
-      <MemoryRouter initialEntries={["/lab"]}>
-        <LabFrame session={{ clinician_id: "admin-ruiz", ward: "W4", role: "admin" }} onSignOut={() => {}}>
-          <p>inside</p>
-        </LabFrame>
-      </MemoryRouter>,
-    );
+const STRIP = "Research · Synthetic, not validated. Nothing here changes a patient's rank.";
+const who = (role: Session["role"]): Session => ({ clinician_id: `${role}-x`, ward: "W4", role });
+const frame = (session: Session | null, at = "/lab", title = "Simulation lab") =>
+  render(
+    <MemoryRouter initialEntries={[at]}>
+      <LabFrame session={session} onSignOut={() => {}} title={title}>
+        <p>inside</p>
+      </LabFrame>
+    </MemoryRouter>,
+  );
+const pages = (name: string) =>
+  within(screen.getByRole("navigation", { name })).getAllByRole("link").map((a) => [a.textContent, a.getAttribute("href"), a.getAttribute("aria-current")]);
 
-  it("carries the standing label, the way back and the page", () => {
-    frame();
-    expect(screen.getByRole("note").textContent).toBe("Simulation lab: not the ward. Nothing here changes a patient's rank.");
+describe("the research space", () => {
+  it("carries the strip, in the research space, around the page and the way back to the ward", () => {
+    frame(who("admin"));
+    const note = screen.getByRole("note");
+    expect(note.textContent).toBe(STRIP);
+    expect(note.closest("[data-hw-space='research']")).toBe(screen.getByText("inside").closest("[data-hw-space='research']"));
+    expect(document.querySelector("b, i, u, s")).toBeNull(); // icons are spans
     expect(within(screen.getByRole("navigation", { name: "Main" })).getByRole("link", { name: "Ward" }).getAttribute("href")).toBe("/ward");
-    expect(screen.getByText("inside")).toBeTruthy();
   });
 
-  it("names the lab in the phone's app bar", () => {
-    phone();
-    frame();
-    expect(within(screen.getByRole("banner")).getByText("Simulation lab")).toBeTruthy();
+  it.each(["", "/api"])("links the lab's pages for an admin (VITE_API_URL=%j) and marks the current one, the front page only on itself", (api) => {
+    vi.stubEnv("VITE_API_URL", api);
+    frame(who("admin"), "/lab/research");
+    expect(pages("Lab pages")).toEqual([
+      ["Research numbers", "/lab/research", "page"],
+      ["Pipeline", "/lab/pipeline", null],
+      ["Simulation lab", "/lab", null],
+    ]);
   });
-});
 
-describe("LabFrame, the clinician's wording", () => {
-  it("names What-if runs and says the trials are simulated", () => {
+  it.each(["md", "charge_rn"] as const)("links the clinician's research pages for %s with the API, a patient's Ask thread marking Ask", (role) => {
+    vi.stubEnv("VITE_API_URL", "/api");
+    frame(who(role), "/ask/patient/p-001", "Ask the assistant");
+    expect(pages("Research pages")).toEqual([
+      ["Ask the assistant", "/ask", "page"],
+      ["What-if runs", "/what-if", null],
+      ["Ward research", "/ward/research", null],
+    ]);
+  });
+
+  it("links the lab's pages for every demo clinician in the sample build, and none for a staff nurse", () => {
+    frame(who("md"), "/lab");
+    expect(pages("Research pages")).toEqual([
+      ["Research numbers", "/lab/research", null],
+      ["Pipeline", "/lab/pipeline", null],
+      ["Simulation lab", "/lab", "page"],
+    ]);
+    cleanup();
+    frame(who("rn"));
+    expect(screen.getByRole("note").textContent).toBe(STRIP);
+    expect(screen.queryByRole("navigation", { name: /pages/ })).toBeNull();
+  });
+
+  it("names the page in the phone's app bar", () => {
     phone();
-    render(
-      <MemoryRouter initialEntries={["/what-if"]}>
-        <LabFrame whatIf session={{ clinician_id: "md-santos", ward: "W4", role: "md" }} onSignOut={() => {}}>
-          <p>inside</p>
-        </LabFrame>
-      </MemoryRouter>,
-    );
+    frame(who("md"), "/what-if", "What-if runs");
     expect(within(screen.getByRole("banner")).getByText("What-if runs")).toBeTruthy();
-    expect(screen.getByRole("note").textContent).toBe("Simulated trials only. Nothing here changes a patient's rank.");
-    expect(screen.queryByText(/Simulation lab/)).toBeNull();
+  });
+
+  it("before sign-in: the strip and the page, a way back to sign-in, no account, no tabs and no page links", () => {
+    frame(null, "/lab/research", "Research numbers");
+    expect(screen.getByRole("note").textContent).toBe(STRIP);
+    expect(screen.getByText("inside")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Sign in" }).getAttribute("href")).toBe("/");
+    expect(screen.getAllByRole("link")).toHaveLength(1);
+    expect(screen.queryByRole("navigation")).toBeNull();
+    expect(screen.queryByRole("button")).toBeNull(); // no account menu, no assistant
+    expect(screen.getByText("Set in HarmonyOS Sans")).toBeTruthy();
   });
 });
 
@@ -55,5 +91,11 @@ describe("SimulatedNote", () => {
   it("says the patients are simulated", () => {
     render(<SimulatedNote />);
     expect(screen.getByRole("note").textContent).toBe("Simulated patients until a hospital is connected.");
+  });
+
+  it("adds read-only for an administrator", () => {
+    render(<SimulatedNote readOnly />);
+    expect(screen.getByText("Simulated patients until a hospital is connected.")).toBeTruthy();
+    expect(screen.getByText("Read-only. Every view is recorded in the audit log.").tagName).toBe("STRONG");
   });
 });

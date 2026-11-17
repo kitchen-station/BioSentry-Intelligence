@@ -16,6 +16,25 @@ declare module "hw-ui" {
     /** Only the stretch where this holds takes the highlight colour. */
     highlightWhere?: (v: number) => boolean;
   }): Graph & { update(config: unknown): void };
+  export interface BarsConfig extends Common {
+    items: { name: string; value: number; interval?: [number, number] }[];
+    highlight?: number;
+    /** Index of the item the readout compares the others with. */
+    baseline?: number;
+    max?: number;
+    label?: (item: { name: string; value: number }) => string;
+    /** Changes against a reference: a labelled zero line in the middle, losses left, gains right. */
+    diverging?: boolean;
+    zeroLabel?: string;
+    sides?: [string, string];
+    /** Names the per-item interval in the readout. */
+    intervalLabel?: string;
+  }
+  export function bars(el: HTMLElement, config: BarsConfig): Graph;
+  /** One measure over time; the picked column (default the latest) is read against the average. */
+  export function columns(el: HTMLElement, config: Common & {
+    x: string[]; values: number[]; highlight?: number; average?: boolean; averageLabel?: string; noun?: [string, string];
+  }): Graph;
   export function range(el: HTMLElement, config: Common & {
     items: { label: string; value: number | null; unit?: string; usual: [number, number]; scale?: [number, number] }[];
   }): Graph;

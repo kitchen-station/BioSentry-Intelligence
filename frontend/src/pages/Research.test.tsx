@@ -7,17 +7,18 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const api = vi.hoisted(() => ({ getStays: vi.fn(), getWard: vi.fn(), restoreSession: vi.fn(), clearSession: vi.fn() }));
 vi.mock("../api", () => api);
 
-import { CONFIDENCE_CHECK, LEARNED_RULES, MODEL_FACTS, RESEARCH_PROVENANCE, RESEARCH_RESULTS, RUN_COMPARISON } from "../data/researchResults";
-import { Research } from "./Research";
+import { CONFIDENCE_CHECK, HELD_OUT_2, HELD_OUT_2_ALONE, LEARNED_RULES, MODEL_FACTS, RESEARCH_PROVENANCE, RESEARCH_RESULTS, RUN_COMPARISON } from "../data/researchResults";
+import { ALONE, HEADLINE, Research } from "./Research";
 
 afterEach(cleanup);
 
-const show = (at = "/", role: "md" | "admin" = "admin") =>
+const show = (at = "/", role: "md" | "admin" | null = "admin") =>
   render(
     <MemoryRouter initialEntries={[at]}>
-      <Research session={{ clinician_id: "md-santos", ward: "W4", role }} onSignOut={() => {}} />
+      <Research session={role && { clinician_id: "md-santos", ward: "W4", role }} onSignOut={() => {}} />
     </MemoryRouter>,
   );
+const STRIP = "Research · Synthetic, not validated. Nothing here changes a patient's rank.";
 
 const round3 = (x: number) => Number(x.toFixed(3));
 const cell = (id: string) => RESEARCH_RESULTS.find((r) => r.id === id)!;
@@ -98,16 +99,121 @@ describe("learned rules data", () => {
   });
 });
 
+describe("held-out set 2 data", () => {
+  it("names its sources, and pins the gains and 98.33% intervals as the declared analysis printed them", () => {
+    expect(HELD_OUT_2.source).toBe("models/held_out_2/analysis.json");
+    expect(HELD_OUT_2_ALONE.source).toBe("models/tier_c/student_vitals/held_out_2.txt");
+    expect(HELD_OUT_2).toMatchObject({ trials: 400, episodes: 1743, notCutShort: 1601, interval: "98.33%" });
+    expect(HELD_OUT_2.rows.map((r) => [r.id, r.gain, r.lo, r.hi, r.verdict])).toEqual([
+      ["news2_or_student", -0.0401, -0.0542, -0.0253, "a loss is shown"],
+      ["news2_or_student_checked", 0.0181, 0.008, 0.0291, "a gain beyond chance is shown"],
+      ["news2_or_reward_final", -0.0127, -0.0245, -0.0001, "a loss is shown"],
+    ]);
+    // The verdict rule of the analysis: a gain only if the lower end is above 0, a loss only if the upper end is below 0.
+    for (const r of HELD_OUT_2.rows) expect(r.verdict).toBe(r.lo > 0 ? "a gain beyond chance is shown" : r.hi < 0 ? "a loss is shown" : "no verdict");
+  });
+
+  it("pins the rules alone as printed, each rate equal to its count over 1,743", () => {
+    const { news2, student, patients } = HELD_OUT_2_ALONE;
+    expect(patients).toBe(37062);
+    expect([student.newAlert, news2.newAlert]).toEqual([{ n: 1048, d: 1743, rate: 0.601 }, { n: 854, d: 1743, rate: 0.49 }]);
+    for (const r of [student, news2]) expect(r.newAlert.rate).toBe(round3(r.newAlert.n / r.newAlert.d));
+    expect([student.timeInAlert, news2.timeInAlert]).toEqual([0.065, 0.166]);
+    expect([student.alertsPerCaught, news2.alertsPerCaught]).toEqual([125.8, 151.0]);
+    expect([student.leadMedianMin, news2.leadMedianMin]).toEqual([82.9, 46.6]);
+  });
+});
+
+describe("the findings, drawn", () => {
+  it("draws the result to quote as a diverging bars graph: each gain with its 98.33% interval, the checked student highlighted", () => {
+    expect(HEADLINE).toMatchObject({ diverging: true, zeroLabel: "0 · NEWS2 alone", sides: ["a loss", "a gain"], intervalLabel: "98.33% interval", highlight: 0 });
+    expect(HEADLINE.items).toEqual([
+      { name: "NEWS2 or student with the confidence check", value: 0.0181, interval: [0.008, 0.0291] },
+      { name: "NEWS2 or student", value: -0.0401, interval: [-0.0542, -0.0253] },
+      { name: "NEWS2 or reward-learned policy", value: -0.0127, interval: [-0.0245, -0.0001] },
+    ]);
+    expect(HEADLINE.items.map((i) => HEADLINE.format!(i.value))).toEqual(["+0.018", "-0.040", "-0.013"]);
+    expect(HEADLINE.items.map((i) => HEADLINE.label!(i))).toEqual([
+      "NEWS2 or student with the confidence check: a gain beyond chance is shown",
+      "NEWS2 or student: a loss is shown",
+      "NEWS2 or reward-learned policy: a loss is shown",
+    ]);
+  });
+
+  it("draws four findings about the student alone, each against NEWS2, from the set 2 file", () => {
+    expect(ALONE.map((c) => [c.title, c.items.map((i) => [i.name, i.value]), c.baseline, c.highlight])).toEqual([
+      ["It gave a new alert in more deteriorations", [["Student model", 60.1], ["NEWS2", 49]], 1, 0],
+      ["It spent less than half as long in alert", [["Student model", 6.5], ["NEWS2", 16.6]], 1, 0],
+      ["It warned about 36 minutes earlier", [["Student model", 82.9], ["NEWS2", 46.6]], 1, 0],
+      ["It needed fewer alerts for each deterioration it caught", [["Student model", 125.8], ["NEWS2", 151]], 1, 0],
+    ]);
+    // Each title holds for its numbers.
+    const [more, half, , fewer] = ALONE.map((c) => c.items.map((i) => i.value));
+    expect(more[0]).toBeGreaterThan(more[1]);
+    expect(half[0]).toBeLessThan(half[1] / 2);
+    expect(fewer[0]).toBeLessThan(fewer[1]);
+    expect(ALONE.map((c) => c.format!(c.items[0].value))).toEqual(["60.1%", "6.5%", "82.9 min", "125.8"]);
+    expect(ALONE.every((c) => !c.diverging && c.items.every((i) => !i.interval))).toBe(true);
+  });
+
+  it("puts the findings first, in the research space, then the tables in a closed accordion, then the sources", () => {
+    show();
+    const figures = screen.getAllByRole("figure");
+    expect(figures.map((f) => within(f).getByRole("heading").textContent)).toEqual([HEADLINE.title, ...ALONE.map((c) => c.title)]);
+    expect(figures.every((f) => f.closest("[data-hw-space='research']"))).toBe(true);
+    const headline = figures[0];
+    expect(headline.dataset.diverging).toBe("");
+    expect(headline.querySelectorAll(".hw-graph__interval")).toHaveLength(3);
+    expect(headline.querySelector(".hw-graph__value")!.textContent).toBe("+0.018");
+    expect(headline.querySelector(".hw-graph__label")!.textContent).toBe("NEWS2 or student with the confidence check: a gain beyond chance is shown");
+    expect(headline.querySelector(".hw-graph__detail")!.textContent).toBe("98.33% interval +0.008 to +0.029");
+    const details = screen.getByText("Full tables").closest("details")!;
+    expect(details.open).toBe(false);
+    expect(screen.getAllByRole("table").every((t) => details.contains(t))).toBe(true);
+    expect(figures.every((f) => f.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+    expect(screen.getByText(/Held-out set 2: 400 trials, 37,062 patients, 1,743 deterioration episodes\./)).toBeTruthy();
+    expect(screen.getByText(/The gains and their 98\.33% intervals: models\/held_out_2\/analysis\.json\. The rules\s+alone: models\/tier_c\/student_vitals\/held_out_2\.txt\./)).toBeTruthy();
+    expect(screen.getByText(/upper end is at the edge of zero \(-0\.0001\)/)).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/95% interval \+0\.008/); // the frames' label: the declared interval is 98.33%
+    expect(document.querySelector("b, i, u, s")).toBeNull(); // icons are spans
+  });
+
+  it("shows the set 2 numbers in the first table of the accordion", () => {
+    show();
+    const table = screen.getAllByRole("table")[0];
+    expect(table.querySelector("caption")!.textContent).toBe("Held-out set 2, 1,743 episodes evaluated. Synthetic simulator, not validated.");
+    expect(within(table).getAllByRole("row").slice(1).map((r) => [...r.children].map((c) => c.textContent))).toEqual([
+      ["Episodes with a new alert in the window", "0.601 (1048/1743)", "0.490 (854/1743)"],
+      ["Time in alert", "0.065", "0.166"],
+      ["Alerts per episode with a new alert", "125.8", "151.0"],
+      ["Median lead time, minutes, episodes with a new alert", "82.9", "46.6"],
+    ]);
+  });
+
+  it("before sign-in (the sample build's evidence): the same findings and tables, no account, no recorded run, a way back to sign-in", () => {
+    show("/lab/research", null);
+    expect(screen.getByRole("heading", { level: 1, name: "Research numbers" })).toBeTruthy();
+    expect(screen.getAllByRole("note")[0].textContent).toBe(STRIP);
+    expect(screen.getAllByRole("figure")).toHaveLength(5);
+    expect(screen.getAllByRole("table")).toHaveLength(4);
+    expect(screen.getByRole("link", { name: "Sign in" }).getAttribute("href")).toBe("/");
+    expect(screen.queryByRole("button", { name: /md-santos/ })).toBeNull();
+    expect(screen.queryByRole("navigation")).toBeNull();
+    expect(document.getElementById("agent")).toBeNull();
+    for (const fn of Object.values(api)) expect(fn).not.toHaveBeenCalled();
+  });
+});
+
 describe("Research page", () => {
   it("shows one h1, the banner and the six rules in a captioned table", () => {
     show();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.getAllByRole("note").map((n) => n.textContent)).toEqual([
-      "Simulation lab: not the ward. Nothing here changes a patient's rank.",
+      STRIP,
       "Synthetic, not validated. These numbers come from a simulator, judged on the same simulator. They are not evidence about patients.",
     ]);
     expect(screen.getByRole("link", { name: "Ward" })).toBeTruthy(); // the bar link, present on every page
-    const table = screen.getAllByRole("table")[0];
+    const table = screen.getAllByRole("table")[1];
     expect(within(table).getByText(/Alert rules on simulated episodes/)).toBeTruthy();
     const rows = within(table).getAllByRole("row").slice(1);
     expect(rows.map((r) => within(r).getByRole("rowheader").textContent)).toEqual([
@@ -140,7 +246,7 @@ describe("Research page", () => {
     expect(screen.getByText(/In 17 of 27, no cuff reading reached NEWS2 inside the window/)).toBeTruthy();
     expect(screen.getByText(/simulator commit f7647c5, scenario 95052d02/)).toBeTruthy();
     expect(screen.getByText(/Earlier run: ward-v1, simulator commit 3a15e01/)).toBeTruthy();
-    expect(screen.getAllByRole("table")[0].querySelector("caption")!.textContent).toMatch(/^Synthetic simulator, not validated\./);
+    expect(screen.getAllByRole("table")[1].querySelector("caption")!.textContent).toMatch(/^Synthetic simulator, not validated\./);
     expect(screen.getByText(/Source: evaluation on 2026-11-13, simulator commit f7647c5, scenario 95052d02\./)).toBeTruthy();
     expect(screen.getByText(/Each model was scored on the held-out seeds once, by procedure\. The same seeds were used earlier for earlier models\. Student model \(run m1-20261113-3d634f3\): trained with MindSpore 2\.11\.0 on ward-v2-ext seeds 61 to 160, chosen on seeds 261 to 300\. Reward-learned policy \(run m2-20261113\): learned on ward-v2-ext seeds from 401, validation seeds 341 to 400\. Confidence check \(run m3-20261113-fbd39f2\): calibrated on ward-v2-ext seeds 301 to 340\./)).toBeTruthy();
     expect(screen.getByText(/NEWS2 itself is never changed/)).toBeTruthy();
@@ -150,8 +256,8 @@ describe("Research page", () => {
   it("shows the learned rules in a second captioned table", () => {
     show();
     const tables = screen.getAllByRole("table");
-    expect(tables).toHaveLength(3);
-    const table = tables[1];
+    expect(tables).toHaveLength(4);
+    const table = tables[2];
     expect(table.querySelector("caption")!.textContent).toBe(
       "Learned rules. Synthetic simulator, not validated. The learned rules were trained on simulator trials and judged on other trials of the same simulator.",
     );
@@ -164,7 +270,7 @@ describe("Research page", () => {
     expect(cells(5)).toEqual(["0.128", "0.026", "0.633 (50/79)", "0.089 (415/4678)", "+0.544", "20.5"]);
     expect(cells(8)).toEqual(["0.153", "0.035", "0.633 (50/79)", "0.140 (656/4678)", "+0.493", "-3.8"]);
     expect(cells(16)).toEqual(["0.451", "0.166", "0.759 (60/79)", "0.504 (2357/4678)", "+0.256", "56.5"]);
-    const first = within(tables[0]);
+    const first = within(tables[1]);
     expect(first.getAllByRole("columnheader")[2].textContent).toBe(within(table).getAllByRole("columnheader")[3].textContent);
     expect(first.getAllByRole("columnheader")[3].textContent).toBe(within(table).getAllByRole("columnheader")[4].textContent);
   });
@@ -242,7 +348,7 @@ describe("Research page", () => {
 
   it("compares ward-v1 and ward-v2 in a third captioned table", () => {
     show();
-    const table = screen.getAllByRole("table")[2];
+    const table = screen.getAllByRole("table")[3];
     expect(table.querySelector("caption")!.textContent).toMatch(/^Synthetic simulator, not validated\. Each rule on ward-v1/);
     expect(within(table).getAllByRole("columnheader")[5].textContent).toBe("Excess over chance, 79 episodes not cut short (no interval), ward-v1");
     const rows = within(table).getAllByRole("row").slice(1);

@@ -1,7 +1,9 @@
-/* The lab is told apart from the ward by its banner: a tinted line that says nothing here touches a rank. */
-.label,
+/* The research space is told apart from the ward by its strip: info-tinted, it says nothing here touches a rank,
+   and holds the space's own page links. The ward pages have a quiet grey line instead. */
+.strip,
 .quiet {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--hw-space-2);
   padding: var(--hw-space-3) var(--hw-space-5);
@@ -9,9 +11,39 @@
   border-bottom: 1px solid var(--hw-color-border-subtle);
 }
 
-.label {
+.strip {
+  column-gap: var(--hw-space-5);
   color: var(--hw-color-info-fg);
   background: var(--hw-color-info-bg);
+  border-bottom-color: var(--hw-color-info-border);
+}
+
+.label {
+  display: flex;
+  flex: 1 1 320px;
+  align-items: center;
+  gap: var(--hw-space-3);
+}
+
+.pages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hw-space-2);
+}
+
+/* A page link: info text; the current page filled in info blue (shape and weight too, not colour alone). */
+.page {
+  --hw-button-fg: var(--hw-color-info-fg);
+
+  font-weight: var(--hw-weight-medium);
+}
+
+.page:hover { text-decoration: none; }
+
+.page[aria-current="page"] {
+  --hw-button-bg: var(--hw-color-info-fg);
+  --hw-button-bg-hover: var(--hw-color-info-fg);
+  --hw-button-fg: var(--hw-color-surface);
 }
 
 .quiet {
@@ -19,6 +51,12 @@
   background: var(--hw-color-surface-subtle);
 }
 
+.readOnly {
+  margin-left: var(--hw-space-4);
+  font-weight: var(--hw-weight-medium);
+  color: var(--hw-color-text);
+}
+
 @media (width >= 768px) {
-  .label, .quiet { padding-inline: var(--hw-space-7); }
+  .strip, .quiet { padding-inline: var(--hw-space-7); }
 }

@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import type { Session } from "../types";
 import { ApiError, getWard, hasLabQuestions, hasPatientQuestions } from "../api";
-import { SimulatedNote } from "../components/LabFrame";
-import { AppShell } from "../components/AppShell";
+import { LabFrame } from "../components/LabFrame";
 import { Thread } from "../components/Thread";
 import { useAskScope } from "../components/useAskScope";
 import styles from "./AskChat.module.css";
@@ -56,20 +55,19 @@ function Chat({ session, onSignOut }: Props) {
   );
 }
 
-/** The chat: the ward's thread at /ask and one patient's at /ask/patient/:id. Nothing here writes to the live ward. */
+/** The chat, in the research space: the ward's thread at /ask and one patient's at /ask/patient/:id. Nothing here writes to the live ward. */
 export function AskChat({ session, onSignOut }: Props) {
   const connected = useAskScope().kind === "patient" ? hasPatientQuestions : hasLabQuestions;
   return (
-    <AppShell session={session} onSignOut={onSignOut} title="Ask" status={`Ward ${session.ward}`}>
-      <SimulatedNote />
+    <LabFrame session={session} onSignOut={onSignOut} title="Ask the assistant" status={`Ward ${session.ward}`}>
       <div className={styles.container}>
-        <h1 className="hw-heading hw-heading--3">Ask</h1>
+        <h1 className="hw-heading hw-heading--3">Ask the assistant</h1>
         {connected ? (
           <Chat session={session} onSignOut={onSignOut} />
         ) : (
           <p className="hw-text-muted">Getting ready: the chat is not connected in this demo.</p>
         )}
       </div>
-    </AppShell>
+    </LabFrame>
   );
 }

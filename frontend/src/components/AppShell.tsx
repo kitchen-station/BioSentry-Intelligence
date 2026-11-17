@@ -1,5 +1,5 @@
 import { useId, useSyncExternalStore, type ReactNode } from "react";
-import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import type { Session } from "../types";
 import { AlertTray } from "./AlertTray";
 import { PatientSearch } from "./PatientSearch";
@@ -34,13 +34,12 @@ export function Mark() {
 
 // ---- Where each role can go ----
 
-interface Tab { label: string; to: string; icon: string; current: (path: string, tab: string | null) => boolean }
+interface Tab { label: string; to: string; icon: string }
 
-const WARD: Tab = { label: "Ward", to: "/ward", icon: "list-ol", current: (p) => p === "/ward" };
-// Until Census and Admit have their own pages, each opens the Station on its matching tab.
-const CENSUS: Tab = { label: "Census", to: "/station?tab=flow", icon: "chart-column", current: (p, t) => p === "/station" && t === "flow" };
-const ADMIT: Tab = { label: "Admit", to: "/station", icon: "user-plus", current: (p, t) => p === "/station" && t !== "flow" };
-const OVERVIEW: Tab = { label: "Overview", to: "/overview", icon: "gauge-high", current: (p) => p === "/overview" };
+const WARD: Tab = { label: "Ward", to: "/ward", icon: "list-ol" };
+const CENSUS: Tab = { label: "Census", to: "/census", icon: "chart-column" };
+const ADMIT: Tab = { label: "Admit", to: "/admit", icon: "user-plus" };
+const OVERVIEW: Tab = { label: "Overview", to: "/overview", icon: "gauge-high" };
 
 const TABS: Record<string, readonly Tab[]> = { md: [WARD, CENSUS, ADMIT], charge_rn: [WARD, CENSUS, ADMIT], admin: [OVERVIEW, WARD] };
 
@@ -173,6 +172,25 @@ export function OfflineBanner({ since, from, retry, acts, className = "" }: {
 }
 
 /**
+ * The frame of a page read before sign-in (the sample build's evidence): the mark and the way back to sign-in. No
+ * account, no tabs, no search, no bell: nobody is signed in.
+ */
+export function PublicShell({ children }: { children: ReactNode }) {
+  return (
+    <div className={styles.shell}>
+      <header className={styles.bar}>
+        <span className={styles.home}><Mark /></span>
+        <div className={styles.tools}>
+          <Link to="/" className="hw-button hw-button--sm hw-button--accent">Sign in</Link>
+        </div>
+      </header>
+      <main className={styles.main}>{children}</main>
+      <p className={styles.credit}>Set in HarmonyOS Sans</p>
+    </div>
+  );
+}
+
+/**
  * The frame of every signed-in page: one top bar (mark, the role's tabs, unit, search, status, bell,
  * account) over the page. On a phone (< 768px) the bar is an app bar with the page's title and status,
  * and the tabs move to a bottom bar; a staff nurse, who has no tabs, has none.
@@ -182,8 +200,6 @@ export function AppShell({ session, onSignOut, title, status, detail = false, ch
   const feed = useWardFeed();
   const assistant = useAssistant();
   const { pathname } = useLocation();
-  const [params] = useSearchParams();
-  const tab = params.get("tab");
   const tabs = TABS[session.role] ?? [];
   const items = researchItems(session.role);
   const menuLabel = session.role === "admin" ? "Lab" : "Research";
@@ -193,7 +209,7 @@ export function AppShell({ session, onSignOut, title, status, detail = false, ch
 
   const tabLinks = (className: string, icon: boolean) =>
     tabs.map((t) => (
-      <Link key={t.label} to={t.to} className={className} aria-current={t.current(pathname, tab) ? "page" : undefined}>
+      <Link key={t.label} to={t.to} className={className} aria-current={pathname === t.to ? "page" : undefined}>
         {icon && <span className={`hw-bottomnav__icon hw-icon fa-solid fa-${t.icon}`} aria-hidden="true" />}
         {t.label}
       </Link>
