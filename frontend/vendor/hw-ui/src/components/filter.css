@@ -1,0 +1,88 @@
+@layer hw.components {
+  /* Filter chips with live counts. Single choice: the app sets aria-pressed="true" on one item, "All" resets.
+     div.hw-filter[role=group][aria-label="Filter patients"]
+       > button.hw-filter__item[type=button][aria-pressed=true|false]
+         > text + span.hw-filter__count[data-tone=emergency|urgent][data-count=N]
+     A tone only shows on a count above zero: leave data-tone off at 0, and data-count="0" cancels it anyway.
+     Phones: one row that scrolls sideways. */
+  .hw-filter {
+    --hw-filter-height: var(--hw-target-size);
+    --hw-filter-font: var(--hw-font-size-14);
+    --hw-filter-bg: var(--hw-color-surface);
+    --hw-filter-fg: var(--hw-color-text);
+    --hw-filter-border: var(--hw-color-border);
+    --hw-filter-selected-bg: var(--hw-color-accent);
+    --hw-filter-selected-fg: var(--hw-color-on-accent);
+    --hw-filter-count-size: 26px;
+    --hw-filter-count-bg: var(--hw-color-fill-disabled);
+    --hw-filter-count-fg: var(--hw-color-text-muted);
+
+    display: flex;
+    gap: var(--hw-space-3);
+    margin: -4px;            /* the padding keeps focus rings inside the scrolling row */
+    padding: 4px;
+    overflow-x: auto;
+  }
+  .hw-filter__item {
+    display: inline-flex;
+    flex-shrink: 0;
+    gap: var(--hw-space-3);
+    align-items: center;
+    height: var(--hw-filter-height);
+    padding: 0 var(--hw-space-3) 0 var(--hw-space-5);
+    font-size: var(--hw-filter-font);
+    font-weight: var(--hw-weight-medium);
+    color: var(--hw-filter-fg);
+    white-space: nowrap;
+    cursor: pointer;
+    background: var(--hw-filter-bg);
+    border: 1px solid var(--hw-filter-border);
+    border-radius: var(--hw-radius-full);
+    transition: background-color var(--hw-duration-1), border-color var(--hw-duration-1), color var(--hw-duration-1);
+  }
+  .hw-filter__item:hover { --hw-filter-border: var(--hw-color-border-strong); }
+  .hw-filter__item[aria-pressed="true"] {
+    --hw-filter-bg: var(--hw-filter-selected-bg);
+    --hw-filter-fg: var(--hw-filter-selected-fg);
+    --hw-filter-border: var(--hw-filter-selected-bg);
+    --hw-filter-count-bg: color-mix(in srgb, var(--hw-filter-selected-fg) 16%, var(--hw-filter-selected-bg));
+    --hw-filter-count-fg: var(--hw-filter-selected-fg);
+  }
+
+  .hw-filter__count {
+    min-width: var(--hw-filter-count-size);
+    height: var(--hw-filter-count-size);
+    padding: 0 7px;
+    font-weight: var(--hw-weight-bold);
+    font-variant-numeric: tabular-nums;
+    line-height: calc(var(--hw-filter-count-size) - 2px);
+    color: var(--hw-filter-count-fg);
+    text-align: center;
+    background: var(--hw-filter-count-bg);
+    border: 1px solid var(--hw-filter-count-border, var(--hw-filter-count-bg));
+    border-radius: var(--hw-radius-full);
+  }
+
+  /* Set on the count itself, so a tone wins over the selected chip's count colours. */
+  .hw-filter__count[data-tone="emergency"]:not([data-count="0"]) {
+    --hw-filter-count-bg: var(--hw-color-emergency);
+    --hw-filter-count-fg: var(--hw-color-on-emergency);
+  }
+  .hw-filter__count[data-tone="urgent"]:not([data-count="0"]) {
+    --hw-filter-count-bg: var(--hw-color-warning-bg);
+    --hw-filter-count-fg: var(--hw-graph-urgent-text);
+    --hw-filter-count-border: var(--hw-graph-urgent);
+  }
+
+  @media (width >= 576px) {
+    .hw-filter { flex-wrap: wrap; margin: 0; padding: 0; overflow-x: visible; }
+    .hw-filter__item {
+      --hw-filter-font: 15px;
+      --hw-filter-count-size: 28px;
+
+      gap: 10px;
+      padding-left: 18px;
+    }
+    .hw-filter__count { padding: 0 var(--hw-space-3); }
+  }
+}

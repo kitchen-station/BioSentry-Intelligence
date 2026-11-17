@@ -1,0 +1,630 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>hw-ui gallery</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../node_modules/@fortawesome/fontawesome-free/css/all.min.css">
+<link rel="stylesheet" href="../src/index.css">
+<style>
+  /* Gallery-only layout; not part of the kit. */
+  .g-grid { --hw-grid-min: 520px; }
+  .g-row { margin-bottom: var(--hw-space-4); }
+  /* The Ward list needs the app's width (1376px at 1440), wider than the gallery container. */
+  .g-wide { --g-w: min(100vw - 32px, 1376px); width: var(--g-w); margin: 0 0 var(--hw-space-8) calc((100% - var(--g-w)) / 2); }
+  .g-stage { display: flex; flex-wrap: wrap; gap: var(--hw-space-4); align-items: flex-start; justify-content: flex-end; min-height: 330px; }
+  @media (width < 576px) { .g-stage { min-height: 0; padding-bottom: 300px; } .g-stage > .hw-search { order: 1; } }
+</style>
+</head>
+<body class="hw-has-bottomnav">
+<a class="hw-visually-hidden" href="#main">Skip to content</a>
+
+<!-- Mobile app bar (phones) + desktop header (≥768px) -->
+<header class="hw-appbar hw-only-mobile">
+  <button class="hw-appbar__action" type="button" aria-label="Open menu" data-hw-open="nav-drawer"><i class="hw-icon fa-solid fa-bars" aria-hidden="true"></i></button>
+  <h1 class="hw-appbar__title">Ward W4</h1>
+  <button class="hw-appbar__action" type="button" aria-label="Search"><i class="hw-icon fa-solid fa-magnifying-glass" aria-hidden="true"></i></button>
+</header>
+<header class="hw-header hw-hide-mobile">
+  <div class="hw-header__utility"><span>Region <i class="hw-icon hw-icon--sm fa-solid fa-chevron-down" aria-hidden="true"></i></span><span>English <i class="hw-icon hw-icon--sm fa-solid fa-chevron-down" aria-hidden="true"></i></span></div>
+  <div class="hw-header__bar">
+    <a class="hw-header__mark" href="#main">BioSentry</a>
+    <nav aria-label="Main"><ul class="hw-header__nav">
+      <li><a class="hw-header__link" href="#main" aria-current="page">Ward</a></li>
+      <li><a class="hw-header__link" href="#main">Patients</a></li>
+      <li><a class="hw-header__link" href="#main">Lab</a></li>
+    </ul></nav>
+  </div>
+</header>
+
+<main id="main" class="hw-container hw-section">
+  <h1 class="hw-section-title">Components</h1>
+  <div class="hw-grid g-grid">
+
+  <section class="hw-card hw-stack" aria-labelledby="h-btn">
+    <h2 id="h-btn" class="hw-heading hw-heading--4">Buttons</h2>
+    <div class="hw-cluster">
+      <button class="hw-button hw-button--primary hw-button--lg" type="button">Primary</button>
+      <button class="hw-button hw-button--primary" type="button">Save</button>
+      <button class="hw-button hw-button--accent" type="button">Accent</button>
+      <button class="hw-button hw-button--secondary" type="button">Secondary</button>
+      <button class="hw-button" type="button">Default</button>
+      <button class="hw-button hw-button--danger hw-button--sm" type="button">Discharge</button>
+      <button class="hw-button hw-button--primary" type="button" disabled>Disabled</button>
+      <a class="hw-link-cta" href="#main">Learn more</a>
+    </div>
+    <div class="hw-cluster">
+      <button class="hw-button hw-button--primary" type="button"><i class="hw-icon fa-solid fa-bed-pulse" aria-hidden="true"></i>Acknowledge</button>
+      <button class="hw-button" type="button"><i class="hw-icon fa-solid fa-download" aria-hidden="true"></i>Export CSV</button>
+      <button class="hw-button hw-button--icon" type="button" aria-label="Settings"><i class="hw-icon fa-solid fa-gear" aria-hidden="true"></i></button>
+      <span class="hw-icon-disc"><i class="fa-solid fa-heart-pulse" aria-hidden="true"></i></span>
+    </div>
+    <div class="hw-button-group" role="group" aria-label="Speed">
+      <button class="hw-button" type="button">1×</button><button class="hw-button" type="button">10×</button><button class="hw-button" type="button">60×</button>
+    </div>
+  </section>
+
+  <section class="hw-card hw-stack" aria-labelledby="h-form">
+    <h2 id="h-form" class="hw-heading hw-heading--4">Inputs</h2>
+    <div class="hw-field">
+      <label class="hw-field__label" for="name">Patient name<span class="hw-field__required" aria-hidden="true">*</span></label>
+      <div class="hw-input"><span class="hw-input__icon" aria-hidden="true"><i class="hw-icon fa-solid fa-magnifying-glass" aria-hidden="true"></i></span><input class="hw-input__control" id="name" placeholder="Search by name or bed" required aria-describedby="name-help"><button class="hw-input__clear" type="button" aria-label="Clear"><i class="hw-icon fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+      <span class="hw-field__help" id="name-help">Type at least 2 characters.</span>
+    </div>
+    <div class="hw-field">
+      <label class="hw-field__label" for="spo2">SpO₂</label>
+      <div class="hw-input"><input class="hw-input__control" id="spo2" value="140" aria-invalid="true" aria-describedby="spo2-err" inputmode="numeric"><span class="hw-input__affix">%</span></div>
+      <span class="hw-field__error" id="spo2-err">Must be between 50 and 100.</span>
+    </div>
+    <div class="hw-field">
+      <label class="hw-field__label" for="note">Note</label>
+      <div class="hw-textarea"><textarea class="hw-textarea__control" id="note">Patient reports mild chest pain since 06:00.</textarea><span class="hw-textarea__count">44 / 500</span></div>
+    </div>
+    <div class="hw-field">
+      <label class="hw-field__label" for="shift">Shift<span class="hw-field__required" aria-hidden="true">*</span></label>
+      <select class="hw-native-select" id="shift" name="shift" required>
+        <option value="">Choose a shift</option>
+        <option value="day">Day, 06:00 to 14:00</option>
+        <option value="evening">Evening, 14:00 to 22:00</option>
+        <option value="night" disabled>Night (roster closed)</option>
+      </select>
+    </div>
+    <div class="hw-field">
+      <label class="hw-field__label" for="unit-locked">Unit</label>
+      <select class="hw-native-select" id="unit-locked" name="unit" disabled><option>Ward W4</option></select>
+    </div>
+    <div class="hw-field">
+      <label class="hw-field__label" for="record">Record number<span class="hw-field__required" aria-hidden="true">*</span></label>
+      <div class="hw-input"><input class="hw-input__control" id="record" name="record" required inputmode="numeric"></div>
+    </div>
+    <div class="hw-number" role="group" aria-label="Beds">
+      <button class="hw-number__step" type="button" aria-label="Decrease" disabled><i class="hw-icon fa-solid fa-minus" aria-hidden="true"></i></button><input class="hw-number__value" type="number" value="1" min="1" aria-label="Beds"><button class="hw-number__step" type="button" aria-label="Increase"><i class="hw-icon fa-solid fa-plus" aria-hidden="true"></i></button>
+    </div>
+  </section>
+
+  <section class="hw-card hw-stack" aria-labelledby="h-sel">
+    <h2 id="h-sel" class="hw-heading hw-heading--4">Select & menu</h2>
+    <div class="hw-field">
+      <span class="hw-field__label" id="ward-label">Ward</span>
+      <div class="hw-select" data-hw-select id="ward-select">
+        <input type="hidden" name="ward" value="w4">
+        <button type="button" class="hw-select__trigger" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="ward-label ward-value"><span id="ward-value">Ward W4 — Medicine</span></button>
+        <ul class="hw-listbox" role="listbox" aria-labelledby="ward-label" hidden>
+          <li class="hw-listbox__option" role="option" data-value="w4" aria-selected="true">Ward W4 — Medicine</li>
+          <li class="hw-listbox__option" role="option" data-value="w5" aria-selected="false">Ward W5 — Medicine</li>
+          <li class="hw-listbox__option" role="option" data-value="s2" aria-selected="false">Ward S2 — Surgery</li>
+          <li class="hw-listbox__option" role="option" data-value="s3" aria-selected="false" aria-disabled="true">Ward S3 (closed)</li>
+        </ul>
+      </div>
+    </div>
+    <div class="hw-menu-anchor">
+      <button class="hw-button" type="button" aria-haspopup="menu" aria-expanded="false" data-hw-menu-trigger>Actions <i class="hw-icon hw-icon--sm fa-solid fa-chevron-down" aria-hidden="true"></i></button>
+      <div class="hw-menu" role="menu" aria-label="Patient actions" hidden>
+        <button class="hw-menu__item" role="menuitem" type="button" data-action="ack">Acknowledge</button>
+        <button class="hw-menu__item" role="menuitem" type="button" data-action="note">Add note</button>
+        <div class="hw-menu__separator" role="separator"></div>
+        <button class="hw-menu__item hw-menu__item--danger" role="menuitem" type="button" data-action="discharge">Discharge</button>
+      </div>
+    </div>
+    <div class="hw-cluster"><span class="hw-chip"><span class="hw-chip__label">Nurse</span><button class="hw-chip__remove" type="button" aria-label="Remove Nurse"><i class="hw-icon hw-icon--sm fa-solid fa-xmark" aria-hidden="true"></i></button></span><span class="hw-chip"><span class="hw-chip__label">Physician</span><button class="hw-chip__remove" type="button" aria-label="Remove Physician"><i class="hw-icon hw-icon--sm fa-solid fa-xmark" aria-hidden="true"></i></button></span></div>
+  </section>
+
+  <section class="hw-card hw-stack" aria-labelledby="h-choice">
+    <h2 id="h-choice" class="hw-heading hw-heading--4">Choice controls</h2>
+    <div class="hw-cluster">
+      <label class="hw-checkbox"><input class="hw-checkbox__input" type="checkbox" checked><span class="hw-checkbox__box"></span>Checked</label>
+      <label class="hw-checkbox"><input class="hw-checkbox__input" type="checkbox" id="ind"><span class="hw-checkbox__box"></span>Some</label>
+      <label class="hw-checkbox"><input class="hw-checkbox__input" type="checkbox"><span class="hw-checkbox__box"></span>Off</label>
+      <label class="hw-checkbox"><input class="hw-checkbox__input" type="checkbox" disabled checked><span class="hw-checkbox__box"></span>Disabled</label>
+    </div>
+    <fieldset class="hw-cluster" style="border:0;margin:0;padding:0"><legend class="hw-visually-hidden">View</legend>
+      <label class="hw-radio"><input class="hw-radio__input" type="radio" name="view" checked><span class="hw-radio__dot"></span>Nurse</label>
+      <label class="hw-radio"><input class="hw-radio__input" type="radio" name="view"><span class="hw-radio__dot"></span>Physician</label>
+    </fieldset>
+    <div class="hw-cluster">
+      <label class="hw-switch"><input class="hw-switch__input" type="checkbox" role="switch" checked><span class="hw-switch__track"></span>Live feed</label>
+      <label class="hw-switch hw-switch--brand"><input class="hw-switch__input" type="checkbox" role="switch" checked><span class="hw-switch__track"></span>Alerts</label>
+      <label class="hw-switch hw-switch--sm"><input class="hw-switch__input" type="checkbox" role="switch"><span class="hw-switch__track"></span>Small</label>
+    </div>
+    <fieldset class="hw-segmented"><legend class="hw-visually-hidden">Speed</legend>
+      <label><input class="hw-segmented__input" type="radio" name="speed" checked><span class="hw-segmented__option">1×</span></label>
+      <label><input class="hw-segmented__input" type="radio" name="speed"><span class="hw-segmented__option">10×</span></label>
+      <label><input class="hw-segmented__input" type="radio" name="speed"><span class="hw-segmented__option">60×</span></label>
+    </fieldset>
+    <div>
+      <label class="hw-field__label" for="vol">Alert threshold</label>
+      <div class="hw-slider-field"><input class="hw-slider" type="range" id="vol" min="0" max="10" value="4"><output class="hw-slider-field__value" for="vol"></output></div>
+    </div>
+    <fieldset class="hw-rate"><legend class="hw-visually-hidden">Rate this page</legend>
+      <label><input class="hw-rate__input" type="radio" name="rate" value="1"><span class="hw-rate__item">1</span></label>
+      <label><input class="hw-rate__input" type="radio" name="rate" value="2"><span class="hw-rate__item">2</span></label>
+      <label><input class="hw-rate__input" type="radio" name="rate" value="3" checked><span class="hw-rate__item">3</span></label>
+      <label><input class="hw-rate__input" type="radio" name="rate" value="4"><span class="hw-rate__item">4</span></label>
+      <label><input class="hw-rate__input" type="radio" name="rate" value="5"><span class="hw-rate__item">5</span></label>
+    </fieldset>
+  </section>
+
+  <section class="hw-card hw-stack" aria-labelledby="h-fb">
+    <h2 id="h-fb" class="hw-heading hw-heading--4">Feedback</h2>
+    <div class="hw-alert" role="note"><span class="hw-alert__icon" aria-hidden="true"><i class="hw-icon fa-solid fa-circle-info" aria-hidden="true"></i></span><div class="hw-alert__body"><p class="hw-alert__title">Synthetic data</p>Every patient here is simulated.</div></div>
+    <div class="hw-alert hw-alert--success"><span class="hw-alert__icon" aria-hidden="true"><i class="hw-icon fa-solid fa-circle-check" aria-hidden="true"></i></span><div class="hw-alert__body">Vitals saved.</div></div>
+    <div class="hw-alert hw-alert--warning"><span class="hw-alert__icon" aria-hidden="true"><i class="hw-icon fa-solid fa-triangle-exclamation" aria-hidden="true"></i></span><div class="hw-alert__body">Patch silent for 30 minutes.</div></div>
+    <div class="hw-alert hw-alert--danger" role="alert"><span class="hw-alert__icon" aria-hidden="true"><i class="hw-icon fa-solid fa-circle-xmark" aria-hidden="true"></i></span><div class="hw-alert__body"><p class="hw-alert__title">NEWS2 7 — urgent</p>Call the rapid response team.</div></div>
+    <div><div class="hw-progress-label"><span id="up-label">Uploading report</span><span>40%</span></div><progress class="hw-progress" max="100" value="40" aria-labelledby="up-label"></progress></div>
+    <div class="hw-cluster"><div class="hw-ring" style="--hw-ring-value:65" role="img" aria-label="65 percent">65%</div><div class="hw-spinner" role="status" aria-label="Loading"></div><div class="hw-loading-bar" style="width:120px" aria-hidden="true"></div></div>
+    <div class="hw-stack" style="--hw-stack-gap:8px" aria-hidden="true"><span class="hw-skeleton hw-skeleton--title"></span><span class="hw-skeleton"></span></div>
+    <div class="hw-cluster"><button class="hw-button" type="button" id="toast-btn">Show toast</button><button class="hw-button" type="button" data-hw-tooltip="Last reading 14:05">Hover or focus me</button></div>
+  </section>
+
+  <section class="hw-card hw-stack" aria-labelledby="h-nav">
+    <h2 id="h-nav" class="hw-heading hw-heading--4">Navigation</h2>
+    <div class="hw-tabs" data-hw-tabs>
+      <div class="hw-tabs__list" role="tablist" aria-label="Views">
+        <button class="hw-tabs__tab" role="tab" type="button" id="t1" aria-controls="p1" aria-selected="true">Ward</button>
+        <button class="hw-tabs__tab" role="tab" type="button" id="t2" aria-controls="p2" aria-selected="false">Station</button>
+        <button class="hw-tabs__tab" role="tab" type="button" id="t3" aria-controls="p3" aria-selected="false">Lab</button>
+      </div>
+      <div class="hw-tabs__panel" role="tabpanel" id="p1" aria-labelledby="t1" tabindex="0">Ranked list.</div>
+      <div class="hw-tabs__panel" role="tabpanel" id="p2" aria-labelledby="t2" tabindex="0" hidden>Admissions and labs.</div>
+      <div class="hw-tabs__panel" role="tabpanel" id="p3" aria-labelledby="t3" tabindex="0" hidden>Simulated runs.</div>
+    </div>
+    <div class="hw-tabs hw-tabs--pill" data-hw-tabs>
+      <div class="hw-tabs__list" role="tablist" aria-label="Range">
+        <button class="hw-tabs__tab" role="tab" type="button" id="t4" aria-controls="p4" aria-selected="true">6 h</button>
+        <button class="hw-tabs__tab" role="tab" type="button" id="t5" aria-controls="p5" aria-selected="false">24 h</button>
+        <button class="hw-tabs__tab" role="tab" type="button" id="t6" aria-controls="p6" aria-selected="false">7 days</button>
+      </div>
+      <div class="hw-tabs__panel" role="tabpanel" id="p4" aria-labelledby="t4" tabindex="0">Last 6 hours.</div>
+      <div class="hw-tabs__panel" role="tabpanel" id="p5" aria-labelledby="t5" tabindex="0" hidden>Last 24 hours.</div>
+      <div class="hw-tabs__panel" role="tabpanel" id="p6" aria-labelledby="t6" tabindex="0" hidden>Last 7 days.</div>
+    </div>
+    <nav aria-label="Breadcrumb"><ol class="hw-breadcrumb"><li><a href="#main">Ward W4</a></li><li><a href="#main">Bed 4</a></li><li><span aria-current="page">Vitals</span></li></ol></nav>
+    <nav aria-label="Pagination"><ul class="hw-pagination">
+      <li><button class="hw-pagination__item" type="button" aria-label="Previous page" disabled><i class="hw-icon hw-icon--sm fa-solid fa-chevron-left" aria-hidden="true"></i></button></li>
+      <li><button class="hw-pagination__item" type="button" aria-current="page">1</button></li>
+      <li><button class="hw-pagination__item" type="button">2</button></li>
+      <li><span class="hw-pagination__ellipsis">…</span></li>
+      <li><button class="hw-pagination__item" type="button">12</button></li>
+      <li><button class="hw-pagination__item" type="button" aria-label="Next page"><i class="hw-icon hw-icon--sm fa-solid fa-chevron-right" aria-hidden="true"></i></button></li>
+    </ul></nav>
+    <ol class="hw-steps"><li class="hw-steps__step" data-status="done">Admit</li><li class="hw-steps__step" data-status="current" aria-current="step">Baseline</li><li class="hw-steps__step">Monitor</li><li class="hw-steps__step">Discharge</li></ol>
+  </section>
+
+  <section class="hw-card hw-stack" aria-labelledby="h-data">
+    <h2 id="h-data" class="hw-heading hw-heading--4">Data display</h2>
+    <div class="hw-table-wrap"><table class="hw-table hw-table--stack">
+      <caption class="hw-visually-hidden">Ranked patients</caption>
+      <thead><tr><th scope="col">Bed</th><th scope="col">Patient</th><th scope="col" class="hw-table__num">NEWS2</th><th scope="col">Status</th></tr></thead>
+      <tbody>
+        <tr aria-selected="true"><td data-label="Bed">4</td><td data-label="Patient">Reyes, M.</td><td data-label="NEWS2" class="hw-table__num">7</td><td data-label="Status"><span class="hw-tag hw-tag--danger">Urgent</span></td></tr>
+        <tr><td data-label="Bed">9</td><td data-label="Patient">Santos, J.</td><td data-label="NEWS2" class="hw-table__num">5</td><td data-label="Status"><span class="hw-tag hw-tag--warning">Review</span></td></tr>
+        <tr><td data-label="Bed">2</td><td data-label="Patient">Cruz, A.</td><td data-label="NEWS2" class="hw-table__num">1</td><td data-label="Status"><span class="hw-tag hw-tag--success">Stable</span></td></tr>
+      </tbody>
+    </table></div>
+    <div class="hw-grid" style="--hw-grid-min:140px">
+      <div class="hw-stat"><div class="hw-stat__label">Alerts / shift</div><div class="hw-stat__value">0.13</div><div class="hw-stat__delta" data-trend="good">▼ 69% vs NEWS2</div></div>
+      <div class="hw-stat"><div class="hw-stat__label">Caught early</div><div class="hw-stat__value">57%</div><div class="hw-stat__delta" data-trend="good">▲ 1.6×</div></div>
+    </div>
+    <div class="hw-cluster">
+      <div class="hw-avatar-stack"><span class="hw-avatar" aria-label="RN Manalo" role="img">RM</span><span class="hw-avatar hw-avatar--self" role="img" aria-label="You">EG</span></div>
+      <span class="hw-badge"><button class="hw-button" type="button">Alerts</button><span class="hw-badge__count">3<span class="hw-visually-hidden"> new</span></span></span>
+      <span class="hw-tag hw-tag--info hw-tag--round">Synthetic</span><span class="hw-tag">Not ranked</span>
+    </div>
+    <div class="hw-accordion">
+      <details class="hw-accordion__item" open><summary class="hw-accordion__summary">How is the rank computed?</summary><div class="hw-accordion__body">NEWS2 sorts; the own-baseline finding breaks ties.</div></details>
+      <details class="hw-accordion__item"><summary class="hw-accordion__summary">What does NOT RANKED mean?</summary><div class="hw-accordion__body">A required value is missing.</div></details>
+    </div>
+    <ol class="hw-timeline"><li class="hw-timeline__item" data-tone="alert"><time class="hw-timeline__time">14:05</time>NEWS2 rose to 7</li><li class="hw-timeline__item"><time class="hw-timeline__time">13:40</time>Vitals entered</li></ol>
+    <label class="hw-upload"><input type="file" class="hw-visually-hidden"><span class="hw-upload__title">Drop a lab report here</span><span>or <span class="hw-upload__browse">browse files</span> · PDF up to 10 MB</span></label>
+    <div class="hw-empty"><div class="hw-empty__art" aria-hidden="true"><i class="hw-icon fa-regular fa-folder-open" aria-hidden="true"></i></div><p class="hw-empty__title">No patients assigned</p>Ask the charge nurse to assign beds.</div>
+  </section>
+
+  <section class="hw-card hw-stack" aria-labelledby="h-ov">
+    <h2 id="h-ov" class="hw-heading hw-heading--4">Overlays</h2>
+    <div class="hw-cluster">
+      <button class="hw-button hw-button--danger" type="button" data-hw-open="discharge" aria-haspopup="dialog">Discharge…</button>
+      <button class="hw-button" type="button" data-hw-open="details" aria-haspopup="dialog">Open drawer</button>
+      <button class="hw-button" type="button" data-hw-open="sheet" aria-haspopup="dialog">Bottom sheet</button>
+    </div>
+    <div class="hw-popover"><p class="hw-popover__title">Why ranked first</p>NEWS2 7: RR 25, SpO₂ 91%, new confusion.</div>
+    <div class="hw-grid" style="--hw-grid-min:180px">
+      <a class="hw-tile" href="#main">Ward</a><a class="hw-tile" href="#main">Research</a>
+    </div>
+  </section>
+  </div>
+
+  <h2 class="hw-section-title" id="h-ward">Ward (0.10)</h2>
+  <div class="g-wide hw-stack" style="--hw-stack-gap:var(--hw-space-5)">
+
+  <section class="hw-card hw-stack" aria-labelledby="h-score">
+    <h3 id="h-score" class="hw-heading hw-heading--4">Score, filter and band tags</h3>
+    <div class="hw-cluster" id="scores">
+      <div class="hw-score" data-band="high" role="img" aria-label="NEWS2 9, High, rising" id="score-high"><span class="hw-score__value">9</span><span class="hw-score__band">High<i class="hw-icon fa-solid fa-arrow-up" aria-hidden="true"></i></span></div>
+      <div class="hw-score" data-band="medium" role="img" aria-label="NEWS2 5, Medium" id="score-medium"><span class="hw-score__value">5</span><span class="hw-score__band">Medium</span></div>
+      <div class="hw-score" data-band="medium" role="img" aria-label="NEWS2 3, Low-medium"><span class="hw-score__value">3</span><span class="hw-score__band">Low-medium</span></div>
+      <div class="hw-score" data-band="low" role="img" aria-label="NEWS2 1, Low" id="score-low"><span class="hw-score__value">1</span><span class="hw-score__band">Low</span></div>
+      <div class="hw-score hw-score--sm" data-band="high" role="img" aria-label="NEWS2 9, High" id="score-sm"><span class="hw-score__value">9</span><span class="hw-score__band">High</span></div>
+      <div class="hw-score hw-score--sm" data-band="medium" role="img" aria-label="NEWS2 5, Medium"><span class="hw-score__value">5</span><span class="hw-score__band">Medium</span></div>
+      <div class="hw-score hw-score--sm" data-band="low" role="img" aria-label="NEWS2 0, Low"><span class="hw-score__value">0</span><span class="hw-score__band">Low</span></div>
+      <div class="hw-score hw-score--sm" data-band="high" role="img" aria-label="NEWS2 7, High"><span class="hw-score__value">7</span></div>
+    </div>
+    <div class="hw-filter" role="group" aria-label="Filter patients" id="filter">
+      <button class="hw-filter__item" type="button" aria-pressed="true">All<span class="hw-filter__count" data-count="11">11</span></button>
+      <button class="hw-filter__item" type="button" aria-pressed="false">High<span class="hw-filter__count" data-tone="emergency" data-count="2">2</span></button>
+      <button class="hw-filter__item" type="button" aria-pressed="false">Medium<span class="hw-filter__count" data-tone="urgent" data-count="3">3</span></button>
+      <button class="hw-filter__item" type="button" aria-pressed="false">Rising<span class="hw-filter__count" data-count="3">3</span></button>
+      <button class="hw-filter__item" type="button" aria-pressed="false">Not ranked<span class="hw-filter__count" data-count="2">2</span></button>
+      <button class="hw-filter__item" type="button" aria-pressed="false">Overdue<span class="hw-filter__count" data-tone="emergency" data-count="0">0</span></button>
+    </div>
+    <div class="hw-cluster">
+      <span class="hw-tag hw-tag--round hw-tag--emergency">9 High</span>
+      <span class="hw-tag hw-tag--round hw-tag--urgent">5 Medium</span>
+      <span class="hw-tag hw-tag--round">1 Low</span>
+      <span class="hw-tag hw-tag--round hw-tag--dashed" id="tag-dashed">NOT RANKED</span>
+    </div>
+  </section>
+
+  <section class="hw-card hw-stack" aria-labelledby="h-bar">
+    <h3 id="h-bar" class="hw-heading hw-heading--4">Search, bell and alert tray</h3>
+    <div class="hw-banner hw-banner--inverse" role="alert" id="offline-banner"><i class="hw-icon fa-solid fa-ban" aria-hidden="true"></i><strong class="hw-banner__title">Offline since 10:58 AM</strong><span>This is the last data received. Ages keep counting. Acknowledging and recording wait until the connection is back.</span></div>
+    <div class="g-stage">
+      <div class="hw-search" id="search">
+        <label class="hw-input">
+          <i class="hw-icon hw-input__icon fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+          <input class="hw-input__control" type="search" role="combobox" aria-label="Find a patient by name or bed" placeholder="Find a patient" value="a" aria-expanded="true" aria-controls="search-results" aria-autocomplete="list" aria-activedescendant="sr-2">
+          <kbd class="hw-search__key" aria-hidden="true">/</kbd>
+        </label>
+        <ul class="hw-search__results" id="search-results" role="listbox" aria-label="Patients in rank order">
+          <li class="hw-search__caption" aria-hidden="true">In rank order</li>
+          <li role="option" id="sr-1" aria-selected="false"><span class="hw-search__rank">#1</span><span class="hw-search__name">Santos, Maria</span><span class="hw-search__bed">67 F · Bed 4A</span><span class="hw-tag hw-tag--round hw-tag--emergency">9 High</span></li>
+          <li role="option" id="sr-2" aria-selected="true"><span class="hw-search__rank">#4</span><span class="hw-search__name">Bautista, Elena</span><span class="hw-search__bed">72 F · Bed 3A</span><span class="hw-tag hw-tag--round hw-tag--urgent">5 Medium</span></li>
+          <li role="option" id="sr-3" aria-selected="false"><span class="hw-search__rank">#5</span><span class="hw-search__name">Garcia, Roberto</span><span class="hw-search__bed">61 M · Bed 5B</span><span class="hw-tag hw-tag--round">4 Low</span></li>
+          <li role="option" id="sr-4" aria-selected="false"><span class="hw-search__rank"></span><span class="hw-search__name">Flores, Ramon</span><span class="hw-search__bed">73 M · Bed 4B</span><span class="hw-tag hw-tag--round hw-tag--dashed">NOT RANKED</span></li>
+        </ul>
+      </div>
+      <div class="hw-menu-anchor">
+        <button class="hw-bell" type="button" id="bell-live" aria-label="2 unacknowledged alerts" aria-haspopup="dialog" aria-expanded="false" aria-controls="tray-live"><i class="hw-icon fa-solid fa-bell" aria-hidden="true"></i><span class="hw-bell__count" aria-hidden="true">2</span></button>
+        <div class="hw-alert-tray" id="tray-live" role="dialog" aria-label="Unacknowledged alerts" hidden>
+          <div class="hw-alert-tray__head"><h4 class="hw-alert-tray__title">Unacknowledged alerts on W4</h4><button class="hw-close" type="button" aria-label="Close alerts"><i class="hw-icon fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+          <div class="hw-alert-tray__item">
+            <div class="hw-score hw-score--sm" data-band="high" role="img" aria-label="NEWS2 9, High"><span class="hw-score__value">9</span></div>
+            <div class="hw-alert-tray__who"><p class="hw-alert-tray__name">Santos, Maria</p><p class="hw-alert-tray__line">Bed 4A · High · since 11:02 AM</p></div>
+            <button class="hw-button" type="button">Open</button>
+            <button class="hw-button hw-button--accent" type="button" aria-label="Acknowledge the alert for Santos, Maria">Acknowledge</button>
+          </div>
+          <div class="hw-alert-tray__item">
+            <div class="hw-score hw-score--sm" data-band="high" role="img" aria-label="NEWS2 7, High"><span class="hw-score__value">7</span></div>
+            <div class="hw-alert-tray__who"><p class="hw-alert-tray__name">Reyes, Carlos</p><p class="hw-alert-tray__line">Bed 2B · High · since 10:57 AM</p></div>
+            <button class="hw-button" type="button">Open</button>
+            <button class="hw-button hw-button--accent" type="button" aria-label="Acknowledge the alert for Reyes, Carlos">Acknowledge</button>
+          </div>
+          <p class="hw-alert-tray__foot">BioSentry does not replace a monitor alarm.</p>
+        </div>
+      </div>
+      <button class="hw-bell" type="button" id="bell-calm" aria-label="No unacknowledged alerts" aria-haspopup="dialog" aria-expanded="false"><i class="hw-icon fa-solid fa-bell" aria-hidden="true"></i></button>
+    </div>
+    <div class="hw-grid" style="--hw-grid-min:340px;align-items:start">
+      <div class="hw-alert-tray" role="dialog" aria-label="Unacknowledged alerts, offline" id="tray-offline">
+        <div class="hw-alert-tray__head"><h4 class="hw-alert-tray__title">Unacknowledged alerts on W4</h4></div>
+        <div class="hw-alert-tray__item">
+          <div class="hw-score hw-score--sm" data-band="high" role="img" aria-label="NEWS2 9, High"><span class="hw-score__value">9</span></div>
+          <div class="hw-alert-tray__who"><p class="hw-alert-tray__name">Santos, Maria</p><p class="hw-alert-tray__line">Bed 4A · High · since 11:02 AM</p></div>
+          <button class="hw-button" type="button">Open</button>
+          <button class="hw-button hw-button--accent" type="button" disabled aria-label="Acknowledge the alert for Santos, Maria">Acknowledge</button>
+        </div>
+        <p class="hw-alert-tray__foot">BioSentry does not replace a monitor alarm.</p>
+      </div>
+      <div class="hw-alert-tray" role="dialog" aria-label="Unacknowledged alerts, none waiting" id="tray-empty">
+        <div class="hw-alert-tray__head"><h4 class="hw-alert-tray__title">Unacknowledged alerts on W4</h4></div>
+        <p class="hw-alert-tray__empty">Nothing is waiting. New alerts appear here and on the patient’s row.</p>
+        <p class="hw-alert-tray__foot">BioSentry does not replace a monitor alarm.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="hw-notice hw-notice--dashed" aria-labelledby="nr-title" id="notice">
+    <div class="hw-notice__head">
+      <h3 class="hw-notice__title" id="nr-title">NOT RANKED · 2</h3>
+      <p class="hw-notice__text">A NEWS2 input is missing, so these patients have no place in the order. Not ranked does not mean low risk.</p>
+      <button class="hw-notice__toggle" type="button" aria-expanded="true" aria-controls="nr-body">Hide</button>
+    </div>
+    <div class="hw-notice__body" id="nr-body">
+      <div class="hw-notice__item">
+        <div class="hw-notice__main"><button class="hw-notice__name" type="button">Flores, Ramon</button><span class="hw-notice__meta">73 M · Bed 4B</span><p class="hw-notice__reason"><strong>Systolic BP missing.</strong> Record a blood pressure.</p></div>
+        <button class="hw-button hw-button--accent" type="button" aria-label="Record vitals for Flores, Ramon">Record vitals</button>
+      </div>
+      <div class="hw-notice__item">
+        <div class="hw-notice__main"><button class="hw-notice__name" type="button">de Leon, Isabel</button><span class="hw-notice__meta">58 F · Bed 3B</span><p class="hw-notice__reason"><strong>No device data.</strong> Apply the patch and verify the signal, or enter the observations.</p></div>
+        <button class="hw-button hw-button--accent" type="button" aria-label="Record vitals for de Leon, Isabel">Record vitals</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="hw-ranklist-wrap" aria-label="Ranked patients, comfortable" id="list-comfortable">
+    <div class="hw-ranklist__head" aria-hidden="true"><span>Rank</span><span>NEWS2</span><span>Patient and next step</span><span>Heart rate</span><span>Resp. rate</span><span>SpO2</span><span>BP</span><span>ACVPU</span><span>Data</span><span></span></div>
+    <ol class="hw-ranklist" data-density="comfortable">
+      <li class="hw-ranklist__row" data-alert>
+        <span class="hw-ranklist__rank">1</span>
+        <div class="hw-score" data-band="high" role="img" aria-label="NEWS2 9, High, rising"><span class="hw-score__value">9</span><span class="hw-score__band">High<i class="hw-icon fa-solid fa-arrow-up" aria-hidden="true"></i></span></div>
+        <div class="hw-ranklist__who">
+          <div class="hw-ranklist__id"><button class="hw-ranklist__name" type="button">Santos, Maria</button><span class="hw-ranklist__meta">67 F · Bed 4A</span></div>
+          <p class="hw-ranklist__response">Call the medical team now (registrar or above)</p>
+          <ul class="hw-ranklist__reasons"><li class="hw-tag">Total 9 (≥7): high</li><li class="hw-tag">Single parameter at 3: systolic BP</li></ul>
+        </div>
+        <div class="hw-ranklist__vitals">
+          <div class="hw-ranklist__vital" role="img" aria-label="Heart rate 118 per minute, adds 2 NEWS2 points" data-points="2"><svg class="hw-ranklist__spark" viewBox="0 0 64 24" aria-hidden="true"><polyline points="2,16 7.5,16 12.9,15 18.4,15 23.8,14 29.3,13 34.7,12 40.2,11 45.6,10 51.1,8 56.5,7 62,6"></polyline><circle cx="62" cy="6" r="2.5"></circle></svg><span class="hw-ranklist__label">HR</span><span class="hw-ranklist__value">118</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="Respiratory rate 23 per minute, adds 2 NEWS2 points" data-points="2"><svg class="hw-ranklist__spark" viewBox="0 0 64 24" aria-hidden="true"><polyline points="2,15 7.5,15 12.9,14 18.4,15 23.8,13 29.3,13 34.7,12 40.2,11 45.6,11 51.1,10 56.5,9 62,8"></polyline><circle cx="62" cy="8" r="2.5"></circle></svg><span class="hw-ranklist__label">RR</span><span class="hw-ranklist__value">23</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="SpO2 93 percent, adds 2 NEWS2 points" data-points="2"><svg class="hw-ranklist__spark" viewBox="0 0 64 24" aria-hidden="true"><polyline points="2,6 7.5,6 12.9,7 18.4,7 23.8,8 29.3,9 34.7,10 40.2,10 45.6,12 51.1,13 56.5,14 62,15"></polyline><circle cx="62" cy="15" r="2.5"></circle></svg><span class="hw-ranklist__label">SpO2</span><span class="hw-ranklist__value">93%</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="Blood pressure 88/52, by nurse, adds 3 NEWS2 points" data-points="3"><span class="hw-ranklist__label">BP</span><span class="hw-ranklist__value">88/52</span><span class="hw-ranklist__by">by nurse</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="ACVPU A" data-points="0"><span class="hw-ranklist__label">ACVPU</span><span class="hw-ranklist__value">A</span></div>
+        </div>
+        <div class="hw-ranklist__data"><span class="hw-ranklist__age">10s ago</span><span class="hw-ranklist__signal">Signal 100%</span><span class="hw-ranklist__obs">Obs continuous</span></div>
+        <div class="hw-ranklist__action"><button class="hw-button hw-button--accent" type="button" aria-label="Acknowledge the alert for Santos, Maria"><i class="hw-icon fa-solid fa-bell" aria-hidden="true"></i>Acknowledge</button></div>
+      </li>
+      <li class="hw-ranklist__row">
+        <span class="hw-ranklist__rank">3</span>
+        <div class="hw-score" data-band="medium" role="img" aria-label="NEWS2 5, Medium, rising"><span class="hw-score__value">5</span><span class="hw-score__band">Medium<i class="hw-icon fa-solid fa-arrow-up" aria-hidden="true"></i></span></div>
+        <div class="hw-ranklist__who">
+          <div class="hw-ranklist__id"><button class="hw-ranklist__name" type="button">Villanueva, Jose</button><span class="hw-ranklist__meta">45 M · Bed 1C</span></div>
+          <p class="hw-ranklist__response">Inform the medical team now</p>
+          <ul class="hw-ranklist__reasons"><li class="hw-tag">Total 5 (5–6): medium</li></ul>
+        </div>
+        <div class="hw-ranklist__vitals">
+          <div class="hw-ranklist__vital" role="img" aria-label="Heart rate 96 per minute, adds 1 NEWS2 point" data-points="1"><svg class="hw-ranklist__spark" viewBox="0 0 64 24" aria-hidden="true"><polyline points="2,13 7.5,13 12.9,12 18.4,13 23.8,12 29.3,12 34.7,11 40.2,12 45.6,11 51.1,11 56.5,10 62,10"></polyline><circle cx="62" cy="10" r="2.5"></circle></svg><span class="hw-ranklist__label">HR</span><span class="hw-ranklist__value">96</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="Respiratory rate 18 per minute" data-points="0"><svg class="hw-ranklist__spark" viewBox="0 0 64 24" aria-hidden="true"><polyline points="2,14 7.5,14 12.9,13 18.4,14 23.8,14 29.3,13 34.7,13 40.2,14 45.6,13 51.1,13 56.5,13 62,13"></polyline><circle cx="62" cy="13" r="2.5"></circle></svg><span class="hw-ranklist__label">RR</span><span class="hw-ranklist__value">18</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="SpO2 94 percent, adds 1 NEWS2 point" data-points="1"><svg class="hw-ranklist__spark" viewBox="0 0 64 24" aria-hidden="true"><polyline points="2,9 7.5,9 12.9,10 18.4,9 23.8,10 29.3,10 34.7,11 40.2,11 45.6,11 51.1,12 56.5,12 62,12"></polyline><circle cx="62" cy="12" r="2.5"></circle></svg><span class="hw-ranklist__label">SpO2</span><span class="hw-ranklist__value">94%</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="Blood pressure 100/62, by nurse, adds 2 NEWS2 points" data-points="2"><span class="hw-ranklist__label">BP</span><span class="hw-ranklist__value">100/62</span><span class="hw-ranklist__by">by nurse</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="ACVPU A" data-points="0"><span class="hw-ranklist__label">ACVPU</span><span class="hw-ranklist__value">A</span></div>
+        </div>
+        <div class="hw-ranklist__data"><span class="hw-ranklist__age">11s ago</span><span class="hw-ranklist__signal">Signal 100%</span><span class="hw-ranklist__obs">Obs due 11:24 AM</span></div>
+        <div class="hw-ranklist__action"><button class="hw-button hw-button--ghost hw-button--icon hw-ranklist__open" type="button" aria-label="Open Villanueva, Jose"><i class="hw-icon fa-solid fa-chevron-right" aria-hidden="true"></i></button></div>
+      </li>
+      <li class="hw-ranklist__row">
+        <span class="hw-ranklist__rank">5</span>
+        <div class="hw-score" data-band="low" role="img" aria-label="NEWS2 4, Low"><span class="hw-score__value">4</span><span class="hw-score__band">Low</span></div>
+        <div class="hw-ranklist__who">
+          <div class="hw-ranklist__id"><button class="hw-ranklist__name" type="button">Garcia, Roberto</button><span class="hw-ranklist__meta">61 M · Bed 5B</span></div>
+          <p class="hw-ranklist__context">Heart failure, suspected, no echocardiogram yet</p>
+        </div>
+        <div class="hw-ranklist__vitals">
+          <div class="hw-ranklist__vital" role="img" aria-label="Heart rate 100 per minute, adds 1 NEWS2 point" data-points="1"><svg class="hw-ranklist__spark" viewBox="0 0 64 24" aria-hidden="true"><polyline points="2,14 7.5,14 12.9,13 18.4,13 23.8,12 29.3,12 34.7,12 40.2,11 45.6,11 51.1,10 56.5,10 62,10"></polyline><circle cx="62" cy="10" r="2.5"></circle></svg><span class="hw-ranklist__label">HR</span><span class="hw-ranklist__value">100</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="Respiratory rate 22 per minute, adds 2 NEWS2 points" data-points="2"><svg class="hw-ranklist__spark" viewBox="0 0 64 24" aria-hidden="true"><polyline points="2,13 7.5,13 12.9,12 18.4,12 23.8,12 29.3,11 34.7,11 40.2,11 45.6,10 51.1,10 56.5,10 62,9"></polyline><circle cx="62" cy="9" r="2.5"></circle></svg><span class="hw-ranklist__label">RR</span><span class="hw-ranklist__value">22</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="SpO2 95 percent, adds 1 NEWS2 point" data-points="1"><svg class="hw-ranklist__spark" viewBox="0 0 64 24" aria-hidden="true"><polyline points="2,9 7.5,9 12.9,9 18.4,10 23.8,10 29.3,10 34.7,10 40.2,11 45.6,11 51.1,11 56.5,11 62,11"></polyline><circle cx="62" cy="11" r="2.5"></circle></svg><span class="hw-ranklist__label">SpO2</span><span class="hw-ranklist__value">95%</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="Blood pressure 124/78, by nurse" data-points="0"><span class="hw-ranklist__label">BP</span><span class="hw-ranklist__value">124/78</span><span class="hw-ranklist__by">by nurse</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="ACVPU A" data-points="0"><span class="hw-ranklist__label">ACVPU</span><span class="hw-ranklist__value">A</span></div>
+        </div>
+        <div class="hw-ranklist__data"><span class="hw-ranklist__age">8s ago</span><span class="hw-ranklist__signal">Signal 100%</span><span class="hw-ranklist__obs">Obs due 12:10 PM</span></div>
+        <div class="hw-ranklist__action"><button class="hw-button hw-button--ghost hw-button--icon hw-ranklist__open" type="button" aria-label="Open Garcia, Roberto"><i class="hw-icon fa-solid fa-chevron-right" aria-hidden="true"></i></button></div>
+      </li>
+      <li class="hw-ranklist__row">
+        <span class="hw-ranklist__rank">8</span>
+        <div class="hw-score" data-band="low" role="img" aria-label="NEWS2 1, Low"><span class="hw-score__value">1</span><span class="hw-score__band">Low</span></div>
+        <div class="hw-ranklist__who">
+          <div class="hw-ranklist__id"><button class="hw-ranklist__name" type="button">Tan, Lucinda</button><span class="hw-ranklist__meta">68 F · Bed 9A</span></div>
+        </div>
+        <div class="hw-ranklist__vitals">
+          <div class="hw-ranklist__vital" role="img" aria-label="Heart rate 76 per minute" data-points="0"><svg class="hw-ranklist__spark" viewBox="0 0 64 24" aria-hidden="true"><polyline points="2,15 7.5,15 12.9,16 18.4,15 23.8,15 29.3,16 34.7,15 40.2,15 45.6,16 51.1,15 56.5,15 62,15"></polyline><circle cx="62" cy="15" r="2.5"></circle></svg><span class="hw-ranklist__label">HR</span><span class="hw-ranklist__value">76</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="Respiratory rate 16 per minute" data-points="0"><svg class="hw-ranklist__spark" viewBox="0 0 64 24" aria-hidden="true"><polyline points="2,15 7.5,15 12.9,15 18.4,14 23.8,15 29.3,15 34.7,15 40.2,15 45.6,14 51.1,15 56.5,15 62,15"></polyline><circle cx="62" cy="15" r="2.5"></circle></svg><span class="hw-ranklist__label">RR</span><span class="hw-ranklist__value">16</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="SpO2 95 percent, adds 1 NEWS2 point" data-points="1"><svg class="hw-ranklist__spark" viewBox="0 0 64 24" aria-hidden="true"><polyline points="2,10 7.5,10 12.9,10 18.4,11 23.8,10 29.3,10 34.7,11 40.2,11 45.6,10 51.1,11 56.5,11 62,11"></polyline><circle cx="62" cy="11" r="2.5"></circle></svg><span class="hw-ranklist__label">SpO2</span><span class="hw-ranklist__value">95%</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="Blood pressure 132/74, by nurse" data-points="0"><span class="hw-ranklist__label">BP</span><span class="hw-ranklist__value">132/74</span><span class="hw-ranklist__by">by nurse</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="ACVPU A" data-points="0"><span class="hw-ranklist__label">ACVPU</span><span class="hw-ranklist__value">A</span></div>
+        </div>
+        <div class="hw-ranklist__data"><span class="hw-ranklist__age" data-stale>Stale · 20 min ago</span><span class="hw-ranklist__signal" data-weak>Signal 67%</span><span class="hw-ranklist__obs">Obs due 12:40 PM</span></div>
+        <div class="hw-ranklist__action"><button class="hw-button hw-button--ghost hw-button--icon hw-ranklist__open" type="button" aria-label="Open Tan, Lucinda"><i class="hw-icon fa-solid fa-chevron-right" aria-hidden="true"></i></button></div>
+      </li>
+    </ol>
+  </section>
+
+  <section class="hw-ranklist-wrap" aria-label="Ranked patients, compact" id="list-compact">
+    <div class="hw-ranklist__head" aria-hidden="true"><span>Rank</span><span>NEWS2</span><span>Patient and next step</span><span>HR</span><span>RR</span><span>SpO2</span><span>BP</span><span>ACVPU</span><span>Data</span><span></span></div>
+    <ol class="hw-ranklist" data-density="compact">
+      <li class="hw-ranklist__row" data-alert>
+        <span class="hw-ranklist__rank">2</span>
+        <div class="hw-score hw-score--sm" data-band="high" role="img" aria-label="NEWS2 7, High, rising"><span class="hw-score__value">7</span><span class="hw-score__band">High</span></div>
+        <div class="hw-ranklist__who">
+          <div class="hw-ranklist__id"><button class="hw-ranklist__name" type="button">Reyes, Carlos</button><span class="hw-ranklist__meta">54 M · Bed 2B</span></div>
+          <p class="hw-ranklist__response">Call the medical team now (registrar or above)</p>
+          <ul class="hw-ranklist__reasons"><li class="hw-tag">Total 7 (≥7): high</li></ul>
+        </div>
+        <div class="hw-ranklist__vitals">
+          <div class="hw-ranklist__vital" role="img" aria-label="Heart rate 58 per minute" data-points="0"><svg class="hw-ranklist__spark" viewBox="0 0 64 24" aria-hidden="true"><polyline points="2,16 62,16"></polyline><circle cx="62" cy="16" r="2.5"></circle></svg><span class="hw-ranklist__label">HR</span><span class="hw-ranklist__value">58</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="Respiratory rate 22 per minute, adds 2 NEWS2 points" data-points="2"><span class="hw-ranklist__label">RR</span><span class="hw-ranklist__value">22</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="SpO2 93 percent, adds 2 NEWS2 points" data-points="2"><span class="hw-ranklist__label">SpO2</span><span class="hw-ranklist__value">93%</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="Blood pressure 104/68, adds 1 NEWS2 point" data-points="1"><span class="hw-ranklist__label">BP</span><span class="hw-ranklist__value">104/68</span><span class="hw-ranklist__by">by nurse</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="ACVPU A" data-points="0"><span class="hw-ranklist__label">ACVPU</span><span class="hw-ranklist__value">A</span></div>
+        </div>
+        <div class="hw-ranklist__data"><span class="hw-ranklist__age">3s ago</span><span class="hw-ranklist__signal">Signal 100%</span><span class="hw-ranklist__obs">Obs continuous</span></div>
+        <div class="hw-ranklist__action"><p class="hw-ranklist__note">Alert not acknowledged since 10:57 AM</p></div>
+      </li>
+      <li class="hw-ranklist__row">
+        <span class="hw-ranklist__rank">4</span>
+        <div class="hw-score hw-score--sm" data-band="medium" role="img" aria-label="NEWS2 5, Medium"><span class="hw-score__value">5</span><span class="hw-score__band">Medium</span></div>
+        <div class="hw-ranklist__who">
+          <div class="hw-ranklist__id"><button class="hw-ranklist__name" type="button">Bautista, Elena</button><span class="hw-ranklist__meta">72 F · Bed 3A</span></div>
+          <p class="hw-ranklist__response">Inform the medical team now</p>
+        </div>
+        <div class="hw-ranklist__vitals">
+          <div class="hw-ranklist__vital" role="img" aria-label="Heart rate 94 per minute, adds 1 NEWS2 point" data-points="1"><span class="hw-ranklist__label">HR</span><span class="hw-ranklist__value">94</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="Respiratory rate 22 per minute, adds 2 NEWS2 points" data-points="2"><span class="hw-ranklist__label">RR</span><span class="hw-ranklist__value">22</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="SpO2 94 percent, adds 1 NEWS2 point" data-points="1"><span class="hw-ranklist__label">SpO2</span><span class="hw-ranklist__value">94%</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="Blood pressure 110/70, adds 1 NEWS2 point" data-points="1"><span class="hw-ranklist__label">BP</span><span class="hw-ranklist__value">110/70</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="ACVPU A" data-points="0"><span class="hw-ranklist__label">ACVPU</span><span class="hw-ranklist__value">A</span></div>
+        </div>
+        <div class="hw-ranklist__data"><span class="hw-ranklist__age">10s ago</span></div>
+        <div class="hw-ranklist__action"><button class="hw-button hw-button--ghost hw-button--icon hw-ranklist__open" type="button" aria-label="Open Bautista, Elena"><i class="hw-icon fa-solid fa-chevron-right" aria-hidden="true"></i></button></div>
+      </li>
+      <li class="hw-ranklist__row">
+        <span class="hw-ranklist__rank">9</span>
+        <div class="hw-score hw-score--sm" data-band="low" role="img" aria-label="NEWS2 0, Low"><span class="hw-score__value">0</span><span class="hw-score__band">Low</span></div>
+        <div class="hw-ranklist__who">
+          <div class="hw-ranklist__id"><button class="hw-ranklist__name" type="button">Lim, Francis</button><span class="hw-ranklist__meta">42 M · Bed 10B</span></div>
+          <p class="hw-ranklist__context">Pericarditis, improving, discharge planned tomorrow</p>
+        </div>
+        <div class="hw-ranklist__vitals">
+          <div class="hw-ranklist__vital" role="img" aria-label="Heart rate 72 per minute" data-points="0"><span class="hw-ranklist__label">HR</span><span class="hw-ranklist__value">72</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="Respiratory rate 14 per minute" data-points="0"><span class="hw-ranklist__label">RR</span><span class="hw-ranklist__value">14</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="SpO2 98 percent" data-points="0"><span class="hw-ranklist__label">SpO2</span><span class="hw-ranklist__value">98%</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="Blood pressure 118/76" data-points="0"><span class="hw-ranklist__label">BP</span><span class="hw-ranklist__value">118/76</span></div>
+          <div class="hw-ranklist__vital" role="img" aria-label="ACVPU A" data-points="0"><span class="hw-ranklist__label">ACVPU</span><span class="hw-ranklist__value">A</span></div>
+        </div>
+        <div class="hw-ranklist__data"><span class="hw-ranklist__age">9s ago</span></div>
+        <div class="hw-ranklist__action"><button class="hw-button hw-button--ghost hw-button--icon hw-ranklist__open" type="button" aria-label="Open Lim, Francis"><i class="hw-icon fa-solid fa-chevron-right" aria-hidden="true"></i></button></div>
+      </li>
+    </ol>
+  </section>
+  </div>
+
+  <h2 class="hw-section-title" id="h-graphs">Graphs</h2>
+  <div class="hw-grid g-grid" data-hw-reveal="stagger">
+    <section class="hw-card">
+      <div id="g-trend" data-hw-graph="trend"><script type="application/json">
+        {"title":"Checking alerts against each patient’s own normal cut them by two thirds",
+         "subtitle":"Alerts per nurse shift on held-out wards, six weeks","xLabel":"Week",
+         "x":["Week 1","Week 2","Week 3","Week 4","Week 5","Week 6"],
+         "series":[{"name":"NEWS2 alone","values":[0.42,0.40,0.43,0.41,0.41,0.414]},
+                   {"name":"Student model","values":[0.44,0.41,0.42,0.40,0.41,0.413],"dashed":true},
+                   {"name":"Checked student","values":[0.20,0.17,0.15,0.14,0.13,0.128]}],
+         "highlight":"Checked student"}
+      </script></div>
+    </section>
+    <section class="hw-card"><div id="g-bars"></div></section>
+    <section class="hw-card">
+      <div id="g-columns" data-hw-graph="columns"><script type="application/json">
+        {"title":"Alerts on Ward W4 have fallen for two weeks","subtitle":"Alerts per day, 3 to 16 November. Sample data.",
+         "x":["3 Nov","4 Nov","5 Nov","6 Nov","7 Nov","8 Nov","9 Nov","10 Nov","11 Nov","12 Nov","13 Nov","14 Nov","15 Nov","16 Nov"],
+         "values":[9,7,8,11,6,5,7,8,6,4,5,3,4,2],"averageLabel":"14-day average","noun":["alert","alerts"]}
+      </script></div>
+    </section>
+    <section class="hw-card">
+      <div id="g-steps" data-hw-graph="steps"><script type="application/json">
+        {"title":"NEWS2 for bed 4 has climbed since early morning","subtitle":"Reyes, M. One reading an hour, 03:00 to 14:00",
+         "x":["03","04","05","06","07","08","09","10","11","12","13","14"],
+         "times":["03:00","04:00","05:00","06:00","07:00","08:00","09:00","10:00","11:00","12:00","13:00","14:00"],
+         "values":[2,2,2,3,3,null,4,4,5,5,6,7],"max":9,
+         "limits":[{"at":5,"label":"Urgent review","tone":"urgent"},{"at":7,"label":"Emergency","tone":"emergency"}]}
+      </script></div>
+    </section>
+    <section class="hw-card">
+      <div id="g-range" data-hw-graph="range"><script type="application/json">
+        {"title":"Four of this patient’s readings are outside their own usual range",
+         "subtitle":"Reyes, M., bed 4. Readings at 14:00 against the last five days. Sample ranges.",
+         "items":[{"label":"Breathing","value":22,"unit":" /min","usual":[14,18],"scale":[8,30]},
+                  {"label":"SpO₂","value":93,"unit":"%","usual":[95,98],"scale":[85,100]},
+                  {"label":"Pulse","value":112,"unit":" /min","usual":[72,88],"scale":[40,140]},
+                  {"label":"Systolic BP","value":104,"unit":" mmHg","usual":[110,130],"scale":[80,200]},
+                  {"label":"Temperature","value":37.1,"unit":" °C","usual":[36.4,37.2],"scale":[35,40]}]}
+      </script></div>
+    </section>
+    <section class="hw-card hw-stack" style="--hw-stack-gap:var(--hw-space-7)">
+      <div id="g-share"></div>
+      <div class="hw-grid" style="--hw-grid-min:240px;--hw-grid-gap:var(--hw-space-6)">
+        <div id="g-stat-1" data-hw-graph="stat"><script type="application/json">
+          {"label":"Alerts per nurse shift","value":"0.13","values":[0.20,0.17,0.15,0.14,0.13,0.128],
+           "change":{"direction":"down","text":"Down 36% in six weeks"},"note":"NEWS2 alone stayed at 0.41"}
+        </script></div>
+        <div id="g-stat-2" data-hw-graph="stat"><script type="application/json">
+          {"label":"Deteriorations flagged early","value":"57%","values":[36,41,47,52,56,57],
+           "change":{"direction":"up","text":"Up 21 points on NEWS2 alone"},"note":"Sample week-by-week values"}
+        </script></div>
+      </div>
+    </section>
+  </div>
+  <p class="hw-caption" style="margin-top:var(--hw-space-7)">Set in HarmonyOS Sans.</p>
+</main>
+
+<!-- Dialogs -->
+<dialog class="hw-dialog hw-dialog--sm" id="discharge" aria-labelledby="dis-title">
+  <div class="hw-dialog__header"><h2 class="hw-dialog__title" id="dis-title">Discharge patient?</h2><button class="hw-close" type="button" data-hw-close aria-label="Close"><i class="hw-icon fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+  <div class="hw-dialog__body">Bed 4 will be freed and the patient leaves every live view. This cannot be undone.</div>
+  <div class="hw-dialog__footer"><button class="hw-button" type="button" data-hw-close>Cancel</button><button class="hw-button hw-button--primary" type="button" data-hw-close value="confirm">Discharge</button></div>
+</dialog>
+<dialog class="hw-dialog hw-dialog--drawer" id="details" aria-labelledby="det-title">
+  <div class="hw-dialog__header"><h2 class="hw-dialog__title" id="det-title">Bed 4 · Reyes, M.</h2><button class="hw-close" type="button" data-hw-close aria-label="Close"><i class="hw-icon fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+  <div class="hw-dialog__body">Record details.</div>
+</dialog>
+<dialog class="hw-dialog hw-dialog--sheet" id="sheet" aria-labelledby="sheet-title">
+  <div class="hw-dialog__header"><h2 class="hw-dialog__title" id="sheet-title">Filter</h2><button class="hw-close" type="button" data-hw-close aria-label="Close"><i class="hw-icon fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+  <div class="hw-dialog__body">Sheet content.</div>
+  <div class="hw-dialog__footer"><button class="hw-button hw-button--primary hw-button--block" type="button" data-hw-close>Apply</button></div>
+</dialog>
+<dialog class="hw-dialog hw-dialog--nav" id="nav-drawer" aria-label="Main menu">
+  <nav class="hw-sidenav" aria-label="Main">
+    <p class="hw-sidenav__group">Ward</p>
+    <a class="hw-sidenav__link" href="#main" aria-current="page"><i class="hw-icon fa-solid fa-list-ol" aria-hidden="true"></i><span class="hw-sidenav__label">Ranked list</span></a>
+    <a class="hw-sidenav__link" href="#main"><i class="hw-icon fa-solid fa-hospital-user" aria-hidden="true"></i><span class="hw-sidenav__label">Patients</span></a>
+    <p class="hw-sidenav__group">Research</p>
+    <a class="hw-sidenav__link" href="#main"><i class="hw-icon fa-solid fa-flask" aria-hidden="true"></i><span class="hw-sidenav__label">Lab</span></a>
+  </nav>
+</dialog>
+
+<!-- Bottom tab bar (phones only) -->
+<nav class="hw-bottomnav hw-only-mobile" aria-label="Primary">
+  <a class="hw-bottomnav__item" href="#main" aria-current="page"><span class="hw-bottomnav__icon" aria-hidden="true"><i class="hw-icon fa-solid fa-list-ol" aria-hidden="true"></i></span>Ward</a>
+  <a class="hw-bottomnav__item" href="#main"><span class="hw-badge"><span class="hw-bottomnav__icon" aria-hidden="true"><i class="hw-icon fa-solid fa-bell" aria-hidden="true"></i></span><span class="hw-badge__count">3<span class="hw-visually-hidden"> new</span></span></span>Alerts</a>
+  <a class="hw-bottomnav__item" href="#main"><span class="hw-bottomnav__icon" aria-hidden="true"><i class="hw-icon fa-solid fa-hospital-user" aria-hidden="true"></i></span>Patients</a>
+  <a class="hw-bottomnav__item" href="#main"><span class="hw-bottomnav__icon" aria-hidden="true"><i class="hw-icon fa-regular fa-user" aria-hidden="true"></i></span>Me</a>
+</nav>
+
+<script type="module">
+  import { initAll, toast, bars, share, leave, cancelLeave } from '../src/js/index.js';
+  window.hw = { destroy: initAll(), toast, leave };
+  bars(document.getElementById('g-bars'), {
+    title: 'Both models catch more deteriorations than NEWS2 alone', subtitle: 'Share of deteriorations flagged early, held-out wards',
+    items: [{ name: 'NEWS2 alone', value: 36 }, { name: 'Student model', value: 56 }, { name: 'Checked student', value: 57 }],
+    highlight: 2, baseline: 0, unit: '%', max: 100, label: (item) => `flagged early by ${item.name}`,
+  });
+  share(document.getElementById('g-share'), {
+    title: 'Most alerts start with a vital sign', subtitle: 'What raised each alert on Ward W4 this week. Sample data.',
+    parts: [{ name: 'Vital signs', value: 29 }, { name: 'Lab results', value: 13 }, { name: 'Nurse concern', value: 5 }],
+    noun: 'alerts', label: (part) => `of alerts came from ${part.name.toLowerCase()}`,
+  });
+  document.getElementById('ind').indeterminate = true;
+  document.getElementById('toast-btn').addEventListener('click', () =>
+    toast({ message: 'Acknowledged bed 4', tone: 'success', action: { label: 'Undo' } }));
+  // Ward demos (app behaviour, gallery only): single-choice filter; bell opens the tray, Esc or close leaves it.
+  const filter = document.getElementById('filter');
+  filter.addEventListener('click', (e) => {
+    const item = e.target.closest('.hw-filter__item');
+    if (item) filter.querySelectorAll('.hw-filter__item').forEach((i) => i.setAttribute('aria-pressed', String(i === item)));
+  });
+  const bell = document.getElementById('bell-live'), tray = document.getElementById('tray-live');
+  const closeTray = () => {
+    if (bell.getAttribute('aria-expanded') !== 'true') return;
+    bell.setAttribute('aria-expanded', 'false'); bell.focus();
+    leave(tray).then((done) => { if (done) tray.hidden = true; });
+  };
+  bell.addEventListener('click', () => {
+    if (bell.getAttribute('aria-expanded') === 'true') return closeTray();
+    cancelLeave(tray); tray.hidden = false; bell.setAttribute('aria-expanded', 'true');
+    tray.querySelector('.hw-button--accent:not(:disabled)')?.focus();
+  });
+  tray.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeTray(); });
+  tray.querySelector('.hw-close').addEventListener('click', closeTray);
+  const params = new URLSearchParams(location.search);
+  if (params.get('theme')) document.documentElement.dataset.hwTheme = params.get('theme');
+  if (params.get('family')) document.documentElement.dataset.hwFamily = params.get('family');
+  if (params.get('density')) document.documentElement.dataset.hwDensity = params.get('density');
+</script>
+</body>
+</html>

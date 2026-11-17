@@ -43,6 +43,7 @@
     --hw-color-warning-fg: var(--hw-orange-10); --hw-color-warning-bg: rgb(244 132 12 / 16%); --hw-color-warning-border: rgb(244 132 12 / 32%);
     --hw-color-danger-fg: var(--hw-red-20);  --hw-color-danger-bg: rgb(224 33 40 / 16%);  --hw-color-danger-border: rgb(224 33 40 / 32%);
     --hw-color-danger: var(--hw-red-30);
+    --hw-color-emergency: var(--hw-red-50);  /* 3.7:1 against the dark surface, 4.8:1 with white text; --hw-color-on-emergency stays white */
     --hw-elevation-popup: 0 4px 12px rgb(0 0 0 / 50%);
     --hw-elevation-dialog: 0 16px 48px rgb(0 0 0 / 60%);
   }
@@ -60,6 +61,7 @@
   [data-hw-density="compact"] {
     --hw-control-height: var(--hw-size-sm);
     --hw-control-height-lg: var(--hw-size-md);
+    --hw-target-size: 40px;
   }
 }
 
@@ -70,6 +72,7 @@
       --hw-control-height: 44px;
       --hw-control-height-sm: 36px;
       --hw-control-height-lg: 52px;
+      --hw-target-size: 44px;
     }
   }
 }

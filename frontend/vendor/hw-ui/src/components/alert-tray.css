@@ -1,0 +1,150 @@
+@layer hw.components {
+  /* Bell and alert tray. Behaviour lives in the app: the bell toggles aria-expanded and the tray's [hidden];
+     close with leave(tray) from js/core/motion.js so the tray plays its exit first.
+     div.hw-menu-anchor
+       > button.hw-bell[type=button][aria-label="2 unacknowledged alerts"][aria-haspopup=dialog][aria-expanded][aria-controls]
+           > i.hw-icon.fa-solid.fa-bell[aria-hidden=true] + span.hw-bell__count[aria-hidden=true]
+       + div.hw-alert-tray[role=dialog][aria-label|aria-labelledby][id]
+           > div.hw-alert-tray__head > h2.hw-alert-tray__title + button.hw-close
+           + div.hw-alert-tray__item* > div.hw-score.hw-score--sm + div.hw-alert-tray__who (p.hw-alert-tray__name + p.hw-alert-tray__line)
+                                        + button.hw-button (Open) + button.hw-button.hw-button--accent (Acknowledge; disabled offline)
+           + p.hw-alert-tray__empty (when nothing is waiting) + p.hw-alert-tray__foot
+     The bell is tinted while it shows a count: leave .hw-bell__count out (or [hidden]) at zero.
+     The tray drops under the bell when it directly follows it; anywhere else it sits in the flow.
+     Phones: a full-width panel under the 56px app bar, 44px buttons. */
+  .hw-bell {
+    --hw-bell-size: var(--hw-target-size);
+    --hw-bell-bg: var(--hw-color-surface);
+    --hw-bell-fg: var(--hw-color-text);
+    --hw-bell-border: var(--hw-color-border);
+    --hw-bell-alert-bg: var(--hw-color-danger-bg);
+    --hw-bell-alert-border: var(--hw-graph-emergency);
+
+    position: relative;
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: var(--hw-bell-size);
+    height: var(--hw-bell-size);
+    padding: 0;
+    color: var(--hw-bell-fg);
+    cursor: pointer;
+    background: var(--hw-bell-bg);
+    border: 1px solid var(--hw-bell-border);
+    border-radius: 50%;
+    transition: background-color var(--hw-duration-1), border-color var(--hw-duration-1);
+  }
+  .hw-bell:hover { --hw-bell-border: var(--hw-color-border-strong); }
+  .hw-bell:has(.hw-bell__count:not([hidden])) {
+    --hw-bell-bg: var(--hw-bell-alert-bg);
+    --hw-bell-fg: var(--hw-graph-emergency-text);
+    --hw-bell-border: var(--hw-bell-alert-border);
+  }
+  .hw-bell > .hw-icon { --hw-icon-size: var(--hw-icon-size-lg); }
+  .hw-bell__count {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    font-size: var(--hw-text-caption);
+    font-weight: var(--hw-weight-bold);
+    font-variant-numeric: tabular-nums;
+    line-height: 20px;
+    color: var(--hw-color-on-emergency);
+    text-align: center;
+    background: var(--hw-color-emergency);
+    border-radius: var(--hw-radius-full);
+  }
+
+  .hw-alert-tray {
+    --hw-alert-tray-width: 400px;
+
+    width: min(var(--hw-alert-tray-width), 100%);
+    overflow: hidden;
+    color: var(--hw-color-text);
+    background: var(--hw-color-surface);
+    border: 1px solid var(--hw-color-border-subtle);
+    border-radius: var(--hw-popup-radius);
+    box-shadow: var(--hw-elevation-popup);
+    transform-origin: top;
+    animation: hw-pop-in var(--hw-motion-micro) var(--hw-ease-enter);
+  }
+  .hw-alert-tray[data-hw-leaving] { animation: hw-pop-out var(--hw-motion-micro) var(--hw-ease-exit) forwards; }
+
+  /* Under the bell: phones get a full-width panel below the app bar (fixed, so it spans the screen). */
+  .hw-bell + .hw-alert-tray {
+    position: fixed;
+    top: calc(56px + env(safe-area-inset-top));
+    right: 0;
+    left: 0;
+    z-index: var(--hw-z-popup);
+    width: auto;
+    max-height: calc(100dvh - 56px - env(safe-area-inset-top));
+    overflow-y: auto;
+    border-width: 0 0 1px;
+    border-color: var(--hw-color-border);
+    border-radius: 0;
+    box-shadow: var(--hw-elevation-overlay);
+  }
+
+  .hw-alert-tray__head { display: flex; gap: var(--hw-space-4); align-items: center; padding: 14px var(--hw-space-5) 10px; }
+  .hw-alert-tray__title { flex-grow: 1; margin: 0; font-size: var(--hw-font-size-16); font-weight: var(--hw-weight-medium); line-height: 1.4; }
+
+  .hw-alert-tray__item {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--hw-space-3) var(--hw-space-4);
+    align-items: center;
+    padding: var(--hw-space-4) var(--hw-space-5);
+    border-top: 1px solid var(--hw-color-border-subtle);
+  }
+  .hw-alert-tray__who { flex: 1 1 calc(100% - 40px - var(--hw-space-4)); min-width: 0; }   /* own line beside the 40px score */
+  .hw-alert-tray__name { margin: 0; font-weight: var(--hw-weight-medium); }
+  .hw-alert-tray__line { margin: 0; font-size: 13px; color: var(--hw-color-text-muted); }
+
+  /* Phones: Open and Acknowledge share the line under the patient, 44px tall. */
+  .hw-alert-tray__item > .hw-button {
+    --hw-button-height: 44px;
+
+    flex: 1 1 120px;
+  }
+
+  .hw-alert-tray__empty { margin: 0; padding: var(--hw-space-2) var(--hw-space-5) 20px; color: var(--hw-color-text-muted); }
+  .hw-alert-tray__foot {
+    margin: 0;
+    padding: 10px var(--hw-space-5);
+    font-size: var(--hw-text-caption);
+    color: var(--hw-color-text-muted);
+    background: var(--hw-color-surface-subtle);
+    border-top: 1px solid var(--hw-color-border-subtle);
+  }
+
+  @media (width >= 576px) {
+    .hw-bell + .hw-alert-tray {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      left: auto;
+      width: var(--hw-alert-tray-width);
+      max-width: calc(100vw - 32px);
+      max-height: calc(100dvh - 96px);
+      border-width: 1px;
+      border-color: var(--hw-color-border-subtle);
+      border-radius: var(--hw-popup-radius);
+      box-shadow: var(--hw-elevation-popup);
+    }
+    .hw-alert-tray__item > .hw-button {
+      --hw-button-height: 36px;
+      --hw-button-pad: 14px;
+      --hw-button-font: 13px;
+
+      flex: none;
+    }
+    .hw-alert-tray__who + .hw-button { margin-left: auto; }
+  }
+  @media (width >= 576px) and (pointer: coarse) {
+    .hw-alert-tray__item > .hw-button { --hw-button-height: 44px; }
+  }
+}
