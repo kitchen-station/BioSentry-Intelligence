@@ -100,7 +100,7 @@ from biosentry.schemas.ingest import (
 )
 from biosentry.schemas.lab import LabJob, LabReport, PatientQuestionJob, QuestionJob
 from biosentry.schemas.analytics import HOURS_MAX, OpenWardAnalytics
-from biosentry.services import analytics, episodes, ingest, lab
+from biosentry.services import episodes, ingest, lab
 from biosentry.services.baseline import BaselineService
 from biosentry.services.history import HistoryService
 from biosentry.services.overview import OverviewService
@@ -503,7 +503,7 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
                 ctx.audit.append(None, OPEN_ANALYTICS_ACTION, resource, outcome)
             if not known:
                 raise HTTPException(status_code=404)  # no detail: the same bytes as an unknown path
-            return analytics.open_analytics(ctx.store, ward, hours)
+            return ctx.wards.open_analytics(ward, hours)
 
     @app.get("/wards", response_model=list[WardUnit])
     def list_wards(ctx: Ctx, who: Who) -> list[WardUnit]:

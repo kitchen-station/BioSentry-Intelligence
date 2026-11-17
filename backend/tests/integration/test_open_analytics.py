@@ -3,23 +3,25 @@ setting. The seeded run below is counted by hand in the comments; the answer car
 bed, person or clinician."""
 
 from datetime import timedelta
+from dataclasses import replace
 from typing import Any
 
 import pytest
+from fastapi.testclient import TestClient
 from test_api import VALID_BODIES, _route_table
 from test_open_view import NOT_FOUND, watch  # noqa: F401 (watch: the API with the setting on)
 from test_store import Api, api, batch, obs, sim_patient  # noqa: F401 (api: fixture)
 from test_units import UNITS
 
-from biosentry.api.app import OPEN_ANALYTICS_ACTION
+from biosentry.api.app import OPEN_ANALYTICS_ACTION, create_app
 
 TEMPLATE = "/wards/{ward}/open-view/analytics"
 URL = "/wards/W4/open-view/analytics?hours=3"
-TOP = {"synthetic", "origin", "hourly", "shifts", "finished_stays"}
-HOUR = {"from_minute", "to_minute", "beds_in_use", "admitted", "discharged", "transferred_in", "transferred_out", "news2"}
+TOP = {"synthetic", "origin", "hourly", "shifts", "length_of_stay"}
+HOUR = {"from_minute", "to_minute", "beds_in_use", "admitted", "transferred_in", "left", "news2"}
 NEWS2 = {"zero_to_four", "five_to_six", "seven_plus", "not_ranked"}
-SHIFT = {"from_minute", "to_minute", "alerts", "patient_minutes"}
-STAY = {"in_minute", "out_minute", "count"}
+SHIFT = {"from_minute", "to_minute", "alerts", "patient_minutes", "discharged", "transferred_out", "died"}
+LENGTH = {"from_hours", "count"}
 GOOD = {"heart_rate": 70, "respiratory_rate": 16, "spo2": 97, "temperature": 36.8}
 SEVEN = {"heart_rate": 120, "respiratory_rate": 22, "spo2": 93, "temperature": 38.5}  # 2 + 2 + 2 + 1
 FIVE = {"heart_rate": 100, "respiratory_rate": 22, "spo2": 94, "temperature": 38.5}  # 1 + 2 + 1 + 1
@@ -51,6 +53,13 @@ def person(pid: str, unit: str, minute: int | None, bed: str, rn: str, **over: A
 
 def bins(pid: str, minute: int, values: dict[str, float]) -> list[dict[str, Any]]:
     return [{"patient_id": pid, "vital": v, "minute": minute, "value": float(x)} for v, x in values.items()]
+
+
+def start_run(api: Api) -> int:
+    response = api.post("/sim/runs", {"client_id": "client-a", "source": "synthetic", "seed": 7, "origin": "2026-01-01T00:00:00Z", "patients": [sim_patient("k-s")]})
+    assert response.status_code == 201, response.text
+    run_id: int = response.json()["run_id"]
+    return run_id
 
 
 def seed(api: Api) -> None:
@@ -98,7 +107,7 @@ def seeded(watch: Api) -> Api:  # noqa: F811
 
 
 def counts(hour: dict[str, Any]) -> list[int]:
-    return [hour[k] for k in ("beds_in_use", "admitted", "discharged", "transferred_in", "transferred_out")] + [
+    return [hour[k] for k in ("beds_in_use", "admitted", "transferred_in", "left")] + [
         hour["news2"][k] for k in ("zero_to_four", "five_to_six", "seven_plus", "not_ranked")
     ]
 
@@ -144,13 +153,15 @@ def test_the_answer_has_exactly_the_contracts_keys_at_every_level(seeded: Api) -
     assert set(body) == TOP
     assert all(set(h) == HOUR and set(h["news2"]) == NEWS2 for h in body["hourly"])
     assert all(set(s) == SHIFT for s in body["shifts"])
-    assert all(set(f) == STAY for f in body["finished_stays"])
+    assert all(set(f) == LENGTH for f in body["length_of_stay"])
     assert body["synthetic"] is True
 
 
 def test_no_id_name_bed_person_or_clinician_is_in_the_answer(seeded: Api) -> None:
     text = get(seeded, "/wards/W4/open-view/analytics?hours=168").text + get(seeded, "/wards/ICU/open-view/analytics").text
     marks = [f"mk-{i}" for i in range(7)] + [f"NAME-mk-{i}" for i in range(7)] + ["mk-person", "Sim, Pat", "rn-delacruz", "cn-icu"]
+    for gone in ("finished_stays", "in_minute", "out_minute"):
+        assert gone not in text  # no time that belongs to one stay
     marks += ["4A", "4B", "4C", "4D", "4E", "4F", "I1", "W4", "ICU"]
     for mark in marks:
         assert mark not in text, mark
@@ -160,36 +171,52 @@ def test_counts_on_the_seeded_run_match_the_hand_count(seeded: Api) -> None:
     body = get(seeded).json()
     assert body["origin"] == "2026-01-01T00:00:00Z"
     assert [(h["from_minute"], h["to_minute"]) for h in body["hourly"]] == [(0, 60), (60, 120), (120, 180)]
-    # beds, admitted, discharged, transferred in, transferred out | 0-4, 5-6, 7+, not ranked
-    assert counts(body["hourly"][0]) == [3, 2, 0, 0, 0, 1, 0, 0, 2]  # mk-1 (bin 60) | mk-2, mk-5 have no bin by 60
-    assert counts(body["hourly"][1]) == [4, 1, 0, 0, 0, 0, 1, 1, 2]  # mk-2 five, mk-1 seven | mk-3, mk-5
-    assert counts(body["hourly"][2]) == [2, 1, 1, 0, 1, 1, 0, 0, 1]  # mk-1 single 3 is total 3 | mk-4
+    # beds, admitted, transferred in, left | 0-4, 5-6, 7+, not ranked
+    assert counts(body["hourly"][0]) == [3, 2, 0, 1, 1, 0, 0, 2]  # mk-0 left at 45 | mk-1 (bin 60) | mk-2, mk-5 have no bin by 60
+    assert counts(body["hourly"][1]) == [4, 1, 0, 0, 0, 1, 1, 2]  # mk-2 five, mk-1 seven | mk-3, mk-5
+    assert counts(body["hourly"][2]) == [2, 1, 0, 3, 1, 0, 0, 1]  # mk-2, mk-5 at 125, mk-3 at 150 | mk-1 single 3 is total 3 | mk-4
     # alerts: mk-1 at 120 and 180, mk-2 at 75 and 120. Patient-minutes: 45 + 180 + 65 + 65 + 50 + 10.
-    assert body["shifts"] == [{"from_minute": 0, "to_minute": 180, "alerts": 4, "patient_minutes": 415}]
-    assert body["finished_stays"] == [
-        {"in_minute": None, "out_minute": 45, "count": 1},
-        {"in_minute": 60, "out_minute": 125, "count": 2},
-        {"in_minute": 100, "out_minute": 150, "count": 1},
+    # One discharged, one transferred, one died: each is 1, so each is served as null (k = 5).
+    assert body["shifts"] == [
+        {"from_minute": 0, "to_minute": 180, "alerts": 4, "patient_minutes": 415, "discharged": None, "transferred_out": None, "died": None}
     ]
+    # Lengths of the finished stays with a known arrival: mk-3 50 min, mk-2 and mk-5 65 min, so 1 and 2 stays: hidden.
+    assert body["length_of_stay"] == [{"from_hours": 0, "count": None}, {"from_hours": 1, "count": None}, {"from_hours": 2, "count": 0}]
+
+
+def test_five_or_more_is_exact_and_one_to_four_is_null_and_none_is_zero(watch: Api) -> None:
+    people = [person(f"k-{i}", "W4", 10, f"5{chr(65 + i)}", "rn-delacruz") for i in range(7)]
+    run = start_run(watch)
+    ends = [{"patient_id": f"k-{i}", "minute": 20, "outcome": "discharged" if i < 5 else "died"} for i in range(7)]
+    done = watch.post(f"/sim/runs/{run}/batch", batch(minute=60, patients=[], observations=[], bins=[], events=[], admissions=people, departures=ends))
+    assert done.status_code == 204, done.text
+    body = get(watch, "/wards/W4/open-view/analytics?hours=1").json()
+    (shift,) = body["shifts"]
+    assert (shift["discharged"], shift["transferred_out"], shift["died"]) == (5, 0, None)  # 5 exact, none 0, two hidden
+    assert body["length_of_stay"] == [{"from_hours": 0, "count": 7}]  # ten minutes each
+    assert counts(body["hourly"][0])[:4] == [1, 7, 0, 7]  # k-s was there before the run
 
 
 def test_an_unranked_unit_counts_arrivals_and_never_a_score(seeded: Api) -> None:
     body = get(seeded, "/wards/ICU/open-view/analytics?hours=3").json()
-    assert [counts(h) for h in body["hourly"]] == [[0] * 9, [0] * 9, [1, 0, 0, 1, 0, 0, 0, 0, 1]]
-    assert body["shifts"] == [{"from_minute": 0, "to_minute": 180, "alerts": 0, "patient_minutes": 30}]
-    assert body["finished_stays"] == []
+    assert [counts(h) for h in body["hourly"]] == [[0] * 8, [0] * 8, [1, 0, 1, 0, 0, 0, 0, 1]]
+    assert body["shifts"] == [
+        {"from_minute": 0, "to_minute": 180, "alerts": 0, "patient_minutes": 30, "discharged": 0, "transferred_out": 0, "died": 0}
+    ]
+    assert body["length_of_stay"] == [{"from_hours": h, "count": 0} for h in range(3)]
 
 
 def test_hours_before_the_run_and_a_second_shift_are_zero_filled_and_clipped(seeded: Api) -> None:
     body = get(seeded, "/wards/W4/open-view/analytics?hours=168").json()
     assert len(body["hourly"]) == 168
     assert body["hourly"][0]["to_minute"] == 180 - 167 * 60
-    assert counts(body["hourly"][0]) == [2, 0, 0, 0, 0, 0, 0, 0, 2]  # the two there before the run count from the window's start
+    assert counts(body["hourly"][0]) == [2, 0, 0, 0, 0, 0, 0, 2]  # the two there before the run count from the window's start
     assert [(s["from_minute"], s["to_minute"]) for s in body["shifts"]][-2:] == [(-720, 0), (0, 180)]
     assert len(body["shifts"]) == 15 and body["shifts"][0]["from_minute"] == 180 - 168 * 60
     one = get(seeded, "/wards/W4/open-view/analytics?hours=1").json()
     assert [(h["from_minute"], h["to_minute"]) for h in one["hourly"]] == [(120, 180)]
-    assert one["finished_stays"] == [{"in_minute": 60, "out_minute": 125, "count": 2}, {"in_minute": 100, "out_minute": 150, "count": 1}]
+    assert one["length_of_stay"] == [{"from_hours": 0, "count": None}]  # three stays, all in the one (last) bucket: hidden
+    assert len(body["length_of_stay"]) == 168
     assert len(get(seeded, "/wards/W4/open-view/analytics").json()["hourly"]) == 24
 
 
@@ -204,6 +231,40 @@ def test_a_window_counts_only_the_bins_and_minutes_inside_it(seeded: Api) -> Non
     shift = get(seeded, "/wards/W4/open-view/analytics?hours=1").json()["shifts"][0]
     # bins ending in (120, 180]: mk-1 at 180 only. Minutes from 120: 60 + 5 + 5 + 30 + 10.
     assert (shift["alerts"], shift["patient_minutes"]) == (1, 110)
+
+
+# --- The cache ---------------------------------------------------------------------------------------
+
+
+def test_the_answer_is_kept_per_run_unit_and_hours_and_recomputed_when_a_batch_moves_the_clock(
+    seeded: Api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from biosentry.services import analytics
+
+    kept = TestClient(create_app(replace(seeded.settings, open_ward_view=True, view_cache_seconds=3.0), clock=seeded.wall))
+    calls: list[tuple[str, int]] = []
+    real = analytics.open_analytics
+
+    def counting(store: Any, unit: str, hours: int) -> Any:
+        calls.append((unit, hours))
+        return real(store, unit, hours)
+
+    monkeypatch.setattr(analytics, "open_analytics", counting)
+    first = get(kept_api(seeded, kept)).content
+    assert get(kept_api(seeded, kept)).content == first
+    get(kept_api(seeded, kept), "/wards/W4/open-view/analytics?hours=2")
+    get(kept_api(seeded, kept), "/wards/ICU/open-view/analytics?hours=3")
+    assert calls == [("W4", 3), ("W4", 2), ("ICU", 3)]  # the second read of W4 for 3 hours came from the cache
+    assert len(rows(seeded)) == 2  # the audit row is still written for a kept read (one a minute per unit)
+    run = seeded.sql("SELECT max(id) AS i FROM run")[0]["i"]
+    seeded.post(f"/sim/runs/{run}/batch", batch(minute=181, patients=[], observations=[], bins=[], events=[]))
+    get(kept_api(seeded, kept))
+    assert calls[-1] == ("W4", 3) and len(calls) == 4  # new data: computed again
+
+
+def kept_api(api: Api, client: TestClient) -> Api:
+    api.client = client
+    return api
 
 
 # --- Parameters and unknowns -----------------------------------------------------------------------

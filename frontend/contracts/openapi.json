@@ -686,12 +686,12 @@
             "minimum": 0,
             "type": "integer"
           },
-          "discharged": {
-            "minimum": 0,
-            "type": "integer"
-          },
           "from_minute": {
             "type": "number"
+          },
+          "left": {
+            "minimum": 0,
+            "type": "integer"
           },
           "news2": {
             "$ref": "#/components/schemas/News2Counts"
@@ -702,10 +702,6 @@
           "transferred_in": {
             "minimum": 0,
             "type": "integer"
-          },
-          "transferred_out": {
-            "minimum": 0,
-            "type": "integer"
           }
         },
         "required": [
@@ -713,9 +709,8 @@
           "to_minute",
           "beds_in_use",
           "admitted",
-          "discharged",
           "transferred_in",
-          "transferred_out",
+          "left",
           "news2"
         ],
         "title": "AnalyticsHour",
@@ -723,11 +718,33 @@
       },
       "AnalyticsShift": {
         "additionalProperties": false,
-        "description": "Run-relative 12-hour shifts, clipped to the requested window. Alerts count scored\npatient bins ending in (from, to] with NEWS2 >=5 or a single parameter at 3, not runs of them.\nPatient-minutes sum stay overlap, including unranked patients. Unknown arrival times\ncontribute from the window start; they are not counted as admissions.",
+        "description": "Run-relative 12-hour shifts, clipped to the requested window. Alerts count scored\npatient bins ending in (from, to] with NEWS2 >=5 or a single parameter at 3, not runs of them.\nPatient-minutes sum stay overlap, including unranked patients. Unknown arrival times\ncontribute from the window start; they are not counted as admissions. Discharged, transferred_out\nand died count the stays that ended in (from, to]; null when 1 to 4 (k = 5).",
         "properties": {
           "alerts": {
             "minimum": 0,
             "type": "integer"
+          },
+          "died": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "discharged": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "from_minute": {
             "type": "number"
@@ -738,13 +755,27 @@
           },
           "to_minute": {
             "type": "number"
+          },
+          "transferred_out": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
           "from_minute",
           "to_minute",
           "alerts",
-          "patient_minutes"
+          "patient_minutes",
+          "discharged",
+          "transferred_out",
+          "died"
         ],
         "title": "AnalyticsShift",
         "type": "object"
@@ -1211,36 +1242,6 @@
         ],
         "title": "FindingDirection",
         "type": "string"
-      },
-      "FinishedStayCount": {
-        "additionalProperties": false,
-        "description": "Finished stays grouped by arrival/departure minute, never individual identifiers.\nIncludes every exit outcome in the window; an unknown arrival remains null.",
-        "properties": {
-          "count": {
-            "minimum": 0,
-            "type": "integer"
-          },
-          "in_minute": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "out_minute": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "in_minute",
-          "out_minute",
-          "count"
-        ],
-        "title": "FinishedStayCount",
-        "type": "object"
       },
       "FlagMeasurement": {
         "additionalProperties": false,
@@ -3069,17 +3070,18 @@
       },
       "OpenWardAnalytics": {
         "additionalProperties": false,
-        "description": "Last hours of ward time, oldest first, with zero-filled buckets. Transfers in are\narrivals linked by person, time and destination to a transferred stay in this run;\nother known arrivals are admissions. Discharged counts only the discharged outcome.",
+        "description": "Last hours of ward time, oldest first, with zero-filled buckets. Transfers in are\narrivals linked by person, time and destination to a transferred stay in this run;\nother known arrivals are admissions.",
         "properties": {
-          "finished_stays": {
-            "items": {
-              "$ref": "#/components/schemas/FinishedStayCount"
-            },
-            "type": "array"
-          },
           "hourly": {
             "items": {
               "$ref": "#/components/schemas/AnalyticsHour"
+            },
+            "maxItems": 168,
+            "type": "array"
+          },
+          "length_of_stay": {
+            "items": {
+              "$ref": "#/components/schemas/StayLength"
             },
             "maxItems": 168,
             "type": "array"
@@ -3105,7 +3107,7 @@
           "origin",
           "hourly",
           "shifts",
-          "finished_stays"
+          "length_of_stay"
         ],
         "title": "OpenWardAnalytics",
         "type": "object"
@@ -5198,6 +5200,33 @@
           "value"
         ],
         "title": "Spo2ScalePresent",
+        "type": "object"
+      },
+      "StayLength": {
+        "additionalProperties": false,
+        "description": "Finished stays in the window whose length is from_hours to from_hours + 1 whole hours; the last\nbucket also holds longer stays. A stay with an unknown arrival has no length and is in none. No\narrival or departure time. Null when 1 to 4 stays (k = 5).",
+        "properties": {
+          "count": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "from_hours": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "from_hours",
+          "count"
+        ],
+        "title": "StayLength",
         "type": "object"
       },
       "Tier": {

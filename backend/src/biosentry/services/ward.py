@@ -42,6 +42,7 @@ from biosentry.schemas import (
     WardResponse,
     WardUnit,
 )
+from biosentry.schemas.analytics import OpenWardAnalytics
 from biosentry.schemas.ingest import (
     BED_LABEL,
     HISTORY_HOURS,
@@ -55,6 +56,7 @@ from biosentry.schemas.ingest import (
     OpenWard,
 )
 
+from . import analytics
 from .model_signals import STUDENT_ID, ModelSignals, ward_model_signals
 from .models import LoadedModels
 from .scoring import decide
@@ -440,6 +442,13 @@ class WardService:
                 "now": whole(self._store.now()),
             }
         )
+
+    def open_analytics(self, unit: str, hours: int) -> OpenWardAnalytics:
+        """The open analytics, kept for a few seconds: the same for everyone, and recomputed once a batch moves the run's clock."""
+        found: OpenWardAnalytics = self._cached(
+            self._key("open_analytics", unit, hours), lambda: analytics.open_analytics(self._store, unit, hours)
+        )
+        return found
 
     def open_ward(self, unit: str) -> OpenWard | None:
         """`_open_ward`, kept for a few seconds: the answer is the same for everyone."""
