@@ -411,3 +411,9 @@ describe("the fixture provider", () => {
     await expect(fixtureProvider.getOverview()).rejects.toThrow("The overview needs the API");
   });
 });
+
+it("fixture history is empty and cannot manufacture a simulated result", async () => {
+  await expect(fixtureProvider.getAssistantHistory("p-001")).resolves.toEqual([]);
+  await expect(fixtureProvider.getPatientRuns("p-001")).resolves.toEqual([]);
+  await expect(fixtureProvider.getPatientRun("p-001", 1)).rejects.toThrow("need the server");
+});

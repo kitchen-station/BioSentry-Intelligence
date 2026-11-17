@@ -62,11 +62,11 @@ def test_unit_operations_migration_applies_and_transaction_rollback_restores_old
 
         with pytest.raises(RollBack):
             with conn.transaction():
-                assert migrate(conn) == ["0020_unit_operations"]
+                assert migrate(conn) == ["0020_unit_operations", "0021_assistant_message"]
                 assert {"capacity", "nurses_on_duty", "awaiting_icu", "outliers"} <= cols()
                 raise RollBack
         assert "capacity" not in cols()
-        assert migrate(conn) == ["0020_unit_operations"]
+        assert migrate(conn) == ["0020_unit_operations", "0021_assistant_message"]
         assert {"capacity", "nurses_on_duty", "awaiting_icu", "outliers"} <= cols()
         assert conn.execute("SELECT name, floor FROM run_unit").fetchone() == {"name": "Ward W4", "floor": 4}
         for name in ("capacity", "nurses_on_duty", "awaiting_icu", "outliers"):
@@ -222,7 +222,7 @@ def test_a_compare_run_from_before_the_patient_question_survives_with_the_new_co
         )
         before = conn.execute("SELECT id, state, mode, report, report_text FROM lab_run ORDER BY id").fetchall()
         assert migrate(conn) == [
-            "0011_patient_question", "0012_sim_episode", "0013_lab_question", "0014_hospital_units", "0015_sim_skip", "0016_unit_score_note", "0017_score_note_separators", "0018_observation_latest_kind", "0019_staff_per_floor", "0020_unit_operations"
+            "0011_patient_question", "0012_sim_episode", "0013_lab_question", "0014_hospital_units", "0015_sim_skip", "0016_unit_score_note", "0017_score_note_separators", "0018_observation_latest_kind", "0019_staff_per_floor", "0020_unit_operations", "0021_assistant_message"
         ]  # fmt: skip
         after = conn.execute("SELECT * FROM lab_run ORDER BY id").fetchall()
         names = {
@@ -267,7 +267,7 @@ def test_a_compare_run_and_a_patient_question_survive_the_general_question_migra
         )
         before = conn.execute("SELECT * FROM lab_run ORDER BY id").fetchall()
         assert migrate(conn) == [
-            "0013_lab_question", "0014_hospital_units", "0015_sim_skip", "0016_unit_score_note", "0017_score_note_separators", "0018_observation_latest_kind", "0019_staff_per_floor", "0020_unit_operations"
+            "0013_lab_question", "0014_hospital_units", "0015_sim_skip", "0016_unit_score_note", "0017_score_note_separators", "0018_observation_latest_kind", "0019_staff_per_floor", "0020_unit_operations", "0021_assistant_message"
         ]
         assert conn.execute("SELECT * FROM lab_run ORDER BY id").fetchall() == before
         conn.execute(
@@ -300,7 +300,7 @@ def test_a_ward_from_before_units_becomes_one_ranked_unit_with_every_row_kept(
             "INSERT INTO sim_command (run_id, kind, patient_id, clinician_id, at, data)"
             " VALUES (1, 'set_speed', NULL, 'md-old', now(), '{\"speed\": 1}')"
         )
-        assert migrate(conn) == ["0014_hospital_units", "0015_sim_skip", "0016_unit_score_note", "0017_score_note_separators", "0018_observation_latest_kind", "0019_staff_per_floor", "0020_unit_operations"]
+        assert migrate(conn) == ["0014_hospital_units", "0015_sim_skip", "0016_unit_score_note", "0017_score_note_separators", "0018_observation_latest_kind", "0019_staff_per_floor", "0020_unit_operations", "0021_assistant_message"]
         assert conn.execute("SELECT score_note FROM run_unit").fetchall() == [{"score_note": None}]  # the old unit has no note
         assert conn.execute("SELECT commands_read FROM run").fetchall() == [{"commands_read": 0}]  # nothing read yet
         assert conn.execute("SELECT kind FROM sim_command").fetchall() == [{"kind": "set_speed"}]  # the old row stays

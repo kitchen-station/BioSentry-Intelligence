@@ -375,6 +375,7 @@ READS = [("GET", p) for p in (
     "/wards/{ward}/lab/questions/{lab_run_id}", "/patients",
     "/patients/{patient_id}", "/patients/{patient_id}/baseline", "/patients/{patient_id}/history",
     "/patients/{patient_id}/notes", "/patients/{patient_id}/questions", "/patients/{patient_id}/questions/{question_id}",
+    "/patients/{patient_id}/assistant/history", "/patients/{patient_id}/lab/runs", "/patients/{patient_id}/lab/runs/{lab_run_id}",
     "/acknowledgements", "/audit",
 )]
 PATIENT_READS = {
@@ -402,6 +403,8 @@ CLOSED_TO_ADMIN = {
 CLOSED_TO_ADMIN_BY_PATIENT = {
     "/patients/{patient_id}/questions": "view_patient_questions",
     "/patients/{patient_id}/questions/{question_id}": "view_patient_question",
+    "/patients/{patient_id}/lab/runs": "view_patient_lab_runs",
+    "/patients/{patient_id}/lab/runs/{lab_run_id}": "view_patient_lab_run",
 }
 
 

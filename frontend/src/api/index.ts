@@ -30,6 +30,9 @@ const fixtures = (): Promise<FixtureModule> => (fixtureModule ??= import("./prov
  */
 function lazyFixtureProvider(): ApiProvider {
   return {
+    getAssistantHistory: (patientId) => fixtures().then((m) => m.fixtureProvider.getAssistantHistory(patientId)),
+    getPatientRuns: (patientId) => fixtures().then((m) => m.fixtureProvider.getPatientRuns(patientId)),
+    getPatientRun: (patientId, runId) => fixtures().then((m) => m.fixtureProvider.getPatientRun(patientId, runId)),
     getWard: () => fixtures().then((m) => m.fixtureProvider.getWard()),
     getPatient: (id) => fixtures().then((m) => m.fixtureProvider.getPatient(id)),
     getBaseline: (patientId) => fixtures().then((m) => m.fixtureProvider.getBaseline(patientId)),
@@ -71,6 +74,9 @@ function lazyFixtureProvider(): ApiProvider {
 
 const provider: ApiProvider = USE_FIXTURES ? lazyFixtureProvider() : httpProvider;
 
+export const getAssistantHistory = provider.getAssistantHistory;
+export const getPatientRuns = provider.getPatientRuns;
+export const getPatientRun = provider.getPatientRun;
 export const getWard = provider.getWard;
 export const getPatient = provider.getPatient;
 export const getBaseline = provider.getBaseline;

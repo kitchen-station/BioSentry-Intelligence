@@ -24,6 +24,9 @@ const SEP = new Date(Date.UTC(2026, 8, 3)).toLocaleDateString("en-GB", { month: 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const api = vi.hoisted(() => ({
+  getAssistantHistory: vi.fn(async () => []),
+  getPatientRuns: vi.fn(async () => []),
+  getPatientRun: vi.fn(),
   getPatient: vi.fn(),
   getWard: vi.fn(),
   getAcknowledgements: vi.fn(),

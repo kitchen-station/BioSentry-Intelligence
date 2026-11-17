@@ -446,8 +446,8 @@ def test_each_kinds_routes_never_serve_another_kind(api: Api) -> None:
         assert api.client.get(f"/wards/W4/lab/runs/{run_id}", headers=api.as_(RN)).status_code == 404
     for run_id in (1, 3):
         assert patient_one(api, MD, "p-001", run_id).status_code == 404
-    assert patient_one(api, MD, "p-001", 2).status_code == 200
-    assert [r["id"] for r in api.client.get("/patients/p-001/questions", headers=api.as_(MD)).json()] == [2]
+    assert patient_one(api, CHARGE, "p-001", 2).status_code == 200  # a question is read by its asker
+    assert [r["id"] for r in api.client.get("/patients/p-001/questions", headers=api.as_(CHARGE)).json()] == [2]
 
 
 # --- timeouts ----------------------------------------------------------------------------------

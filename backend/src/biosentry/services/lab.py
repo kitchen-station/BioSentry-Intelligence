@@ -12,6 +12,7 @@ from typing import Any, Literal
 from psycopg.types.json import Jsonb
 
 from biosentry.core.audit import AuditLog
+from biosentry.repositories.assistant import AssistantRepository
 from biosentry.repositories.postgres import Conn, PostgresStore, iso, transaction, whole
 from biosentry.schemas.lab import (
     LabAnswer,
@@ -225,13 +226,35 @@ def _is(value: Any, want: Any) -> bool:
 def _matches(row: dict[str, Any], doc: Any) -> bool:
     """contract-d7 v3 section 5: the checks on a `done` report, these and nothing else. The
     simulator adds keys between versions (`paired_episodes`), so no other key is read or
-    required: the rest is stored as it comes."""
+    required here: optional patient links are checked separately; the rest is stored as it comes."""
     return (
         isinstance(doc, dict)
         and _is(doc.get("compare_format"), 1)
         and doc.get("synthetic") is True
         and _is(doc.get("mode"), row["mode"])
     )
+
+
+def _patient_refs(conn: Conn, row: dict[str, Any], doc: dict[str, Any]) -> bool:
+    """Optional compare.json patient_refs: [{run_id, patient_id}]. Never infer membership
+    from a seed or a reused patient id. Old workers may omit the field; those runs stay unlinked.
+    """
+    refs = doc.get("patient_refs", [])
+    if not isinstance(refs, list) or len(refs) > 10000:
+        return False
+    for ref in refs:
+        if (
+            not isinstance(ref, dict) or set(ref) != {"run_id", "patient_id"}
+            or type(ref["run_id"]) is not int or not 0 < ref["run_id"] <= 9223372036854775807
+            or not isinstance(ref["patient_id"], str) or not 1 <= len(ref["patient_id"]) <= 64
+        ):
+            return False
+        if conn.execute(
+            "SELECT 1 FROM patient WHERE run_id = %s AND id = %s AND unit = %s",
+            (ref["run_id"], ref["patient_id"], row["ward"]),
+        ).fetchone() is None:
+            return False
+    return True
 
 
 def _answered(row: dict[str, Any], doc: Any) -> bool:
@@ -303,7 +326,7 @@ def report(conn: Conn, lab_run_id: int, body: LabReport, now: datetime) -> Resul
         if isinstance(body, LabDone | LabAnswer):
             if isinstance(body, LabDone):
                 doc, text = _parse(body.compare_json), body.compare_txt
-                ok = row["kind"] == "compare" and _matches(row, doc)
+                ok = row["kind"] == "compare" and _matches(row, doc) and _patient_refs(conn, row, doc)
             else:
                 doc, text = _parse(body.record_json), body.answer
                 ok = (row["kind"] == "patient_question" and _answered(row, doc)) or (
@@ -315,6 +338,8 @@ def report(conn: Conn, lab_run_id: int, body: LabReport, now: datetime) -> Resul
                     " report_text = %s WHERE id = %s",
                     (now, Jsonb(doc), text, lab_run_id),
                 )
+                if row["kind"] == "patient_question":
+                    AssistantRepository(conn).append(row, "assistant", text, now)
                 return "ok"
             state, reason = "failed", "the report did not match the request"
         else:

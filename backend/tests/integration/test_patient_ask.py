@@ -104,10 +104,10 @@ def test_every_clinician_who_may_see_the_patient_asks_and_reads(api: Api, who: s
     ]
 
 
-def test_an_assignee_who_did_not_ask_reads_it(api: Api) -> None:
+def test_an_assignee_who_did_not_ask_cannot_read_it(api: Api) -> None:
     put(api, MD, "p-001")
-    assert [r["id"] for r in listing(api, "rn-delacruz", "p-001").json()] == [1]
-    assert one(api, "rn-delacruz", "p-001", 1).status_code == 200
+    assert listing(api, "rn-delacruz", "p-001").json() == []
+    assert one(api, "rn-delacruz", "p-001", 1).status_code == 404
 
 
 @pytest.mark.parametrize("pid", ["p-003", "p-999"])
@@ -335,7 +335,7 @@ def test_a_done_report_is_stored_and_the_clinician_reads_the_answer(api: Api) ->
     row = rows(api)[0]
     assert (row["state"], row["report_text"], row["finished_at"]) == ("done", "line one\nline two", api.wall.now)
     assert row["report"]["extra_key"] == {"a": 1} and row["report"]["data_sha256"] == sha
-    seen = one(api, "rn-delacruz", "p-001", 1).json()
+    seen = one(api, MD, "p-001", 1).json()  # its asker reads it
     assert seen["state"] == "done" and seen["answer"] == "line one\nline two"
     assert seen["report"]["kind"] == "own_baseline"
     assert "context" not in seen and "patient" not in seen
