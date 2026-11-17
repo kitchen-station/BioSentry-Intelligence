@@ -33,7 +33,7 @@ export interface Bar {
   width: number;
 }
 
-/** One row per bed, oldest stay first. An unknown arrival starts where the bed was last free. */
+/** One row per bed used in the window, oldest stay first. An unknown arrival starts where the bed was last free. */
 export function bedRows(stays: PatientStay[], now: number): { bed: string; bars: Bar[] }[] {
   const span = FLOW_DAYS * DAY_MS;
   const from = now - span;
@@ -49,7 +49,7 @@ export function bedRows(stays: PatientStay[], now: number): { bed: string; bars:
       return [{ stay, left: ((start - from) / span) * 100, width: ((end - start) / span) * 100 }];
     });
     return { bed, bars: bars.sort((a, b) => a.left - b.left) };
-  });
+  }).filter((row) => row.bars.length > 0);
 }
 
 /** Date marks along the timeline, every two days, oldest first. */
@@ -61,11 +61,24 @@ export function dayTicks(now: number): { at: number; left: number }[] {
   }));
 }
 
-/** Whoever moved most recently, newest first. */
-export function recentMoves(stays: PatientStay[], count: number): PatientStay[] {
+/** Whoever moved (arrived or left) since `since`, newest first. A stay with no known move is left out. */
+export function recentMoves(stays: PatientStay[], since: number): PatientStay[] {
   const latest = (s: PatientStay) => ms(s.left_at ?? s.admitted_at ?? "1970-01-01T00:00:00Z");
-  return stays
-    .filter((s) => s.left_at !== null || s.admitted_at !== null)
-    .sort((a, b) => latest(b) - latest(a))
-    .slice(0, count);
+  return stays.filter((s) => latest(s) > since).sort((a, b) => latest(b) - latest(a));
+}
+
+/**
+ * Patients on the ward at this time of day on each of the last FLOW_DAYS days, oldest first, for the days the stays
+ * can count: none while a patient whose arrival is not recorded was (or may have been) on the ward, and none before
+ * the first recorded arrival. So the series is the latest run of countable days, and may be empty.
+ */
+export function occupancy(stays: PatientStay[], now: number): { at: number; count: number }[] {
+  const unknownUntil = Math.max(...stays.map((s) => (s.admitted_at !== null ? -Infinity : s.left_at ? ms(s.left_at) : Infinity)));
+  const firstIn = Math.min(...stays.flatMap((s) => (s.admitted_at ? [ms(s.admitted_at)] : [])));
+  return Array.from({ length: FLOW_DAYS }, (_, i) => now - (FLOW_DAYS - 1 - i) * DAY_MS)
+    .filter((at) => at >= unknownUntil && at >= firstIn)
+    .map((at) => ({
+      at,
+      count: stays.filter((s) => s.admitted_at !== null && ms(s.admitted_at) <= at && (s.left_at === null || ms(s.left_at) > at)).length,
+    }));
 }

@@ -9,8 +9,8 @@ interface Props {
   readonly readOnly?: boolean;
   /** Offline: Record vitals waits until the connection is back. */
   readonly offline?: boolean;
-  /** Opens the Record vitals drawer for a row. */
-  readonly onRecord: (row: AbstainedRowType) => void;
+  /** Opens the Record vitals drawer for a row (none where the page offers no entry). */
+  readonly onRecord?: (row: AbstainedRowType) => void;
 }
 
 /**

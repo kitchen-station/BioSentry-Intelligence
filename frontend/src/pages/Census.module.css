@@ -1,0 +1,53 @@
+/* Census: layout only. The look is the kit's: hw-stat, hw-card, columns (ink highlight from data-hw-space="clinical"),
+   hw-filter, hw-table, hw-timeline-beds. */
+
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr); /* a wide table or timeline scrolls in its region instead of widening the page */
+  gap: var(--hw-space-6);
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: var(--hw-space-6) var(--hw-space-7) var(--hw-space-8);
+}
+
+.alert { align-items: center; }
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--hw-space-6) var(--hw-space-5);
+}
+
+/* Occupancy beside the movement from 1200px; one column below. */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--hw-space-6);
+  align-items: start;
+}
+
+.stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--hw-space-4);
+}
+
+@media (width >= 1200px) {
+  .split { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); }
+}
+
+@media (width < 768px) {
+  .page { padding: var(--hw-space-5) var(--hw-space-4) var(--hw-space-8); }
+}
+
+@media (width < 600px) {
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  .table th,
+  .table td { padding-inline: var(--hw-space-2); }
+
+  .table th:nth-child(5),
+  .table td:nth-child(5) {
+    display: none;
+  }
+}

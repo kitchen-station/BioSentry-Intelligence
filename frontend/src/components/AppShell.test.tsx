@@ -90,22 +90,29 @@ describe("the desk bar", () => {
 
   it.each([
     ["/ward", "Ward"],
-    ["/station?tab=flow", "Census"],
-    ["/station", "Admit"],
+    ["/census", "Census"],
+    ["/admit", "Admit"],
+    ["/station", null],
     ["/patient/p-001", null],
-  ])("marks the current tab on %s", (path, current) => {
+  ])("marks the current tab on %s, on a desk and on a phone", (path, current) => {
+    shell("charge_rn", path);
+    for (const n of ["Ward", "Census", "Admit"]) {
+      expect(within(main()).getByRole("link", { name: n }).getAttribute("aria-current")).toBe(n === current ? "page" : null);
+    }
+    cleanup();
+    phone(true);
     shell("charge_rn", path);
     for (const n of ["Ward", "Census", "Admit"]) {
       expect(within(main()).getByRole("link", { name: n }).getAttribute("aria-current")).toBe(n === current ? "page" : null);
     }
   });
 
-  it("sends Census and Admit to the Station's tabs until they have their own pages, and Overview for an admin", async () => {
+  it("sends Census and Admit to their own pages, and Overview for an admin", async () => {
     shell("md");
     await userEvent.click(within(main()).getByRole("link", { name: "Census" }));
-    expect(screen.getByText("at /station?tab=flow")).toBeTruthy();
+    expect(screen.getByText("at /census")).toBeTruthy();
     await userEvent.click(within(main()).getByRole("link", { name: "Admit" }));
-    expect(screen.getByText("at /station")).toBeTruthy();
+    expect(screen.getByText("at /admit")).toBeTruthy();
     cleanup();
     shell("admin", "/overview");
     expect(within(main()).getByRole("link", { name: "Overview" }).getAttribute("aria-current")).toBe("page");

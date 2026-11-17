@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation, useSearchParams } from "react-router-dom";
 import type { Session } from "./types";
 import { restoreSession, clearSession, hasWardResearch, usesServer } from "./api";
 import { SignIn } from "./pages/SignIn";
 import { Ward } from "./pages/Ward";
 import { PatientDetail } from "./pages/PatientDetail";
-import { Station } from "./pages/Station";
+import { Admit } from "./pages/Admit";
+import { Census } from "./pages/Census";
 import { Pipeline } from "./pages/Pipeline";
 import { Research } from "./pages/Research";
 import { Lab } from "./pages/Lab";
@@ -57,6 +58,11 @@ function saveSession(s: Session | null): void {
 function ToSignIn({ gone }: { gone: string | null | undefined }) {
   const location = useLocation();
   return <Navigate to="/" replace state={gone === null ? null : { from: location.pathname, who: gone }} />;
+}
+
+/** The old Station, kept for one release: its Patient flow tab (?tab=flow) is Census now, the rest is Admit. */
+function FromStation() {
+  return <Navigate to={useSearchParams()[0].get("tab") === "flow" ? "/census" : "/admit"} replace />;
 }
 
 export function App() {
@@ -114,14 +120,19 @@ export function App() {
         path="/patient/:id"
         element={session ? <PatientDetail session={session} onSignOut={signOut} /> : <ToSignIn gone={gone} />}
       />
-      <Route
-        path="/station"
-        element={
-          session && (session.role === "md" || session.role === "charge_rn")
-            ? <Station session={session} onSignOut={signOut} />
-            : session ? <Navigate to={session.role === "admin" ? "/overview" : "/ward"} replace /> : <ToSignIn gone={gone} />
-        }
-      />
+      {/* Census and Admit, for a physician and the charge nurse; an administrator goes to the overview, a staff nurse to the ward. */}
+      {([["/census", Census], ["/admit", Admit]] as const).map(([path, Page]) => (
+        <Route
+          key={path}
+          path={path}
+          element={
+            session && (session.role === "md" || session.role === "charge_rn")
+              ? <Page session={session} onSignOut={signOut} />
+              : session ? <Navigate to={session.role === "admin" ? "/overview" : "/ward"} replace /> : <ToSignIn gone={gone} />
+          }
+        />
+      ))}
+      <Route path="/station" element={<FromStation />} />
       <Route
         path="/overview"
         element={

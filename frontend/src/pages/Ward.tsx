@@ -316,7 +316,7 @@ function WardPage({ session, onSignOut, feed }: Props & { feed: WardFeed }) {
             <p className="hw-empty__title">No patients on Ward {data.ward}</p>
             <p>A patient appears here once admitted, and stays NOT RANKED until the first complete set of observations is in.</p>
             {(session.role === "md" || session.role === "charge_rn") && (
-              <Link className="hw-button hw-button--primary" to="/station">Admit a patient</Link>
+              <Link className="hw-button hw-button--primary" to="/admit">Admit a patient</Link>
             )}
           </div>
         )}
