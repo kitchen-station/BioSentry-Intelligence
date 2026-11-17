@@ -124,6 +124,70 @@ keyboard, in light and dark. Rules, API and colour roles: [docs/graphs.md](docs/
 - **Drawn marks.** The chevrons on `.hw-tile`, `.hw-link-cta` and the breadcrumb separators are drawn with
   borders, not typed as "›". Text in generated content is read as part of a link's name ("Ward ›").
 
+## 0.10.0 (BioSentry Phase 1)
+
+Ward components, CSS only: the app owns behaviour and sets state through the attributes below. Each file opens
+with its full contract in a comment, and `test/gallery.html` (section "Ward") has working markup for all of them.
+
+| Component | Contract |
+|---|---|
+| `hw-score` (`score.css`) | `div.hw-score[data-band=high\|medium\|low][role=img][aria-label] > span.hw-score__value + span.hw-score__band`. 60px (54px below 576px); `--sm` 40px with the band beside the tile (leave the band out where the text next to it already says it). "Low-medium" is `data-band="medium"` plus `data-long`: the word breaks after its hyphen onto two lines, inside the tile and beside `--sm`. |
+| `hw-filter` (`filter.css`) | `div.hw-filter[role=group][aria-label] > button.hw-filter__item[aria-pressed] > text + span.hw-filter__count[data-tone=emergency\|urgent][data-count]`. A tone shows only above zero. One sideways-scrolling row on phones. |
+| `hw-bell`, `hw-alert-tray` (`alert-tray.css`) | `div.hw-menu-anchor > button.hw-bell[aria-label][aria-haspopup=dialog][aria-expanded] > i.hw-icon + span.hw-bell__count` `+ div.hw-alert-tray[role=dialog] > div.hw-alert-tray__head (h2.hw-alert-tray__title + button.hw-close) + div.hw-alert-tray__item* (div.hw-score.hw-score--sm + div.hw-alert-tray__who > p.hw-alert-tray__name + p.hw-alert-tray__line; button.hw-button Open + button.hw-button.hw-button--accent Acknowledge) + p.hw-alert-tray__empty + p.hw-alert-tray__foot`. The bell is tinted while it holds a count. Phones: full-width panel under the 56px app bar, 44px buttons. Exit: `leave(tray)`, then `hidden`. |
+| `hw-search` (`search.css`) | `div.hw-search > label.hw-input > i.hw-input__icon + input.hw-input__control[type=search][role=combobox][aria-expanded][aria-controls][aria-activedescendant] + kbd.hw-search__key` `+ ul.hw-search__results[role=listbox] > li.hw-search__caption[aria-hidden] + li[role=option][aria-selected] > span.hw-search__rank + span.hw-search__name + span.hw-search__bed + span.hw-tag` `+ p.hw-search__empty[role=status]`. |
+| `hw-segmented--accent` (`segmented.css`) | The selected option in ink (accent) instead of brand red, for products where red is clinical. The default stays brand, as the emphasis rule says. |
+| Band tags (`tag.css`) | `hw-tag--emergency` (7+), `hw-tag--urgent` (5–6 or a single 3), plain `hw-tag` (low), `hw-tag--dashed` (NOT RANKED only). |
+| `hw-ranklist` (`ranklist.css`) | `section.hw-ranklist-wrap > div.hw-ranklist__head[aria-hidden] + ol.hw-ranklist[data-density=comfortable\|compact] > li.hw-ranklist__row[data-alert]` with rank, score, who (id, response, context, reasons), five vitals (`[data-points=0-3]`), data (age `[data-stale]`, signal `[data-weak]`, obs) and action. Rows from 1200px (tighter columns and 48px sparklines up to 1365px, so the action stays in view at 1280), cards below. Full element list at the top of the file. |
+| `hw-notice--dashed` (`notice.css`) | `section.hw-notice.hw-notice--dashed > div.hw-notice__head (h2.hw-notice__title + p.hw-notice__text + button.hw-notice__toggle[aria-expanded]) + div.hw-notice__body > div.hw-notice__item* (div.hw-notice__main + button.hw-button)`. Dashed means incomplete and nothing else. |
+| `hw-banner--inverse` (`alert.css`) | `div.hw-banner.hw-banner--inverse[role=alert] > i.hw-icon + strong.hw-banner__title + span`. Offline: black, white text. |
+
+New tokens: `--hw-color-emergency` (NEWS2 7+ fill; red-50 in dark), `--hw-color-on-emergency` (white),
+`--hw-target-size` (44px; 40px in compact density, 44px on touch).
+
+### Phase 2 (0.10.0-biosentry.2): Patient
+
+Patient components, CSS only, as in Phase 1; `trend` gains four options. `test/gallery.html` (section "Patient
+(0.10 Phase 2)") has working markup for each, and each CSS file opens with its full element list.
+
+| Component | Contract |
+|---|---|
+| `hw-pager` (`pager.css`) | `div.hw-pager[role=group][aria-label="Move through patients in rank order"] > button.hw-button[type=button] (i.hw-icon.fa-solid.fa-arrow-left[aria-hidden] + "Previous" + kbd.hw-pager__key[aria-hidden=true] "K") + span.hw-pager__position ("1 of 9 in rank order" \| "Not in the ranked order") + button.hw-button[type=button] (kbd.hw-pager__key[aria-hidden=true] "J" + "Next" + i.hw-icon.fa-solid.fa-arrow-right[aria-hidden])`. `disabled` on the button at either end (both when not in the ranked order). The app wires K and J while focus is not in a field. Key hints hide below 768px; below 576px the position sits above two equal buttons. |
+| `hw-decision` (`decision.css`) | `section.hw-decision[aria-label="Decision"][data-band=high\|medium\|low]` (no `data-band` when NOT RANKED) `> div.hw-decision__cell` × 4: NEWS2 (`p.hw-decision__label` + `div.hw-decision__reading > span.hw-decision__score + span.hw-decision__meta > span.hw-decision__band` (+ `i.fa-arrow-up` when rising) `+ span.hw-decision__change`); Next step (`p.hw-decision__label + p.hw-decision__step + p.hw-decision__note`, a `strong` in the note for the NOT RANKED reason); Why (`p.hw-decision__label + ul.hw-decision__reasons > li.hw-tag` or `p.hw-decision__text`, `+ p.hw-decision__model > i.hw-icon.fa-solid.fa-flask + span > strong "Prediction models · rank unchanged." + text`); Signal (`p.hw-decision__label + p.hw-decision__signal + p.hw-decision__note[data-stale]`). The band colours the score, the band word and the next step: high emergency text, medium (and Low-medium) urgent text, low and NOT RANKED ink. A stale source is red and bold. Subtle lines between cells; one row from 1200px, two by two from 576px, stacked on phones; a cell left out leaves no gap. |
+| `hw-actionbar` (`actionbar.css`) | `div.hw-actionbar.hw-only-mobile > button.hw-button.hw-button--primary + button.hw-button + button.hw-button` (Record vitals · Notes · Next). The first action takes two shares of the width; 48px buttons; sticky to the bottom of the viewport, padded with the safe-area inset; surface with a top border. **Rule:** it replaces the bottom tab bar on a detail screen. A screen shows `.hw-actionbar` or `.hw-bottomnav`, never both (drop `.hw-has-bottomnav` too). Put it last in the screen. |
+| `trend` (`js/graph/trend.js`) | New options, all optional; without them a trend draws exactly as before. `range: [lo, hi]` fixed y-range (ticks at its ends; values outside drawn on the edge, real values in the readout and table). `limits: [{ at, label?, tone? }]` dashed lines named at their right end. `band: [lo, hi]` + `bandLabel` a shaded usual range, named. `highlightWhere: (v) => boolean` only the stretches, dots and readout number where it holds take the highlight colour; the rest of the line is grey. Below 480px of plot the names move inside it. API and example: [docs/graphs.md](docs/graphs.md#trend-clinical-options). |
+| Highlight by space (`themes.css`) | `data-hw-space="clinical"` sets `--hw-graph-highlight` to ink (`--hw-color-text`), `data-hw-space="research"` to `--hw-color-info-fg`; dark values follow the theme (`#F3F3F3`, `#9DBDFC`). The Patient trends set no space, so their `highlightWhere` stretch stays red. |
+
+New tokens (component tier, pointing at semantic tokens): `--hw-pager-position-width`; `--hw-decision-band-fg`,
+`-bg`, `-line`, `-cols`, `-pad`, `-score-size`, `-step-size`; `--hw-actionbar-pad-y`, `-pad-x`, `-gap`, `-bg`,
+`-border`, `-button-height`. No new semantic tokens; the spaces override `--hw-graph-highlight`.
+
+### Phase 3 (0.10.0-biosentry.3): Census and Admit
+
+One new component, CSS only, and one modifier. Census also uses `columns` (with `data-hw-space="clinical"`, so its
+highlight is ink), `stat`, `filter` and `table`; Admit uses `steps`, `field`, `native-select`, `segmented--accent`,
+`checkbox`, `upload` and `tag`. `test/gallery.html` (section "Census (0.10 Phase 3)") has working markup for both.
+
+| Component | Contract |
+|---|---|
+| `hw-timeline-beds` (`timeline-beds.css`) | `div.hw-timeline-beds > ul.hw-timeline-beds__legend[aria-label="Legend"] > li.hw-timeline-beds__key (span.hw-timeline-beds__swatch "On the ward" \| span.hw-timeline-beds__mark[data-outcome] + name)` `+ div.hw-timeline-beds__scroll[tabindex=0][role=region][aria-label] > div.hw-timeline-beds__chart > div.hw-timeline-beds__row* (span.hw-timeline-beds__bed + div.hw-timeline-beds__track > span.hw-timeline-beds__stay[role=img][aria-label][data-outcome][style="--hw-timeline-beds-left: 12%; --hw-timeline-beds-width: 30%"] > span.hw-timeline-beds__name + span.hw-timeline-beds__mark[data-outcome][aria-hidden])` `+ div.hw-timeline-beds__axis[aria-hidden] > span.hw-timeline-beds__tick[style="--hw-timeline-beds-left: …"]* + span.hw-timeline-beds__now`. The window ends now (the track's right edge, ruled in ink). A stay with no `data-outcome` is on the ward: a solid ink bar (ink is the highlight; never red). An ended stay (`data-outcome=discharged\|transferred\|higher_care\|died`) is soft grey, closed by its mark: D in a box, T in a dashed box, H in a filled box, a filled disc for died. The kit draws the letters, so marks are always `aria-hidden`; the stay's label and the legend (all five) carry the outcome. The chart keeps 720px (640px below 576px) and scrolls sideways in its region. |
+| `hw-steps--accent` (`steps.css`) | The current step in ink instead of brand red, for products where red is clinical (as `hw-segmented--accent`). |
+
+New tokens (component tier): `--hw-timeline-beds-bed-width`, `-row-height`, `-bar-height`, `-min-width`, `-open-bg`,
+`-open-fg`, `-ended-bg`, `-ended-fg`, `-rule`, `-now`, `-mark-size`, and per mark `-mark-bg`, `-mark-fg`, `-mark-border`,
+`-mark-style`, `-mark-radius`; per stay `-left` and `-width` (set by the app). No new semantic tokens.
+
+### Phase 4 (0.10.0-biosentry.4): Research
+
+`bars` gains two options; nothing else changes. `test/gallery.html` (section "Research (0.10 Phase 4)", inside
+`data-hw-space="research"`) draws both.
+
+| Component | Contract |
+|---|---|
+| `bars` (`js/graph/bars.js`) | `diverging: true` puts a labelled zero line in the middle (`zeroLabel`, bold; optional `sides: [loss, gain]` under it): losses run left of it, gains right, on a symmetric scale; the graph carries `data-diverging`, each track `data-sign=positive\|negative`. Per item, `interval: [lo, hi]` draws `span.hw-graph__interval[aria-hidden]`, an ink whisker with end caps (haloed in the surface), and the value moves past its far end; `intervalLabel` names it in the readout ("98.33% interval +0.008 to +0.029"). Both optional: an old config draws exactly as before. Below 576px a diverging graph puts each name above its bar and keeps only the scale's ends and zero. API: [docs/graphs.md](docs/graphs.md#bars-diverging-and-intervals). |
+
+New tokens: none. Component custom properties set by the script: `--hw-graph-start` (a bar's or whisker's left edge),
+`--hw-graph-label` (where the value sits), `--hw-graph-bar-radius`.
+
 ## Rules (enforced by `npm run lint`)
 
 1. **Cascade layers** `hw.tokens → hw.base → hw.components → hw.utilities`. Later layers win regardless of
@@ -150,7 +214,7 @@ keyboard, in light and dark. Rules, API and colour roles: [docs/graphs.md](docs/
 ```bash
 npm install          # dev tools + Font Awesome Free (the only runtime peer dependency; the font is bundled)
 npm run lint         # CSS architecture rules + JS lint
-npm test             # Playwright: 102 checks (keyboard, form states, link names, motion, graphs, reduced motion, axe in 5 modes)
+npm test             # Playwright: 173 checks (keyboard, form states, link names, motion, graphs, reduced motion, axe in 5 modes)
 ```
 
 ## Adding a component

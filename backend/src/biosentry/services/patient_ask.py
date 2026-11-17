@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from typing import Any, Literal
 
 from biosentry.core.audit import AuditLog
+from biosentry.repositories.assistant import AssistantRepository, RETENTION
 from biosentry.repositories.postgres import PostgresStore, iso, whole
 from biosentry.schemas import AbstainedRow, BaselineResponse, PatientDetail, VitalHistoryFull
 from biosentry.schemas.lab import (
@@ -157,6 +158,7 @@ class PatientAskService:
                     (found.unit, who, now, body.question, store.run_id, patient_id, text, sha),
                 ).fetchone()
                 assert row is not None
+                AssistantRepository(store.conn).append(row, "user", body.question, now)
         if row is None:  # audited after the transaction, so the expiry above is kept either way
             self._audit.append(who, "ask_patient", patient_id, "limited")
             return "limited"
@@ -164,7 +166,7 @@ class PatientAskService:
         return PatientQuestionItem.model_validate(_item(row))
 
     def recent(self, who: str, patient_id: str) -> list[PatientQuestionItem] | None:
-        """The newest 20 for this patient, for whoever may see the patient now."""
+        """The asker’s newest 20 within 90 days, only while the patient is still visible."""
         if patient_id not in self._wards.visible(who):
             self._audit.append(who, "view_patient_questions", patient_id, "not_found")
             return None
@@ -172,8 +174,9 @@ class PatientAskService:
         _expire(store.conn, store.clock())
         rows = store.conn.execute(
             "SELECT * FROM lab_run WHERE kind = 'patient_question' AND run_id = %s"
-            " AND patient_id = %s ORDER BY id DESC LIMIT %s",
-            (store.run_id, patient_id, LIST_LIMIT),
+            " AND patient_id = %s AND requested_by = %s AND requested_at >= %s"
+            " ORDER BY id DESC LIMIT %s",
+            (store.run_id, patient_id, who, store.clock() - RETENTION, LIST_LIMIT),
         ).fetchall()
         self._audit.append_view(who, "view_patient_questions", patient_id)  # the panel reads it on a timer
         return [PatientQuestionItem.model_validate(_item(r)) for r in rows]
@@ -188,8 +191,8 @@ class PatientAskService:
             _expire(store.conn, store.clock())
             row = store.conn.execute(
                 "SELECT * FROM lab_run WHERE kind = 'patient_question' AND id = %s AND run_id = %s"
-                " AND patient_id = %s",
-                (question_id, store.run_id, patient_id),
+                " AND patient_id = %s AND requested_by = %s AND requested_at >= %s",
+                (question_id, store.run_id, patient_id, who, store.clock() - RETENTION),
             ).fetchone()
         if row is None:  # malformed, unknown, another patient's and not yours are one answer
             self._audit.append(who, "view_patient_question", patient_id, "not_found")

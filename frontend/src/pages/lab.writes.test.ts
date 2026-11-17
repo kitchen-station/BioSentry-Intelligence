@@ -1,6 +1,6 @@
 // The lab may read the ward and may not write to the live ward. It has two writes, and neither reaches the live ward: a simulated-run
 // request to /wards/W4/lab/runs and a question for the research agent to /wards/W4/lab/questions. This reads the source and follows imports from
-// every lab page and from the Ask page (which sits in the ward's frame, not the lab's), so it covers every code path, not only the ones a render reaches.
+// every page in the research space (each renders <LabFrame), so it covers every code path, not only the ones a render reaches.
 import { describe, expect, it } from "vitest";
 
 const all = import.meta.glob("../**/*.{ts,tsx}", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
@@ -56,7 +56,7 @@ describe("lab modules", () => {
     expect(roots).toContain("./Pipeline.tsx");
   });
 
-  it("reach the api only through getWard in Pipeline, the lab-run calls in LabRuns, and the question calls in the Ask thread", () => {
+  it("reach the api only through getWard in Pipeline, the ward research read, the lab-run calls in LabRuns, and the question calls in the Ask thread", () => {
     const users = Object.fromEntries(
       reached(roots).map((p) => [p, apiStatements(sources[p])] as const).filter(([, s]) => s.length > 0),
     );
@@ -66,12 +66,15 @@ describe("lab modules", () => {
       "./LabRuns.tsx": ['import { ApiError, getLabRun, getLabRuns, hasLabRuns, requestLabRun } from "../api"'],
       // Plain constants (blood-pressure bounds), no request. The guard reaches it now that it follows imports out of pages/.
       "../data/fixtures.ts": ['import { DIASTOLIC_BOUNDS, SYSTOLIC_BOUNDS } from "../api/bounds"'],
-      "./Lab.tsx": ['import { hasLabQuestions } from "../api"'],
       "./AskChat.tsx": ['import { ApiError, getWard, hasLabQuestions, hasPatientQuestions } from "../api"'],
       "../components/Thread.tsx": [
         'import { askLab, askPatient, getLabQuestion, getLabQuestions, getPatientQuestion, getPatientQuestions } from "../api"',
       ],
       "../components/useQuestions.ts": ['import { ApiError } from "../api"'],
+      // Ward research sits in the research space too: one read of the table, and the baseline words of the patient page
+      // (BaselinePanel), whose hook reads a patient's baseline. Both are reads; neither page renders that hook.
+      "./WardResearch.tsx": ['import { ApiError, getWardResearch, hasLabQuestions } from "../api"'],
+      "../components/useBaseline.ts": ['import { getBaseline } from "../api"'],
     });
   });
 

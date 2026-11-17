@@ -180,6 +180,55 @@ def test_rank_and_alerts_exact_text():
     ) + tail("which alerts are active for this patient")
 
 
+@pytest.mark.parametrize("q, kind", [
+    ("why is this patient ranked here", "why_rank"),
+    ("which vitals drive NEWS2", "news2_vitals"),
+    ("what is the NEWS2 component breakdown", "news2_vitals"),
+    ("what happened in their last runs", "baseline_runs"),
+    ("show the latest baseline run", "baseline_runs"),
+])
+def test_more_plain_questions_have_a_fixed_kind(q, kind):
+    out = run(q)
+    assert out["status"] == "answered" and out["kind"] == kind and out["planner"] == "keywords"
+
+
+def test_news2_readings_do_not_claim_component_scores_or_copy_extra_patient_data():
+    d = detail_dict(secret="OTHER PATIENT SECRET")
+    d["vitals"]["blood_pressure"]["data"] = {"present": True, "value": {"systolic": 108, "diastolic": 70}}
+    out = run("which vitals drive NEWS2", patient(detail=d))
+    assert out["status"] == "answered" and out["numbers"] == ["5", "120", "18", "95", "37.2", "108"]
+    assert "Systolic blood pressure: 108." in out["text"]
+    assert "no NEWS2 component scores" in out["text"]
+    assert "70" not in out["numbers"] and "OTHER PATIENT SECRET" not in out["text"]
+    d["vitals"]["heart_rate"]["data"] = {"present": False, "reason": "not measured"}
+    assert "Heart rate: no reading is present." in run("NEWS2 vitals", patient(detail=d))["text"]
+
+
+def test_last_runs_reports_only_the_latest_baseline_run_state():
+    out = run("what happened in their last runs")
+    assert out["status"] == "answered" and out["kind"] == "baseline_runs"
+    assert "not a history of earlier runs" in out["text"]
+    assert "Heart rate: the current deviation run has 3 consecutive 15-minute values." in out["text"]
+    assert "It started at 13 Nov 2026 07:30 UTC. Its change is significant. Its direction is rising." in out["text"]
+    assert "Respiratory rate: baseline forming." in out["text"]
+    assert "SpO2: baseline unavailable." in out["text"]
+    assert "Test Person" not in out["text"]
+    assert ask.grounded(out["text"], out["numbers"], out["kind"], out["args"], patient())
+    assert ask.NO_BASELINE in run("last runs", patient(baseline=None))["text"]
+
+
+@pytest.mark.parametrize("q", ["what changed since last shift", "what happened on the previous shift"])
+def test_a_shift_question_admits_that_the_shift_boundary_is_missing(q):
+    out = run(q)
+    assert out["status"] == "refused" and out["reason"] == "shift"
+    assert "no shift boundary" in out["text"] and "6 hours" not in out["text"]
+
+
+def test_an_unknown_question_still_gets_the_honest_refusal():
+    out = run("tell me about the patient's day")
+    assert out["status"] == "refused" and out["text"] == ask.REFUSALS["none"]
+
+
 def test_a_missing_required_field_is_bad_data():
     for q, key in (("why is this patient flagged", "rank"), ("why is this patient flagged", "supporting"),
                    ("which alerts are active", "escalation_reasons"), ("what changed", "vital_history")):
@@ -465,9 +514,11 @@ def test_b4_a_mixed_question_is_refused_whole(q, key):
 
 def test_b4_every_answer_names_what_it_answered():
     phrases = {"own_baseline": "this patient's own baseline", "recent_change": "what changed in this patient's vital history",
-               "why_rank": "why this patient has this rank", "active_alerts": "which alerts are active for this patient"}
+               "why_rank": "why this patient has this rank", "active_alerts": "which alerts are active for this patient",
+               "news2_vitals": "the current readings available alongside this patient's NEWS2 total",
+               "baseline_runs": "the current baseline run state recorded for this patient"}
     assert ask.PHRASES == phrases
-    for q in QS:
+    for q in [*QS, "which vitals drive NEWS2", "what happened in their last runs"]:
         out = run(q)
         assert out["text"].endswith(f"I answered only this: {phrases[out['kind']]}. I used nothing else in the question.\n" + LAST)
 

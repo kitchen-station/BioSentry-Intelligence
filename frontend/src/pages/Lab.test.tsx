@@ -44,14 +44,17 @@ const lab = (who: typeof session | typeof admin = session) =>
     </MemoryRouter>,
   );
 
+// The page below the research strip (whose page links are the menu's, tested in LabFrame.test).
+const page = () => within(screen.getByRole("heading", { level: 1 }).parentElement!);
+
 describe("lab index", () => {
-  it("gives a physician no link to a developer page, and calls the page What-if runs", () => {
+  it("gives a physician with the API no link to a developer page, and calls the page What-if runs", () => {
+    vi.stubEnv("VITE_API_URL", "/api");
     lab();
     expect(screen.getByRole("heading", { level: 1, name: "What-if runs" })).toBeTruthy();
-    expect(within(screen.getByRole("banner")).getByText("What-if runs")).toBeTruthy();
-    expect(screen.getByRole("note").textContent).toBe("Simulated trials only. Nothing here changes a patient's rank.");
+    expect(screen.getByRole("note").textContent).toBe("Research · Synthetic, not validated. Nothing here changes a patient's rank.");
     expect(screen.queryByText(/Simulation lab/)).toBeNull();
-    for (const name of ["Research numbers", "The research agent's questions and answers", "The pipeline"]) {
+    for (const name of ["Research numbers", "The research agent's questions and answers", "The pipeline", "Pipeline"]) {
       expect(screen.queryByRole("link", { name })).toBeNull();
     }
   });
@@ -59,7 +62,7 @@ describe("lab index", () => {
   it("lists the three developer places for an admin, and no simulator link in the fixture build", () => {
     lab(admin);
     expect(screen.getByRole("heading", { level: 1, name: "Simulation lab" })).toBeTruthy();
-    const href = (name: string) => screen.getByRole("link", { name }).getAttribute("href");
+    const href = (name: string) => page().getByRole("link", { name }).getAttribute("href");
     expect(href("Research numbers")).toBe("/lab/research");
     expect(href("The research agent's questions and answers")).toBe("/lab/research#agent");
     expect(href("The pipeline")).toBe("/lab/pipeline");
@@ -68,12 +71,11 @@ describe("lab index", () => {
     expect(screen.queryByRole("link", { name: "Ask the assistant" })).toBeNull();
   });
 
-  it("links the Ask page first when the build has a server", () => {
-    api.hasLabQuestions = true;
+  it("links the Ask page once, in the research strip, when the build has a server", () => {
+    vi.stubEnv("VITE_API_URL", "/api");
     lab();
-    api.hasLabQuestions = false;
-    const first = screen.getAllByRole("listitem")[0];
-    expect(within(first).getByRole("link", { name: "Ask the assistant" }).getAttribute("href")).toBe("/ask");
+    expect(screen.getAllByRole("link", { name: "Ask the assistant" }).map((a) => a.getAttribute("href"))).toEqual(["/ask"]);
+    expect(page().queryByRole("link", { name: "Ask the assistant" })).toBeNull();
   });
 
   it("does not link the Ask page for an admin, who cannot open it", () => {
@@ -121,7 +123,7 @@ describe("the lab writes nothing to the ward", () => {
     api.getWard.mockResolvedValue(synthetic);
     lab(admin);
     for (const name of ["Research numbers", "The pipeline"]) {
-      await userEvent.click(screen.getByRole("link", { name }));
+      await userEvent.click(page().getByRole("link", { name }));
       expect(await screen.findByRole("heading", { level: 1, name })).toBeTruthy();
       await userEvent.click(screen.getByRole("link", { name: "Ward" }));
       expect(screen.getByText("the ward")).toBeTruthy();

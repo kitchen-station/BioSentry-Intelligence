@@ -1,11 +1,11 @@
 import type { BloodPressure, Spo2Scale, Vitals } from "../types";
 
 /**
- * "88/52": the display text of a structured blood pressure. Display only: the string is
+ * "88/52 mmHg": the display text of a structured blood pressure. Display only: the string is
  * never parsed back into numbers (D10).
  */
 export function formatBloodPressure(bp: BloodPressure): string {
-  return `${bp.systolic}/${bp.diastolic}`;
+  return `${bp.systolic}/${bp.diastolic} mmHg`;
 }
 
 /** The NEWS2 air-or-oxygen input, in words rather than a bare true/false. */

@@ -30,6 +30,9 @@ const fixtures = (): Promise<FixtureModule> => (fixtureModule ??= import("./prov
  */
 function lazyFixtureProvider(): ApiProvider {
   return {
+    getAssistantHistory: (patientId) => fixtures().then((m) => m.fixtureProvider.getAssistantHistory(patientId)),
+    getPatientRuns: (patientId) => fixtures().then((m) => m.fixtureProvider.getPatientRuns(patientId)),
+    getPatientRun: (patientId, runId) => fixtures().then((m) => m.fixtureProvider.getPatientRun(patientId, runId)),
     getWard: (unit) => fixtures().then((m) => m.fixtureProvider.getWard(unit)),
     getOpenUnits: () => fixtures().then((m) => m.fixtureProvider.getOpenUnits()),
     getPatient: (id) => fixtures().then((m) => m.fixtureProvider.getPatient(id)),
@@ -42,7 +45,8 @@ function lazyFixtureProvider(): ApiProvider {
     listAllPatients: () => fixtures().then((m) => m.fixtureProvider.listAllPatients()),
     getStays: () => fixtures().then((m) => m.fixtureProvider.getStays()),
     getLiveWard: (unit) => fixtures().then((m) => m.fixtureProvider.getLiveWard(unit)),
-    getOverview: () => fixtures().then((m) => m.fixtureProvider.getOverview()),
+    getOverview: (ward) => fixtures().then((m) => m.fixtureProvider.getOverview(ward)),
+    getUnits: () => fixtures().then((m) => m.fixtureProvider.getUnits()),
     admitPatient: (input) => fixtures().then((m) => m.fixtureProvider.admitPatient(input)),
     enterLabResults: (patientId, labs) =>
       fixtures().then((m) => m.fixtureProvider.enterLabResults(patientId, labs)),
@@ -72,6 +76,9 @@ function lazyFixtureProvider(): ApiProvider {
 
 const provider: ApiProvider = USE_FIXTURES ? lazyFixtureProvider() : httpProvider;
 
+export const getAssistantHistory = provider.getAssistantHistory;
+export const getPatientRuns = provider.getPatientRuns;
+export const getPatientRun = provider.getPatientRun;
 export const getWard = provider.getWard;
 export const getOpenUnits = provider.getOpenUnits;
 export const getPatient = provider.getPatient;
@@ -83,6 +90,7 @@ export const listAllPatients = provider.listAllPatients;
 export const getStays = provider.getStays;
 export const getLiveWard = provider.getLiveWard;
 export const getOverview = provider.getOverview;
+export const getUnits = provider.getUnits;
 export const admitPatient = provider.admitPatient;
 export const enterLabResults = provider.enterLabResults;
 export const recordVitals = provider.recordVitals;

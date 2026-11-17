@@ -56,6 +56,10 @@
     --hw-color-toast-ok: var(--hw-mint-30);   /* glyphs on the dark toast */
     --hw-color-toast-bad: var(--hw-red-30);
 
+    /* Clinical fill for NEWS2 7+ (score tile, filter count, bell count). Text on it is white in every theme. */
+    --hw-color-emergency: var(--hw-red-60);   /* 6.1:1 with white */
+    --hw-color-on-emergency: var(--hw-gray-0);
+
     /* Typography */
     --hw-font-sans: "HarmonyOS Sans", "HarmonyOS Sans SC", Inter, Arial, "Segoe UI", "Microsoft YaHei", sans-serif;
     --hw-font-mono: "HarmonyOS Sans Mono", "Fira Code", Consolas, Menlo, monospace;
@@ -71,6 +75,7 @@
     --hw-button-radius: var(--hw-radius-sm);
     --hw-card-radius: var(--hw-radius-xl);
     --hw-popup-radius: var(--hw-radius-md);
+    --hw-target-size: 44px;                    /* controls that stay a full tap target with a mouse: filter chips, the bell */
 
     /* Elevation */
     --hw-elevation-popup: var(--hw-shadow-2);
@@ -98,7 +103,7 @@
     --hw-icon-size-sm: 12px; --hw-icon-size-md: 16px; --hw-icon-size-lg: 20px; --hw-icon-size-xl: 32px;
 
     /* Graphs (js/graph/, components/graph.css). Every colour has one job. */
-    --hw-graph-highlight: var(--hw-color-brand);          /* the one thing to look at */
+    --hw-graph-highlight: var(--hw-color-brand);          /* the one thing to look at; ink or info blue by data-hw-space (themes.css) */
     --hw-graph-context: var(--hw-gray-40);                /* everything else */
     --hw-graph-context-strong: var(--hw-gray-60);
     --hw-graph-context-soft: var(--hw-gray-20);

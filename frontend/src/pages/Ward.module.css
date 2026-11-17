@@ -1,13 +1,10 @@
-/* Ward: layout only. Look comes from hw-ui (hw-stat, hw-alert, hw-button, hw-card in WardRow). */
+/* Ward: layout only. The look is the kit's: hw-filter, hw-ranklist, hw-score, hw-notice--dashed,
+   hw-banner--inverse, hw-segmented, hw-table, hw-empty, hw-skeleton. */
 
 .container {
-  max-width: var(--ward-max);
+  max-width: 1440px;
   margin: 0 auto;
-  padding: var(--hw-space-6) var(--hw-space-5) var(--hw-space-8);
-}
-
-.loading {
-  color: var(--hw-color-text-muted);
+  padding: var(--hw-space-6) var(--hw-space-7) var(--hw-space-8);
 }
 
 .unitPicker {
@@ -18,7 +15,7 @@
   margin-bottom: var(--hw-space-6);
 }
 
-/* ---- Status in the shell bar ---- */
+/* ---- Status in the top bar ---- */
 
 .statusItem {
   display: inline-flex;
@@ -42,95 +39,111 @@
   color: var(--hw-color-text);
 }
 
-/* ---- Summary: five stats ---- */
+/* ---- Header: title and count line, then the two switches ---- */
 
-.summary {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: var(--hw-space-6) var(--hw-space-5);
-  margin-bottom: var(--hw-space-7);
-}
-
-.stat :global(.hw-stat__label) { order: -1; } /* the number comes first in the DOM, the label first on screen */
-
-.stat :global(.hw-stat__value) {
-  margin-top: var(--hw-space-2);
-  font-size: 48px;
-}
-
-/* A count that asks for action takes its clinical colour, number and rule both. */
-.stat[data-tone="alert"] { border-top-color: var(--hw-graph-emergency); }
-.stat[data-tone="alert"] :global(.hw-stat__value) { color: var(--hw-graph-emergency-text); }
-.stat[data-tone="urgent"] { border-top-color: var(--hw-graph-urgent); }
-.stat[data-tone="urgent"] :global(.hw-stat__value) { color: var(--hw-graph-urgent-text); }
-.stat[data-tone="act"] { border-top-color: var(--hw-color-accent); }
-
-/* ---- Sections ---- */
-
-.sectionHeader {
+.header {
   display: flex;
   flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: var(--hw-space-2) var(--hw-space-5);
-  margin: var(--hw-space-7) 0 var(--hw-space-4);
+  align-items: flex-end;
+  gap: var(--hw-space-4) var(--hw-space-7);
 }
 
-.sectionHeader:first-child { margin-top: 0; }
-
-.eyebrow {
-  font-size: var(--hw-font-size-20);
-  font-weight: var(--hw-weight-semibold);
-  color: var(--hw-color-text);
+.title {
+  font-size: var(--hw-font-size-32);
+  font-weight: var(--hw-weight-regular);
+  line-height: 1.2;
 }
 
-.sortInfo {
+.countLine {
+  margin-top: var(--hw-space-1);
+  color: var(--hw-color-text-muted);
+}
+
+.switches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hw-space-3) var(--hw-space-5);
+  margin-left: auto;
+}
+
+/* The kit's filter row pads its chips' focus rings; this lines the chips up with the title. */
+.filters { margin: var(--hw-space-4) calc(-1 * var(--hw-space-2)) 0; }
+
+.block {
+  align-items: center;
+  margin-top: var(--hw-space-4);
+}
+
+.offline { padding-inline: var(--hw-space-7); }
+
+.strip,
+.panel { margin-top: var(--hw-space-6); }
+
+/* ---- The table ---- */
+
+.sort {
+  padding: 0;
+  font: inherit;
+  font-weight: inherit;
+  color: inherit;
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+.who { white-space: nowrap; }
+.who a { font-weight: var(--hw-weight-medium); color: var(--hw-color-text); }
+
+.sub {
+  display: block;
   font-size: var(--hw-text-caption);
   color: var(--hw-color-text-muted);
 }
 
-.offline {
-  align-items: center;
-  border-width: 0 0 1px;
-  border-radius: 0;
+/* The clinical colour the list carries, kept in the table: the next step in its band's colour, a value adding points red (bold at 2+). */
+.next[data-band="high"] { font-weight: var(--hw-weight-medium); color: var(--hw-graph-emergency-text); }
+.next:is([data-band="medium"], [data-band="low-medium"]) { font-weight: var(--hw-weight-medium); color: var(--hw-graph-urgent-text); }
+.vital:is([data-points="1"], [data-points="2"], [data-points="3"]) { color: var(--hw-graph-emergency-text); }
+.vital:is([data-points="2"], [data-points="3"]) { font-weight: var(--hw-weight-bold); }
+
+/* ---- Loading ---- */
+
+.box {
+  margin-top: var(--hw-space-6);
+  background: var(--hw-color-surface);
+  border-radius: var(--hw-card-radius);
 }
 
-.block {
-  align-items: center;
-  margin-bottom: var(--hw-space-4);
-}
-
-.alerts {
+.skeletonRow {
   display: flex;
-  flex-direction: column;
-  gap: var(--hw-space-3);
-  margin-bottom: var(--hw-space-5);
-}
-
-.alert {
   align-items: center;
+  gap: var(--hw-space-5);
+  min-height: 88px;
+  padding: 0 var(--hw-space-6);
 }
 
-.rowList {
-  display: flex;
-  flex-direction: column;
+.skeletonTile {
+  flex: none;
+  width: 60px;
+  height: 60px;
+}
+
+.skeletonText {
+  display: grid;
+  flex: 1;
   gap: var(--hw-space-3);
 }
 
 .footer {
-  margin-top: var(--hw-space-8);
-  padding-top: var(--hw-space-5);
+  margin-top: var(--hw-space-6);
   font-size: var(--hw-text-caption);
   color: var(--hw-color-text-muted);
-  text-align: center;
-  border-top: 1px solid var(--hw-color-border-subtle);
 }
 
-@media (width < 576px) {
-  .container { padding-inline: var(--hw-space-4); }
-  .summary { grid-template-columns: repeat(3, 1fr); gap: var(--hw-space-4) var(--hw-space-3); margin-bottom: var(--hw-space-6); }
-  .stat { padding-top: var(--hw-space-3); }
-  .stat :global(.hw-stat__label) { font-size: var(--hw-font-size-11); line-height: 1.3; }
-  .stat :global(.hw-stat__value) { font-size: 28px; }
-  .alert { flex-wrap: wrap; }
+@media (width < 768px) {
+  .container { padding: var(--hw-space-4) var(--hw-space-4) var(--hw-space-6); }
+  .title { font-size: var(--hw-font-size-24); }
+  /* Phone rows are cards: density and the table are desk choices. */
+  .switches { display: none; }
+  .offline { padding-inline: var(--hw-space-4); }
 }

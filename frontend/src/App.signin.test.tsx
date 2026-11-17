@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
-/** App with the real sign-in page and the real session menu: where the next sign-in lands. */
+/** App with the real sign-in page and the real account menu: where the next sign-in lands. */
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Session } from "./types";
-import { SessionMenu } from "./components/SessionMenu";
+import { AccountMenu } from "./components/SessionMenu";
 import { App } from "./App";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -33,13 +33,15 @@ type StubProps = { session: Session; onSignOut: (e?: boolean) => void };
 const stub = (name: string) => ({ session, onSignOut }: StubProps) => (
   <div>
     <p>{name} page for {session.clinician_id}</p>
-    <SessionMenu session={session} onSignOut={onSignOut} />
+    <AccountMenu session={session} onSignOut={onSignOut} />
     <button type="button" onClick={() => onSignOut()}>session ends</button>
   </div>
 );
+// The shared ward read is not what these tests are about: it passes the page through.
+vi.mock("./components/WardFeedProvider", () => ({ WardFeedProvider: ({ children }: { children: unknown }) => children }));
 vi.mock("./pages/Ward", () => ({ Ward: (p: StubProps) => stub("ward")(p) }));
 vi.mock("./pages/PatientDetail", () => ({ PatientDetail: (p: StubProps) => stub("patient")(p) }));
-vi.mock("./pages/Station", () => ({ Station: (p: StubProps) => stub("station")(p) }));
+vi.mock("./pages/Admit", () => ({ Admit: (p: StubProps) => stub("admit")(p) }));
 vi.mock("./pages/Overview", () => ({ Overview: (p: StubProps) => stub("overview")(p) }));
 vi.mock("./pages/Lab", () => ({ Lab: (p: StubProps) => stub("lab")(p) }));
 vi.mock("./pages/Research", () => ({ Research: (p: StubProps) => stub("research")(p) }));
@@ -91,7 +93,7 @@ describe("where a sign-in lands", () => {
     expect(await screen.findByText("ward page for rn-delacruz")).toBeTruthy();
   });
 
-  it("a physician after another physician signed out on the lab: the station", async () => {
+  it("a physician after another physician signed out on the lab: the Station destination, which is Admit now", async () => {
     sessionStorage.setItem("biosentry.session", JSON.stringify(physician));
     start("/lab");
     await signOut();
@@ -99,7 +101,7 @@ describe("where a sign-in lands", () => {
     await click(/Dr\. Aquino/);
     await click("Continue");
     await click(/Station/);
-    expect(await screen.findByText("station page for md-aquino")).toBeTruthy();
+    expect(await screen.findByText("admit page for md-aquino")).toBeTruthy();
   });
 
   it("an admin after a clinician signed out on the lab: the overview", async () => {

@@ -1,5 +1,29 @@
 /* Simulated runs: layout only. Fields, buttons, tags, the table and the accordion are hw-ui. */
 
+/* The request beside the runs and a result from 992px; one column below. */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: var(--hw-space-6);
+}
+
+.ask { padding-bottom: var(--hw-space-2); }
+
+.results {
+  display: grid;
+  gap: var(--hw-space-4);
+  min-width: 0;
+}
+
+@media (width >= 992px) {
+  .split { grid-template-columns: minmax(260px, 360px) minmax(0, 1fr); }
+  .ask {
+    padding: 0 var(--hw-space-6) 0 0;
+    border-right: 1px solid var(--hw-color-border-subtle);
+  }
+}
+
 .form {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));

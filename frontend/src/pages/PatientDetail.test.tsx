@@ -10,9 +10,12 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import synthetic from "../data/synthetic.json";
-import type { AbstainedDetail, BaselineComputed, BaselineResponse, ClinicalNote, LabPanel, PatientDetail as Detail, Session, SessionRole } from "../types";
+import type { AbstainedDetail, BaselineComputed, BaselineResponse, ClinicalNote, LabPanel, PatientDetail as Detail, ScoreRow, Session, SessionRole, WardResponse } from "../types";
+import { trend } from "hw-ui";
 import { ChatBubble } from "../components/ChatBubble";
 import { formatClock, formatClockSeconds } from "../components/format";
+import { WardFeedContext, type WardFeed } from "../components/wardFeed";
+import { WardFeedProvider } from "../components/WardFeedProvider";
 import { PatientDetail } from "./PatientDetail";
 
 // "Sep" or "Sept", whichever the runtime's en-GB gives: the clock uses the same call as the simulator.
@@ -21,7 +24,13 @@ const SEP = new Date(Date.UTC(2026, 8, 3)).toLocaleDateString("en-GB", { month: 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const api = vi.hoisted(() => ({
+  getAssistantHistory: vi.fn(async () => []),
+  getPatientRuns: vi.fn(async () => []),
+  getPatientRun: vi.fn(),
   getPatient: vi.fn(),
+  getWard: vi.fn(),
+  getAcknowledgements: vi.fn(),
+  acknowledge: vi.fn(),
   getNotes: vi.fn(),
   getBaseline: vi.fn(),
   getLiveWard: vi.fn(),
@@ -37,6 +46,11 @@ const api = vi.hoisted(() => ({
   getPatientQuestion: vi.fn(),
 }));
 vi.mock("../api", () => api);
+// The kit's own graph, watched: the tests read the config each trend was drawn with.
+vi.mock("hw-ui", async (importOriginal) => {
+  const real = await importOriginal<typeof import("hw-ui")>();
+  return { ...real, trend: vi.fn(real.trend) };
+});
 
 // p-001 from the committed ward: NEWS2 9 (high), two reasons.
 const row = synthetic.ranked[0] as unknown as Detail;
@@ -132,7 +146,7 @@ describe("the header clock is ward time, as served", () => {
       await vi.advanceTimersByTimeAsync(20_000);
     });
     expect(screen.getByText(clock(SERVED))).toBeTruthy();
-    expect(screen.getByText(/Cannot reach the ward server since/)).toBeTruthy();
+    expect(screen.getByText(/^Offline since \d\d:\d\d/)).toBeTruthy();
   });
 
   it("shows a nurse's entry time without its date when it is the ward's today", async () => {
@@ -150,13 +164,13 @@ describe("the header clock is ward time, as served", () => {
 });
 
 describe("PatientDetail", () => {
-  it("says the patients are simulated, once, and has the session menu", async () => {
+  it("says the patients are simulated, once, and has the top bar and the account", async () => {
     page("rn");
     await loaded();
     expect(screen.getAllByText("Simulated patients until a hospital is connected.")).toHaveLength(1);
-    expect(screen.getByRole("link", { name: "Ward" }).getAttribute("aria-current")).toBeNull();
+    expect(within(screen.getByRole("banner")).getByText("Ward W4")).toBeTruthy(); // a staff nurse has no tabs: the bar names the ward
     const crumbs = screen.getByRole("navigation", { name: "Breadcrumb" });
-    expect(within(crumbs).getByRole("link", { name: "Ward view" }).getAttribute("href")).toBe("/ward");
+    expect(within(crumbs).getByRole("link", { name: "Ward W4" }).getAttribute("href")).toBe("/ward");
     expect(screen.getByRole("button", { name: /rn-manalo/ })).toBeTruthy();
   });
 
@@ -169,7 +183,7 @@ describe("PatientDetail", () => {
     expect(screen.getByText("Single parameter at 3: systolic BP")).toBeTruthy();
     expect(screen.getByText("Call the medical team now (registrar or above)")).toBeTruthy();
     expect(screen.getByText(`Bed ${row.bed}`, { exact: false })).toBeTruthy();
-    expect(screen.getByText(/1h since collection/)).toBeTruthy();
+    expect(screen.getByText("Collected 1 h ago")).toBeTruthy();
   });
 
   it("gives a physician the assessment due instead", async () => {
@@ -218,9 +232,15 @@ describe("PatientDetail", () => {
     api.getPatient.mockResolvedValue({ ...base, labs: { ...everyLab, freshness_hours: 2 } });
     page();
     await loaded();
-    const labs = screen.getByText(/^Labs/).parentElement!;
+    const labs = screen.getByRole("region", { name: "Labs" });
     for (const label of LAB_LABELS) expect(within(labs).getByText(label)).toBeTruthy();
+    expect(within(labs).getByText("Collected 2 h ago")).toBeTruthy();
     expect(screen.queryByText("No lab result yet.")).toBeNull();
+    cleanup();
+    api.getPatient.mockResolvedValue({ ...base, labs: { ...everyLab, freshness_hours: 0.5 } });
+    page();
+    await loaded();
+    expect(screen.getByText("Collected 30 min ago")).toBeTruthy();
   });
 
   it("says plainly what is not there: no reasons, no labs, no age or sex", async () => {
@@ -236,11 +256,13 @@ describe("PatientDetail", () => {
     page();
     await loaded();
     expect(screen.getByText("Sorted on NEWS2 only")).toBeTruthy();
-    expect(screen.queryByText("Next step")).toBeNull(); // band low: no response block
+    // Band low: no response, a dash, and when the observations are due (as the ward row says it).
+    const step = within(screen.getByRole("region", { name: "Decision" })).getByText("Next step").parentElement!;
+    expect(step.textContent).toMatch(/^Next step—Obs (due|overdue)/);
     expect(screen.getByText("Own baseline: not shown in this version.")).toBeTruthy(); // never an empty box
     expect(screen.getByText("No lab result yet.")).toBeTruthy();
     expect(screen.getByText(/^-- -- · Bed/)).toBeTruthy();
-    expect(screen.queryByText(/since collection/)).toBeNull();
+    expect(screen.queryByText(/^Collected/)).toBeNull();
     expect(screen.getByText("Signal 80%")).toBeTruthy(); // the strip
     expect(screen.getByText("80%")).toBeTruthy(); // the summary block
   });
@@ -254,7 +276,7 @@ describe("PatientDetail", () => {
     expect(api.getBaseline).toHaveBeenCalledWith("p-001");
     expect(within(region).getByText(/Heart rate/).closest("li")!.textContent).toContain("from own baseline");
     const tierB = region.parentElement!;
-    expect(within(tierB).getByText("Own baseline")).toBeTruthy();
+    expect(within(tierB).getByText("Against own baseline")).toBeTruthy();
     expect(tierB.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_CONTAINED_BY).toBeTruthy();
     // The band as a graph above the list: heart rate 90 against its own 58.1 to 81.9.
     const graph = within(tierB).getByRole("figure", { name: "1 of 1 vital is outside its own band" });
@@ -266,7 +288,7 @@ describe("PatientDetail", () => {
     api.getBaseline.mockResolvedValue(baseline);
     page();
     expect(await screen.findByRole("region", { name: "Change from own baseline" })).toBeTruthy();
-    expect(screen.getByText("Own baseline")).toBeTruthy();
+    expect(screen.getByText("Against own baseline")).toBeTruthy();
   });
 
   it("says it is loading the baseline, and never shows another patient's", async () => {
@@ -288,7 +310,7 @@ describe("PatientDetail", () => {
     expect(await screen.findByText("Baseline could not be loaded.")).toBeTruthy();
     expect(screen.queryByRole("region", { name: "Change from own baseline" })).toBeNull();
     expect(screen.queryByRole("alert")).toBeNull(); // quiet, not an alarm
-    expect(screen.getByText("Own baseline")).toBeTruthy();
+    expect(screen.getByText("Against own baseline")).toBeTruthy();
   });
 
   it("shows unavailable for a patient that is missing or not yours", async () => {
@@ -318,6 +340,21 @@ describe("PatientDetail", () => {
     expect(screen.queryByText("Patient not found.")).toBeNull();
   });
 
+  it("draws a not-ranked patient's stored history where there is some", async () => {
+    const row = synthetic.abstained[0];
+    const hr = [{ time: "2026-09-03T06:00:00Z", value: 80 }, { time: "2026-09-03T06:30:00Z", value: 84 }];
+    api.getPatient.mockResolvedValue({
+      ...row, unit: null, floor: null, now: "2026-09-03T07:00:00Z",
+      vital_history: { heart_rate: hr, respiratory_rate: [], spo2: [] },
+    } as unknown as AbstainedDetail);
+    page("rn", `/patient/${row.id}`);
+    await loaded();
+    expect(screen.getByRole("heading", { name: /^Heart rate / })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: /^SpO2 / })).toBeNull();
+    expect(screen.queryByText("No stored history available.")).toBeNull();
+    expect(screen.getByText(/Unit unavailable · Floor unavailable · Bed/)).toBeTruthy();
+  });
+
   it("shows an error when the patient cannot be loaded", async () => {
     api.getPatient.mockRejectedValue(new Error("offline"));
     page();
@@ -345,16 +382,17 @@ describe("PatientDetail", () => {
     api.addNote.mockResolvedValue(note("n-002", "Repeat lactate sent"));
     page("charge_rn");
     await loaded();
-    await user.click(await screen.findByRole("button", { name: "Notes (1)" }));
+    await user.click(await screen.findByRole("button", { name: "All notes (1)" }));
     expect(screen.getByText("Clinical notes · 1")).toBeTruthy();
-    expect(screen.getByText("BP trending down")).toBeTruthy();
+    expect(within(screen.getByRole("dialog")).getByText("BP trending down")).toBeTruthy();
 
     const add = screen.getByRole("button", { name: "Add note" }) as HTMLButtonElement;
     expect(add.disabled).toBe(true);
     await user.type(screen.getByPlaceholderText("Add a clinical note..."), "  Repeat lactate sent  ");
     await user.click(add);
     expect(api.addNote).toHaveBeenCalledWith("p-001", "rn-manalo", "Charge RN", "Repeat lactate sent");
-    expect(await screen.findByText("Repeat lactate sent")).toBeTruthy();
+    expect(await within(screen.getByRole("dialog")).findByText("Repeat lactate sent")).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "Latest note" })).getByText("Repeat lactate sent")).toBeTruthy(); // the newest is on the page too
     expect(screen.getByText("Clinical notes · 2")).toBeTruthy();
     expect((screen.getByPlaceholderText("Add a clinical note...") as HTMLTextAreaElement).value).toBe("");
   });
@@ -364,14 +402,14 @@ describe("PatientDetail", () => {
     api.addNote.mockResolvedValue(note("n-003", "Seen by MD"));
     page("md");
     await loaded();
-    await user.click(screen.getByRole("button", { name: "Notes" }));
+    await user.click(screen.getByRole("button", { name: "All notes" }));
     expect(screen.getByText("Clinical notes")).toBeTruthy();
     const box = screen.getByPlaceholderText("Add a clinical note...");
     await user.type(box, "Seen by MD{Enter}");
     expect(api.addNote).not.toHaveBeenCalled();
     await user.keyboard("{Control>}{Enter}{/Control}");
     expect(api.addNote).toHaveBeenCalledWith("p-001", "rn-manalo", "MD", "Seen by MD");
-    await waitFor(() => expect(screen.getByText("Seen by MD")).toBeTruthy());
+    await waitFor(() => expect(within(screen.getByRole("dialog")).getByText("Seen by MD")).toBeTruthy());
   });
 
   it("keeps the text and says so when a note is not saved", async () => {
@@ -379,7 +417,7 @@ describe("PatientDetail", () => {
     api.addNote.mockRejectedValue(new Error("500"));
     page();
     await loaded();
-    await user.click(screen.getByRole("button", { name: "Notes" }));
+    await user.click(screen.getByRole("button", { name: "All notes" }));
     const box = screen.getByPlaceholderText("Add a clinical note...") as HTMLTextAreaElement;
     await user.type(box, "Family updated");
     await user.click(screen.getByRole("button", { name: "Add note" }));
@@ -394,39 +432,64 @@ describe("PatientDetail", () => {
     api.getNotes.mockRejectedValue(new Error("offline"));
     page();
     await loaded();
-    await user.click(screen.getByRole("button", { name: "Notes" }));
+    await user.click(screen.getByRole("button", { name: "All notes" }));
     expect((await screen.findByRole("alert")).textContent).toBe("Notes could not be loaded.");
   });
 
-  it("opens the charts drawer and closes drawers by toggle, close button, Esc or backdrop", async () => {
+  it("closes the notes drawer by its close button, Esc or the backdrop, not by a click inside", async () => {
     const user = userEvent.setup();
     page();
     await loaded();
-    const charts = screen.getByRole("button", { name: "Charts" });
+    const all = screen.getByRole("button", { name: "All notes" });
+    expect(all.getAttribute("aria-haspopup")).toBe("dialog");
 
-    await user.click(charts);
-    const panel = screen.getByRole("dialog", { name: "Vital trends · 5 h" });
-    expect(charts.getAttribute("aria-expanded")).toBe("true");
-    for (const label of ["Heart rate", "Respiratory rate", "SpO2"]) {
-      expect(within(panel).getByRole("heading", { level: 3, name: new RegExp(`^${label} `) })).toBeTruthy();
-    }
-    expect(within(panel).getByText("Charts show patch data only. Values entered by a nurse are not plotted.")).toBeTruthy();
-    await user.click(charts); // same button again closes it
-    expect(screen.queryByRole("dialog")).toBeNull();
-
-    await user.click(charts);
-    await user.click(screen.getByRole("button", { name: "Close charts" }));
+    await user.click(all);
+    await user.click(screen.getByRole("button", { name: "Close notes" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 
-    await user.click(charts);
+    await user.click(all);
     fireEvent(screen.getByRole("dialog"), new Event("cancel", { cancelable: true })); // Esc
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 
-    await user.click(screen.getByRole("button", { name: "Notes" }));
+    await user.click(all);
     await user.click(screen.getByPlaceholderText("Add a clinical note...")); // inside: stays open
     expect(screen.getByRole("dialog", { name: "Clinical notes" })).toBeTruthy();
     await user.click(screen.getByRole("dialog")); // the backdrop is the dialog itself
     await waitFor(() => expect(screen.queryByPlaceholderText("Add a clinical note...")).toBeNull());
+  });
+
+  it("shows the latest note on the page, links Notes to it, and keeps the full list for All notes", async () => {
+    const user = userEvent.setup();
+    api.getNotes.mockResolvedValue([
+      { ...note("n-001", "Older note"), timestamp: "2026-09-03T05:00:00Z" },
+      note("n-002", "BP trending down"),
+    ]);
+    page();
+    await loaded();
+    const card = await screen.findByRole("region", { name: "Latest note" });
+    await within(card).findByText("BP trending down"); // the newest by its time, wherever it sits in the list
+    expect(within(card).queryByText("Older note")).toBeNull();
+    expect(within(card).getByText("rn-manalo")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Notes (2)" }).getAttribute("href")).toBe("#notes");
+    expect(card.id).toBe("notes");
+    expect(screen.queryByRole("button", { name: "Charts" })).toBeNull(); // the charts drawer is gone: the trends are on the page
+    await user.click(within(card).getByRole("button", { name: "All notes (2)" }));
+    const drawer = screen.getByRole("dialog", { name: "Clinical notes · 2" });
+    expect(within(drawer).getByText("Older note")).toBeTruthy();
+    expect(within(drawer).getByText("BP trending down")).toBeTruthy();
+  });
+
+  it("says there are no notes yet, and nothing when they could not be loaded", async () => {
+    page();
+    await loaded();
+    const card = screen.getByRole("region", { name: "Latest note" });
+    expect(await within(card).findByText("No notes yet for this patient.")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Notes" })).toBeTruthy();
+    cleanup();
+    api.getNotes.mockRejectedValue(new Error("down"));
+    page();
+    await loaded();
+    await waitFor(() => expect(within(screen.getByRole("region", { name: "Latest note" })).queryByText(/No notes yet/)).toBeNull());
   });
 
   it("says there is no patch signal, and who entered the values, when the row has none", async () => {
@@ -458,26 +521,59 @@ describe("PatientDetail", () => {
       ranked, rank: ranked ? 1 : null, score: ranked ? 9 : null,
       not_ranked_reason: ranked ? null : "No device data", not_ranked_instruction: ranked ? null : "Apply the patch",
     });
-    const save = async (user: ReturnType<typeof userEvent.setup>) => {
-      await loaded();
-      await user.click(screen.getByRole("button", { name: "Record vitals" }));
-      await user.type(screen.getByLabelText("Heart rate (bpm)"), "118");
+    const open = (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole("button", { name: "Record vitals" }));
+    const save = async (user: ReturnType<typeof userEvent.setup>, hr = "118") => {
+      await user.type(screen.getByLabelText("Heart rate (bpm)"), hr);
       await user.click(screen.getByRole("button", { name: "Record" }));
+    };
+    const close = async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click(screen.getByRole("button", { name: "Close" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     };
     beforeEach(() => { api.canRecordVitals = true; });
     afterEach(() => { api.canRecordVitals = false; });
+
+    it("opens one drawer from the header: who, errors only after Record, the saving state, and the ranked result", async () => {
+      const user = userEvent.setup();
+      let answer!: (r: ReturnType<typeof recorded>) => void;
+      api.recordVitals.mockReturnValue(new Promise((res) => (answer = res)));
+      page();
+      await loaded();
+      const button = screen.getByRole("button", { name: "Record vitals" });
+      expect(button.getAttribute("aria-haspopup")).toBe("dialog");
+      await open(user);
+      const dialog = within(screen.getByRole("dialog", { name: "Record vitals" }));
+      expect(dialog.getByText(`${row.name} · ${row.age} ${row.sex} · Bed ${row.bed}`)).toBeTruthy();
+      expect(dialog.queryByText("NOT RANKED")).toBeNull(); // a ranked patient has no reason line
+      expect(dialog.queryByRole("alert")).toBeNull(); // nothing is wrong before Record
+      await user.type(dialog.getByLabelText("Heart rate (bpm)"), "400");
+      expect(dialog.queryByRole("alert")).toBeNull();
+      await user.click(dialog.getByRole("button", { name: "Record" }));
+      expect(dialog.getByText("Heart rate must be 1 to 300.")).toBeTruthy(); // under its field
+      expect(api.recordVitals).not.toHaveBeenCalled();
+      await user.clear(dialog.getByLabelText("Heart rate (bpm)"));
+      await save(user);
+      expect((dialog.getByRole("button", { name: "Recording…" }) as HTMLButtonElement).disabled).toBe(true);
+      await act(async () => answer(recorded(true)));
+      expect(dialog.getByRole("status").textContent).toBe("Ranked #1 with NEWS2 9.");
+      expect(dialog.getByText("Call the medical team now (registrar or above)", { selector: "strong" })).toBeTruthy();
+      expect(dialog.queryByRole("link", { name: "Open patient" })).toBeNull(); // this is the patient
+    });
 
     it("reads the patient again when the result is ranked", async () => {
       const user = userEvent.setup();
       api.recordVitals.mockResolvedValue(recorded(true));
       page();
+      await loaded();
+      await open(user);
       await save(user);
       await waitFor(() => expect(api.getPatient).toHaveBeenCalledTimes(2));
       // The panel reads again at once: a typed value can change which vital counts.
       await waitFor(() => expect(api.getBaseline).toHaveBeenCalledTimes(2));
       api.getPatient.mockResolvedValue({ ...base, score: 4, escalation_reasons: [] });
-      await user.type(screen.getByLabelText("Heart rate (bpm)"), "120");
-      await user.click(screen.getByRole("button", { name: "Record" }));
+      await close(user);
+      await open(user);
+      await save(user, "120");
       await waitFor(() => expect(api.getPatient).toHaveBeenCalledTimes(3));
       expect(await screen.findByText("Sorted on NEWS2 only")).toBeTruthy();
       expect(screen.queryByRole("link", { name: "Back to ward" })).toBeNull();
@@ -487,8 +583,11 @@ describe("PatientDetail", () => {
       const user = userEvent.setup();
       api.recordVitals.mockResolvedValue(recorded(false));
       page();
+      await loaded();
+      await open(user);
       await save(user);
       expect(await screen.findByText(/Recorded. Still not ranked. No device data./)).toBeTruthy();
+      expect(within(screen.getByRole("dialog")).getByRole("status").textContent).toBe("Still not ranked. No device data. Apply the patch.");
       expect(screen.getByRole("link", { name: "Back to ward" }).getAttribute("href")).toBe("/ward");
       expect(api.getPatient).toHaveBeenCalledTimes(2);
     });
@@ -497,12 +596,14 @@ describe("PatientDetail", () => {
       const user = userEvent.setup();
       api.recordVitals.mockResolvedValue(recorded(true));
       page();
+      await loaded();
+      await open(user);
       await save(user);
       api.getPatient.mockRejectedValue(new Error("down"));
-      await user.type(screen.getByLabelText("Heart rate (bpm)"), "120");
-      await user.click(screen.getByRole("button", { name: "Record" }));
+      await user.click(await screen.findByRole("button", { name: "Close" }));
+      await open(user);
+      await save(user, "120");
       expect(await screen.findByText("Recorded. The page could not refresh; reload to see the new score.")).toBeTruthy();
-      expect(screen.getByLabelText("Heart rate (bpm)")).toBeTruthy();
       expect(screen.getByText(/Ranked #1 with NEWS2 9\./)).toBeTruthy();
     });
 
@@ -510,22 +611,24 @@ describe("PatientDetail", () => {
       const user = userEvent.setup();
       api.recordVitals.mockResolvedValue(recorded(false));
       page();
+      await loaded();
+      await open(user);
       await save(user);
       const label = "No longer ranked. The figures below are from before this entry.";
       expect(await screen.findByText(label)).toBeTruthy();
       api.recordVitals.mockResolvedValue(recorded(true));
-      await user.type(screen.getByLabelText("Heart rate (bpm)"), "120");
-      await user.click(screen.getByRole("button", { name: "Record" }));
+      await user.click(screen.getByRole("button", { name: "Add the missing values" }));
+      await save(user, "120");
       await waitFor(() => expect(screen.queryByText(/Still not ranked/)).toBeNull());
       expect(screen.queryByText(label)).toBeNull();
     });
 
-    it("closes the form", async () => {
+    it("closes the drawer", async () => {
       const user = userEvent.setup();
       page();
       await loaded();
-      await user.click(screen.getByRole("button", { name: "Record vitals" }));
-      await user.click(screen.getByRole("button", { name: "Close" }));
+      await open(user);
+      await close(user);
       expect(screen.queryByLabelText("Heart rate (bpm)")).toBeNull();
     });
   });
@@ -597,7 +700,7 @@ describe("PatientDetail own-baseline reason and patch display", () => {
     expect(screen.queryByText(/^Not a NEWS2 trigger/)).toBeNull();
     // Only model lines: the patient is where NEWS2 puts them, and the page still says so.
     expect(screen.getByText("Sorted on NEWS2 only")).toBeTruthy();
-    const label = screen.getByText("Prediction models \u00b7 rank unchanged");
+    const label = screen.getByText("Prediction models \u00b7 rank unchanged.");
     const why = screen.getByText("Why this patient is up");
     expect(why.compareDocumentPosition(label) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(label.compareDocumentPosition(screen.getByText("Prediction model flag (synthetic, not validated)")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -637,7 +740,7 @@ describe("PatientDetail for an administrator (read only)", () => {
     expect(screen.getByText("Read-only. Views are recorded in the audit log.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Record vitals" })).toBeNull();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "Notes" }));
+    await user.click(screen.getByRole("button", { name: "All notes" }));
     expect(screen.queryByPlaceholderText("Add a clinical note...")).toBeNull();
     expect(screen.queryByRole("button", { name: "Add note" })).toBeNull();
   });
@@ -648,11 +751,14 @@ describe("PatientDetail for an administrator (read only)", () => {
     page("admin");
     await loaded();
     expect(api.getNotes).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "Notes" }));
-    expect(await screen.findByText("BP trending down")).toBeTruthy();
+    const card = screen.getByRole("region", { name: "Latest note" });
+    expect(within(card).queryByText(/No notes yet/)).toBeNull(); // nothing is read, so nothing is claimed
+    await user.click(screen.getByRole("button", { name: "All notes" }));
+    expect(await within(screen.getByRole("dialog")).findByText("BP trending down")).toBeTruthy();
     expect(api.getNotes).toHaveBeenCalledTimes(1);
-    await user.click(screen.getByRole("button", { name: "Notes (1)" })); // close
-    await user.click(screen.getByRole("button", { name: "Notes (1)" })); // open again: a new read
+    await user.click(screen.getByRole("button", { name: "Close notes" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await user.click(screen.getByRole("button", { name: "All notes (1)" })); // open again: a new read
     expect(api.getNotes).toHaveBeenCalledTimes(2);
   });
 
@@ -661,7 +767,7 @@ describe("PatientDetail for an administrator (read only)", () => {
     const user = userEvent.setup();
     page("admin");
     await loaded();
-    await user.click(screen.getByRole("button", { name: "Notes" }));
+    await user.click(screen.getByRole("button", { name: "All notes" }));
     expect(await screen.findByText("Notes could not be loaded.")).toBeTruthy();
   });
 
@@ -675,14 +781,12 @@ describe("PatientDetail for an administrator (read only)", () => {
 describe("PatientDetail own baseline on the charts", () => {
   const hr = baseline.vitals[0] as BaselineComputed;
   const withVitals = (...vitals: BaselineResponse["vitals"]): BaselineResponse => ({ ...baseline, vitals });
-  // The kit graph draws no band: each chart says it in its subtitle.
-  const bands = () => within(screen.getByRole("dialog")).queryAllByText(/Own baseline \d/);
+  // Each chart also says its band in its subtitle.
+  const bands = () => within(screen.getByRole("region", { name: "Trends" })).queryAllByText(/Own baseline \d/);
   const SHADED = "Own baseline: this patient's own baseline (synthetic, not validated). Not a normal range.";
   const openCharts = async (role?: SessionRole) => {
-    const user = userEvent.setup();
     page(role);
     await loaded();
-    await user.click(screen.getByRole("button", { name: "Charts" }));
   };
 
   it("draws each computed vital's band from the answer the page already has, with one label line", async () => {
@@ -730,25 +834,80 @@ describe("PatientDetail own baseline on the charts", () => {
   });
 });
 
-describe("PatientDetail charts title", () => {
-  const hist = (...times: string[]) => ({
-    heart_rate: times.map((time) => ({ time, value: 80 })),
-    respiratory_rate: [],
-    spo2: [],
+describe("PatientDetail trends on the page", () => {
+  const configs = (label: string) => vi.mocked(trend).mock.calls.filter(([, c]) => c.series[0].name === label).map(([, c]) => c);
+  const last = (label: string) => configs(label).at(-1)!;
+
+  it("draws heart rate, respiratory rate and SpO2 on clinical ranges, with the NEWS2 lines, the own band and the points stretch", async () => {
+    api.getBaseline.mockResolvedValue(baseline);
+    page();
+    await loaded();
+    const trends = screen.getByRole("region", { name: "Trends" });
+    for (const label of ["Heart rate", "Respiratory rate", "SpO2"]) {
+      expect(within(trends).getByRole("heading", { level: 3, name: new RegExp(`^${label} `) })).toBeTruthy();
+    }
+    await waitFor(() => expect(last("Heart rate").band).toEqual([58.1, 81.9]));
+    expect(last("Heart rate").bandLabel).toBe("Own baseline 58.1–81.9");
+    const hr = last("Heart rate");
+    expect(hr.range).toEqual([40, 140]);
+    expect(hr.limits).toEqual([{ at: 90, label: "+1 point above 90" }, { at: 51, label: "+1 point below 51" }]);
+    expect([91, 90, 51, 50].map(hr.highlightWhere!)).toEqual([true, false, false, true]);
+    const rr = last("Respiratory rate");
+    expect(rr.range).toEqual([8, 30]);
+    expect(rr.limits).toEqual([{ at: 20, label: "+2 points above 20" }, { at: 12, label: "+1 point below 12" }]);
+    expect(rr.band).toBeUndefined(); // no computed band for it
+    const spo2 = last("SpO2");
+    expect(spo2.range).toEqual([85, 100]);
+    expect(spo2.limits).toEqual([{ at: 96, label: "+1 point below 96" }]); // scale 1
+    expect([95, 96].map(spo2.highlightWhere!)).toEqual([true, false]);
+    expect(trends.closest("[data-hw-space]")).toBeNull(); // no space: the points stretch keeps the default (red) highlight
+    expect(within(trends).getByText("Charts show patch data only. Values entered by a nurse are not plotted.")).toBeTruthy();
   });
-  it.each([
-    ["no points", [], "Vital trends"],
-    ["one point", ["2026-09-03T01:00:00Z"], "Vital trends \u00b7 under 1 h"],
-    ["30 minutes", ["2026-09-03T01:00:00Z", "2026-09-03T01:30:00Z"], "Vital trends \u00b7 under 1 h"],
-    ["6 hours", ["2026-09-03T01:00:00Z", "2026-09-03T07:00:00Z"], "Vital trends \u00b7 6 h"],
-    ["3 days", ["2026-09-01T01:00:00Z", "2026-09-04T01:00:00Z"], "Vital trends \u00b7 72 h"],
-  ])("says the span for %s", async (_name, times, title) => {
-    api.getPatient.mockResolvedValue({ ...base, vital_history: hist(...times) });
+
+  it("filters the stored readings with 1 h, 6 h, 24 h and Stay, counted from the newest", async () => {
+    // p-001 has 24 sets from 01:00 to 06:45; one more two days before.
+    const h = base.vital_history;
+    api.getPatient.mockResolvedValue({ ...base, vital_history: { ...h, heart_rate: [{ time: "2026-09-01T01:00:00Z", value: 70 }, ...h.heart_rate] } });
     const user = userEvent.setup();
     page();
     await loaded();
-    await user.click(screen.getByRole("button", { name: "Charts" }));
-    expect(screen.getByText(title)).toBeTruthy();
+    const group = within(screen.getByRole("group", { name: "Time range" }));
+    expect(group.getAllByRole("radio").map((r) => (r as HTMLInputElement).labels![0].textContent)).toEqual(["1 h", "6 h", "24 h", "Stay"]);
+    expect((group.getByRole("radio", { name: "6 h" }) as HTMLInputElement).checked).toBe(true);
+    expect(last("Heart rate").x).toHaveLength(24);
+    await user.click(group.getByRole("radio", { name: "1 h" }));
+    expect(last("Heart rate").x).toHaveLength(4);
+    await user.click(group.getByRole("radio", { name: "Stay" }));
+    expect(last("Heart rate").x).toHaveLength(25);
+    await user.click(group.getByRole("radio", { name: "24 h" }));
+    expect(last("Heart rate").x).toHaveLength(24);
+  });
+
+  it("says when a vital has too few readings in the range, and draws scale 2's lines for a patient on oxygen", async () => {
+    const v = base.vitals;
+    api.getPatient.mockResolvedValue({
+      ...base,
+      vital_history: { ...base.vital_history, respiratory_rate: [] },
+      vitals: {
+        ...v,
+        spo2_scale: { ...v.spo2_scale, data: { present: true, value: 2 } },
+        supplemental_o2: { ...v.supplemental_o2, data: { present: true, value: true } },
+      },
+    } as Detail);
+    page();
+    await loaded();
+    expect(screen.getByText("Respiratory rate: no stored readings in this range.")).toBeTruthy();
+    const spo2 = last("SpO2");
+    expect(spo2.limits).toEqual([{ at: 92, label: "+1 point above 92" }, { at: 88, label: "+1 point below 88" }]);
+    expect([93, 90, 87].map(spo2.highlightWhere!)).toEqual([true, false, true]);
+  });
+
+  it("reads scale 1 when no scale is recorded", async () => {
+    const v = base.vitals;
+    api.getPatient.mockResolvedValue({ ...base, vitals: { ...v, spo2_scale: { ...v.spo2_scale, data: { present: false, reason: "not_recorded" } } } } as Detail);
+    page();
+    await loaded();
+    expect(last("SpO2").limits).toEqual([{ at: 96, label: "+1 point below 96" }]);
   });
 });
 
@@ -799,7 +958,7 @@ describe("PatientDetail follows the ward's speed", () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     page("charge_rn");
     await loaded();
-    await user.click(screen.getByRole("button", { name: "Notes" }));
+    await user.click(screen.getByRole("button", { name: "All notes" }));
     await user.type(screen.getByPlaceholderText("Add a clinical note..."), "Repeat lactate");
     await user.click(screen.getByRole("button", { name: "Record vitals" }));
     const hr = screen.getByLabelText("Heart rate (bpm)");
@@ -831,66 +990,65 @@ describe("PatientDetail follows the ward's speed", () => {
     await loaded();
     api.getPatient.mockRejectedValue(new Error("down"));
     await advance(2_100);
-    expect(await screen.findByText(/Cannot reach the ward server since/)).toBeTruthy();
+    const banner = await screen.findByRole("alert");
+    expect(banner.className).toContain("hw-banner--inverse"); // Phase 1's black banner
+    expect(within(banner).getByText(/^Offline since \d\d:\d\d/)).toBeTruthy();
+    expect(banner.textContent).toContain("Retrying every 5 seconds. Acknowledging and recording wait until the connection is back.");
     expect(screen.queryByText(/could not be loaded/)).toBeNull();
     expect(screen.getByRole("heading", { level: 1 })).toBeTruthy();
     api.getPatient.mockResolvedValue(base);
     await advance(5_100);
-    await waitFor(() => expect(screen.queryByText(/Cannot reach the ward server since/)).toBeNull());
+    await waitFor(() => expect(screen.queryByText(/Offline since/)).toBeNull());
   });
 
-  const summaryBar = () => document.querySelector('[class*="summaryBar"]') as HTMLElement;
-
-  it("puts the stale lines in the summary bar, beside the score", async () => {
+  it("puts the offline banner above the page and the no-longer line above the decision strip", async () => {
     page();
     await loaded();
     api.getPatient.mockRejectedValue(new Error("down"));
     await advance(2_100);
-    const failed = await screen.findByText(/Cannot reach the ward server since/);
-    expect(summaryBar().contains(failed)).toBe(true);
+    const failed = await screen.findByText(/^Offline since/);
+    const note = screen.getByText("Simulated patients until a hospital is connected.");
+    expect(failed.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     api.getPatient.mockResolvedValue(null);
     await advance(5_100);
     const gone = await screen.findByText(/No longer on your ranked list\. Figures from/);
-    expect(summaryBar().contains(gone)).toBe(true);
+    const decision = screen.getByRole("region", { name: "Decision" });
+    expect(gone.compareDocumentPosition(decision) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // The server answered, so the line that it cannot be reached is no longer true and must go.
-    expect(screen.queryByText(/Cannot reach the ward server since/)).toBeNull();
+    expect(screen.queryByText(/Offline since/)).toBeNull();
   });
 
-  it("shows the Cannot reach line in an open drawer's header too", async () => {
+  it("shows the offline line in an open drawer too", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     page();
     await loaded();
-    await user.click(screen.getByRole("button", { name: /Charts/ }));
+    await user.click(screen.getByRole("button", { name: "All notes" }));
     api.getPatient.mockRejectedValue(new Error("down"));
     await advance(2_100);
-    await waitFor(() => expect(within(screen.getByRole("dialog")).getByText(/Cannot reach the ward server since/)).toBeTruthy());
+    await waitFor(() => expect(within(screen.getByRole("dialog")).getByText(/^Offline since \d\d:\d\d.*\. Cannot reach the ward server\.$/)).toBeTruthy());
   });
 
   it("keeps the band across a timed read of the patient", async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     api.getBaseline.mockResolvedValue({ ...baseline, vitals: [baseline.vitals[0]] });
     page();
     await loaded();
     await screen.findByRole("region", { name: "Change from own baseline" });
-    await user.click(screen.getByRole("button", { name: /Charts/ }));
-    const drawer = screen.getByRole("dialog");
+    const trends = screen.getByRole("region", { name: "Trends" });
+    const line = within(trends).getByText(/Own baseline 58\.1 to 81\.9 bpm/);
     await advance(2_100);
-    expect(screen.getByRole("dialog")).toBe(drawer);
-    expect(within(drawer).getAllByText(/Own baseline 58\.1 to 81\.9 bpm/)).toHaveLength(1);
+    expect(within(trends).getAllByText(/Own baseline 58\.1 to 81\.9 bpm/)).toEqual([line]);
   });
 
-  it("leaves the open charts drawer alone while the data does not change", async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+  it("leaves the trends alone while the data does not change", async () => {
     page();
     await loaded();
-    await user.click(screen.getByRole("button", { name: /Charts/ }));
     await advance(900);
-    const drawer = screen.getByRole("dialog");
-    const before = drawer.innerHTML;
+    const trends = screen.getByRole("region", { name: "Trends" });
+    const before = trends.innerHTML;
     await advance(4_200);
     expect(api.getPatient.mock.calls.length).toBeGreaterThanOrEqual(3);
-    expect(screen.getByRole("dialog")).toBe(drawer);
-    expect(drawer.innerHTML).toBe(before); // the graphs are not rebuilt
+    expect(screen.getByRole("region", { name: "Trends" })).toBe(trends);
+    expect(trends.innerHTML).toBe(before); // the graphs are not rebuilt
   });
 
   it("drops a slow old answer that lands after a newer one", async () => {
@@ -982,7 +1140,7 @@ describe("PatientDetail prediction models panel", () => {
     await loaded();
     const region = screen.getByRole("region", { name: "Prediction models" });
     expect(within(region).getAllByText(/No result: the patient's own baseline is still forming/)).toHaveLength(1);
-    expect(screen.getByText("Prediction models · rank unchanged")).toBeTruthy();
+    expect(screen.getByText("Prediction models · rank unchanged.")).toBeTruthy();
   });
 
   it("shows no panel when the server sends no models", async () => {
@@ -1064,20 +1222,22 @@ describe("PatientDetail: stay panel", () => {
     api.hasHistory = false;
   });
 
-  it("sits after Current vitals, for an admin too, and reads nothing while closed", async () => {
+  it("sits under Trends as an accordion, for an admin too, and reads nothing while closed", async () => {
     api.hasPatientQuestions = true;
     api.getPatientQuestions.mockResolvedValue([]);
     try {
       page("rn");
       await loaded();
-      const summary = await screen.findByText("Stay");
-      const vitals = screen.getByText("Current vitals");
-      expect(vitals.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      const summary = await screen.findByText("Stay", { selector: "summary" });
+      const trends = screen.getByRole("region", { name: "Trends" });
+      expect(trends.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(trends.parentElement!.contains(summary)).toBe(true); // the same (left) column
+      expect(summary.closest("details")!.open).toBe(false);
       expect(api.getPatientHistory).not.toHaveBeenCalled();
       cleanup();
       page("admin");
       await loaded();
-      expect(await screen.findByText("Stay")).toBeTruthy();
+      expect(await screen.findByText("Stay", { selector: "summary" })).toBeTruthy();
     } finally {
       api.hasPatientQuestions = false;
     }
@@ -1087,7 +1247,7 @@ describe("PatientDetail: stay panel", () => {
     api.hasHistory = false;
     page("rn");
     await loaded();
-    expect(screen.queryByText("Stay")).toBeNull();
+    expect(screen.queryByText("Stay", { selector: "summary" })).toBeNull();
     expect(api.getPatientHistory).not.toHaveBeenCalled();
   });
 
@@ -1098,14 +1258,14 @@ describe("PatientDetail: stay panel", () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       page("rn");
       await loaded();
-      await user.click(await screen.findByText("Stay"));
+      await user.click(await screen.findByText("Stay", { selector: "summary" }));
       await screen.findByText(/^Admitted at /);
       expect(api.getPatientHistory).toHaveBeenCalledTimes(1);
       await act(async () => {
         await vi.advanceTimersByTimeAsync(5_100);
       });
       expect(api.getPatient.mock.calls.length).toBeGreaterThan(1);
-      expect((screen.getByText("Stay").closest("details") as HTMLDetailsElement).open).toBe(true);
+      expect((screen.getByText("Stay", { selector: "summary" }).closest("details") as HTMLDetailsElement).open).toBe(true);
       expect(screen.getByText(/^Admitted at /)).toBeTruthy();
       expect(api.getPatientHistory).toHaveBeenCalledTimes(1);
     } finally {
@@ -1147,5 +1307,240 @@ describe("PatientDetail flips on a changed refresh", () => {
     });
     await advance(2_100);
     expect(flips().sort()).toEqual([String(base.score - 1), "77 bpm"].sort());
+  });
+});
+
+// ---- Phase 2: the header, the decision strip, the pager and the phone ----
+
+const ranks = synthetic.ranked.slice(0, 3) as unknown as ScoreRow[]; // p-001, p-002, p-003 in rank order
+const names = Object.fromEntries((synthetic.ranked as unknown as ScoreRow[]).map((r) => [r.id, r.name]));
+const feedOf = (over: Partial<WardFeed> = {}): WardFeed => ({
+  data: {
+    ward: "W4", clinician: "rn-manalo", shift: "07:00", receiving_data: true, sort_tier: "A", tier_status: row.tier_status,
+    ranked: ranks, abstained: [], now: "2026-09-03T07:00:00Z",
+  } as WardResponse,
+  fetchedAt: Date.parse("2026-09-03T07:00:00Z"), failedSince: null, sim: null, refresh: () => undefined, pollMs: 15_000,
+  readOnly: false, alerts: [], acknowledge: vi.fn(), flush: () => Promise.resolve(), notice: null, setNotice: () => undefined,
+  ...over,
+});
+const fed = (feed: WardFeed, role: SessionRole = "charge_rn", path = "/patient/p-002") =>
+  render(
+    <WardFeedContext.Provider value={feed}>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/patient/:id" element={<PatientDetail session={session(role)} onSignOut={() => undefined} />} />
+        </Routes>
+      </MemoryRouter>
+    </WardFeedContext.Provider>,
+  );
+const showing = (id: string) => screen.findByRole("heading", { level: 1, name: names[id] });
+const pager = () => within(screen.getByRole("group", { name: "Move through patients in rank order" }));
+
+describe("PatientDetail: the decision strip", () => {
+  it("leads with the score and its band, the next step, why and the signal, and has one NEWS2 only", async () => {
+    api.getPatient.mockResolvedValue({ ...base, trend: "rising" });
+    page("rn");
+    await loaded();
+    const region = screen.getByRole("region", { name: "Decision" });
+    const strip = within(region);
+    expect(region.getAttribute("data-band")).toBe("high");
+    expect(strip.getByText("Call the medical team now (registrar or above)")).toBeTruthy();
+    expect(strip.getByText("Total 9 (≥7): high")).toBeTruthy();
+    expect(strip.getByText("100%").closest("[data-signal]")!.getAttribute("data-signal")).toBe("good");
+    expect(strip.getByText(/s ago$/)).toBeTruthy(); // the data's age under the signal
+    expect(screen.getByText("Advisory only. BioSentry does not replace a monitor alarm. Views are logged for audit under rn-manalo.")).toBeTruthy();
+  });
+
+  it("names the patient with the context under the name", async () => {
+    page("rn");
+    expect((await loaded()).textContent).toBe(row.name);
+    expect(screen.getByText(`${row.age} ${row.sex} · Bed ${row.bed} · ${row.admitting_context}`)).toBeTruthy();
+  });
+});
+
+describe("PatientDetail: Previous and Next in rank order", () => {
+  beforeEach(() => {
+    api.getPatient.mockImplementation(async (id: string) => ({ ...base, id, name: names[id] }));
+  });
+
+  it("walks the ward's ranked order and is disabled at both ends", async () => {
+    const user = userEvent.setup();
+    fed(feedOf());
+    await showing("p-002");
+    expect(pager().getByText("2 of 3 in rank order")).toBeTruthy();
+    expect(pager().getByRole("button", { name: "Next" }).querySelector("kbd")!.getAttribute("aria-hidden")).toBe("true");
+    await user.click(pager().getByRole("button", { name: "Next" }));
+    await showing("p-003");
+    expect(pager().getByText("3 of 3 in rank order")).toBeTruthy();
+    expect((pager().getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(true);
+    await user.click(pager().getByRole("button", { name: "Previous" }));
+    await showing("p-002");
+    await user.click(pager().getByRole("button", { name: "Previous" }));
+    await showing("p-001");
+    expect(pager().getByText("1 of 3 in rank order")).toBeTruthy();
+    expect((pager().getByRole("button", { name: "Previous" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(api.getPatient.mock.calls.map(([id]) => id)).toEqual(["p-002", "p-003", "p-002", "p-001"]);
+  });
+
+  it("moves with J and K outside a field, and not from a field, a dialog or with a modifier", async () => {
+    const user = userEvent.setup();
+    fed(feedOf());
+    await showing("p-002");
+    await user.click(screen.getByRole("radio", { name: "1 h" })); // a field: the key is the field's
+    await user.keyboard("j");
+    await user.keyboard("{Control>}j{/Control}");
+    await user.click(screen.getByRole("button", { name: "All notes" }));
+    screen.getByRole("button", { name: "Close notes" }).focus(); // inside a dialog
+    await user.keyboard("k");
+    await user.click(screen.getByRole("button", { name: "Close notes" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(api.getPatient).toHaveBeenCalledTimes(1);
+    (document.activeElement as HTMLElement).blur();
+    await user.keyboard("j");
+    await showing("p-003");
+    await user.keyboard("j"); // the end: nothing further
+    await user.keyboard("x");
+    await user.keyboard("K");
+    await showing("p-002");
+    expect(api.getPatient.mock.calls.map(([id]) => id)).toEqual(["p-002", "p-003", "p-002"]);
+  });
+
+  it("says a patient outside the ranked order is not in it, with both ways shut", async () => {
+    fed(feedOf(), "charge_rn", "/patient/p-009");
+    await showing("p-009");
+    expect(pager().getByText("Not in the ranked order")).toBeTruthy();
+    for (const name of ["Previous", "Next"]) expect((pager().getByRole("button", { name }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("shows no pager without the ward's order (an administrator), rather than make one up", async () => {
+    page("admin");
+    await loaded();
+    expect(screen.queryByRole("group", { name: "Move through patients in rank order" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Acknowledge alert" })).toBeNull();
+  });
+});
+
+describe("PatientDetail: Acknowledge alert", () => {
+  afterEach(() => {
+    document.querySelector(".hw-toast-region")?.remove();
+    api.canRecordVitals = false;
+  });
+
+  it("acknowledges this patient's open alert with the ward's Undo, and only while one is open", async () => {
+    const user = userEvent.setup();
+    api.getWard.mockResolvedValue(feedOf().data);
+    api.getAcknowledgements.mockResolvedValue([]);
+    api.acknowledge.mockResolvedValue(undefined);
+    render(
+      <WardFeedProvider session={session("rn")}>
+        <MemoryRouter initialEntries={["/patient/p-001"]}>
+          <Routes><Route path="/patient/:id" element={<PatientDetail session={session("rn")} onSignOut={() => undefined} />} /></Routes>
+        </MemoryRouter>
+      </WardFeedProvider>,
+    );
+    await loaded();
+    await user.click(await screen.findByRole("button", { name: "Acknowledge alert" }));
+    expect(screen.queryByRole("button", { name: "Acknowledge alert" })).toBeNull(); // hidden while Undo is open
+    await user.click(screen.getByRole("button", { name: "Undo" }));
+    expect(await screen.findByRole("button", { name: "Acknowledge alert" })).toBeTruthy();
+    expect(api.acknowledge).not.toHaveBeenCalled(); // undone inside the window: nothing saved
+  });
+
+  it("is not offered for a patient with no open alert", async () => {
+    api.getPatient.mockResolvedValue({ ...base, id: "p-002" });
+    fed(feedOf({ alerts: [ranks[0]] }), "rn", "/patient/p-002");
+    await loaded();
+    expect(screen.queryByRole("button", { name: "Acknowledge alert" })).toBeNull();
+  });
+
+  it("waits while offline, as Record vitals does, and the last data stays", async () => {
+    api.canRecordVitals = true;
+    fed(feedOf({ alerts: [ranks[0]], failedSince: Date.now() }), "rn", "/patient/p-001");
+    await loaded();
+    expect(within(screen.getByRole("alert")).getByText(/^Offline since/)).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Acknowledge alert" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Record vitals" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/s ago$/).getAttribute("data-stale")).toBe("true"); // the age turns red
+    expect(screen.getByText("Call the medical team now (registrar or above)")).toBeTruthy();
+  });
+});
+
+describe("PatientDetail on a phone", () => {
+  const real = window.matchMedia;
+  beforeEach(() => {
+    window.matchMedia = ((q: string) => ({ ...real(q), matches: q === "(width < 768px)" })) as typeof window.matchMedia;
+    api.getPatient.mockImplementation(async (id: string) => ({ ...base, id, name: names[id] }));
+  });
+  afterEach(() => {
+    window.matchMedia = real;
+    api.canRecordVitals = false;
+  });
+  const bar = () => within(document.querySelector(".hw-actionbar") as HTMLElement);
+
+  it("puts the decision strip first, then the tabs Now, Trends, Labs and Notes, driven by the keyboard", async () => {
+    const user = userEvent.setup();
+    page("rn");
+    await loaded();
+    const list = screen.getByRole("tablist", { name: "Patient sections" });
+    const tabs = within(list).getAllByRole("tab");
+    const panel = () => screen.getByRole("tabpanel");
+    const selected = () => tabs.findIndex((t) => t.getAttribute("aria-selected") === "true");
+    expect(tabs.map((t) => t.textContent)).toEqual(["Now", "Trends", "Labs", "Notes"]);
+    expect(tabs.map((t) => t.tabIndex)).toEqual([0, -1, -1, -1]);
+    expect(tabs[0].getAttribute("aria-controls")).toBe(panel().id);
+    expect(panel().getAttribute("aria-labelledby")).toBe(tabs[0].id);
+    expect(screen.getByRole("region", { name: "Decision" }).compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(panel()).getByRole("region", { name: "Current vitals" })).toBeTruthy();
+    expect(within(panel()).getByRole("region", { name: "Against own baseline" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: /^Notes/ })).toBeNull(); // the action bar has Notes on a phone
+
+    tabs[0].focus();
+    await user.keyboard("{ArrowRight}");
+    expect([selected(), tabs.indexOf(document.activeElement as HTMLElement)]).toEqual([1, 1]);
+    expect(within(panel()).getByRole("region", { name: "Trends" })).toBeTruthy();
+    await user.keyboard("{End}");
+    expect(selected()).toBe(3);
+    expect(within(panel()).getByPlaceholderText("Add a clinical note...")).toBeTruthy();
+    await user.keyboard("{ArrowRight}");
+    expect(selected()).toBe(0); // round to the first
+    await user.keyboard("{ArrowLeft}");
+    expect(selected()).toBe(3);
+    await user.keyboard("{Home}");
+    expect(selected()).toBe(0);
+    await user.keyboard("a");
+    expect(selected()).toBe(0);
+    await user.click(tabs[2]);
+    expect(within(panel()).getByRole("region", { name: "Labs" })).toBeTruthy();
+  });
+
+  it("holds Record vitals, Notes and Next in the action bar, in place of the bottom tabs and the header pager", async () => {
+    api.canRecordVitals = true;
+    const user = userEvent.setup();
+    fed(feedOf());
+    await showing("p-002");
+    expect(screen.queryByRole("navigation", { name: "Main" })).toBeNull(); // a charge nurse's bottom tabs give way
+    expect(screen.queryByRole("group", { name: "Move through patients in rank order" })).toBeNull();
+    expect(bar().getAllByRole("button").map((b) => b.textContent)).toEqual(["Record vitals", "Notes", "Next"]);
+    await user.click(bar().getByRole("button", { name: "Notes" }));
+    expect(screen.getByRole("tab", { name: "Notes" }).getAttribute("aria-selected")).toBe("true");
+    await user.click(bar().getByRole("button", { name: "Record vitals" }));
+    expect(screen.getByRole("dialog", { name: "Record vitals" })).toBeTruthy(); // full screen on a phone (the kit's drawer)
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await user.click(bar().getByRole("button", { name: "Next" }));
+    await showing("p-003");
+    expect((bar().getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("reads an administrator's notes only when the Notes tab opens, and offers only Notes", async () => {
+    api.getNotes.mockResolvedValue([note("n-001", "BP trending down")]);
+    const user = userEvent.setup();
+    page("admin");
+    await loaded();
+    expect(bar().getAllByRole("button").map((b) => b.textContent)).toEqual(["Notes"]);
+    expect(api.getNotes).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("tab", { name: "Notes" }));
+    expect(await screen.findByText("BP trending down")).toBeTruthy();
+    expect(api.getNotes).toHaveBeenCalledTimes(1);
   });
 });

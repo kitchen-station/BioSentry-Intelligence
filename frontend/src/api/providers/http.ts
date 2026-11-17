@@ -15,6 +15,7 @@
 
 import type { ApiProvider } from "../contract";
 import type {
+  AssistantMessage,
   AbstainedRow,
   Acknowledgement,
   AdmitPatientInput,
@@ -42,6 +43,7 @@ import type {
   QuestionItem,
   VitalsRecorded,
   WardOverview,
+  WardUnit,
   PatientStay,
   WardResponse,
 } from "../../types";
@@ -54,6 +56,9 @@ import {
 } from "../client";
 
 export const httpProvider: ApiProvider = {
+  getAssistantHistory: (patientId) => fetchJson<AssistantMessage[]>(`/patients/${encodeURIComponent(patientId)}/assistant/history`),
+  getPatientRuns: (patientId) => fetchJson<LabRunItem[]>(`/patients/${encodeURIComponent(patientId)}/lab/runs`),
+  getPatientRun: (patientId, runId) => fetchJson<LabRunDetail>(`/patients/${encodeURIComponent(patientId)}/lab/runs/${runId}`),
   getWard(unit = "W4"): Promise<WardResponse> {
     return fetchJson<WardResponse>(`/wards/${encodeURIComponent(unit)}/rows`);
   },
@@ -70,8 +75,12 @@ export const httpProvider: ApiProvider = {
     return fetchJson<LiveWard>(`/wards/${encodeURIComponent(unit)}/live`);
   },
 
-  getOverview(): Promise<WardOverview> {
-    return fetchJson<WardOverview>("/wards/W4/overview");
+  getOverview(ward = "W4"): Promise<WardOverview> {
+    return fetchJson<WardOverview>(`/wards/${encodeURIComponent(ward)}/overview`);
+  },
+
+  getUnits(): Promise<WardUnit[]> {
+    return fetchJson<WardUnit[]>("/wards");
   },
 
   requestLabRun(input: NewLabRun): Promise<LabRunItem> {

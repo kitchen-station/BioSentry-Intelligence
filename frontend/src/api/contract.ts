@@ -5,6 +5,7 @@
  */
 
 import type {
+  AssistantMessage,
   AbstainedRow,
   Acknowledgement,
   AdmitPatientInput,
@@ -32,9 +33,13 @@ import type {
   VitalsRecorded,
   WardOverview,
   WardResponse,
+  WardUnit,
 } from "../types";
 
 export interface ApiProvider {
+  getAssistantHistory(patientId: string): Promise<AssistantMessage[]>;
+  getPatientRuns(patientId: string): Promise<LabRunItem[]>;
+  getPatientRun(patientId: string, runId: number): Promise<LabRunDetail>;
   getWard(unit?: string): Promise<WardResponse>;
   getOpenUnits(): Promise<OpenUnits>;
   getPatient(id: string): Promise<PatientDetail | AbstainedDetail | null>;
@@ -59,7 +64,9 @@ export interface ApiProvider {
   /** What the ward simulator last published, for the caller. Null when there is no simulator (fixture mode). */
   getLiveWard(unit?: string): Promise<LiveWard | null>;
   /** The admin's read-only ward overview. Only the API has one; any other caller is refused (403). */
-  getOverview(): Promise<WardOverview>;
+  getOverview(ward?: string): Promise<WardOverview>;
+  /** Every unit of the run with its floor (GET /wards). Read-only. Only the API has one. */
+  getUnits(): Promise<WardUnit[]>;
   admitPatient(input: AdmitPatientInput): Promise<AbstainedRow>;
   enterLabResults(
     patientId: string,

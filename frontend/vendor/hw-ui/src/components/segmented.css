@@ -1,6 +1,8 @@
 @layer hw.components {
   /* Markup: fieldset.hw-segmented > label > input[type=radio].hw-segmented__input + span.hw-segmented__option */
-  .hw-segmented { display: inline-flex; flex-wrap: wrap; gap: var(--hw-space-3); margin: 0; padding: 0; border: 0; }
+  /* Selected: brand red by default (the kit's emphasis rule); --accent makes it ink, for products where red is clinical. */
+  .hw-segmented { --hw-segmented-selected: var(--hw-color-brand); display: inline-flex; flex-wrap: wrap; gap: var(--hw-space-3); margin: 0; padding: 0; border: 0; }
+  .hw-segmented--accent { --hw-segmented-selected: var(--hw-color-accent); }
   .hw-segmented__input { position: absolute; width: 1px; height: 1px; opacity: 0; }
   .hw-segmented__option {
     white-space: nowrap;
@@ -16,7 +18,7 @@
     transition: background-color var(--hw-duration-1), border-color var(--hw-duration-1);
   }
   .hw-segmented__option:hover { background: var(--hw-color-fill-hover); }
-  .hw-segmented__input:checked + .hw-segmented__option { border-color: var(--hw-color-brand); box-shadow: inset 0 0 0 1px var(--hw-color-brand); }
+  .hw-segmented__input:checked + .hw-segmented__option { border-color: var(--hw-segmented-selected); box-shadow: inset 0 0 0 1px var(--hw-segmented-selected); }
   .hw-segmented__input:focus-visible + .hw-segmented__option { box-shadow: var(--hw-focus-ring); }
   .hw-segmented__input:disabled + .hw-segmented__option { cursor: not-allowed; color: var(--hw-color-text-subtle); background: var(--hw-color-fill-disabled); }
   .hw-segmented--sm .hw-segmented__option { height: var(--hw-control-height-sm); padding: 0 var(--hw-space-4); font-size: var(--hw-text-caption); }

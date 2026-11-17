@@ -43,9 +43,19 @@
     --hw-color-warning-fg: var(--hw-orange-10); --hw-color-warning-bg: rgb(244 132 12 / 16%); --hw-color-warning-border: rgb(244 132 12 / 32%);
     --hw-color-danger-fg: var(--hw-red-20);  --hw-color-danger-bg: rgb(224 33 40 / 16%);  --hw-color-danger-border: rgb(224 33 40 / 32%);
     --hw-color-danger: var(--hw-red-30);
+    --hw-color-emergency: var(--hw-red-50);  /* 3.7:1 against the dark surface, 4.8:1 with white text; --hw-color-on-emergency stays white */
     --hw-elevation-popup: 0 4px 12px rgb(0 0 0 / 50%);
     --hw-elevation-dialog: 0 16px 48px rgb(0 0 0 / 60%);
   }
+
+  /* Highlight colour by space. In a clinical product red means NEWS2 7+ or a value adding points, so:
+       data-hw-space="clinical"  clinical analysis pages (Census): highlight in ink (#191919; dark #F3F3F3)
+       data-hw-space="research"  the research space: highlight in info blue (#1F55B5; dark #9DBDFC)
+     The Patient trends set no space: there the only highlight is the stretch adding points (highlightWhere), in red.
+     Both point at semantic tokens, so the dark values follow the theme. The second selector keeps the space when a
+     theme is set on an element inside it. Kept after the dark block so a space on the same element wins. */
+  [data-hw-space="clinical"], [data-hw-space="clinical"] [data-hw-theme] { --hw-graph-highlight: var(--hw-color-text); }
+  [data-hw-space="research"], [data-hw-space="research"] [data-hw-theme] { --hw-graph-highlight: var(--hw-color-info-fg); }
 
   /* Cloud-console family: near-black primary, pill buttons, compact controls */
   [data-hw-family="cloud"] {
@@ -60,6 +70,7 @@
   [data-hw-density="compact"] {
     --hw-control-height: var(--hw-size-sm);
     --hw-control-height-lg: var(--hw-size-md);
+    --hw-target-size: 40px;
   }
 }
 
@@ -70,6 +81,7 @@
       --hw-control-height: 44px;
       --hw-control-height-sm: 36px;
       --hw-control-height-lg: 52px;
+      --hw-target-size: 44px;
     }
   }
 }

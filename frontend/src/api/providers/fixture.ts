@@ -10,6 +10,9 @@ import * as fixtures from "../../data/fixtures";
 export const setActiveClinician = fixtures.setActiveClinician;
 
 export const fixtureProvider: ApiProvider = {
+  getAssistantHistory: () => Promise.resolve([]),
+  getPatientRuns: () => Promise.resolve([]),
+  getPatientRun: () => Promise.reject(new Error("Simulated runs need the server")),
   getWard: fixtures.getWard,
   getOpenUnits: () => Promise.reject(new Error("Open unit list needs the API")),
   getPatient: fixtures.getPatient,
@@ -23,6 +26,7 @@ export const fixtureProvider: ApiProvider = {
   // No simulator behind the fixture, so no live view.
   getLiveWard: () => Promise.resolve(null),
   getOverview: () => Promise.reject(new Error("The overview needs the API")),
+  getUnits: () => Promise.reject(new Error("The unit list needs the API")),
   requestLabRun: () => Promise.reject(new Error("Simulated runs need the server")),
   getLabRuns: () => Promise.reject(new Error("Simulated runs need the server")),
   getLabRun: () => Promise.reject(new Error("Simulated runs need the server")),

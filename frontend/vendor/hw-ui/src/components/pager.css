@@ -1,0 +1,44 @@
+@layer hw.components {
+  /* Pager: previous and next patient in rank order. CSS only: the app sets disabled on the button at either end,
+     writes the position, and wires K (previous) and J (next) while focus is not in a field.
+     div.hw-pager[role=group][aria-label="Move through patients in rank order"]
+       > button.hw-button[type=button][disabled at the first patient]
+           > i.hw-icon.fa-solid.fa-arrow-left[aria-hidden=true] + "Previous" + kbd.hw-pager__key[aria-hidden=true] ("K")
+       + span.hw-pager__position ("1 of 9 in rank order" | "Not in the ranked order")
+       + button.hw-button[type=button][disabled at the last patient]
+           > kbd.hw-pager__key[aria-hidden=true] ("J") + "Next" + i.hw-icon.fa-solid.fa-arrow-right[aria-hidden=true]
+     The key hints are for sighted keyboard users; the buttons' names stay "Previous" and "Next". They hide below
+     768px, where the phone action bar carries Next. Below 576px the position sits above two equal buttons. */
+  .hw-pager {
+    --hw-pager-position-width: 140px;
+
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--hw-space-3) var(--hw-space-4);
+    align-items: center;
+  }
+  .hw-pager__position {
+    min-width: var(--hw-pager-position-width);
+    font-variant-numeric: tabular-nums;
+    color: var(--hw-color-text-muted);
+    text-align: center;
+  }
+  .hw-pager__key {
+    padding: 0 5px;
+    font: inherit;
+    font-size: var(--hw-font-size-11);
+    line-height: 16px;
+    color: var(--hw-color-text-muted);
+    border: 1px solid var(--hw-color-border);
+    border-radius: var(--hw-radius-xs);
+  }
+  .hw-pager :disabled > .hw-pager__key { color: var(--hw-color-text-subtle); border-color: var(--hw-color-border-subtle); }
+
+  @media (width < 576px) {
+    .hw-pager { display: grid; grid-template-columns: 1fr 1fr; }
+    .hw-pager__position { grid-row: 1; grid-column: 1 / -1; }
+  }
+  @media (width < 768px) {
+    .hw-pager__key { display: none; }
+  }
+}

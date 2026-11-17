@@ -1,20 +1,21 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import type { Session } from "../types";
 import { hasLabQuestions, hasPatientQuestions } from "../api";
 import { Thread } from "./Thread";
-import { OPEN_CHAT, asksWard } from "./roles";
+import { AssistantContext, OPEN_CHAT, asksWard } from "./roles";
 import { useAskScope } from "./useAskScope";
 import styles from "./ChatBubble.module.css";
 
 const FOCUSABLE = "a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), summary";
 
 /**
- * The chat, one click away on every signed-in page: a button at the bottom right that opens the shared thread in a panel. On a
- * patient's page it is that patient's thread, elsewhere the ward's. It shows only where the reader may ask: a physician or a
- * charge nurse everywhere, a staff nurse on a patient's page, an administrator nowhere. The Ask pages are the chat already.
+ * The assistant, one click away on every signed-in page: the top bar's Assistant button (and a patient page's own button)
+ * opens the shared thread in a panel. On a patient's page it is that patient's thread, elsewhere the ward's. It can be opened
+ * only where the reader may ask: a physician or a charge nurse everywhere, a staff nurse on a patient's page, an administrator
+ * nowhere. The Ask pages are the chat already. App renders it once, around every page, and gives the bar its state.
  */
-export function ChatBubble({ session, onSignOut }: { session: Session; onSignOut: () => void }) {
+export function ChatBubble({ session, onSignOut, children }: { session: Session; onSignOut: () => void; children?: ReactNode }) {
   const { pathname } = useLocation();
   const scope = useAskScope();
   const patientId = scope.kind === "patient" ? scope.id : undefined;
@@ -24,17 +25,30 @@ export function ChatBubble({ session, onSignOut }: { session: Session; onSignOut
   const title = useId();
   const scopeId = useId();
   const panel = useRef<HTMLDivElement>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
+  // Whichever control opened the panel gets the focus back when it closes.
+  const opener = useRef<HTMLElement | null>(null);
 
   const asks = asksWard(session.role);
-  const connected = patientId ? hasPatientQuestions : hasLabQuestions; // the fixture build has neither: no bubble
+  const connected = patientId ? hasPatientQuestions : hasLabQuestions; // the fixture build has neither: no assistant
   const shown = connected && scope.kind !== "none" && !pathname.startsWith("/ask") && (asks || (session.role === "rn" && patientId !== undefined));
   const open = shown && openAt === pathname;
+
+  const openFrom = (from: HTMLElement | null) => {
+    opener.current = from;
+    setOpenAt(pathname);
+  };
+  const close = () => {
+    setOpenAt(null);
+    opener.current?.focus();
+  };
 
   // The patient page's own button opens the same panel.
   useEffect(() => {
     if (!shown) return;
-    const onOpen = () => setOpenAt(pathname);
+    const onOpen = (e: Event) => {
+      opener.current = (e as CustomEvent<HTMLElement | null>).detail ?? (document.activeElement as HTMLElement | null);
+      setOpenAt(pathname);
+    };
     window.addEventListener(OPEN_CHAT, onOpen);
     return () => window.removeEventListener(OPEN_CHAT, onOpen);
   }, [shown, pathname]);
@@ -47,7 +61,7 @@ export function ChatBubble({ session, onSignOut }: { session: Session; onSignOut
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setOpenAt(null);
-        trigger.current?.focus();
+        opener.current?.focus();
         return;
       }
       if (e.key !== "Tab" || !panel.current) return;
@@ -63,15 +77,9 @@ export function ChatBubble({ session, onSignOut }: { session: Session; onSignOut
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open]);
 
-  if (!shown) return null;
-
-  const close = () => {
-    setOpenAt(null);
-    trigger.current?.focus();
-  };
-
   return (
-    <>
+    <AssistantContext.Provider value={shown ? { open, toggle: (from) => (open ? close() : openFrom(from)) } : null}>
+      {children}
       {open && (
         <>
           <div className={styles.backdrop} data-testid="chat-backdrop" onClick={close} />
@@ -100,16 +108,6 @@ export function ChatBubble({ session, onSignOut }: { session: Session; onSignOut
           </div>
         </>
       )}
-      <button
-        ref={trigger}
-        type="button"
-        className={`hw-button hw-button--primary hw-button--lg ${styles.bubble}`}
-        aria-expanded={open}
-        onClick={() => (open ? close() : setOpenAt(pathname))}
-      >
-        <span className="hw-icon fa-solid fa-comments" aria-hidden="true" />
-        Ask
-      </button>
-    </>
+    </AssistantContext.Provider>
   );
 }

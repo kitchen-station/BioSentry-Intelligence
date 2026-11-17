@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation, useSearchParams } from "react-router-dom";
 import type { Session } from "./types";
 import { restoreSession, clearSession, hasWardResearch, usesServer } from "./api";
 import { SignIn } from "./pages/SignIn";
 import { Ward } from "./pages/Ward";
 import { PatientDetail } from "./pages/PatientDetail";
-import { Station } from "./pages/Station";
+import { Admit } from "./pages/Admit";
+import { Census } from "./pages/Census";
 import { Pipeline } from "./pages/Pipeline";
 import { Research } from "./pages/Research";
 import { Lab } from "./pages/Lab";
@@ -14,6 +15,7 @@ import { Overview } from "./pages/Overview";
 import { WardResearch } from "./pages/WardResearch";
 import { ChatBubble } from "./components/ChatBubble";
 import { asksWard } from "./components/roles";
+import { WardFeedProvider } from "./components/WardFeedProvider";
 
 // Per tab, gone when the tab closes. Only who is signed in is kept here, never a token: with the
 // API the token lives in memory, so a reload returns to sign-in (restoreSession says false). With
@@ -58,6 +60,11 @@ function ToSignIn({ gone }: { gone: string | null | undefined }) {
   return <Navigate to="/" replace state={gone === null ? null : { from: location.pathname, who: gone }} />;
 }
 
+/** The old Station, kept for one release: its Patient flow tab (?tab=flow) is Census now, the rest is Admit. */
+function FromStation() {
+  return <Navigate to={useSearchParams()[0].get("tab") === "flow" ? "/census" : "/admit"} replace />;
+}
+
 export function App() {
   const [session, setSession] = useState<Session | null>(() => {
     const s = loadSession();
@@ -93,8 +100,7 @@ export function App() {
   const clinician = asksWard(session?.role); // the roles that may ask
   const toWard = <Navigate to="/ward" replace />;
 
-  return (
-    <>
+  const routes = (
     <Routes>
       <Route
         path="/"
@@ -114,14 +120,19 @@ export function App() {
         path="/patient/:id"
         element={session ? <PatientDetail session={session} onSignOut={signOut} /> : <ToSignIn gone={gone} />}
       />
-      <Route
-        path="/station"
-        element={
-          session && (session.role === "md" || session.role === "charge_rn")
-            ? <Station session={session} onSignOut={signOut} />
-            : session ? <Navigate to={session.role === "admin" ? "/overview" : "/ward"} replace /> : <ToSignIn gone={gone} />
-        }
-      />
+      {/* Census and Admit, for a physician and the charge nurse; an administrator goes to the overview, a staff nurse to the ward. */}
+      {([["/census", Census], ["/admit", Admit]] as const).map(([path, Page]) => (
+        <Route
+          key={path}
+          path={path}
+          element={
+            session && (session.role === "md" || session.role === "charge_rn")
+              ? <Page session={session} onSignOut={signOut} />
+              : session ? <Navigate to={session.role === "admin" ? "/overview" : "/ward"} replace /> : <ToSignIn gone={gone} />
+          }
+        />
+      ))}
+      <Route path="/station" element={<FromStation />} />
       <Route
         path="/overview"
         element={
@@ -144,9 +155,10 @@ export function App() {
         element={session ? (developer ? <Lab session={session} onSignOut={signOut} /> : clinician ? <Navigate to="/what-if" replace /> : toWard) : <ToSignIn gone={gone} />}
       />
       <Route path="/lab/ask" element={session ? (clinician ? <Navigate to="/ask" replace /> : toWard) : <ToSignIn gone={gone} />} />
+      {/* The owner's decision: in the sample build (no server, no real patient) the evidence is readable before sign-in. The live build keeps it signed in. */}
       <Route
         path="/lab/research"
-        element={session ? (developer ? <Research session={session} onSignOut={signOut} /> : toWard) : <ToSignIn gone={gone} />}
+        element={session ? (developer ? <Research session={session} onSignOut={signOut} /> : toWard) : !usesServer ? <Research session={null} onSignOut={signOut} /> : <ToSignIn gone={gone} />}
       />
       <Route
         path="/lab/pipeline"
@@ -156,7 +168,11 @@ export function App() {
       <Route path="/pipeline" element={session ? <Navigate to="/lab/pipeline" replace /> : <ToSignIn gone={gone} />} />
       <Route path="*" element={<Navigate to={session ? "/ward" : "/"} replace />} />
     </Routes>
-    {session && <ChatBubble session={session} onSignOut={signOut} />}
-    </>
   );
+
+  // A signed-in clinician's pages share one read of the ward: the Ward rows and the bell on every page show the same alerts.
+  // An administrator reads the ward only on the Ward page (it brings its own read), never in the background.
+  // The assistant's panel, once around every page: the top bar's Assistant button opens it.
+  const pages = session ? <ChatBubble session={session} onSignOut={signOut}>{routes}</ChatBubble> : routes;
+  return session && session.role !== "admin" ? <WardFeedProvider key={session.clinician_id} session={session}>{pages}</WardFeedProvider> : pages;
 }

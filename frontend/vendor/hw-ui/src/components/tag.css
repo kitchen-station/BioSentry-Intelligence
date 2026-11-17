@@ -2,6 +2,8 @@
   .hw-tag {
     --hw-tag-fg: var(--hw-color-text);
     --hw-tag-bg: var(--hw-color-fill-hover);
+    --hw-tag-border: transparent;
+    --hw-tag-border-style: solid;
 
     display: inline-flex;
     gap: var(--hw-space-2);
@@ -12,12 +14,18 @@
     color: var(--hw-tag-fg);
     white-space: nowrap;
     background: var(--hw-tag-bg);
+    border: 1px var(--hw-tag-border-style) var(--hw-tag-border);
     border-radius: var(--hw-radius-xs);
   }
   .hw-tag--info { --hw-tag-fg: var(--hw-color-info-fg); --hw-tag-bg: var(--hw-color-info-bg); }
   .hw-tag--success { --hw-tag-fg: var(--hw-color-success-fg); --hw-tag-bg: var(--hw-color-success-bg); }
   .hw-tag--warning { --hw-tag-fg: var(--hw-color-warning-fg); --hw-tag-bg: var(--hw-color-warning-bg); }
   .hw-tag--danger { --hw-tag-fg: var(--hw-color-danger-fg); --hw-tag-bg: var(--hw-color-danger-bg); }
+  /* NEWS2 bands, matching .hw-score: emergency = 7+, urgent = 5–6 or a single parameter at 3. */
+  .hw-tag--emergency { --hw-tag-fg: var(--hw-color-on-emergency); --hw-tag-bg: var(--hw-color-emergency); }
+  .hw-tag--urgent { --hw-tag-fg: var(--hw-graph-urgent-text); --hw-tag-bg: var(--hw-color-surface); --hw-tag-border: var(--hw-graph-urgent); }
+  /* Dashed means incomplete (NOT RANKED), and nothing else. */
+  .hw-tag--dashed { --hw-tag-bg: transparent; --hw-tag-border: var(--hw-color-text-muted); --hw-tag-border-style: dashed; }
   .hw-tag--round { border-radius: var(--hw-radius-full); }
   .hw-tag--lg { height: 28px; padding: 0 10px; font-size: var(--hw-font-size-14); }
 }

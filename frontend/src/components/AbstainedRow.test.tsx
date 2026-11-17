@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
@@ -17,28 +18,33 @@ const row: AbstainedRowType = {
   synthetic: true,
 };
 
+// The name links to the patient: a router around each render.
+const html = (el: ReactElement) => renderToStaticMarkup(<MemoryRouter>{el}</MemoryRouter>);
+
 describe("a NOT RANKED row", () => {
-  const renderRow = (value: AbstainedRowType, canRecord = false) => renderToStaticMarkup(
-    <MemoryRouter><AbstainedRow row={value} canRecord={canRecord} clinicianId="rn-delacruz" /></MemoryRouter>,
-  );
   it("states the reason and the instruction", () => {
-    const out = renderRow(row);
+    const out = html(<AbstainedRow row={row} />);
     expect(out).toContain("Systolic BP missing");
     expect(out).toContain("Record a blood pressure");
-    expect(out).toContain("NOT RANKED");
+    expect(out).toContain('href="/patient/p-004"'); // the strip around it says NOT RANKED; the name opens the patient
   });
 
   it("offers no entry unless the build can re-rank (fixture mode is unchanged)", () => {
-    const out = renderRow(row);
+    const out = html(<AbstainedRow row={row} />);
     expect(out).not.toContain("Record vitals");
     expect(out).not.toContain("<button");
   });
 
-  it("offers a collapsed 'Record vitals' action when it can", () => {
-    const out = renderRow(row, true);
+  it("offers 'Record vitals', which opens the drawer, when it can", () => {
+    const out = html(<AbstainedRow row={row} canRecord />);
     expect(out).toContain("Record vitals");
-    expect(out).toContain('aria-expanded="false"');
-    expect(out).not.toContain("<form"); // the form is opened by the nurse, not rendered up front
+    expect(out).toContain('aria-haspopup="dialog"');
+    expect(out).not.toContain("<form"); // one form, in the drawer: none under the row
+  });
+
+  it("disables Record vitals while offline", () => {
+    expect(html(<AbstainedRow row={row} canRecord disabled />)).toMatch(/<button[^>]*disabled=""[^>]*>Record vitals/);
+    expect(html(<AbstainedRow row={row} canRecord />)).not.toContain('disabled=""');
   });
 });
 
@@ -61,9 +67,9 @@ describe("the last stored values of a NOT RANKED row", () => {
 
   it("shows each value with its source and its age against the ward's time", () => {
     syncWardNow("2026-09-03T07:00:00Z");
-    const out = renderToStaticMarkup(<MemoryRouter><AbstainedRow row={{ ...row, last_seen }} /></MemoryRouter>);
+    const out = html(<AbstainedRow row={{ ...row, last_seen }} />);
     expect(out).toContain("HR 88 (device, 2 h ago,");
-    expect(out).toContain("BP 120/80 (nurse, 2 h ago,");
+    expect(out).toContain("BP 120/80 mmHg (nurse, 2 h ago,");
     expect(out).not.toContain("RR");
     forgetWardNow();
   });
@@ -71,22 +77,22 @@ describe("the last stored values of a NOT RANKED row", () => {
   it("names a quality that is not ok, and says nothing for ok", () => {
     syncWardNow("2026-09-03T07:00:00Z");
     const weak = { ...last_seen!, heart_rate: { ...last_seen!.heart_rate, provenance: { ...last_seen!.heart_rate.provenance, quality: "degraded" } } };
-    const out = renderToStaticMarkup(<MemoryRouter><AbstainedRow row={{ ...row, last_seen: weak as AbstainedRowType["last_seen"] }} /></MemoryRouter>);
+    const out = html(<AbstainedRow row={{ ...row, last_seen: weak as AbstainedRowType["last_seen"] }} />);
     expect(out).toContain("HR 88 (device, degraded, 2 h ago,");
-    expect(out).toContain("BP 120/80 (nurse, 2 h ago,");
+    expect(out).toContain("BP 120/80 mmHg (nurse, 2 h ago,");
     forgetWardNow();
   });
 
   it("gives the time alone before the ward's time is known", () => {
     forgetWardNow();
-    const out = renderToStaticMarkup(<MemoryRouter><AbstainedRow row={{ ...row, last_seen }} /></MemoryRouter>);
+    const out = html(<AbstainedRow row={{ ...row, last_seen }} />);
     expect(out).toMatch(/HR 88 \(device, [^)]*\d\d:\d\d/); // no age yet: the date and clock stand alone, so an old value is not read as today's
     expect(out).not.toMatch(/HR 88 \(device, \d+ (h|min)/);
   });
 
   it("says no value is stored when none is, and shows nothing when the row has no last_seen", () => {
     const none = { ...last_seen, heart_rate: gap, blood_pressure: gap } as unknown as AbstainedRowType["last_seen"];
-    expect(renderToStaticMarkup(<MemoryRouter><AbstainedRow row={{ ...row, last_seen: none }} /></MemoryRouter>)).toContain("no value stored");
-    expect(renderToStaticMarkup(<MemoryRouter><AbstainedRow row={row} /></MemoryRouter>)).not.toContain("Last seen");
+    expect(html(<AbstainedRow row={{ ...row, last_seen: none }} />)).toContain("no value stored");
+    expect(html(<AbstainedRow row={row} />)).not.toContain("Last seen");
   });
 });

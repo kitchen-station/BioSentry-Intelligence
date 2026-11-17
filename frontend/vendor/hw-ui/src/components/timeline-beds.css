@@ -1,0 +1,148 @@
+@layer hw.components {
+  /* Bed timeline (Census): who was in each bed across a window that ends now, one row per bed. CSS only: the app
+     places each stay as a percentage of the window, names it, and writes the legend.
+     div.hw-timeline-beds
+       > ul.hw-timeline-beds__legend[aria-label="Legend"]
+           > li.hw-timeline-beds__key > span.hw-timeline-beds__swatch[aria-hidden=true] + "On the ward"
+           + li.hw-timeline-beds__key > span.hw-timeline-beds__mark[data-outcome=discharged|transferred|higher_care|died][aria-hidden=true] + name   (one per outcome)
+       + div.hw-timeline-beds__scroll[tabindex=0][role=region][aria-label]
+           > div.hw-timeline-beds__chart
+               > div.hw-timeline-beds__row*
+                   > span.hw-timeline-beds__bed ("4A")
+                   + div.hw-timeline-beds__track
+                       > span.hw-timeline-beds__stay[role=img][aria-label="Santos, Maria, Discharged"][data-outcome]
+                                                    [style="--hw-timeline-beds-left: 12.5%; --hw-timeline-beds-width: 30%"]
+                           > span.hw-timeline-beds__name ("Santos"; leave it out when the bar is too short to hold it)
+                           + span.hw-timeline-beds__mark[data-outcome][aria-hidden=true]   (an ended stay only: closes the bar)
+               + div.hw-timeline-beds__axis[aria-hidden=true]
+                   > span.hw-timeline-beds__tick[style="--hw-timeline-beds-left: 14.29%"]* ("6 Nov") + span.hw-timeline-beds__now ("Now")
+     A stay with no data-outcome is still on the ward: a solid ink bar that runs to Now. Ink is the highlight here, never red,
+     because red is clinical. An ended stay is a soft grey bar closed by its outcome mark: D discharged, T transferred
+     (dashed box), H higher care (filled box), a filled disc died. The kit draws the letters, so a mark is always
+     aria-hidden; the stay's aria-label and the legend carry the outcome. The chart keeps its width and scrolls sideways
+     when the space is narrower. */
+  .hw-timeline-beds {
+    --hw-timeline-beds-bed-width: 56px;
+    --hw-timeline-beds-row-height: 36px;
+    --hw-timeline-beds-bar-height: 20px;
+    --hw-timeline-beds-min-width: 720px;
+    --hw-timeline-beds-open-bg: var(--hw-color-accent);
+    --hw-timeline-beds-open-fg: var(--hw-color-on-accent);
+    --hw-timeline-beds-ended-bg: var(--hw-graph-context-soft);
+    --hw-timeline-beds-ended-fg: var(--hw-color-text);
+    --hw-timeline-beds-rule: var(--hw-color-border-subtle);
+    --hw-timeline-beds-now: var(--hw-graph-baseline);
+    --hw-timeline-beds-mark-size: 18px;
+
+    display: flex;
+    flex-direction: column;
+    gap: var(--hw-space-4);
+    min-width: 0;
+    font-size: var(--hw-text-caption);
+  }
+
+  .hw-timeline-beds__legend { display: flex; flex-wrap: wrap; gap: var(--hw-space-2) var(--hw-space-5); margin: 0; padding: 0; list-style: none; }
+  .hw-timeline-beds__key { display: inline-flex; gap: var(--hw-space-2); align-items: center; }
+  .hw-timeline-beds__swatch { width: 22px; height: 12px; background: var(--hw-timeline-beds-open-bg); border-radius: var(--hw-radius-xs); }
+
+  /* The outcome mark: a 18px box with a letter, its look from its own data-outcome (legend and bar alike). */
+  .hw-timeline-beds__mark {
+    --hw-timeline-beds-mark-bg: var(--hw-color-surface);
+    --hw-timeline-beds-mark-fg: var(--hw-color-text);
+    --hw-timeline-beds-mark-border: var(--hw-color-text-muted);
+    --hw-timeline-beds-mark-style: solid;
+    --hw-timeline-beds-mark-radius: var(--hw-radius-xs);
+
+    display: inline-grid;
+    flex-shrink: 0;
+    place-items: center;
+    box-sizing: border-box;
+    width: var(--hw-timeline-beds-mark-size);
+    height: var(--hw-timeline-beds-mark-size);
+    font-size: var(--hw-font-size-11);
+    font-weight: var(--hw-weight-bold);
+    line-height: 1;
+    color: var(--hw-timeline-beds-mark-fg);
+    background: var(--hw-timeline-beds-mark-bg);
+    border: 1.5px var(--hw-timeline-beds-mark-style) var(--hw-timeline-beds-mark-border);
+    border-radius: var(--hw-timeline-beds-mark-radius);
+  }
+  .hw-timeline-beds__mark[data-outcome="discharged"]::before { content: "D"; }
+  .hw-timeline-beds__mark[data-outcome="transferred"] { --hw-timeline-beds-mark-style: dashed; }
+  .hw-timeline-beds__mark[data-outcome="transferred"]::before { content: "T"; }
+  .hw-timeline-beds__mark[data-outcome="higher_care"] {
+    --hw-timeline-beds-mark-bg: var(--hw-timeline-beds-open-bg);
+    --hw-timeline-beds-mark-fg: var(--hw-timeline-beds-open-fg);
+    --hw-timeline-beds-mark-border: var(--hw-timeline-beds-open-bg);
+  }
+  .hw-timeline-beds__mark[data-outcome="higher_care"]::before { content: "H"; }
+  .hw-timeline-beds__mark[data-outcome="died"] {
+    --hw-timeline-beds-mark-bg: var(--hw-timeline-beds-open-bg);
+    --hw-timeline-beds-mark-border: var(--hw-timeline-beds-open-bg);
+    --hw-timeline-beds-mark-radius: 50%;
+  }
+
+  .hw-timeline-beds__scroll { overflow-x: auto; }
+  .hw-timeline-beds__scroll:focus-visible { outline: none; box-shadow: var(--hw-focus-ring); }
+  .hw-timeline-beds__chart { min-width: var(--hw-timeline-beds-min-width); padding-inline-end: calc(var(--hw-timeline-beds-mark-size) / 2); }
+
+  .hw-timeline-beds__row {
+    display: grid;
+    grid-template-columns: var(--hw-timeline-beds-bed-width) minmax(0, 1fr);
+    align-items: center;
+    min-height: var(--hw-timeline-beds-row-height);
+    border-top: 1px solid var(--hw-timeline-beds-rule);
+  }
+  .hw-timeline-beds__bed { font-size: var(--hw-font-size-14); font-weight: var(--hw-weight-bold); }
+
+  /* The track's end is now: one ink rule down every row. */
+  .hw-timeline-beds__track { position: relative; align-self: stretch; border-inline-end: 1px solid var(--hw-timeline-beds-now); }
+
+  .hw-timeline-beds__stay {
+    --hw-timeline-beds-bg: var(--hw-timeline-beds-open-bg);
+    --hw-timeline-beds-fg: var(--hw-timeline-beds-open-fg);
+    --hw-timeline-beds-left: 0%;
+    --hw-timeline-beds-width: 0%;
+
+    position: absolute;
+    top: calc(50% - var(--hw-timeline-beds-bar-height) / 2); /* no transform: a mark must rise above the next stay */
+    left: var(--hw-timeline-beds-left);
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    width: var(--hw-timeline-beds-width);
+    min-width: 3px;
+    height: var(--hw-timeline-beds-bar-height);
+    color: var(--hw-timeline-beds-fg);
+    background: var(--hw-timeline-beds-bg);
+    border-radius: var(--hw-radius-xs);
+  }
+  .hw-timeline-beds__stay[data-outcome] {
+    --hw-timeline-beds-bg: var(--hw-timeline-beds-ended-bg);
+    --hw-timeline-beds-fg: var(--hw-timeline-beds-ended-fg);
+  }
+  /* The bar keeps its exact width; only the name is padded: clear of a mark that closes the stay before, and of its own. */
+  .hw-timeline-beds__name {
+    min-width: 0;
+    padding-inline: calc(var(--hw-timeline-beds-mark-size) / 2 + 3px) 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .hw-timeline-beds__stay[data-outcome] > .hw-timeline-beds__name { padding-inline-end: calc(var(--hw-timeline-beds-mark-size) / 2 + 2px); }
+  .hw-timeline-beds__stay > .hw-timeline-beds__mark { position: absolute; top: 50%; right: 0; z-index: 1; translate: 50% -50%; }
+
+  .hw-timeline-beds__axis {
+    position: relative;
+    height: 22px;
+    margin-inline-start: var(--hw-timeline-beds-bed-width);
+    color: var(--hw-color-text-muted);
+    border-top: 1px solid var(--hw-timeline-beds-now);
+  }
+  .hw-timeline-beds__tick { --hw-timeline-beds-left: 0%; position: absolute; top: 4px; left: var(--hw-timeline-beds-left); white-space: nowrap; }
+  .hw-timeline-beds__now { position: absolute; top: 4px; right: 0; font-weight: var(--hw-weight-bold); color: var(--hw-color-text); }
+
+  @media (width < 576px) {
+    .hw-timeline-beds { --hw-timeline-beds-bed-width: 44px; --hw-timeline-beds-min-width: 640px; }
+  }
+}

@@ -18,13 +18,14 @@ const SEP = new Date(Date.UTC(2026, 8, 3)).toLocaleDateString("en-GB", { month: 
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const api = vi.hoisted(() => ({ hasOverview: true, getOverview: vi.fn() }));
+const api = vi.hoisted(() => ({ hasOverview: true, getOverview: vi.fn(), getUnits: vi.fn() }));
 vi.mock("../api", async () => ({
   ApiError: (await vi.importActual<typeof import("../api/client")>("../api/client")).ApiError,
   get hasOverview() {
     return api.hasOverview;
   },
   getOverview: api.getOverview,
+  getUnits: api.getUnits,
 }));
 
 const session = { clinician_id: "admin-ruiz", ward: "W4", role: "admin" } as const;
@@ -63,6 +64,7 @@ const show = (who: Session = session, onSignOut: () => void = () => {}) =>
 beforeEach(() => {
   api.hasOverview = true;
   api.getOverview.mockReset().mockResolvedValue(overview());
+  api.getUnits.mockReset().mockResolvedValue([]);
 });
 afterEach(() => {
   cleanup();
@@ -73,8 +75,10 @@ describe("Overview", () => {
   it("shows the standing lines, the time and the simulator", async () => {
     show();
     expect(screen.getByRole("heading", { name: "Ward overview" })).toBeTruthy();
+    expect(screen.getByRole("note").textContent).toBe("Simulated patients until a hospital is connected.Read-only. Every view is recorded in the audit log.");
     expect(screen.getByText("Read-only. Every view is recorded in the audit log.")).toBeTruthy();
     expect(screen.getByText("Simulated patients until a hospital is connected.")).toBeTruthy();
+    expect(screen.getByText("This page does not refresh by itself: every read is recorded.")).toBeTruthy();
     expect(await screen.findByText(AS_OF)).toBeTruthy();
     expect(screen.getByText(`Simulator: 4 ${SEP}, 15:10 \u00b7 10x \u00b7 5 received \u00b7 0 rejected \u00b7 1 abstained`)).toBeTruthy();
     expect(screen.queryByText("Not receiving data")).toBeNull();
@@ -109,16 +113,44 @@ describe("Overview", () => {
     expect(screen.getByText("No activity in the last 24 hours.")).toBeTruthy();
   });
 
-  it("lists clinicians and groups activity by clinician", async () => {
+  it("lists clinicians, and activity as counts: a row per clinician, a column per kind of event in words", async () => {
     show();
-    expect(await screen.findByRole("heading", { name: "rn-reyes", level: 3 })).toBeTruthy();
+    await screen.findByText(AS_OF);
     expect(screen.getByRole("heading", { name: "Activity in the last 24 hours" })).toBeTruthy();
     expect(screen.getByText(/Activity is shown for oversight, not performance review\. Counts only/)).toBeTruthy();
-    expect(screen.getByText("view_patient ok: 12")).toBeTruthy();
-    expect(screen.getByText("view_patient not_found: 1")).toBeTruthy();
-    expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(2);
+    const table = screen.getAllByRole("table").at(-1)!;
+    expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Clinician", "Patient views", "Patient views, not found", "Alerts acknowledged"]);
+    expect(within(table).getAllByRole("row").slice(1).map((r) => r.textContent)).toEqual(["rn-reyes1210", "md-santos003"]);
+    expect(document.body.textContent).not.toMatch(/view_patient|not_found|acknowledge\b/); // no raw event name
     expect(screen.getByText("Charge Nurse")).toBeTruthy();
     expect(screen.queryByText("charge_rn")).toBeNull();
+  });
+
+  it("words an unlisted event and outcome from their names, and adds up repeated ones", async () => {
+    api.getOverview.mockResolvedValue(overview({ activity: [
+      { clinician_id: "rn-reyes", action: "view_lab_run", outcome: "denied", count: 2 },
+      { clinician_id: "rn-reyes", action: "sim_command", outcome: "odd_thing", count: 1 },
+      { clinician_id: "rn-reyes", action: "sim_command", outcome: "odd_thing", count: 4 },
+      { clinician_id: "md-santos", action: "ask_patient", outcome: "limited", count: 1 },
+    ] }));
+    show();
+    await screen.findByText(AS_OF);
+    const table = screen.getAllByRole("table").at(-1)!;
+    expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
+      "Clinician", "View lab run, refused", "Sim command, odd thing", "Questions about a patient, over the limit",
+    ]);
+    expect(within(table).getAllByRole("row").slice(1).map((r) => r.textContent)).toEqual(["rn-reyes250", "md-santos001"]);
+  });
+
+  it("shows four status tiles from the same read: patients, ranked, NOT RANKED with the reasons, and the data feed", async () => {
+    show();
+    await screen.findByText(AS_OF);
+    const now = screen.getByRole("region", { name: "Now" });
+    expect([...now.querySelectorAll(".hw-stat")].map((t) => t.textContent)).toEqual([
+      "Patients2", "Ranked1", "NOT RANKED1heart rate missing",
+      `Data feedReceiving dataSimulator: 4 ${SEP}, 15:10 \u00b7 10x \u00b7 5 received \u00b7 0 rejected \u00b7 1 abstained`,
+    ]);
+    expect(document.querySelector("b, i, u, s")).toBeNull(); // icons are spans
   });
 
   it("links to the ward list", async () => {
@@ -128,6 +160,7 @@ describe("Overview", () => {
 
   it("reads again once per Refresh click, disabled while loading, and never on a timer", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
+    const interval = vi.spyOn(globalThis, "setInterval");
     show();
     await screen.findByText(AS_OF);
     expect(api.getOverview).toHaveBeenCalledTimes(1);
@@ -140,6 +173,8 @@ describe("Overview", () => {
     answer(overview({ as_of: "2026-11-13T09:00:00Z" }));
     expect(await screen.findByText("As of 2026-11-13 09:00 UTC")).toBeTruthy();
     expect(api.getOverview).toHaveBeenCalledTimes(2);
+    expect(interval.mock.calls.filter(([, ms]) => (ms ?? 0) >= 1000)).toEqual([]); // the page sets no poll
+    expect(screen.getByRole("button", { name: "Refresh" }).className).toContain("hw-button--accent");
   });
 
   it("says a 403 is not available and shows no data", async () => {
@@ -224,7 +259,7 @@ describe("Overview", () => {
     await screen.findByText(AS_OF);
     expect(document.title).toBe("Ward overview \u00b7 BioSentry");
     const regions = screen.getAllByRole("region").filter((r) => r.hasAttribute("tabindex"));
-    expect(regions.map((r) => r.getAttribute("aria-labelledby"))).toEqual(["patients", "clinicians"]);
+    expect(regions.map((r) => r.getAttribute("aria-labelledby"))).toEqual(["patients", "clinicians", "activity"]);
     expect(regions.every((r) => r.getAttribute("tabindex") === "0")).toBe(true);
     expect(screen.getAllByRole("columnheader").every((h) => h.getAttribute("scope") === "col")).toBe(true);
     cleanup();
@@ -237,5 +272,29 @@ describe("Overview", () => {
     expect(screen.getByText("The overview needs the live API. This demo has no server.")).toBeTruthy();
     expect(api.getOverview).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Refresh" })).toBeNull();
+  });
+
+  it("lists the floors from the ground floor up, and reads the unit that is picked", async () => {
+    const u = (id: string, name: string, floor: number) => ({ id, name, floor, kind: "ranked" as const, patients: 1 });
+    api.getUnits.mockResolvedValue([u("SURG5A", "Surgery 5A", 5), u("ER", "Emergency Room", 0), u("W4", "Ward W4", 4)]);
+    show();
+    const picker = await screen.findByRole("combobox", { name: /Floor/ });
+    expect(within(picker).getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "Ground floor: Emergency Room",
+      "4th floor: Ward W4",
+      "5th floor: Surgery 5A",
+    ]);
+    expect((picker as HTMLSelectElement).value).toBe("W4");
+    expect(api.getOverview).toHaveBeenLastCalledWith(undefined);
+    await userEvent.selectOptions(picker, "ER");
+    await screen.findByText(AS_OF);
+    expect(api.getOverview).toHaveBeenLastCalledWith("ER");
+  });
+
+  it("shows no picker when the units cannot be read", async () => {
+    api.getUnits.mockRejectedValue(new ApiError(403, "Forbidden", null));
+    show();
+    await screen.findByText(AS_OF);
+    expect(screen.queryByRole("combobox")).toBeNull();
   });
 });

@@ -24,10 +24,10 @@ export function el(tag, className, parent, text) {
   return n;
 }
 
-/** v => "0.13", "57%", "–". Pass config.format to take over completely. */
-export function formatter({ format, unit = '' } = {}) {
+/** v => "0.13", "57%", "–" (signDisplay 'exceptZero': "+0.02"). Pass config.format to take over completely. */
+export function formatter({ format, unit = '', signDisplay = 'auto' } = {}) {
   if (format) return (v) => (missing(v) ? '–' : format(v));
-  const nf = new Intl.NumberFormat(document.documentElement.lang || undefined, { maximumFractionDigits: 2 });
+  const nf = new Intl.NumberFormat(document.documentElement.lang || undefined, { maximumFractionDigits: 2, signDisplay });
   return (v) => (missing(v) ? '–' : nf.format(v) + unit);
 }
 
@@ -69,7 +69,7 @@ export function frame(root, kind, { title, subtitle, level = 3 } = {}) {
 
   return {
     root, plot, foot, titleId: heading.id,
-    /** Update the sentence above the plot. tone: 'urgent' | 'emergency' colours the number. */
+    /** Update the sentence above the plot. tone: 'urgent' | 'emergency' | 'highlight' colours the number. */
     say({ value: v = '', label: l = '', detail: d = '', tone } = {}) {
       value.textContent = v;
       label.textContent = l;

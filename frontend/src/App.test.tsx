@@ -3,13 +3,14 @@
  * App: the session survives a reload only when what is stored is well formed and the API can be
  * re-armed with it (an API token lives in memory, so after a reload it cannot: sign in again), the
  * route guards send a signed-out visitor to sign-in (remembering where they were going) and keep a
- * staff nurse out of the station, and signing out clears the session everywhere.
+ * staff nurse out of Census and Admit (the old Station redirects to them), and signing out clears the session everywhere.
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ReactNode } from "react";
 import type { Session } from "./types";
 import { App } from "./App";
 
@@ -72,22 +73,29 @@ vi.mock("./pages/AskChat", () => ({
   AskChat: ({ session }: { session: Session }) => <p>ask page for {session.clinician_id}</p>,
 }));
 vi.mock("./pages/Research", () => ({
-  Research: ({ session }: { session: Session }) => <p>research page for {session.clinician_id}</p>,
+  Research: ({ session }: { session: Session | null }) => <p>research page for {session?.clinician_id ?? "nobody signed in"}</p>,
 }));
 vi.mock("./pages/Pipeline", () => ({
   Pipeline: ({ session }: { session: Session }) => <p>pipeline page for {session.clinician_id}</p>,
 }));
-vi.mock("./pages/Station", () => ({
-  Station: ({ session, onSignOut }: { session: Session; onSignOut: (explicit?: boolean) => void }) => (
-    <div>
-      <p>station page for {session.clinician_id}</p>
-      <button type="button" onClick={() => onSignOut(true)}>
-        sign out
-      </button>
-      <button type="button" onClick={() => onSignOut()}>
-        session ends
-      </button>
-    </div>
+const station = (name: string) => ({ session, onSignOut }: { session: Session; onSignOut: (explicit?: boolean) => void }) => (
+  <div>
+    <p>{name} page for {session.clinician_id}</p>
+    <button type="button" onClick={() => onSignOut(true)}>
+      sign out
+    </button>
+    <button type="button" onClick={() => onSignOut()}>
+      session ends
+    </button>
+  </div>
+);
+vi.mock("./pages/Admit", () => ({ Admit: (p: Parameters<ReturnType<typeof station>>[0]) => station("admit")(p) }));
+vi.mock("./pages/Census", () => ({ Census: (p: Parameters<ReturnType<typeof station>>[0]) => station("census")(p) }));
+
+// The shared ward read is a stand-in too: it says whose feed wraps the page.
+vi.mock("./components/WardFeedProvider", () => ({
+  WardFeedProvider: ({ session, children }: { session: Session; children: ReactNode }) => (
+    <div data-feed={session.clinician_id}>{children}</div>
   ),
 }));
 
@@ -160,33 +168,38 @@ describe("restoring the session", () => {
   });
 });
 
-describe("the chat bubble", () => {
+describe("the shared ward read", () => {
   const md: Session = { clinician_id: "md-santos", ward: "W4", role: "md" };
-  const ask = () => screen.queryByRole("button", { name: "Ask" });
-
-  it("is not on the sign-in page", () => {
-    at("/ward");
-    expect(ask()).toBeNull();
-  });
+  const feed = () => document.querySelector("[data-feed]")?.getAttribute("data-feed") ?? null;
 
   it.each([
-    [charge, "/ward", true],
-    [md, "/ward", true],
-    [md, "/patient/p-001", true],
-    [nurse, "/ward", false],
-    [nurse, "/patient/p-001", true],
-    [admin, "/overview", false],
-    [admin, "/patient/p-001", false],
-    [md, "/ask", false],
-  ])("for %o at %s: shown %s", (who, path, shown) => {
+    [nurse, "/ward", "rn-reyes"],
+    [charge, "/admit", "rn-manalo"],
+    [charge, "/census", "rn-manalo"],
+    [md, "/patient/p-001", "md-santos"],
+    [md, "/lab", "md-santos"],
+    [admin, "/overview", null],
+    [admin, "/ward", null],
+  ])("for %o at %s wraps the page in the feed of %s", (who, path, owner) => {
     store(who);
     at(path);
-    expect(ask() !== null).toBe(shown);
+    expect(feed()).toBe(owner);
+  });
+
+  it("is not there before sign-in", () => {
+    at("/ward");
+    expect(feed()).toBeNull();
+  });
+
+  it.each([[nurse, "/patient/p-001"], [md, "/ward"], [charge, "/patient/p-001"]])("has no floating Ask button for %o at %s", (who, path) => {
+    store(who);
+    at(path);
+    expect(screen.queryByRole("button", { name: "Ask" })).toBeNull();
   });
 });
 
 describe("route guards", () => {
-  it.each(["/ward", "/patient/p-001", "/station", "/research", "/pipeline"])(
+  it.each(["/ward", "/patient/p-001", "/census", "/admit", "/research", "/pipeline"])(
     "sends a signed-out visitor from %s to sign-in, remembering where they were going",
     (path) => {
       at(path);
@@ -327,9 +340,24 @@ describe("route guards", () => {
     expect(screen.queryByText(/ward research page/)).toBeNull();
   });
 
-  it("sends a signed-out visitor of the lab to sign-in, remembering where", () => {
+  it("sends a signed-out visitor of the evidence to sign-in in the live build, remembering where", () => {
     at("/lab/research");
     expect(screen.getByText("sign-in page from /lab/research")).toBeTruthy();
+    expect(screen.queryByText(/research page/)).toBeNull();
+  });
+
+  it("opens the evidence before sign-in in the sample build only, with no session around it, and no other lab page", () => {
+    api.usesServer = false;
+    at("/lab/research");
+    expect(screen.getByText("research page for nobody signed in")).toBeTruthy();
+    expect(document.querySelector("[data-feed]")).toBeNull(); // no ward read before sign-in
+    cleanup();
+    for (const path of ["/lab", "/lab/pipeline", "/what-if", "/ask"]) {
+      const { unmount } = at(path);
+      expect(screen.getByText(`sign-in page from ${path}`)).toBeTruthy();
+      unmount();
+    }
+    api.usesServer = true;
   });
 
   it("sends a signed-out visitor of an old address to sign-in", () => {
@@ -355,9 +383,9 @@ describe("route guards", () => {
     expect(screen.getByText("patient page for admin-ruiz")).toBeTruthy();
   });
 
-  it("still sends an admin from the station to the overview", () => {
+  it.each(["/census", "/admit", "/station"])("still sends an admin from %s to the overview", (path) => {
     store(admin);
-    at("/station");
+    at(path);
     expect(screen.getByText("overview page for admin-ruiz")).toBeTruthy();
   });
 
@@ -371,20 +399,38 @@ describe("route guards", () => {
     expect(screen.getByText("sign-in page from /overview")).toBeTruthy();
   });
 
-  it("keeps a staff nurse out of the station: back to the ward", () => {
+  it.each(["/census", "/admit"])("keeps a staff nurse out of %s: back to the ward", (path) => {
     store(nurse);
-    at("/station");
+    at(path);
     expect(screen.getByText("ward page for rn-reyes")).toBeTruthy();
   });
 
   it.each([charge, { clinician_id: "md-santos", ward: "W4", role: "md" } as Session])(
-    "lets $role into the station",
+    "lets $role into Census and Admit",
     (s) => {
       store(s);
-      at("/station");
-      expect(screen.getByText(`station page for ${s.clinician_id}`)).toBeTruthy();
+      at("/census");
+      expect(screen.getByText(`census page for ${s.clinician_id}`)).toBeTruthy();
+      cleanup();
+      at("/admit");
+      expect(screen.getByText(`admit page for ${s.clinician_id}`)).toBeTruthy();
     },
   );
+
+  it.each([
+    ["/station", "admit"],
+    ["/station?tab=flow", "census"],
+    ["/station?tab=labs", "admit"],
+  ])("keeps the old Station working for a release: %s opens %s", (path, name) => {
+    store(charge);
+    at(path);
+    expect(screen.getByText(`${name} page for rn-manalo`)).toBeTruthy();
+  });
+
+  it("sends a signed-out visitor from the old Station to sign-in, returning to its new page", () => {
+    at("/station?tab=flow");
+    expect(screen.getByText("sign-in page from /census")).toBeTruthy();
+  });
 });
 
 describe("signing in and out", () => {
@@ -410,7 +456,7 @@ describe("signing in and out", () => {
 
   it.each([
     ["the ward", "/ward", nurse],
-    ["the station", "/station", charge],
+    ["Admit", "/admit", charge],
   ])("signs out from %s: clears the API session and the stored one", async (_, path, s) => {
     store(s);
     at(path);

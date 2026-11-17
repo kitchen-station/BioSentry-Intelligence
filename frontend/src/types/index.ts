@@ -26,6 +26,7 @@ import type {
 
 export type {
   AbstainedDetail,
+  AssistantMessage,
   AbstainedRow,
   Acknowledgement,
   Acvpu,
@@ -85,6 +86,7 @@ export type {
   VitalHistoryFull,
   VitalTrends,
   WardOverview,
+  WardUnit,
   Vitals,
   VitalsRecorded,
   PatientStay,

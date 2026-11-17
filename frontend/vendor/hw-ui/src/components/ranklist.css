@@ -1,0 +1,221 @@
+@layer hw.components {
+  /* Ranked list (the Ward). Rows from 1200px up, cards below. One markup for both; CSS hides what a size
+     or density leaves out, so render every element and let the kit drop it.
+
+     section.hw-ranklist-wrap[aria-label="Ranked patients"]             surface, rounded, scrolls sideways if narrow
+       > div.hw-ranklist__head[aria-hidden=true] > span * 11             column names: Rank, NEWS2, Patient and next step,
+                                                                         Heart rate, Resp. rate, SpO2, temperature, BP, ACVPU, Data, (empty)
+       + ol.hw-ranklist[data-density=comfortable|compact]
+           > li.hw-ranklist__row[data-alert]                             data-alert only on unacknowledged alert rows
+               > span.hw-ranklist__rank                                  "1" (hidden on cards: the list order says it)
+               + div.hw-ranklist__score > div.hw-score + span.hw-ranklist__status           default size when comfortable, .hw-score--sm when compact
+               + div.hw-ranklist__who
+                   > div.hw-ranklist__id > button.hw-ranklist__name[type=button] + span.hw-ranklist__meta ("67 F · Bed 4A")
+                   + p.hw-ranklist__response                             role response line; takes the band colour of the row's score
+                   + p.hw-ranklist__context                              only when there is no response line (comfortable rows only)
+                   + p.hw-ranklist__reason                               first reason or NEWS2 fallback, always visible
+                   + ul.hw-ranklist__reasons > li.hw-tag *               reason chips (comfortable rows only)
+               + div.hw-ranklist__vitals                                 five vitals plus ACVPU, in this order: HR, RR, SpO2, temperature, BP, ACVPU
+                   > div.hw-ranklist__vital[role=img][aria-label="Heart rate 118 per minute, adds 2 NEWS2 points"][data-points=0|1|2|3]
+                       > svg.hw-ranklist__spark[viewBox="0 0 64 24"][aria-hidden=true] > polyline + circle[r=2.5]   (HR, RR, SpO2, temperature; comfortable rows)
+                       + span.hw-ranklist__label ("HR", "RR", "SpO2", "Temp", "BP", "ACVPU": shown on cards only)
+                       + span.hw-ranklist__value ("118"; red when it adds points, bold at 2+)
+                       + span.hw-ranklist__by ("by nurse", BP only; comfortable rows)
+               + div.hw-ranklist__data
+                   > span.hw-ranklist__age[data-stale]                   "10s ago"; data-stale turns it red and bold
+                   + span.hw-ranklist__signal[data-weak]                 "Signal 67%"; data-weak makes it bold (comfortable rows)
+                   + span.hw-ranklist__obs                               "Obs due 11:24 AM" (comfortable rows)
+               + div.hw-ranklist__action, one of:
+                   button.hw-button.hw-button--accent (Acknowledge, i.fa-bell icon; aria-label names the patient; disabled offline)
+                   p.hw-ranklist__note ("Alert not acknowledged since 11:02 AM", read-only roles)
+                   button.hw-button.hw-button--ghost.hw-button--icon.hw-ranklist__open[aria-label="Open Santos, Maria"] > i.fa-chevron-right
+     Boolean attributes (data-alert, data-stale, data-weak) count when present; ="false" counts as absent.
+     Compact: minimum 56px rows, no sparklines, chips, context, "by nurse", signal or obs.
+     Cards: score and statuses, name and age, response and reason, wrapping vitals, Acknowledge full width.
+     Rows from 1200px; narrower screens scroll horizontally to preserve all readings and statuses. */
+  .hw-ranklist-wrap, .hw-ranklist {
+    --hw-ranklist-cols: 32px 190px minmax(250px, 1fr) 112px 112px 112px 100px 112px 52px 132px 150px;
+    --hw-ranklist-gap: var(--hw-space-5);
+    --hw-ranklist-pad: 20px;
+    --hw-ranklist-spark-width: 64px;
+    --hw-ranklist-action-pad: 20px;
+  }
+  .hw-ranklist[data-density="compact"], .hw-ranklist-wrap:has(> .hw-ranklist[data-density="compact"]) {
+    --hw-ranklist-cols: 32px 230px minmax(250px, 1fr) 76px 76px 64px 76px 112px 52px 132px 150px;
+  }
+  .hw-ranklist {
+    --hw-ranklist-row-height: 88px;
+    --hw-ranklist-row-pad: 10px;
+
+    display: grid;
+    gap: var(--hw-space-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .hw-ranklist[data-density="compact"] { --hw-ranklist-row-height: 56px; --hw-ranklist-row-pad: 6px; }
+  .hw-ranklist__head { display: none; }
+
+  /* ---------- Card (phones and tablets) ---------- */
+  .hw-ranklist__row {
+    --hw-ranklist-row-bg: var(--hw-color-surface);
+    --hw-ranklist-edge: transparent;
+    --hw-ranklist-response: var(--hw-color-text);
+
+    display: grid;
+    grid-template-areas: "score score score" "id id data" "resp resp resp" "reason reason reason" "vitals vitals vitals" "action action action";
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    column-gap: var(--hw-space-4);
+    align-items: start;
+    padding: 14px;
+    background: var(--hw-ranklist-row-bg);
+    border: 2px solid var(--hw-ranklist-edge);
+    border-radius: var(--hw-card-radius);
+  }
+  .hw-ranklist__row[data-alert]:not([data-alert="false"]) {
+    --hw-ranklist-row-bg: var(--hw-color-danger-bg);
+    --hw-ranklist-edge: var(--hw-graph-emergency);
+  }
+  .hw-ranklist__row:has(.hw-score[data-band="high"]) { --hw-ranklist-response: var(--hw-graph-emergency-text); }
+  .hw-ranklist__row:has(.hw-score[data-band="medium"]) { --hw-ranklist-response: var(--hw-graph-urgent-text); }
+
+  .hw-ranklist__rank { display: none; grid-area: rank; font-size: var(--hw-font-size-18); color: var(--hw-color-text-muted); text-align: center; }
+  .hw-ranklist__score { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+  .hw-ranklist__row > .hw-ranklist__score { grid-area: score; margin-bottom: 8px; }
+  .hw-ranklist__status { display: flex; flex-direction: column; font-size: var(--hw-font-size-11); line-height: 1.4; color: var(--hw-color-text-muted); }
+  .hw-ranklist__reason { display: block; grid-area: reason; margin: 3px 0 0; font-size: 13px; overflow-wrap: anywhere; }
+  .hw-ranklist__who { display: contents; }
+  .hw-ranklist__id { display: flex; flex-wrap: wrap; grid-area: id; gap: 0 10px; align-items: baseline; min-width: 0; }
+  .hw-ranklist__name {
+    padding: 0;
+    font-size: var(--hw-font-size-16);
+    font-weight: var(--hw-weight-medium);
+    color: var(--hw-color-text);
+    text-align: left;
+    text-decoration: underline;
+    text-decoration-color: var(--hw-color-border);
+    text-underline-offset: 3px;
+    cursor: pointer;
+    background: none;
+    border: 0;
+    transition: text-decoration-color var(--hw-duration-1);
+  }
+  .hw-ranklist__name:hover { text-decoration-color: currentcolor; }
+  .hw-ranklist__meta { font-size: 13px; color: var(--hw-color-text-muted); }
+  .hw-ranklist__response { grid-area: resp; margin: 10px 0 0; font-weight: var(--hw-weight-medium); color: var(--hw-ranklist-response); }
+  .hw-ranklist__context { margin: 0; color: var(--hw-color-text-muted); }
+  .hw-ranklist__reasons { flex-wrap: wrap; gap: 6px; margin: 3px 0 0; padding: 0; list-style: none; }
+  .hw-ranklist__context, .hw-ranklist__reasons { display: none; }
+  .hw-ranklist__row[data-alert]:not([data-alert="false"]) .hw-tag { --hw-tag-bg: var(--hw-color-surface); }
+
+  .hw-ranklist__vitals { display: flex; flex-wrap: wrap; grid-area: vitals; gap: 2px 14px; margin-top: var(--hw-space-3); }
+  .hw-ranklist__vital {
+    --hw-ranklist-value-fg: var(--hw-color-text);
+    --hw-ranklist-value-weight: var(--hw-weight-medium);
+    --hw-ranklist-dot: var(--hw-graph-context-strong);
+
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 6px;
+    align-items: baseline;
+  }
+  .hw-ranklist__vital:is([data-points="1"], [data-points="2"], [data-points="3"]) {
+    --hw-ranklist-value-fg: var(--hw-graph-emergency-text);
+    --hw-ranklist-dot: var(--hw-graph-emergency);
+  }
+  .hw-ranklist__vital:is([data-points="2"], [data-points="3"]) { --hw-ranklist-value-weight: var(--hw-weight-bold); }
+  .hw-ranklist__spark { display: none; flex-shrink: 0; width: var(--hw-ranklist-spark-width); height: 24px; overflow: visible; }
+  .hw-ranklist__spark polyline { fill: none; stroke: var(--hw-graph-context); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .hw-ranklist__spark circle { fill: var(--hw-ranklist-dot); }
+  .hw-ranklist__label { font-size: var(--hw-text-caption); color: var(--hw-color-text-muted); }
+  .hw-ranklist__value { font-size: 15px; font-weight: var(--hw-ranklist-value-weight); font-variant-numeric: tabular-nums; color: var(--hw-ranklist-value-fg); }
+  .hw-ranklist__by { display: none; flex-basis: 100%; font-size: var(--hw-font-size-11); line-height: 1.2; color: var(--hw-color-text-muted); }
+
+  .hw-ranklist__data { display: flex; flex-direction: column; grid-area: data; font-size: var(--hw-text-caption); line-height: 1.4; color: var(--hw-color-text-muted); text-align: right; white-space: nowrap; }
+  .hw-ranklist__age[data-stale]:not([data-stale="false"]) { font-weight: var(--hw-weight-bold); color: var(--hw-graph-emergency-text); }
+  .hw-ranklist__signal[data-weak]:not([data-weak="false"]) { font-weight: var(--hw-weight-bold); color: var(--hw-color-text); }
+  .hw-ranklist__signal, .hw-ranklist__obs { display: none; }
+
+  .hw-ranklist__action { display: flex; grid-area: action; justify-content: flex-end; margin-top: var(--hw-space-4); }
+  .hw-ranklist__action > .hw-button {
+    --hw-button-height: 44px;
+
+    width: 100%;
+  }
+  .hw-ranklist__action > .hw-ranklist__open {
+    --hw-button-radius: var(--hw-radius-full);
+    --hw-button-fg: var(--hw-color-text-muted);
+
+    display: none;
+  }
+  .hw-ranklist__note { margin: 0; font-size: 13px; font-weight: var(--hw-weight-medium); color: var(--hw-graph-emergency-text); text-align: right; }
+
+  /* On a card the name opens the patient, so a row whose only action is the chevron has no action line. */
+  @media (width < 1200px) {
+    .hw-ranklist__action:has(> .hw-ranklist__open:only-child) { display: none; }
+  }
+
+  /* ---------- Rows (1200px and up) ---------- */
+  @media (width >= 1200px) {
+    .hw-ranklist-wrap { overflow-x: auto; background: var(--hw-color-surface); border-radius: var(--hw-card-radius); }
+    .hw-ranklist { display: block; }
+    .hw-ranklist__head, .hw-ranklist__row {
+      display: grid;
+      grid-template-columns: var(--hw-ranklist-cols);
+      column-gap: var(--hw-ranklist-gap);
+      align-items: center;
+      min-width: min-content;
+      padding-inline: var(--hw-ranklist-pad);
+    }
+    .hw-ranklist__head { padding-block: 10px; font-size: var(--hw-text-caption); color: var(--hw-color-text-muted); }
+    .hw-ranklist__head > :first-child { text-align: center; }
+    .hw-ranklist__row {
+      grid-template-areas: "rank score who . . . . . . data action";
+      min-height: var(--hw-ranklist-row-height);
+      padding-block: var(--hw-ranklist-row-pad);
+      border: 0;
+      border-top: 1px solid var(--hw-color-border-subtle);
+      border-radius: 0;
+      box-shadow: inset 4px 0 0 var(--hw-ranklist-edge);
+    }
+    .hw-ranklist__rank { display: block; }
+    .hw-ranklist__row > .hw-ranklist__score { margin-bottom: 0; }
+    .hw-ranklist__who { display: block; grid-area: who; min-width: 0; }
+    .hw-ranklist__response { margin: 0; }
+    .hw-ranklist__context { display: block; }
+    .hw-ranklist__reasons { display: flex; }
+    .hw-ranklist__vitals { display: contents; }
+    .hw-ranklist__vital { flex-wrap: wrap; gap: 0 var(--hw-space-3); align-items: center; }
+    .hw-ranklist__spark { display: block; }
+    .hw-ranklist__label { display: none; }
+    .hw-ranklist__value { font-size: var(--hw-font-size-16); }
+    .hw-ranklist__by { display: block; }
+    .hw-ranklist__data { font-size: 13px; text-align: left; white-space: normal; }
+    .hw-ranklist__signal, .hw-ranklist__obs { display: block; }
+    .hw-ranklist__action { display: flex; margin-top: 0; }
+    .hw-ranklist__action > .hw-button {
+      --hw-button-height: var(--hw-control-height);
+      --hw-button-pad: var(--hw-ranklist-action-pad);
+
+      width: auto;
+    }
+    .hw-ranklist__action > .hw-ranklist__open { display: inline-flex; }
+
+    /* Compact: the same columns, less in each. */
+    .hw-ranklist[data-density="compact"] :is(.hw-ranklist__spark, .hw-ranklist__context, .hw-ranklist__reasons, .hw-ranklist__by, .hw-ranklist__signal, .hw-ranklist__obs) { display: none; }
+  }
+
+  /* Laptops (1200 to 1365px): tighter spacing; the wrapper scrolls when needed. */
+  @media (1200px <= width < 1366px) {
+    .hw-ranklist-wrap, .hw-ranklist {
+      --hw-ranklist-cols: 28px 190px minmax(220px, 1fr) 80px 80px 64px 76px 112px 48px 116px 144px;
+      --hw-ranklist-gap: var(--hw-space-4);
+      --hw-ranklist-pad: var(--hw-space-5);
+      --hw-ranklist-spark-width: 48px;
+      --hw-ranklist-action-pad: 14px;
+    }
+    .hw-ranklist[data-density="compact"], .hw-ranklist-wrap:has(> .hw-ranklist[data-density="compact"]) {
+      --hw-ranklist-cols: 28px 230px minmax(220px, 1fr) 76px 76px 64px 76px 112px 48px 116px 144px;
+    }
+  }
+}

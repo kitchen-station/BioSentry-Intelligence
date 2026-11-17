@@ -26,7 +26,11 @@ const row = (id: string, name: string): AbstainedRow => ({
 });
 const rows = [row("p-004", "Flores, Ramon"), row("p-005", "de Leon, Isabel")];
 const html = (list: readonly AbstainedRow[] = rows) =>
-  renderToStaticMarkup(<MemoryRouter><NotRankedSection rows={list} clinicianId="rn-delacruz" onRecorded={() => undefined} /></MemoryRouter>);
+  renderToStaticMarkup(
+    <MemoryRouter>
+      <NotRankedSection rows={list} onRecord={() => undefined} />
+    </MemoryRouter>,
+  );
 
 beforeEach(() => {
   build.canRecordVitals = false;
@@ -41,18 +45,23 @@ describe("the NOT RANKED section", () => {
     expect(out).toContain("Record a blood pressure");
   });
 
-  it("offers no entry in a fixture build: nothing on the page can record", () => {
+  it("offers no entry in a fixture build: the one button folds the strip", () => {
     build.canRecordVitals = false;
     const out = html();
     expect(out).not.toContain("Record vitals");
-    expect(out).not.toContain("<button");
+    expect(out.match(/<button/g)).toHaveLength(1);
+    expect(out).toMatch(/<button[^>]*aria-expanded="true"[^>]*>Hide<\/button>/);
+  });
+
+  it("says why the patients are not ranked, and that it is not low risk", () => {
+    expect(html()).toContain("Action required to enable scoring. Not ranked does not mean low risk.");
   });
 
   it("offers one entry per row in an API build", () => {
     build.canRecordVitals = true;
     const out = html();
     expect(out.match(/Record vitals/g)).toHaveLength(rows.length);
-    expect(out.match(/aria-expanded="false"/g)).toHaveLength(rows.length);
+    expect(out.match(/aria-haspopup="dialog"/g)).toHaveLength(rows.length); // each opens the one drawer
   });
 
   it("renders nothing when every patient is ranked", () => {

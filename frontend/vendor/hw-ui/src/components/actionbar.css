@@ -1,0 +1,31 @@
+@layer hw.components {
+  /* Phone action bar: the actions of a detail screen (the Patient page), pinned to the bottom of the screen.
+     div.hw-actionbar.hw-only-mobile
+       > button.hw-button.hw-button--primary[type=button] ("Record vitals")     takes two shares of the width
+       + button.hw-button[type=button] ("Notes")
+       + button.hw-button[type=button][disabled at the last patient] ("Next" + i.hw-icon.fa-solid.fa-arrow-right)
+     Rule: it replaces the bottom tab bar on a detail screen. A screen shows .hw-actionbar or .hw-bottomnav, never
+     both, so leave .hw-bottomnav and .hw-has-bottomnav out of a screen that has it.
+     Put it last in the screen: it sticks to the bottom of the viewport while the screen scrolls (no padding to
+     reserve) and pads itself clear of the home indicator with the safe-area inset. 48px buttons, touch included.
+     On wider screens the same actions live in the page header, so it is used with .hw-only-mobile. */
+  .hw-actionbar {
+    --hw-actionbar-pad-y: 10px;
+    --hw-actionbar-pad-x: 12px;
+    --hw-actionbar-gap: var(--hw-space-3);
+    --hw-actionbar-bg: var(--hw-color-surface);
+    --hw-actionbar-border: var(--hw-color-border-subtle);
+    --hw-actionbar-button-height: 48px;
+
+    position: sticky;
+    bottom: 0;
+    z-index: var(--hw-z-sticky);
+    display: flex;
+    gap: var(--hw-actionbar-gap);
+    padding: var(--hw-actionbar-pad-y) var(--hw-actionbar-pad-x) calc(var(--hw-actionbar-pad-y) + env(safe-area-inset-bottom));
+    background: var(--hw-actionbar-bg);
+    border-top: 1px solid var(--hw-actionbar-border);
+  }
+  .hw-actionbar > .hw-button { --hw-button-height: var(--hw-actionbar-button-height); --hw-button-pad: 0; flex: 1 1 0; min-width: 0; }
+  .hw-actionbar > .hw-button:first-child { flex-grow: 2; }
+}

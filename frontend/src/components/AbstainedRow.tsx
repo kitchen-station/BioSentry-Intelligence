@@ -1,10 +1,9 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
-import type { AbstainedRow as AbstainedRowType, VitalsRecorded } from "../types";
+import type { AbstainedRow as AbstainedRowType } from "../types";
 import styles from "./AbstainedRow.module.css";
 import { formatAge, formatBloodPressure, formatClockDay } from "./format";
 import { useWardNow } from "./wardNow";
-import { VitalsEntry } from "./VitalsEntry";
+import { sentence } from "./vitalsDraft";
 
 const SEEN = [
   ["heart_rate", "HR"],
@@ -26,9 +25,9 @@ export function LastSeen({ seen, now }: { seen: NonNullable<AbstainedRowType["la
     return [`${label} ${value} (${m.provenance.source}, ${quality}${age}${formatClockDay(at, now)})`];
   });
   return (
-    <div className={styles.seen}>
+    <p className={styles.seen}>
       Last seen: {items.length > 0 ? items.join(" · ") : "no value stored"}
-    </div>
+    </p>
   );
 }
 
@@ -36,54 +35,30 @@ interface Props {
   row: AbstainedRowType;
   /** HTTP mode only: the fixture provider cannot re-rank, so it offers no entry (D4). */
   canRecord?: boolean;
-  /** Who is recording (shown in the echo of what will be stored). */
-  clinicianId?: string;
-  onRecorded?: (row: AbstainedRowType, recorded: VitalsRecorded) => void;
+  /** Opens the Record vitals drawer for this row (the page holds it, so it outlives the row). */
+  onRecord?: (row: AbstainedRowType) => void;
+  /** Offline: Record vitals waits until the connection is back. */
+  disabled?: boolean;
+  /** The unit shown when the row carries none (the page's unit). */
   fallbackUnit?: string;
 }
 
-export function AbstainedRow({ row, canRecord = false, clinicianId = "", onRecorded, fallbackUnit }: Props) {
-  const [entering, setEntering] = useState(false);
+export function AbstainedRow({ row, canRecord = false, onRecord, disabled = false, fallbackUnit }: Props) {
   const now = useWardNow();
   return (
-    <div className={`hw-card ${styles.row}`}>
-      <div className={styles.tagCol}>
-        <span className={`hw-tag ${styles.tag}`}>NOT RANKED</span>
-      </div>
-      <div className={styles.infoCol}>
-        <div className={styles.nameRow}>
-          <Link className={styles.name} to={`/patient/${encodeURIComponent(row.id)}`}>{row.name}</Link>
-          <span className={styles.detail}>
-            {row.age ?? "--"}{row.sex ? ` ${row.sex}` : ""} &middot; {row.unit ?? fallbackUnit ?? "Unit unavailable"} &middot; {row.floor == null ? "Floor unavailable" : `Floor ${row.floor}`} &middot; Bed {row.bed}
-          </span>
-        </div>
-        <div className={styles.context}>{row.admitting_context}</div>
-      </div>
-      <div className={styles.reasonCol}>
-        <div className={styles.reason}>{row.reason}</div>
-        <div className={styles.instruction}>{row.instruction}</div>
+    <div className="hw-notice__item">
+      <div className="hw-notice__main">
+        <Link to={`/patient/${row.id}`} className="hw-notice__name">{row.name}</Link>
+        <span className="hw-notice__meta">
+          {row.age ?? "--"}{row.sex ? ` ${row.sex}` : ""} &middot; {row.unit ?? fallbackUnit ?? "Unit unavailable"} &middot; {row.floor == null ? "Floor unavailable" : `Floor ${row.floor}`} &middot; Bed {row.bed}
+        </span>
+        <p className="hw-notice__reason"><strong>{sentence(row.reason)}</strong> {sentence(row.instruction)}</p>
         {row.last_seen && <LastSeen seen={row.last_seen} now={now} />}
-        {canRecord && (
-          <button
-            type="button"
-            className={`hw-button hw-button--sm ${styles.action}`}
-            aria-expanded={entering}
-            onClick={() => setEntering((open) => !open)}
-          >
-            {entering ? "Close" : "Record vitals"}
-          </button>
-        )}
       </div>
-      {canRecord && entering && (
-        <div className={styles.entry}>
-          <VitalsEntry
-            patientId={row.id}
-            patientName={row.name}
-            clinicianId={clinicianId}
-            onRecorded={(recorded) => onRecorded?.(row, recorded)}
-            onClose={() => setEntering(false)}
-          />
-        </div>
+      {canRecord && (
+        <button type="button" className="hw-button hw-button--accent" aria-haspopup="dialog" disabled={disabled} onClick={() => onRecord?.(row)}>
+          Record vitals
+        </button>
       )}
     </div>
   );

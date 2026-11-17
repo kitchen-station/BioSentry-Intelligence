@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import type { Session, WardOverview } from "../types";
-import { ApiError, getOverview, hasOverview } from "../api";
+import type { Session, WardOverview, WardUnit } from "../types";
+import { ApiError, getOverview, getUnits, hasOverview } from "../api";
 import { AppShell } from "../components/AppShell";
 import { SimulatedNote } from "../components/LabFrame";
 import { ROLE_LABELS } from "../components/SessionMenu";
@@ -9,21 +9,48 @@ import { formatSimClock, simStatus } from "../components/format";
 import research from "./Research.module.css";
 import styles from "./Overview.module.css";
 
+/** "Ground floor" for 0, then "1st floor", "2nd floor": the picker's words. */
+export const floorName = (n: number) => (n === 0 ? "Ground floor" : `${n}${["th", "st", "nd", "rd"][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] ?? "th"} floor`);
+
 const when = (iso: string) => `${iso.slice(0, 16).replace("T", " ")} UTC`;
 
+// The audit log's event names, in words. An action not listed here reads as its own name with spaces.
+const ACTIONS: Record<string, string> = {
+  view_ward: "Ward list views",
+  view_patient: "Patient views",
+  acknowledge: "Alerts acknowledged",
+  record_vitals: "Vitals recorded",
+  add_note: "Notes added",
+  view_notes: "Notes read",
+  view_history: "Stay histories read",
+  view_ward_research: "Ward research reads",
+  admit_patient: "Patients admitted",
+  enter_labs: "Lab results entered",
+  ask_patient: "Questions about a patient",
+  lab_question: "Questions for the research agent",
+  lab_request: "Simulated runs asked for",
+};
+const OUTCOMES: Record<string, string> = { not_found: "not found", denied: "refused", rejected: "rejected", limited: "over the limit" };
+const words = (s: string) => s.replaceAll("_", " ");
+/** "Patient views", or "Patient views, not found" for an outcome other than ok. */
+const activityLabel = (action: string, outcome: string): string =>
+  `${ACTIONS[action] ?? words(action).replace(/^./, (c) => c.toUpperCase())}${outcome === "ok" ? "" : `, ${OUTCOMES[outcome] ?? words(outcome)}`}`;
+
 /**
- * What an administrator sees of the ward. It reads once and again on Refresh, never on a timer:
- * every view writes a row to the audit log, so a poll would bury the real activity.
+ * What an administrator sees of the ward: four status tiles, who is assigned, and activity as counts. It reads once
+ * and again on Refresh, never on a timer: every view writes a row to the audit log, so a poll would bury the real activity.
  */
 export function Overview({ session, onSignOut }: { session: Session; onSignOut: () => void }) {
   const [data, setData] = useState<WardOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const admin = session.role === "admin";
   const [loading, setLoading] = useState(hasOverview && admin);
+  const [units, setUnits] = useState<WardUnit[]>([]);
+  const [ward, setWard] = useState<string | undefined>(undefined); // undefined: W4, the home unit
   const failed = "The overview could not be loaded. Try Refresh.";
 
   const show = useCallback(() => {
-    getOverview()
+    getOverview(ward)
       .then((d: unknown) => {
         const o = d as Partial<WardOverview> | null;
         const ok =
@@ -46,7 +73,7 @@ export function Overview({ session, onSignOut }: { session: Session; onSignOut: 
         if (status === 401) onSignOut();
       })
       .finally(() => setLoading(false));
-  }, [onSignOut]);
+  }, [onSignOut, ward]);
 
   useEffect(() => {
     document.title = "Ward overview \u00b7 BioSentry";
@@ -60,6 +87,11 @@ export function Overview({ session, onSignOut }: { session: Session; onSignOut: 
     if (hasOverview && admin) show();
   }, [show, admin]);
 
+  // The floors, read once. Read-only: choosing one only changes which unit's overview is read.
+  useEffect(() => {
+    if (hasOverview && admin) getUnits().then((u) => Array.isArray(u) && setUnits([...u].sort((a, b) => (a.floor ?? 99) - (b.floor ?? 99) || a.id.localeCompare(b.id)))).catch(() => setUnits([]));
+  }, [admin]);
+
   const sim = data ? simStatus(data.sim) : null;
   const role = (id: string) => data?.clinicians.find((c) => c.id === id)?.role;
   const isCharge = (care: readonly string[]) => care.some((id) => role(id) === "charge_rn");
@@ -67,12 +99,20 @@ export function Overview({ session, onSignOut }: { session: Session; onSignOut: 
   const nurses = (care: readonly string[]) =>
     care.filter((id) => role(id) === "rn" || role(id) === undefined || (role(id) === "charge_rn" && !chargeAll)).join(", ") || "None";
   const physicians = (care: readonly string[]) => care.filter((id) => role(id) === "md").join(", ") || "None";
-  const byClinician = new Map<string, WardOverview["activity"][number][]>();
-  for (const a of data?.activity ?? []) byClinician.set(a.clinician_id, [...(byClinician.get(a.clinician_id) ?? []), a]);
+  // Activity as counts: one row per clinician, one column per kind of event, in the order the server listed them.
+  const kinds = [...new Set((data?.activity ?? []).map((a) => activityLabel(a.action, a.outcome)))];
+  const counts = new Map<string, Map<string, number>>();
+  for (const a of data?.activity ?? []) {
+    const row = counts.get(a.clinician_id) ?? new Map<string, number>();
+    const kind = activityLabel(a.action, a.outcome);
+    counts.set(a.clinician_id, row.set(kind, (row.get(kind) ?? 0) + a.count));
+  }
+  const notRanked = data?.patients.filter((p) => p.state !== "ranked") ?? [];
+  const reasons = [...new Set(notRanked.map((p) => p.reason))].join(" · ");
 
   return (
     <AppShell session={session} onSignOut={onSignOut} title="Administration">
-      <SimulatedNote />
+      <SimulatedNote readOnly={admin} />
       <div className={research.main}>
         <h1 className="hw-heading hw-heading--3">Ward overview</h1>
 
@@ -82,23 +122,21 @@ export function Overview({ session, onSignOut }: { session: Session; onSignOut: 
           <p className="hw-text-muted">The overview needs the live API. This demo has no server.</p>
         ) : (
           <>
-            <p className="hw-caption">Read-only. Every view is recorded in the audit log.</p>
+            {units.length > 0 && (
+              <label className="hw-caption">
+                Floor{" "}
+                <select className="hw-native-select" value={ward ?? "W4"} onChange={(e) => { setLoading(true); setWard(e.target.value); }}>
+                  {units.map((u) => (
+                    <option key={u.id} value={u.id}>{u.floor === null ? "" : `${floorName(u.floor)}: `}{u.name}</option>
+                  ))}
+                </select>
+              </label>
+            )}
             <div className={`${research.toolbar} hw-caption`}>
               {data && <p>As of {when(data.as_of)}</p>}
-              {sim && (
-                <p>
-                  Simulator: {formatSimClock(sim)} &middot; {sim.counts.received} received &middot;{" "}
-                  {sim.counts.rejected} rejected &middot; {sim.counts.abstained} abstained
-                </p>
-              )}
-              {data && !data.receiving_data && (
-                <p className={styles.warn}>
-                  <span className="hw-icon fa-solid fa-signal" aria-hidden="true" />
-                  Not receiving data
-                </p>
-              )}
+              <p>This page does not refresh by itself: every read is recorded.</p>
               <Link to="/ward">Ward list</Link>
-              <button type="button" className="hw-button hw-button--sm" onClick={() => { setLoading(true); show(); }} disabled={loading}>
+              <button type="button" className="hw-button hw-button--accent hw-button--sm" onClick={() => { setLoading(true); show(); }} disabled={loading}>
                 <span className="hw-icon fa-solid fa-rotate" aria-hidden="true" />
                 Refresh
               </button>
@@ -114,6 +152,42 @@ export function Overview({ session, onSignOut }: { session: Session; onSignOut: 
 
         {data && (
           <>
+            <section className={`hw-card hw-card--outlined ${styles.tiles}`} aria-label="Now">
+              <div className="hw-stat">
+                <span className="hw-stat__label">Patients</span>
+                <div className="hw-stat__main"><span className="hw-stat__value">{data.patients.length}</span></div>
+              </div>
+              <div className="hw-stat">
+                <span className="hw-stat__label">Ranked</span>
+                <div className="hw-stat__main"><span className="hw-stat__value">{data.patients.length - notRanked.length}</span></div>
+              </div>
+              <div className="hw-stat">
+                <span className="hw-stat__label">NOT RANKED</span>
+                <div className="hw-stat__main"><span className="hw-stat__value">{notRanked.length}</span></div>
+                {reasons && <span className="hw-stat__note">{reasons}</span>}
+              </div>
+              <div className="hw-stat">
+                <span className="hw-stat__label">Data feed</span>
+                {data.receiving_data ? (
+                  <span className="hw-stat__change">
+                    <span className="hw-icon fa-solid fa-signal" aria-hidden="true" />
+                    Receiving data
+                  </span>
+                ) : (
+                  <span className="hw-stat__change">
+                    <span className="hw-icon fa-solid fa-ban" aria-hidden="true" />
+                    Not receiving data
+                  </span>
+                )}
+                {sim && (
+                  <span className="hw-stat__note">
+                    Simulator: {formatSimClock(sim)} &middot; {sim.counts.received} received &middot;{" "}
+                    {sim.counts.rejected} rejected &middot; {sim.counts.abstained} abstained
+                  </span>
+                )}
+              </div>
+            </section>
+
             <section className={`hw-card hw-card--outlined ${research.card}`} aria-labelledby="patients">
               <h2 id="patients" className="hw-heading hw-heading--4">Patients</h2>
               <div className="hw-table-wrap" tabIndex={0} role="region" aria-labelledby="patients">
@@ -164,19 +238,28 @@ export function Overview({ session, onSignOut }: { session: Session; onSignOut: 
               <p className="hw-caption">
                 Activity is shown for oversight, not performance review. Counts only: no patient and no time is shown.
               </p>
-              {byClinician.size === 0 && <p className="hw-text-muted">No activity in the last 24 hours.</p>}
-              {byClinician.size > 0 && (
-                <div className={styles.groups}>
-                  {[...byClinician].map(([id, rows]) => (
-                    <div key={id} className={styles.group}>
-                      <h3 className={styles.who}>{id}</h3>
-                      <ul>
-                        {rows.map((a) => (
-                          <li key={`${a.action} ${a.outcome}`}>{a.action} {a.outcome}: {a.count}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
+              {kinds.length === 0 ? (
+                <p className="hw-text-muted">No activity in the last 24 hours.</p>
+              ) : (
+                <div className="hw-table-wrap" tabIndex={0} role="region" aria-labelledby="activity">
+                  <table className={`hw-table ${research.nowrap}`}>
+                    <thead>
+                      <tr>
+                        <th scope="col">Clinician</th>
+                        {kinds.map((k) => <th key={k} scope="col" className="hw-table__num">{k}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...counts].map(([id, row]) => (
+                        <tr key={id}>
+                          <th scope="row">{id}</th>
+                          {kinds.map((k) => (
+                            <td key={k} className={`hw-table__num ${row.has(k) ? "" : research.sub}`}>{row.get(k) ?? 0}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </section>

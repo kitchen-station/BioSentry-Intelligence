@@ -281,10 +281,10 @@ def insert_run(
     run_id: int = row["id"]
     with conn.cursor() as cur:
         cur.executemany(
-            "INSERT INTO run_unit (run_id, id, position, name, floor, kind, score_note)"
-            " VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            "INSERT INTO run_unit (run_id, id, position, name, floor, kind, score_note, capacity)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
             [
-                (run_id, u["id"], i, u["name"], u["floor"], u["kind"], u.get("score_note"))
+                (run_id, u["id"], i, u["name"], u["floor"], u["kind"], u.get("score_note"), u.get("capacity"))
                 for i, u in enumerate(units or [{"id": ward, "name": ward, "floor": None, "kind": "ranked"}])
             ],
         )
@@ -307,7 +307,7 @@ class PostgresStore:
         # run if a new one starts mid-request. Upgrade: re-check the newest id under lock_run.
         run = conn.execute(
             "SELECT r.*, COALESCE((SELECT jsonb_agg(jsonb_build_object('id', u.id, 'name', u.name,"
-            " 'floor', u.floor, 'kind', u.kind, 'score_note', u.score_note) ORDER BY u.position) FROM run_unit u"
+            " 'floor', u.floor, 'kind', u.kind, 'score_note', u.score_note, 'capacity', u.capacity) ORDER BY u.position) FROM run_unit u"
             " WHERE u.run_id = r.id), '[]') AS units FROM run r ORDER BY r.id DESC LIMIT 1"
         ).fetchone()
         if run is None:
@@ -812,6 +812,24 @@ class PostgresStore:
         assert row is not None  # the caller checked the unit against `units`
         view: dict[str, Any] | None = row["live_view"]
         return view
+
+    def unit_operations(self, unit: str) -> dict[str, int | None]:
+        row = self.conn.execute(
+            "SELECT nurses_on_duty, awaiting_icu, outliers FROM run_unit WHERE run_id = %s AND id = %s",
+            (self.run_id, unit),
+        ).fetchone()
+        assert row is not None
+        return row
+
+    def outcomes_24h(self, unit: str) -> dict[str, int]:
+        row = self.conn.execute(
+            "SELECT count(*) FILTER (WHERE outcome = 'transferred') AS transfers,"
+            " count(*) FILTER (WHERE outcome = 'died') AS deaths FROM patient"
+            " WHERE run_id = %s AND unit = %s AND left_at > %s AND left_at <= %s",
+            (self.run_id, unit, self.as_of - timedelta(hours=24), self.as_of),
+        ).fetchone()
+        assert row is not None
+        return row
 
     # --- writing -------------------------------------------------------------------------------
 
