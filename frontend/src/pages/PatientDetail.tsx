@@ -17,7 +17,7 @@ import { TrendChart } from "../components/TrendChart";
 import { formatClock, formatClockSeconds, formatSimClock, patchInUse } from "../components/format";
 import { useLivePoll } from "../components/useLivePoll";
 import { band, driftResponse, response } from "../components/risk";
-import { OPEN_CHAT } from "../components/roles";
+import { openAssistant } from "../components/roles";
 import { VitalsEntry } from "../components/VitalsEntry";
 import { standing } from "../components/vitalsDraft";
 import styles from "./PatientDetail.module.css";
@@ -265,7 +265,7 @@ export function PatientDetail({ session, onSignOut }: { session: Session; onSign
           <div className={styles.actions}>
             {/* The assistant's panel (the chat bubble) opens on this patient's scope. Not for an admin, who cannot ask. */}
             {hasPatientQuestions && !readOnly && (
-              <button type="button" className="hw-button hw-button--sm" onClick={() => window.dispatchEvent(new Event(OPEN_CHAT))}>
+              <button type="button" className="hw-button hw-button--sm" onClick={(e) => openAssistant(e.currentTarget)}>
                 <Icon name="comments" />
                 Ask the assistant
               </button>

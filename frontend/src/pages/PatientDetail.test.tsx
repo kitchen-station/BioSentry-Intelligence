@@ -150,11 +150,11 @@ describe("the header clock is ward time, as served", () => {
 });
 
 describe("PatientDetail", () => {
-  it("says the patients are simulated, once, and has the session menu", async () => {
+  it("says the patients are simulated, once, and has the top bar and the account", async () => {
     page("rn");
     await loaded();
     expect(screen.getAllByText("Simulated patients until a hospital is connected.")).toHaveLength(1);
-    expect(screen.getByRole("link", { name: "Ward" }).getAttribute("aria-current")).toBeNull();
+    expect(within(screen.getByRole("banner")).getByText("Ward W4")).toBeTruthy(); // a staff nurse has no tabs: the bar names the ward
     const crumbs = screen.getByRole("navigation", { name: "Breadcrumb" });
     expect(within(crumbs).getByRole("link", { name: "Ward view" }).getAttribute("href")).toBe("/ward");
     expect(screen.getByRole("button", { name: /rn-manalo/ })).toBeTruthy();

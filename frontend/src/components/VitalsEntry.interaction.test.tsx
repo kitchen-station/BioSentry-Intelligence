@@ -358,7 +358,7 @@ describe("what the server refuses is shown as the server said it", () => {
 describe("the row and the ward page", () => {
   it("opens and closes the form from the row, collapsed until asked for", async () => {
     const user = userEvent.setup();
-    render(<AbstainedRow row={row} canRecord clinicianId="rn-delacruz" />);
+    render(<MemoryRouter><AbstainedRow row={row} canRecord clinicianId="rn-delacruz" /></MemoryRouter>);
     expect(screen.queryByRole("form")).toBeNull();
 
     const toggle = screen.getByRole("button", { name: "Record vitals" });
@@ -373,7 +373,7 @@ describe("the row and the ward page", () => {
 
   it("closes from the form's own Close button too, and the row collapses with it", async () => {
     const user = userEvent.setup();
-    render(<AbstainedRow row={row} canRecord clinicianId="rn-delacruz" />);
+    render(<MemoryRouter><AbstainedRow row={row} canRecord clinicianId="rn-delacruz" /></MemoryRouter>);
     await user.click(screen.getByRole("button", { name: "Record vitals" }));
     await user.click(screen.getAllByRole("button", { name: "Close" })[1]); // the form's, not the row toggle
     expect(screen.queryByRole("form")).toBeNull();

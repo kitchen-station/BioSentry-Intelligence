@@ -9,6 +9,7 @@ import {
   type ReactNode,
   type SelectHTMLAttributes,
 } from "react";
+import { useSearchParams } from "react-router-dom";
 import type { Session, AdmitPatientInput, LabExtractionResult, PatientExtractionResult } from "../types";
 import { admitPatient, enterLabResults, extractLabsFromFile, extractPatientFromFile, listAllPatients } from "../api";
 import { AppShell } from "../components/AppShell";
@@ -38,7 +39,14 @@ const TABS: Array<{ id: Section; label: string }> = [
 ];
 
 export function Station({ session, onSignOut }: Props) {
-  const [section, setSection] = useState<Section>("admit");
+  // The bar's Census opens this page on Patient flow (?tab=flow) and Admit on the first tab; following either moves to its tab.
+  const asked: Section = useSearchParams()[0].get("tab") === "flow" ? "flow" : "admit";
+  const [section, setSection] = useState<Section>(asked);
+  const [openedFor, setOpenedFor] = useState(asked);
+  if (openedFor !== asked) {
+    setOpenedFor(asked);
+    setSection(asked);
+  }
 
   // On a phone the tab list scrolls sideways: keep the selected tab in view.
   useEffect(() => {

@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
+// The assistant's panel, opened from the top bar's Assistant button (the real AppShell) and from a patient page's own button.
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Session, SessionRole } from "../types";
+import { AppShell } from "./AppShell";
 import { ChatBubble } from "./ChatBubble";
-import { OPEN_CHAT } from "./roles";
+import { OPEN_CHAT, openAssistant } from "./roles";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -22,6 +24,8 @@ const Where = () => {
     <>
       <p data-testid="where">{useLocation().pathname}</p>
       <button type="button" onClick={() => navigate(-1)}>back</button>
+      {/* A stand-in for the patient page's header button. */}
+      <button type="button" onClick={(e) => openAssistant(e.currentTarget)}>from the page</button>
     </>
   );
 };
@@ -29,12 +33,17 @@ const at = (path: string, role: SessionRole = "md") => {
   const session: Session = { clinician_id: "md-santos", ward: "W4", role };
   return render(
     <MemoryRouter initialEntries={[path]}>
-      <Where />
-      <ChatBubble session={session} onSignOut={vi.fn()} />
+      <ChatBubble session={session} onSignOut={vi.fn()}>
+        <AppShell session={session} onSignOut={vi.fn()}>
+          <Where />
+        </AppShell>
+      </ChatBubble>
     </MemoryRouter>,
   );
 };
-const bubble = () => screen.getByRole("button", { name: "Ask" });
+// The top bar's trigger.
+const bubble = () => screen.getByRole("button", { name: "Assistant" });
+const noTrigger = () => expect(screen.queryByRole("button", { name: "Assistant" })).toBeNull();
 
 afterEach(() => {
   cleanup();
@@ -42,10 +51,12 @@ afterEach(() => {
   api.hasPatientQuestions = true;
 });
 
-describe("where the bubble shows", () => {
-  it("shows for a physician and a charge nurse on a signed-in page, closed", () => {
+describe("where the top bar's Assistant button shows", () => {
+  it("shows for a physician and a charge nurse on a signed-in page, closed, in the bar", () => {
     at("/ward");
     expect(bubble().getAttribute("aria-expanded")).toBe("false");
+    expect(bubble().getAttribute("aria-haspopup")).toBe("dialog");
+    expect(within(screen.getByRole("banner")).getByRole("button", { name: "Assistant" })).toBeTruthy();
     expect(screen.queryByRole("dialog")).toBeNull();
     cleanup();
     at("/station", "charge_rn");
@@ -55,17 +66,32 @@ describe("where the bubble shows", () => {
   it("is absent at sign-in, on the Ask pages, and for an administrator", () => {
     for (const [path, role] of [["/", "md"], ["/ask", "md"], ["/ask/patient/p-001", "md"], ["/ward", "admin"], ["/patient/p-001", "admin"]] as const) {
       at(path, role);
-      expect(screen.queryByRole("button", { name: "Ask" })).toBeNull();
+      noTrigger();
       cleanup();
     }
   });
 
   it("shows for a staff nurse on a patient's page only", () => {
     at("/ward", "rn");
-    expect(screen.queryByRole("button", { name: "Ask" })).toBeNull();
+    noTrigger();
     cleanup();
     at("/patient/p-001", "rn");
     expect(bubble()).toBeTruthy();
+  });
+
+  it("is not shown where the build has no chat", () => {
+    api.hasLabQuestions = false;
+    at("/ward");
+    noTrigger();
+    cleanup();
+    api.hasPatientQuestions = false;
+    at("/patient/p-001");
+    noTrigger();
+  });
+
+  it("has no floating button left", () => {
+    at("/ward");
+    expect(screen.queryByRole("button", { name: "Ask" })).toBeNull();
   });
 });
 
@@ -76,6 +102,7 @@ describe("the panel", () => {
     const dialog = screen.getByRole("dialog", { name: "Assistant" });
     expect(dialog.getAttribute("aria-modal")).toBe("true");
     expect(within(dialog).getByText("The ward")).toBeTruthy();
+    expect(dialog.getAttribute("aria-describedby")).toBe(within(dialog).getByText("The ward").id);
     expect(screen.getByRole("button", { name: "thread ward" })).toBeTruthy();
     expect(bubble().getAttribute("aria-expanded")).toBe("true");
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Close the chat" }));
@@ -88,7 +115,7 @@ describe("the panel", () => {
     expect(screen.getByRole("button", { name: "thread p-001" })).toBeTruthy();
   });
 
-  it("closes by Escape, the close button, the bubble and a click outside, and gives the focus back", async () => {
+  it("closes by Escape, the close button, the bar's button and a click outside, and gives the focus back to the bar's button", async () => {
     at("/ward");
     const closers = [
       () => userEvent.keyboard("{Escape}"),
@@ -103,6 +130,19 @@ describe("the panel", () => {
       expect(screen.queryByRole("dialog")).toBeNull();
       expect(document.activeElement).toBe(bubble());
     }
+  });
+
+  it("gives the focus back to whichever control opened it: the page's own button", async () => {
+    at("/patient/p-001", "rn");
+    const own = screen.getByRole("button", { name: "from the page" });
+    await userEvent.click(own);
+    expect(screen.getByRole("dialog", { name: "Assistant" })).toBeTruthy();
+    expect(bubble().getAttribute("aria-expanded")).toBe("true");
+    await userEvent.keyboard("{Escape}");
+    expect(document.activeElement).toBe(own);
+    await userEvent.click(own);
+    await userEvent.click(screen.getByTestId("chat-backdrop"));
+    expect(document.activeElement).toBe(own);
   });
 
   it("keeps Tab and Shift+Tab inside the panel", async () => {
@@ -135,16 +175,6 @@ describe("the panel", () => {
     await userEvent.click(bubble());
     expect(screen.getByRole("button", { name: "thread p-001" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Open as a page" })).toBeNull();
-  });
-
-  it("is not shown where the build has no chat", () => {
-    api.hasLabQuestions = false;
-    at("/ward");
-    expect(screen.queryByRole("button", { name: "Ask" })).toBeNull();
-    cleanup();
-    api.hasPatientQuestions = false;
-    at("/patient/p-001");
-    expect(screen.queryByRole("button", { name: "Ask" })).toBeNull();
   });
 });
 
@@ -188,7 +218,7 @@ describe("after the independent review", () => {
     expect(bubble().getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("opens when the patient page's own button asks, and only where the bubble is shown", async () => {
+  it("opens when the patient page's own button asks, and only where the assistant is shown", async () => {
     at("/patient/p-001", "rn");
     act(() => void window.dispatchEvent(new Event(OPEN_CHAT)));
     expect(screen.getByRole("dialog", { name: "Assistant" })).toBeTruthy();
@@ -198,4 +228,3 @@ describe("after the independent review", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
-

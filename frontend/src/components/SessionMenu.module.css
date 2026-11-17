@@ -1,27 +1,15 @@
-/* Placement in the app shell's grid (AppShell.module.css names the areas) and the account trigger.
-   The look of the links and the panel is the kit's: hw-sidenav, hw-menu. */
-
-.nav {
-  grid-area: nav;
-  position: sticky;
-  top: 56px;
-  align-self: start;
-  height: calc(100vh - 56px);
-  overflow-y: auto;
-}
+/* The account trigger in the top bar. The look of the panel is the kit's: hw-menu. */
 
 .account {
-  grid-area: account;
   display: flex;
-  align-items: center; /* the anchor fills the 56px bar row, so the panel opens below the bar */
-  justify-self: end;
+  align-items: center;
 }
 
 .trigger {
   display: inline-flex;
   align-items: center;
   gap: var(--hw-space-3);
-  min-height: var(--hw-control-height-sm);
+  min-height: 44px;
   padding: 0 var(--hw-space-3) 0 var(--hw-space-2);
   font-size: var(--hw-text-body);
   font-weight: var(--hw-weight-medium);
@@ -40,8 +28,8 @@
 .avatar {
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   font-size: 12px;
   color: var(--hw-color-on-accent);
   background: var(--hw-color-accent);
@@ -74,12 +62,14 @@
   color: var(--hw-color-text-muted);
 }
 
-@media (width < 576px) {
-  /* The id is on the account panel; the bar keeps the avatar and the chevron. */
-  .trigger {
-    max-width: 40vw;
+/* Phone: the avatar and the chevron; the id is in the panel's accessible name and the trigger's. */
+@media (width < 768px) {
+  .who {
+    position: absolute;
+    width: 1px;
+    height: 1px;
     overflow: hidden;
+    clip-path: inset(50%);
     white-space: nowrap;
-    text-overflow: ellipsis;
   }
 }

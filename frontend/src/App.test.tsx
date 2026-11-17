@@ -10,6 +10,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ReactNode } from "react";
 import type { Session } from "./types";
 import { App } from "./App";
 
@@ -91,6 +92,13 @@ vi.mock("./pages/Station", () => ({
   ),
 }));
 
+// The shared ward read is a stand-in too: it says whose feed wraps the page.
+vi.mock("./components/WardFeedProvider", () => ({
+  WardFeedProvider: ({ session, children }: { session: Session; children: ReactNode }) => (
+    <div data-feed={session.clinician_id}>{children}</div>
+  ),
+}));
+
 vi.mock("./pages/WardResearch", () => ({
   WardResearch: ({ session }: { session: Session }) => <p>ward research page for {session.clinician_id}</p>,
 }));
@@ -160,28 +168,32 @@ describe("restoring the session", () => {
   });
 });
 
-describe("the chat bubble", () => {
+describe("the shared ward read", () => {
   const md: Session = { clinician_id: "md-santos", ward: "W4", role: "md" };
-  const ask = () => screen.queryByRole("button", { name: "Ask" });
-
-  it("is not on the sign-in page", () => {
-    at("/ward");
-    expect(ask()).toBeNull();
-  });
+  const feed = () => document.querySelector("[data-feed]")?.getAttribute("data-feed") ?? null;
 
   it.each([
-    [charge, "/ward", true],
-    [md, "/ward", true],
-    [md, "/patient/p-001", true],
-    [nurse, "/ward", false],
-    [nurse, "/patient/p-001", true],
-    [admin, "/overview", false],
-    [admin, "/patient/p-001", false],
-    [md, "/ask", false],
-  ])("for %o at %s: shown %s", (who, path, shown) => {
+    [nurse, "/ward", "rn-reyes"],
+    [charge, "/station", "rn-manalo"],
+    [md, "/patient/p-001", "md-santos"],
+    [md, "/lab", "md-santos"],
+    [admin, "/overview", null],
+    [admin, "/ward", null],
+  ])("for %o at %s wraps the page in the feed of %s", (who, path, owner) => {
     store(who);
     at(path);
-    expect(ask() !== null).toBe(shown);
+    expect(feed()).toBe(owner);
+  });
+
+  it("is not there before sign-in", () => {
+    at("/ward");
+    expect(feed()).toBeNull();
+  });
+
+  it.each([[nurse, "/patient/p-001"], [md, "/ward"], [charge, "/patient/p-001"]])("has no floating Ask button for %o at %s", (who, path) => {
+    store(who);
+    at(path);
+    expect(screen.queryByRole("button", { name: "Ask" })).toBeNull();
   });
 });
 

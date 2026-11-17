@@ -177,7 +177,7 @@ export function echoDraft(draft: VitalsDraft): string[] {
 
 // --- What the server said ---
 
-function sentence(text: string): string {
+export function sentence(text: string): string {
   const trimmed = text.trim();
   return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
 }
