@@ -110,6 +110,20 @@ They share one frame and five rules: a readout sentence instead of tooltips, one
 on the marks, a title that states the finding, and honest shapes. Each works with a mouse, touch and the
 keyboard, in light and dark. Rules, API and colour roles: [docs/graphs.md](docs/graphs.md).
 
+## Forms
+
+- **Native select.** `<select class="hw-native-select">` is a real `<select>` in the kit's look: no wrapper,
+  no JavaScript. It sizes to its options, fills a `.hw-field`, and takes `--sm`, `--lg` and `--block`.
+  An empty first option (`<option value="">Choose a shift</option>`) reads as a placeholder. Use it when
+  the platform picker fits (phones, long lists, plain forms); use `.hw-select` when options need tags or
+  search. Do not wrap a `<select>` in `.hw-input`.
+- **Invalid.** A field turns red only after the person has used it (`:user-invalid`) or when the app sets
+  `aria-invalid="true"`. Empty required fields are never red on load.
+- **Disabled.** The grey look follows the control's own `disabled` state. A disabled `<option>` or a
+  disabled clear button does not grey the field.
+- **Drawn marks.** The chevrons on `.hw-tile`, `.hw-link-cta` and the breadcrumb separators are drawn with
+  borders, not typed as "›". Text in generated content is read as part of a link's name ("Ward ›").
+
 ## Rules (enforced by `npm run lint`)
 
 1. **Cascade layers** `hw.tokens → hw.base → hw.components → hw.utilities`. Later layers win regardless of
@@ -136,7 +150,7 @@ keyboard, in light and dark. Rules, API and colour roles: [docs/graphs.md](docs/
 ```bash
 npm install          # dev tools + Font Awesome Free (the only runtime peer dependency; the font is bundled)
 npm run lint         # CSS architecture rules + JS lint
-npm test             # Playwright: 88 checks (keyboard, motion, graphs, reduced motion, axe in 5 modes)
+npm test             # Playwright: 102 checks (keyboard, form states, link names, motion, graphs, reduced motion, axe in 5 modes)
 ```
 
 ## Adding a component

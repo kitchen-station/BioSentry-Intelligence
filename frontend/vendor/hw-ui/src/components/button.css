@@ -84,7 +84,7 @@
   .hw-button--icon { width: var(--hw-button-height); padding: 0; }
   .hw-button--block { width: 100%; }
 
-  /* Text CTA: "Learn more ›" */
+  /* Text CTA: "Learn more" with a chevron. The chevron is drawn, not typed, so the link's name stays "Learn more". */
   .hw-link-cta {
     display: inline-flex;
     gap: var(--hw-space-2);
@@ -93,11 +93,19 @@
     text-decoration: none;
   }
   .hw-link-cta::after {
-    content: "›";
+    content: "";
+    flex-shrink: 0;
+    width: 0.4em;
+    height: 0.4em;
+    margin-right: 0.12em; /* keeps the rotated tip inside the link's box */
+    margin-left: -0.1em;
+    border-top: 1.5px solid currentcolor;
+    border-right: 1.5px solid currentcolor;
+    transform: rotate(45deg);
     transition: transform var(--hw-duration-2) var(--hw-ease-standard);
   }
   .hw-link-cta:hover { color: var(--hw-color-brand-text); }
-  .hw-link-cta:hover::after { transform: translateX(4px); }
+  .hw-link-cta:hover::after { transform: translateX(4px) rotate(45deg); }
 
   .hw-button-group { display: inline-flex; }
   .hw-button-group > .hw-button:not(:first-child) { margin-left: -1px; }

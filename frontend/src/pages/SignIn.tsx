@@ -281,7 +281,6 @@ export function SignIn({ onSignIn }: Props) {
                       value={adminId}
                       onChange={(e) => setAdminId(e.target.value)}
                       autoComplete="off"
-                      placeholder=" "
                       maxLength={64}
                       required
                     />
@@ -301,7 +300,6 @@ export function SignIn({ onSignIn }: Props) {
                     value={passphrase}
                     onChange={(e) => setPassphrase(e.target.value)}
                     autoComplete="off"
-                    placeholder=" " // the kit marks an empty field invalid only once a placeholder is gone
                     maxLength={256}
                     required={usesServer}
                   />

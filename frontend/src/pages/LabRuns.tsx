@@ -164,11 +164,9 @@ export function LabRuns({ role, onSignOut }: { role: SessionRole; onSignOut: () 
   const select = (label: string, value: string | number, options: readonly (string | number)[], set: (v: string) => void, text: (o: string | number) => string = String) => (
     <label className="hw-field">
       <span className="hw-field__label">{label}</span>
-      <span className="hw-input">
-        <select className="hw-input__control" value={value} onChange={(e) => set(e.target.value)}>
-          {options.map((o) => <option key={o} value={o}>{text(o)}</option>)}
-        </select>
-      </span>
+      <select className="hw-native-select" value={value} onChange={(e) => set(e.target.value)}>
+        {options.map((o) => <option key={o} value={o}>{text(o)}</option>)}
+      </select>
     </label>
   );
 

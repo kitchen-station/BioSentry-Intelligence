@@ -108,7 +108,7 @@ function SelectField({ label, wide, ...select }: FieldProps & SelectHTMLAttribut
   return (
     <div className={`hw-field hw-field--full ${wide ? styles.wide : ""}`}>
       <label className="hw-field__label" htmlFor={id}>{label}</label>
-      <div className="hw-input"><select id={id} className="hw-input__control" {...select} /></div>
+      <select id={id} className="hw-native-select" {...select} />
     </div>
   );
 }

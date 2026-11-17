@@ -40,19 +40,6 @@
 
 .patient { max-width: 480px; }
 
-/* The kit marks an invalid control red at once. An empty required field is not an error here:
-   the submit button stays disabled until it is filled. */
-.form :global(.hw-input):has(:required:invalid):not(:hover, :focus-within) {
-  --hw-input-border: var(--hw-color-border);
-}
-
-/* The kit greys a field that holds anything disabled; a select's disabled options leave it enabled. */
-.form :global(.hw-input):has(option:disabled):not(:has(select:disabled)) {
-  --hw-input-border: var(--hw-color-border);
-  cursor: auto;
-  background: var(--hw-color-surface);
-}
-
 .actions {
   display: flex;
   flex-wrap: wrap;

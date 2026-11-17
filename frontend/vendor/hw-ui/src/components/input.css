@@ -17,8 +17,14 @@
   }
   .hw-input:hover, .hw-input:focus-within { --hw-input-border: var(--hw-color-border-strong); }
   .hw-input:focus-within { box-shadow: var(--hw-focus-ring); }
-  .hw-input:has(:invalid:not(:placeholder-shown)), .hw-input:has([aria-invalid="true"]) { --hw-input-border: var(--hw-color-danger); }
-  .hw-input:has(:disabled) { cursor: not-allowed; background: var(--hw-color-fill-hover); --hw-input-border: var(--hw-color-border-subtle); }
+
+  /* Red only after the person has used the field (:user-invalid), or when the app sets aria-invalid.
+     Plain :invalid would mark every empty required field red before anyone has typed. */
+  .hw-input:has(.hw-input__control:user-invalid), .hw-input:has([aria-invalid="true"]) { --hw-input-border: var(--hw-color-danger); }
+
+  /* Only the control's own disabled state greys the wrapper: a bare :has(:disabled) also matches a
+     disabled <option> or a disabled clear button. */
+  .hw-input:has(.hw-input__control:disabled) { cursor: not-allowed; background: var(--hw-color-fill-hover); --hw-input-border: var(--hw-color-border-subtle); }
   .hw-input--sm { --hw-input-height: var(--hw-control-height-sm); }
   .hw-input--lg { --hw-input-height: var(--hw-control-height-lg); }
 

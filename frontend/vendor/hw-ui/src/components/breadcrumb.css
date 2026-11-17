@@ -1,7 +1,20 @@
 @layer hw.components {
   /* Markup: nav[aria-label=Breadcrumb] > ol.hw-breadcrumb > li > a | span[aria-current=page] */
   .hw-breadcrumb { display: flex; flex-wrap: wrap; gap: var(--hw-space-3); align-items: center; margin: 0; padding: 0; font-size: var(--hw-font-size-14); color: var(--hw-color-text-muted); list-style: none; }
-  .hw-breadcrumb li + li::before { content: "›"; margin-right: var(--hw-space-3); }
+
+  /* Separators are drawn, not typed, so screen readers do not read them out between the links. */
+  .hw-breadcrumb li + li::before {
+    content: "";
+    display: inline-block;
+    width: 0.4em;
+    height: 0.4em;
+    margin-right: calc(var(--hw-space-3) + 0.1em);
+    margin-left: -0.15em;
+    vertical-align: 0.14em;
+    border-top: 1.5px solid currentcolor;
+    border-right: 1.5px solid currentcolor;
+    transform: rotate(45deg);
+  }
   .hw-breadcrumb a { color: inherit; text-decoration: none; transition: color var(--hw-duration-2); }
   .hw-breadcrumb a:hover { color: var(--hw-color-text); text-decoration: underline; }
   .hw-breadcrumb [aria-current="page"] { color: var(--hw-color-text); }

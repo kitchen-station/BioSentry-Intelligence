@@ -30,9 +30,23 @@
     transition: box-shadow var(--hw-duration-3), color var(--hw-duration-2), transform var(--hw-motion-micro) var(--hw-ease-move);
   }
   .hw-tile:active, .hw-card--interactive:active { transform: scale(var(--hw-press-scale)); }
-  .hw-tile::after { content: "›"; margin-left: auto; color: var(--hw-color-brand-text); transition: transform var(--hw-duration-2); }
+
+  /* The chevron is drawn with borders, not a "›" character: text in generated content becomes part
+     of the link's accessible name ("Ward ›"). */
+  .hw-tile::after {
+    content: "";
+    flex-shrink: 0;
+    width: 0.44em;
+    height: 0.44em;
+    margin-right: 0.12em;
+    margin-left: auto;
+    border-top: 2px solid var(--hw-color-brand-text);
+    border-right: 2px solid var(--hw-color-brand-text);
+    transform: rotate(45deg);
+    transition: transform var(--hw-duration-2);
+  }
   .hw-tile:hover { color: var(--hw-color-brand-text); box-shadow: var(--hw-elevation-raised); }
-  .hw-tile:hover::after { transform: translateX(4px); }
+  .hw-tile:hover::after { transform: translateX(4px) rotate(45deg); }
 
   @media (width < 576px) { .hw-card { --hw-card-pad: var(--hw-space-5); } }
 }
