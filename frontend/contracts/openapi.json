@@ -674,6 +674,81 @@
         "title": "AlertUnavailable",
         "type": "object"
       },
+      "AnalyticsHour": {
+        "additionalProperties": false,
+        "description": "One hour ending at to_minute. Events use (from, to]; occupancy and NEWS2 are\nsnapshots at to. NEWS2 uses the latest stored bin ending in the preceding 15 minutes;\nabsent, unrebuildable or unranked-unit scores count as not_ranked.",
+        "properties": {
+          "admitted": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "beds_in_use": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "discharged": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "from_minute": {
+            "type": "number"
+          },
+          "news2": {
+            "$ref": "#/components/schemas/News2Counts"
+          },
+          "to_minute": {
+            "type": "number"
+          },
+          "transferred_in": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "transferred_out": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "from_minute",
+          "to_minute",
+          "beds_in_use",
+          "admitted",
+          "discharged",
+          "transferred_in",
+          "transferred_out",
+          "news2"
+        ],
+        "title": "AnalyticsHour",
+        "type": "object"
+      },
+      "AnalyticsShift": {
+        "additionalProperties": false,
+        "description": "Run-relative 12-hour shifts, clipped to the requested window. Alerts count scored\npatient bins ending in (from, to] with NEWS2 >=5 or a single parameter at 3, not runs of them.\nPatient-minutes sum stay overlap, including unranked patients. Unknown arrival times\ncontribute from the window start; they are not counted as admissions.",
+        "properties": {
+          "alerts": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "from_minute": {
+            "type": "number"
+          },
+          "patient_minutes": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "to_minute": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "from_minute",
+          "to_minute",
+          "alerts",
+          "patient_minutes"
+        ],
+        "title": "AnalyticsShift",
+        "type": "object"
+      },
       "BaselineComputed": {
         "additionalProperties": false,
         "properties": {
@@ -1136,6 +1211,36 @@
         ],
         "title": "FindingDirection",
         "type": "string"
+      },
+      "FinishedStayCount": {
+        "additionalProperties": false,
+        "description": "Finished stays grouped by arrival/departure minute, never individual identifiers.\nIncludes every exit outcome in the window; an unknown arrival remains null.",
+        "properties": {
+          "count": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "in_minute": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "out_minute": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "in_minute",
+          "out_minute",
+          "count"
+        ],
+        "title": "FinishedStayCount",
+        "type": "object"
       },
       "FlagMeasurement": {
         "additionalProperties": false,
@@ -2149,6 +2254,35 @@
         "title": "NewQuestion",
         "type": "object"
       },
+      "News2Counts": {
+        "additionalProperties": false,
+        "properties": {
+          "five_to_six": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "not_ranked": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "seven_plus": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "zero_to_four": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "zero_to_four",
+          "five_to_six",
+          "seven_plus",
+          "not_ranked"
+        ],
+        "title": "News2Counts",
+        "type": "object"
+      },
       "NumberMeasurement": {
         "additionalProperties": false,
         "properties": {
@@ -2931,6 +3065,49 @@
           "beds"
         ],
         "title": "OpenWard",
+        "type": "object"
+      },
+      "OpenWardAnalytics": {
+        "additionalProperties": false,
+        "description": "Last hours of ward time, oldest first, with zero-filled buckets. Transfers in are\narrivals linked by person, time and destination to a transferred stay in this run;\nother known arrivals are admissions. Discharged counts only the discharged outcome.",
+        "properties": {
+          "finished_stays": {
+            "items": {
+              "$ref": "#/components/schemas/FinishedStayCount"
+            },
+            "type": "array"
+          },
+          "hourly": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsHour"
+            },
+            "maxItems": 168,
+            "type": "array"
+          },
+          "origin": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "shifts": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsShift"
+            },
+            "maxItems": 15,
+            "type": "array"
+          },
+          "synthetic": {
+            "const": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "synthetic",
+          "origin",
+          "hourly",
+          "shifts",
+          "finished_stays"
+        ],
+        "title": "OpenWardAnalytics",
         "type": "object"
       },
       "OverviewActivity": {

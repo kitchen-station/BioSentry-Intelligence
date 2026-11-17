@@ -116,7 +116,7 @@ def test_on_it_answers_with_no_header_and_the_same_bytes_with_any_credential(wat
 def test_on_the_route_table_gains_only_this_route_and_every_other_still_wants_a_token(watch: Api) -> None:
     off = create_app(replace(watch.settings, open_ward_view=False), clock=watch.wall)
     table = _route_table(watch.client.app)
-    opened = ["/open-view", "/wards/{ward}/open-view", "/wards/{ward}/open-view/beds/{bed}"]
+    opened = ["/open-view", "/wards/{ward}/open-view", "/wards/{ward}/open-view/beds/{bed}", "/wards/{ward}/open-view/analytics"]
     assert sorted(set(table) - set(_route_table(off))) == [("GET", path) for path in sorted(opened)]
     assert set(_route_table(off)) <= set(table)
     cases = [{}, {"Authorization": "Basic abc"}, {"Authorization": "Bearer"}, {"Authorization": "Bearer rn-nobody"}]

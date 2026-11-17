@@ -73,7 +73,7 @@ def test_only_the_wiring_imports_the_model_modules() -> None:
         "services/model_signals.py",
         "services/ward.py",
     }
-    assert importers("biosentry.services.as_of") == {"services/model_signals.py", "services/history.py"}
+    assert importers("biosentry.services.as_of") == {"services/model_signals.py", "services/history.py", "services/analytics.py"}  # the open analytics count the rebuilt bins
 
 
 def test_the_arbiter_and_the_ranking_code_only_receive_results() -> None:

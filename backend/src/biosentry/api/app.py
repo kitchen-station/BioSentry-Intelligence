@@ -99,7 +99,8 @@ from biosentry.schemas.ingest import (
     WHOLE_RUN_KINDS,
 )
 from biosentry.schemas.lab import LabJob, LabReport, PatientQuestionJob, QuestionJob
-from biosentry.services import episodes, ingest, lab
+from biosentry.schemas.analytics import HOURS_MAX, OpenWardAnalytics
+from biosentry.services import analytics, episodes, ingest, lab
 from biosentry.services.baseline import BaselineService
 from biosentry.services.history import HistoryService
 from biosentry.services.overview import OverviewService
@@ -118,6 +119,8 @@ SIGN_IN_WINDOW = timedelta(minutes=15)
 ANONYMOUS_ROW_EVERY = timedelta(minutes=1)
 OPEN_VIEW_ACTION = "view_open_ward"
 OPEN_BED_ACTION = "view_open_bed"
+OPEN_ANALYTICS_ACTION = "view_open_analytics"
+ANALYTICS_PATH = "/wards/{ward}/open-view/analytics"
 OPEN_UNITS = "*"  # the audit resource of the open unit list: no unit id can be this
 OPEN_VIEW_WARNING = (
     "BIOSENTRY_OPEN_WARD_VIEW is on: GET /wards/{ward}/open-view shows the ward to anyone who can"
@@ -376,7 +379,7 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
     async def invalid_request(request: Request, exc: RequestValidationError) -> Response:
         route = request.scope.get("route")
         key = (request.method, getattr(route, "path", ""))
-        if key in UNAUTHENTICATED_WRITES:
+        if key in UNAUTHENTICATED_WRITES or key == ("GET", ANALYTICS_PATH):  # the open route reads no credential
             return unprocessable(exc)
         # Identity first, as on every route: a body that is not JSON fails before the
         # dependencies run, and an unidentified caller must be told nothing about it.
@@ -488,6 +491,19 @@ def create_app(settings: Settings | None = None, clock: Clock = utc_now) -> Fast
             if found is None:
                 raise HTTPException(status_code=404)  # no detail: the same bytes as an unknown path
             return found
+
+        @app.get(ANALYTICS_PATH, response_model=OpenWardAnalytics)
+        def open_analytics(ward: str, ctx: Ctx, hours: Annotated[int, Query(ge=1, le=HOURS_MAX)] = 24) -> OpenWardAnalytics:
+            """Counts only. No credential is read here: the answer is the same for every caller."""
+            known = ward in ctx.store.units and ctx.store.synthetic
+            outcome: Outcome = "ok" if known else "not_found"
+            resource = ward if known else "-"  # the unit, never the hours or the caller's path text
+            since = ctx.store.clock() - ANONYMOUS_ROW_EVERY
+            if not ctx.audit.count(OPEN_ANALYTICS_ACTION, resource, outcome, since):  # as open_view above
+                ctx.audit.append(None, OPEN_ANALYTICS_ACTION, resource, outcome)
+            if not known:
+                raise HTTPException(status_code=404)  # no detail: the same bytes as an unknown path
+            return analytics.open_analytics(ctx.store, ward, hours)
 
     @app.get("/wards", response_model=list[WardUnit])
     def list_wards(ctx: Ctx, who: Who) -> list[WardUnit]:
