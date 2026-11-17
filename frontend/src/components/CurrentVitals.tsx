@@ -72,6 +72,21 @@ export function CurrentVitals({ vitals, now }: { vitals: Vitals; now: number }):
       <VitalRow now={now} label="Consciousness" measurement={vitals.consciousness} flip points={p.consciousness} />
       <VitalRow now={now} label="Oxygen" measurement={vitals.supplemental_o2} format={formatOxygen} flip points={p.supplemental_o2} />
       <VitalRow now={now} label="SpO2 scale" measurement={vitals.spo2_scale} format={formatSpo2Scale} />
+      <Rhythm rhythm={vitals.rhythm} />
     </>
+  );
+}
+
+/** Display only: never scored. The source text is on screen and in the accessible label. */
+export function Rhythm({ rhythm }: { rhythm: Vitals["rhythm"] }): ReactElement {
+  const shown = rhythm.data.present ? (rhythm.data.value === "af" ? "AF" : "Sinus") : "--";
+  return (
+    <div className={styles.vitalRow}>
+      <dt className={styles.vitalLabel}>Rhythm</dt>
+      <dd className={styles.vitalValue} aria-label={`Rhythm ${shown === "--" ? "not recorded" : shown}. ${rhythm.source_text}`}>
+        {shown}
+        <span className={styles.nurseNote}> {rhythm.source_text}</span>
+      </dd>
+    </div>
   );
 }

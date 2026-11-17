@@ -207,7 +207,9 @@ def ended(history: dict[str, list[dict[str, Any]]]) -> dict[str, list[dict[str, 
         moment = datetime.fromisoformat(start) + timedelta(minutes=15)
         return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    return {v: [{**h, "time": end(h["time"])} for h in points] for v, points in history.items()}
+    # The cuff series are timestamped readings, not bins: they are served as stored.
+    return {v: points if v in ("systolic", "diastolic") else [{**h, "time": end(h["time"])} for h in points]
+            for v, points in history.items()}
 
 
 def test_the_fixture_detail_pages_are_reproduced(api: Api) -> None:
@@ -215,7 +217,7 @@ def test_the_fixture_detail_pages_are_reproduced(api: Api) -> None:
         detail = api.client.get(f"/patients/{row['id']}", headers=api.as_("rn-manalo")).json()
         assert detail["vital_history"] == ended(DATA["details"][row["id"]]["vital_history"])
         # the last bin of each vital ends at the ward's own time
-        assert {points[-1]["time"] for points in detail["vital_history"].values()} == {DATA["as_of"]}
+        assert {points[-1]["time"] for v, points in detail["vital_history"].items() if v not in ("systolic", "diastolic")} == {DATA["as_of"]}
         assert detail["tier_breakdown"] == bare(DATA["details"][row["id"]]["tier_breakdown"])
 
 
@@ -2064,3 +2066,38 @@ def test_the_command_feed_needs_the_ingest_key_and_the_newest_run(api: Api) -> N
     start(api, client_id="client-b")
     refused = commands(api, old)
     assert (refused.status_code, refused.json()) == (409, {"detail": REPLACED})
+
+
+# --- Rhythm and the five-vital history ----------------------------------------------------------
+
+
+def test_rhythm_is_not_recorded_until_sent(api: Api) -> None:
+    start(api)
+    rhythm = api.client.get("/patients/s-1", headers=api.as_("rn-delacruz")).json()["vitals"]["rhythm"]
+    assert rhythm["data"] == {"present": False, "reason": "not_recorded"} and rhythm["source_text"]
+
+
+def test_the_history_has_five_vitals_with_gaps_even_for_a_not_ranked_patient(api: Api) -> None:
+    # A refused cuff makes the patient NOT RANKED: its detail has no vitals block, but keeps its history.
+    start(api, patients=[{**sim_patient(), "observations": [
+        *sim_patient()["observations"],
+        obs("s-1", "blood_pressure", -5, "nurse", absent_reason="refused"),
+    ]}])
+    history = api.client.get("/patients/s-1", headers=api.as_("rn-delacruz")).json()["vital_history"]
+    assert [p["value"] for p in history["temperature"]] == [55.0, 70.0, None]
+    assert [(p["value"], p["source"]) for p in history["systolic"]] == [(88, "nurse"), (None, "nurse")]
+    assert [(p["value"], p["source"]) for p in history["diastolic"]] == [(52, "nurse"), (None, "nurse")]
+
+
+def test_a_rhythm_reading_changes_no_rank_or_score(api: Api) -> None:
+    start(api)
+    forward(api, 0)
+    run_id = api.sql("SELECT max(id) AS i FROM run")[0]["i"]
+    before = api.ward("rn-delacruz")["ranked"][0]
+    for minute, value in enumerate(("af", "sinus"), start=1):  # one row per minute: each reading gets its own
+        body = batch(minute=minute, patients=[], bins=[], events=[], observations=[obs("s-1", "rhythm", minute, "nurse", txt=value)])
+        assert api.post(f"/sim/runs/{run_id}/batch", body).status_code == 204
+        after = api.ward("rn-delacruz")["ranked"][0]
+        assert after["vitals"]["rhythm"]["data"] == {"present": True, "value": value}
+        strip = lambda row: {k: v for k, v in row.items() if k not in ("vitals", "last_update_s")}  # noqa: E731  (the clock moves with each batch)
+        assert strip(after) == strip(before)

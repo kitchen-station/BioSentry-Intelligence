@@ -138,6 +138,9 @@ export function WardRow({ row, role, now, ageOffsetS, compact = false, alert = f
           <span className="hw-ranklist__meta">
             {row.age ?? "--"}{row.sex ? ` ${row.sex}` : ""} &middot; Bed {row.bed}
           </span>
+          {v.rhythm.data.present && v.rhythm.data.value === "af" && (
+            <span className="hw-tag" title={v.rhythm.source_text} aria-label={`Atrial fibrillation. ${v.rhythm.source_text}`}>AF</span>
+          )}
         </div>
         {line !== null
           ? <p className="hw-ranklist__response">{line}</p>

@@ -255,7 +255,10 @@ def test_the_ward_read_runs_the_same_statements_as_before_and_reads_nothing_of_t
 def test_one_history_read_runs_four_statements_of_its_own(api: Api) -> None:
     start(api, patients=[stay("s-1", 20)])
     ran = statements(api, lambda s, a, w: HistoryService(s, a, w).compute("rn-delacruz", "s-1"))
-    assert len(ran) == 2 + 3 + 3 + 1  # scope, the patient read, then temperature, observations and events, and the episode
+    # scope, the patient read (plus one for the blood-pressure history, only this page reads it), then temperature,
+    # observations and events, and the episode
+    assert len(ran) == 2 + 3 + 1 + 3 + 1
+    assert sum("code = 'blood_pressure'" in q and "min(bin_at)" in q for q in ran) == 1
     assert sum("sim_episode" in q for q in ran) == 1
     assert sum("clinician_action" in q for q in ran) == 1 and sum("temperature" in q for q in ran) == 1
     assert sum("FROM observation" in q or "JOIN observation" in q for q in ran) >= 1

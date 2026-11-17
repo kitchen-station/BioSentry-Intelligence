@@ -59,6 +59,9 @@ def build(
                 heart_rate=[b for b in history.heart_rate if b.time >= since],
                 respiratory_rate=[b for b in history.respiratory_rate if b.time >= since],
                 spo2=[b for b in history.spo2 if b.time >= since],
+                temperature=[b for b in history.temperature if b.time >= since],
+                systolic=[b for b in history.systolic if b.time >= since],
+                diastolic=[b for b in history.diastolic if b.time >= since],
             ),
         )
         if baseline is not None:

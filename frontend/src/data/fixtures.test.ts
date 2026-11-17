@@ -30,7 +30,7 @@ const SOURCES: readonly ProvenanceSource[] = [
 ];
 const QUALITY: readonly QualityLevel[] = ["ok", "degraded", "missing"];
 // Nurse-entered vitals (CP1 added the structured BP and the NEWS2 oxygen inputs).
-const NURSE_VITALS = new Set(["blood_pressure", "consciousness", "spo2_scale", "supplemental_o2"]);
+const NURSE_VITALS = new Set(["blood_pressure", "rhythm", "consciousness", "spo2_scale", "supplemental_o2"]);
 // Ids of the sign-in profiles (src/pages/SignIn.tsx).
 const CLINICIANS = ["rn-delacruz", "rn-reyes", "rn-manalo", "md-santos", "md-aquino"];
 

@@ -5072,6 +5072,57 @@
         "title": "ResearchRow",
         "type": "object"
       },
+      "RhythmMeasurement": {
+        "additionalProperties": false,
+        "description": "Display-only rhythm observation; never a score or model input.",
+        "properties": {
+          "data": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RhythmPresent"
+              },
+              {
+                "$ref": "#/components/schemas/MeasurementAbsent"
+              }
+            ]
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "source_text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "provenance",
+          "source_text"
+        ],
+        "title": "RhythmMeasurement",
+        "type": "object"
+      },
+      "RhythmPresent": {
+        "additionalProperties": false,
+        "properties": {
+          "present": {
+            "const": true,
+            "type": "boolean"
+          },
+          "value": {
+            "enum": [
+              "sinus",
+              "af"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "present",
+          "value"
+        ],
+        "title": "RhythmPresent",
+        "type": "object"
+      },
       "RowModels": {
         "additionalProperties": false,
         "properties": {
@@ -5325,6 +5376,36 @@
           "source"
         ],
         "title": "SimulatedEpisode",
+        "type": "object"
+      },
+      "SourcedVitalHistory": {
+        "additionalProperties": false,
+        "description": "One timestamped nurse or cuff reading; null is an explicit missing observation.",
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/ProvenanceSource"
+          },
+          "time": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "time",
+          "value",
+          "source"
+        ],
+        "title": "SourcedVitalHistory",
         "type": "object"
       },
       "Spo2Scale": {
@@ -5731,6 +5812,12 @@
       "VitalHistoryFull": {
         "additionalProperties": false,
         "properties": {
+          "diastolic": {
+            "items": {
+              "$ref": "#/components/schemas/SourcedVitalHistory"
+            },
+            "type": "array"
+          },
           "heart_rate": {
             "items": {
               "$ref": "#/components/schemas/VitalHistory"
@@ -5748,12 +5835,27 @@
               "$ref": "#/components/schemas/VitalHistory"
             },
             "type": "array"
+          },
+          "systolic": {
+            "items": {
+              "$ref": "#/components/schemas/SourcedVitalHistory"
+            },
+            "type": "array"
+          },
+          "temperature": {
+            "items": {
+              "$ref": "#/components/schemas/VitalHistory"
+            },
+            "type": "array"
           }
         },
         "required": [
           "heart_rate",
           "respiratory_rate",
-          "spo2"
+          "spo2",
+          "temperature",
+          "systolic",
+          "diastolic"
         ],
         "title": "VitalHistoryFull",
         "type": "object"
@@ -5839,6 +5941,9 @@
           "respiratory_rate": {
             "$ref": "#/components/schemas/NumberMeasurement"
           },
+          "rhythm": {
+            "$ref": "#/components/schemas/RhythmMeasurement"
+          },
           "spo2": {
             "$ref": "#/components/schemas/NumberMeasurement"
           },
@@ -5860,7 +5965,8 @@
           "blood_pressure",
           "consciousness",
           "supplemental_o2",
-          "spo2_scale"
+          "spo2_scale",
+          "rhythm"
         ],
         "title": "Vitals",
         "type": "object"

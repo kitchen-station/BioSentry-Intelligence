@@ -73,10 +73,10 @@ class BaselineService:
         admitted_at = state.admitted_at
         vitals: list[BaselineComputed | BaselineForming | BaselineUnavailable] = []
         for vital in ORDER:
-            # Temperature has no full history in the patient read, so it has no baseline here. Systolic pressure is
+            # Preserve the existing baseline inputs: temperature history is display-only here. Systolic pressure is
             # charted, not streamed: its bins come from the stored observations, and no patch has to be live for it.
             charted = vital == "systolic_bp"
-            points = self._store.systolic_bins(patient_id) if charted else getattr(state.vital_history, vital, None)
+            points = self._store.systolic_bins(patient_id) if charted else (None if vital == "temperature" else getattr(state.vital_history, vital, None))
             if points is None:
                 vitals.append(
                     BaselineUnavailable(vital=vital, status="unavailable", reason="no_history")

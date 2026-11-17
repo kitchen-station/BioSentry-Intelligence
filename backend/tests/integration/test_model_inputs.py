@@ -79,7 +79,7 @@ def test_a_run_posted_as_the_simulator_builds_it_stores_temperature_for_the_whol
     heart = states["s-2"].vital_history.heart_rate
     assert len(heart) == len(temperature) == 120  # 30 hours of bins, not the seed's 12
     assert temperature[0].time == heart[0].time and temperature[-1].time == heart[-1].time
-    assert "temperature" not in states["s-2"].vital_history.model_dump()  # not in any response
+    assert [t.value for t in states["s-2"].vital_history.temperature] == [t.value for t in temperature]
 
 
 def test_the_two_batched_queries_return_what_the_rule_needs_in_one_statement_each(api: Api) -> None:

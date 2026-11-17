@@ -33,6 +33,7 @@ Code = Literal[
     "consciousness",
     "supplemental_o2",
     "spo2_scale",
+    "rhythm",
     *(name for name in LabPanel.model_fields if name != "freshness_hours"),
 ]
 Vital = Literal["heart_rate", "respiratory_rate", "spo2", "temperature"]
@@ -58,7 +59,7 @@ class Obs(Contract):
     minute: Minute
     num: Num | None = None
     num2: Num | None = None  # diastolic
-    txt: Literal["A", "C", "V", "P", "U"] | None = None  # ACVPU
+    txt: Literal["A", "C", "V", "P", "U", "sinus", "af"] | None = None  # ACVPU or rhythm
     absent_reason: Text | None = None
     source: ProvenanceSource
     quality: QualityLevel
@@ -66,9 +67,15 @@ class Obs(Contract):
     @model_validator(mode="after")
     def _a_value_or_a_reason(self) -> Self:
         given = {f for f in ("num", "num2", "txt") if getattr(self, f) is not None}
-        want = {"blood_pressure": {"num", "num2"}, "consciousness": {"txt"}}.get(self.code, {"num"})
+        want = {"blood_pressure": {"num", "num2"}, "consciousness": {"txt"}, "rhythm": {"txt"}}.get(self.code, {"num"})
         if given != (want if self.absent_reason is None else set()):
             raise ValueError("give the value this code takes, or the absent_reason, not both")
+        if self.txt is not None:
+            allowed = ("sinus", "af") if self.code == "rhythm" else ("A", "C", "V", "P", "U")
+            if self.txt not in allowed:
+                raise ValueError("txt must match the observation code")
+        if self.code == "rhythm" and self.source not in (ProvenanceSource.device, ProvenanceSource.nurse):
+            raise ValueError("rhythm must be a device or charted observation")
         return self
 
 

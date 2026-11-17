@@ -16,7 +16,7 @@ from biosentry.core.config import DEFAULT_DATASET, Settings, is_loopback, restri
 from biosentry.db.migrate import SETUP_LOCK, migrate
 from biosentry.db.passphrase import hash_passphrase
 from biosentry.repositories.postgres import (
-    HISTORY_VITALS,
+    DEVICE_VITALS,
     Conn,
     Obs,
     assign,
@@ -46,7 +46,7 @@ def _obs(patient_id: str, code: str, m: dict[str, Any]) -> Obs:
     value = data["value"]
     if code == "blood_pressure":
         return Obs(*common, num=value["systolic"], num2=value["diastolic"])
-    if code == "consciousness":
+    if code in ("consciousness", "rhythm"):
         return Obs(*common, txt=value)
     return Obs(*common, num=float(value))
 
@@ -127,14 +127,8 @@ def seed(conn: Conn, fixture: Path = DEFAULT_DATASET, dev_passphrase: bool = Fal
             # The fixture file gives each bin's start; the table holds its end, like a posted run.
             bins += [
                 (pid, v, parse(h["time"]) + timedelta(minutes=15), h["value"])
-                for v in HISTORY_VITALS
+                for v in DEVICE_VITALS
                 for h in history[v]
-            ]
-            # Temperature has a sparkline but no detail chart: only its last 12 bins exist.
-            temp = p["vital_trends"]["temperature"]
-            bins += [
-                (pid, "temperature", as_of - timedelta(minutes=15 * (len(temp) - 1 - i)), value)
-                for i, value in enumerate(temp)
             ]
         for pid in patients:
             assign(conn, run_id, pid, raw["ward"])
