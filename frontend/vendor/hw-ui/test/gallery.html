@@ -500,6 +500,86 @@
   </section>
   </div>
 
+  <h2 class="hw-section-title" id="h-patient">Patient (0.10 Phase 2)</h2>
+  <div class="g-wide hw-stack" style="--hw-stack-gap:var(--hw-space-5)">
+
+  <section class="hw-card hw-stack" aria-labelledby="h-pager">
+    <h3 id="h-pager" class="hw-heading hw-heading--4">Pager and phone action bar</h3>
+    <div class="hw-cluster" style="justify-content:space-between">
+      <div class="hw-pager" role="group" aria-label="Move through patients in rank order" id="pager-first">
+        <button class="hw-button" type="button" disabled><i class="hw-icon fa-solid fa-arrow-left" aria-hidden="true"></i>Previous<kbd class="hw-pager__key" aria-hidden="true">K</kbd></button>
+        <span class="hw-pager__position">1 of 9 in rank order</span>
+        <button class="hw-button" type="button"><kbd class="hw-pager__key" aria-hidden="true">J</kbd>Next<i class="hw-icon fa-solid fa-arrow-right" aria-hidden="true"></i></button>
+      </div>
+      <div class="hw-pager" role="group" aria-label="Move through patients in rank order" id="pager-last">
+        <button class="hw-button" type="button"><i class="hw-icon fa-solid fa-arrow-left" aria-hidden="true"></i>Previous<kbd class="hw-pager__key" aria-hidden="true">K</kbd></button>
+        <span class="hw-pager__position">9 of 9 in rank order</span>
+        <button class="hw-button" type="button" disabled><kbd class="hw-pager__key" aria-hidden="true">J</kbd>Next<i class="hw-icon fa-solid fa-arrow-right" aria-hidden="true"></i></button>
+      </div>
+    </div>
+    <p class="hw-caption">On a phone the action bar replaces the bottom tab bar on a detail screen (the app adds <code>hw-only-mobile</code>). Shown here in place, at phone width.</p>
+    <div style="max-width:390px">
+      <div class="hw-actionbar" id="actionbar">
+        <button class="hw-button hw-button--primary" type="button">Record vitals</button>
+        <button class="hw-button" type="button">Notes</button>
+        <button class="hw-button" type="button">Next<i class="hw-icon fa-solid fa-arrow-right" aria-hidden="true"></i></button>
+      </div>
+    </div>
+  </section>
+
+  <section class="hw-decision" aria-label="Decision, Santos, Maria" data-band="high" id="decision-high">
+    <div class="hw-decision__cell">
+      <p class="hw-decision__label">NEWS2</p>
+      <div class="hw-decision__reading">
+        <span class="hw-decision__score">9</span>
+        <span class="hw-decision__meta"><span class="hw-decision__band">High<i class="hw-icon fa-solid fa-arrow-up" aria-hidden="true"></i></span><span class="hw-decision__change">Up 4 since 02:00 AM</span></span>
+      </div>
+    </div>
+    <div class="hw-decision__cell">
+      <p class="hw-decision__label">Next step</p>
+      <p class="hw-decision__step">Call the medical team now (registrar or above)</p>
+      <p class="hw-decision__note">NEWS2 response for charge nurses</p>
+    </div>
+    <div class="hw-decision__cell">
+      <p class="hw-decision__label">Why this patient is up</p>
+      <ul class="hw-decision__reasons"><li class="hw-tag">Total 9 (≥7): high</li><li class="hw-tag">Single parameter at 3: systolic BP</li></ul>
+      <p class="hw-decision__model"><i class="hw-icon fa-solid fa-flask" aria-hidden="true"></i><span><strong>Prediction models · rank unchanged.</strong> Heart rate 118 vs 79 bpm own baseline (+39) · Flagged</span></p>
+    </div>
+    <div class="hw-decision__cell">
+      <p class="hw-decision__label">Signal</p>
+      <p class="hw-decision__signal">100%</p>
+      <p class="hw-decision__note">Patch · 10s ago</p>
+    </div>
+  </section>
+
+  <section class="hw-decision" aria-label="Decision, Flores, Ramon" id="decision-nr">
+    <div class="hw-decision__cell">
+      <p class="hw-decision__label">NEWS2</p>
+      <div class="hw-decision__reading">
+        <span class="hw-decision__score">–</span>
+        <span class="hw-decision__meta"><span class="hw-decision__band">NOT RANKED</span></span>
+      </div>
+    </div>
+    <div class="hw-decision__cell">
+      <p class="hw-decision__label">Next step</p>
+      <p class="hw-decision__step">Record a blood pressure</p>
+      <p class="hw-decision__note"><strong>Systolic BP missing.</strong> No place in the order until this is recorded.</p>
+    </div>
+    <div class="hw-decision__cell">
+      <p class="hw-decision__label">Why this patient is up</p>
+      <p class="hw-decision__text">Not scored yet.</p>
+      <p class="hw-decision__model"><i class="hw-icon fa-solid fa-flask" aria-hidden="true"></i><span><strong>Prediction models · rank unchanged.</strong> No flag. No flag is not an all-clear: NEWS2 alone sets the next step.</span></p>
+    </div>
+    <div class="hw-decision__cell">
+      <p class="hw-decision__label">Signal</p>
+      <p class="hw-decision__signal">100%</p>
+      <p class="hw-decision__note" data-stale>Stale · Patch · 7 min ago</p>
+    </div>
+  </section>
+
+  <section class="hw-card" style="max-width:900px"><div id="g-hr"></div></section>
+  </div>
+
   <h2 class="hw-section-title" id="h-graphs">Graphs</h2>
   <div class="hw-grid g-grid" data-hw-reveal="stagger">
     <section class="hw-card">
@@ -592,8 +672,20 @@
 </nav>
 
 <script type="module">
-  import { initAll, toast, bars, share, leave, cancelLeave } from '../src/js/index.js';
-  window.hw = { destroy: initAll(), toast, leave };
+  import { initAll, toast, bars, share, trend, leave, cancelLeave } from '../src/js/index.js';
+  window.hw = { destroy: initAll(), toast, leave, trend };
+  // Patient trend: clinical y-range, the NEWS2 heart-rate thresholds (+1 at 50 or below, +1 above 90, +2 above 110),
+  // the patient's own usual range, and red only where the reading adds points.
+  const hhmm = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  trend(document.getElementById('g-hr'), {
+    title: 'Heart rate has added NEWS2 points since 08:30', subtitle: 'Santos, M., bed 4A. Every 15 minutes for six hours, against her own usual range. Sample data.',
+    x: Array.from({ length: 24 }, (_, i) => hhmm(315 + 15 * i)), xLabel: 'Time', unit: ' bpm',
+    series: [{ name: 'Heart rate', values: [78, 80, 79, 82, 81, 84, 96, 93, 86, 83, null, 85, 88, 91, 94, 97, 101, 104, 108, 112, 109, 113, 116, 118] }],
+    range: [40, 140],
+    limits: [{ at: 50, label: '+1 point at 50 or below' }, { at: 90, label: '+1 point above 90' }, { at: 110, label: '+2 points above 110' }],
+    band: [72, 88], bandLabel: 'Own usual 72–88',
+    highlightWhere: (v) => v > 90 || v <= 50,
+  });
   bars(document.getElementById('g-bars'), {
     title: 'Both models catch more deteriorations than NEWS2 alone', subtitle: 'Share of deteriorations flagged early, held-out wards',
     items: [{ name: 'NEWS2 alone', value: 36 }, { name: 'Student model', value: 56 }, { name: 'Checked student', value: 57 }],

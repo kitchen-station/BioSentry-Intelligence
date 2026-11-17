@@ -1,0 +1,97 @@
+@layer hw.components {
+  /* Decision strip: the top of the Patient page. Four cells divided by subtle lines: NEWS2, next step, why, signal.
+     One row from 1200px, two by two from 576px, stacked on phones. Leave a cell out and the lines still fall right.
+     section.hw-decision[aria-label="Decision"][data-band=high|medium|low]   no data-band when NOT RANKED (ink)
+       > div.hw-decision__cell                                                 NEWS2
+           > p.hw-decision__label ("NEWS2")
+           + div.hw-decision__reading
+               > span.hw-decision__score ("9" | "–")                           band colour
+               + span.hw-decision__meta
+                   > span.hw-decision__band ("High" + i.hw-icon.fa-solid.fa-arrow-up[aria-hidden] when rising | "NOT RANKED")
+                   + span.hw-decision__change ("Up 4 since 02:00 AM")
+       + div.hw-decision__cell                                                 Next step
+           > p.hw-decision__label ("Next step")
+           + p.hw-decision__step ("Call the medical team now (registrar or above)" | "—" | "Record a blood pressure")
+           + p.hw-decision__note ("NEWS2 response for charge nurses" | "Obs due 11:24 AM"
+                                  | strong "Systolic BP missing." + " No place in the order until this is recorded.")
+       + div.hw-decision__cell                                                 Why
+           > p.hw-decision__label ("Why this patient is up")
+           + ul.hw-decision__reasons > li.hw-tag ("Total 9 (≥7): high", "Single parameter at 3: heart rate")
+             | p.hw-decision__text ("No NEWS2 trigger at this score." | "Not scored yet.")
+           + p.hw-decision__model > i.hw-icon.fa-solid.fa-flask[aria-hidden] + span
+               > strong ("Prediction models · rank unchanged.") + " Heart rate 118 vs 79 bpm own baseline (+39) · Flagged"
+       + div.hw-decision__cell                                                 Signal
+           > p.hw-decision__label ("Signal")
+           + p.hw-decision__signal ("100%" | "–")
+           + p.hw-decision__note[data-stale] ("Patch · 10s ago"; data-stale: "Stale · Patch · 7 min ago", red and bold)
+     Band colour (score, band word, next step): high = emergency text, medium (and Low-medium) = urgent text,
+     low and NOT RANKED = ink. The band is always written next to the number. */
+  .hw-decision {
+    --hw-decision-band-fg: var(--hw-color-text);
+    --hw-decision-bg: var(--hw-color-surface);
+    --hw-decision-line: var(--hw-color-border-subtle);
+    --hw-decision-cols: minmax(0, 1fr);
+    --hw-decision-pad: var(--hw-space-5);
+    --hw-decision-score-size: 60px;
+    --hw-decision-step-size: var(--hw-font-size-18);
+
+    display: grid;
+    grid-template-columns: var(--hw-decision-cols);
+    overflow: clip;              /* trims each cell's dividing lines at the strip's outer edge */
+    background: var(--hw-decision-bg);
+    border-radius: var(--hw-card-radius);
+  }
+  .hw-decision[data-band="high"] { --hw-decision-band-fg: var(--hw-graph-emergency-text); }
+  .hw-decision[data-band="medium"] { --hw-decision-band-fg: var(--hw-graph-urgent-text); }
+
+  /* Every cell draws a line on its top and left edge; the strip clips the ones on its outer edge, so the lines
+     fall between cells in any column count. */
+  .hw-decision__cell { min-width: 0; padding: var(--hw-decision-pad); box-shadow: -1px -1px 0 var(--hw-decision-line); }
+
+  .hw-decision__label { margin: 0; font-size: 13px; color: var(--hw-color-text-muted); }
+  .hw-decision__reading { display: flex; gap: 14px; align-items: flex-end; margin-top: var(--hw-space-1); }
+  .hw-decision__score {
+    font-size: var(--hw-decision-score-size);
+    font-weight: var(--hw-weight-light);
+    font-variant-numeric: tabular-nums;
+    line-height: .95;
+    color: var(--hw-decision-band-fg);
+  }
+  .hw-decision__meta { display: grid; padding-bottom: 6px; }
+  .hw-decision__band { display: flex; gap: var(--hw-space-2); align-items: center; font-size: var(--hw-font-size-16); font-weight: var(--hw-weight-bold); color: var(--hw-decision-band-fg); }
+  .hw-decision__band > .hw-icon { --hw-icon-size: 14px; }
+  .hw-decision__change { font-size: 13px; color: var(--hw-color-text-muted); }
+
+  .hw-decision__step { margin: 6px 0 0; font-size: var(--hw-decision-step-size); font-weight: var(--hw-weight-medium); line-height: 1.3; color: var(--hw-decision-band-fg); }
+  .hw-decision__note { margin: 6px 0 0; font-size: 13px; color: var(--hw-color-text-muted); }
+  .hw-decision__note > strong { color: var(--hw-color-text); }
+  .hw-decision__note[data-stale]:not([data-stale="false"]) { font-weight: var(--hw-weight-bold); color: var(--hw-graph-emergency-text); }
+  .hw-decision__text { margin: var(--hw-space-3) 0 0; }
+
+  .hw-decision__reasons { display: flex; flex-wrap: wrap; gap: 6px; margin: var(--hw-space-3) 0 0; padding: 0; list-style: none; }
+  .hw-decision__model {
+    display: flex;
+    gap: 10px;
+    margin: 14px 0 0;
+    padding: 10px var(--hw-space-4);
+    font-size: 13px;
+    color: var(--hw-color-info-fg);
+    background: var(--hw-color-info-bg);
+    border-radius: var(--hw-radius-md);
+  }
+  .hw-decision__model > .hw-icon { flex-shrink: 0; margin-top: 3px; }
+
+  .hw-decision__signal { margin: var(--hw-space-1) 0 0; font-size: 40px; font-weight: var(--hw-weight-light); font-variant-numeric: tabular-nums; line-height: 1.15; }
+
+  @media (width >= 576px) {
+    .hw-decision {
+      --hw-decision-cols: repeat(2, minmax(0, 1fr));
+      --hw-decision-pad: 20px var(--hw-space-6);
+      --hw-decision-score-size: 72px;
+      --hw-decision-step-size: 22px;
+    }
+  }
+  @media (width >= 1200px) {
+    .hw-decision { --hw-decision-cols: 250px minmax(0, 1.15fr) minmax(0, 1.4fr) 190px; }
+  }
+}

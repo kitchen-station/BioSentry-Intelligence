@@ -2,7 +2,8 @@
   /* Graphs (js/graph/). One frame for every type:
      .hw-graph > .hw-graph__head (title + subtitle) + p.hw-graph__readout (value + reading) + [keys] + .hw-graph__plot + .hw-graph__foot
      The readout sentence replaces tooltips. One mark is highlighted ([data-on] or [aria-pressed="true"]); the rest is context.
-     All colour comes from --hw-graph-* tokens. Text never wears a mark colour except a limit's own name. */
+     All colour comes from --hw-graph-* tokens. Text never wears a mark colour except a limit's own name and the
+     readout number, which takes its mark's tone (steps) or the highlight while the reading passes highlightWhere (trend). */
   .hw-graph { display: flex; flex-direction: column; min-width: 0; color: var(--hw-color-text); }
   .hw-graph__title { margin: 0; font-size: 19px; font-weight: var(--hw-weight-medium); line-height: 1.3; text-wrap: balance; }
   .hw-graph__subtitle { margin: var(--hw-space-2) 0 0; font-size: 13px; color: var(--hw-color-text-muted); }
@@ -13,6 +14,7 @@
   .hw-graph__value { font-size: 44px; font-weight: var(--hw-weight-light); font-variant-numeric: tabular-nums; line-height: 1; white-space: nowrap; }
   .hw-graph__readout[data-tone="urgent"] > .hw-graph__value { color: var(--hw-graph-urgent-text); }
   .hw-graph__readout[data-tone="emergency"] > .hw-graph__value { color: var(--hw-graph-emergency-text); }
+  .hw-graph__readout[data-tone="highlight"] > .hw-graph__value { color: var(--hw-graph-highlight); } /* trend: the reading passes highlightWhere */
   .hw-graph__reading { display: grid; min-width: 0; padding-bottom: 3px; }
   .hw-graph__label { font-weight: var(--hw-weight-medium); }
   .hw-graph__detail { font-size: 13px; color: var(--hw-color-text-muted); }
@@ -67,6 +69,13 @@
   .hw-graph__end { dominant-baseline: middle; fill: var(--hw-color-text-muted); }
   .hw-graph__end[data-on] { font-weight: var(--hw-weight-bold); fill: var(--hw-color-text); }
   .hw-graph__end-value { font-weight: var(--hw-weight-bold); fill: var(--hw-color-text); }
+  /* Trend reference marks (range, limits, band options): a shaded band, dashed limits, each named at the right
+     end; on a narrow plot the names sit inside it with a surface halo so a line can pass behind them. */
+  .hw-graph__band { fill: var(--hw-graph-band); fill-opacity: .5; } /* an area under the lines: half the strength of the range pill */
+  .hw-graph__band-label { dominant-baseline: middle; fill: var(--hw-color-text-muted); }
+  .hw-graph__band-label--inside { dominant-baseline: auto; font-size: 11px; }
+  .hw-graph__limit[data-dashed] { stroke: var(--hw-graph-context-strong); stroke-dasharray: 5 4; }
+  .hw-graph__limit-label--inside, .hw-graph__band-label--inside { paint-order: stroke; stroke: var(--hw-graph-surface); stroke-width: 3px; stroke-linejoin: round; }
 
   /* Bars */
   .hw-graph__rows { display: grid; margin-top: var(--hw-space-3); }
