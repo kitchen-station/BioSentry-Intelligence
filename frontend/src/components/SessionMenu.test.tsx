@@ -173,13 +173,20 @@ describe("SessionMenu", () => {
     expect(screen.queryByRole("link", { name: "Pipeline" })).toBeNull();
   });
 
-  it("closes when the backdrop is clicked", async () => {
+  it("closes on a press outside it and on Escape, which gives focus back to the trigger", async () => {
     menu({ clinician_id: "rn-reyes", ward: "W4", role: "rn" });
     await open("rn-reyes");
-    const backdrop = screen.getByText("Ward W4").closest("div")!.parentElement!
-      .previousElementSibling as HTMLElement;
-    await userEvent.click(backdrop);
+    expect(screen.getByRole("button", { name: /rn-reyes/ }).getAttribute("aria-expanded")).toBe("true");
+    await userEvent.click(screen.getByText("Ward W4")); // inside the panel: it stays
+    expect(screen.getByText("Ward W4")).toBeTruthy();
+    await userEvent.click(document.body);
     expect(screen.queryByText("Ward W4")).toBeNull();
+    await open("rn-reyes");
+    await userEvent.keyboard("{Shift}"); // any other key leaves it open
+    expect(screen.getByText("Ward W4")).toBeTruthy();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByText("Ward W4")).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: /rn-reyes/ }));
   });
 
   it("keeps Ward Monitor, Station and Overview out of the dropdown", async () => {

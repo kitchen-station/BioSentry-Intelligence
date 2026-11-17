@@ -483,11 +483,11 @@ applied to made-up patients.
   `shown` unit gets a NEWS2 band and an `unranked` unit gets nothing.
 - **Ward view** must be filtered server-side to the signed-in clinician's patients, on every
   call. The API does this from its care assignments; the fixture provider stands in when there is no API.
-- **Look:** follows the studio brand book (foundation v1), kept quiet for a clinical surface.
-  Paper ground, Flour cards, Linen hairlines, Char ink; Slate only for chart lines, never text;
-  Scorch marks what needs action (NEWS2 7+ solid, 5-6 or a single 3 as an edge), sage marks
-  stable. Fraunces for names, Spectral for text, IBM Plex Mono for numbers and labels, Hanken
-  Grotesk for buttons. No dots, shadows or gradients. Tokens are in `frontend/src/index.css`.
+- **Look:** built on hw-ui, our Huawei-inspired UI kit (vendored in `frontend/vendor/hw-ui`), in its
+  Cloud console family: grey surfaces, near-black actions, HarmonyOS Sans (bundled, unmodified) and
+  Font Awesome Free icons. Colour marks only what needs action: emergency red for NEWS2 7+, urgent
+  orange for 5-6 or a single 3, red text for a value that adds points; everything else is grey. Pages
+  use kit classes; their CSS modules hold layout only and read kit tokens (`frontend/src/index.css`).
 - **Role-aware:** each row shows the NEWS2 response for the signed-in role (RCP 2017, Chart 4):
   a nurse sees whom to call, a physician sees what assessment is due.
 

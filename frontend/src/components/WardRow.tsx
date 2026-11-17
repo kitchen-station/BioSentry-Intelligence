@@ -45,7 +45,7 @@ export function WardRow({ row, role, now, ageOffsetS }: Props) {
   const patch = patchInUse(row.vitals);
   return (
     <Link to={`/patient/${row.id}`} className={styles.link}>
-      <div className={styles.row} data-band={b}>
+      <div className={`hw-card hw-card--interactive ${styles.row}`} data-band={b}>
         {/* Rank + score */}
         <div className={styles.rankCol}>
           <span className={styles.rank}><Flip>{row.rank}</Flip></span>
@@ -62,16 +62,16 @@ export function WardRow({ row, role, now, ageOffsetS }: Props) {
             <span className={styles.detail}>
               {row.age ?? "--"}{row.sex ? ` ${row.sex}` : ""} &middot; Bed {row.bed}
             </span>
-            {nurse !== null && <span className={styles.updateTag}>{nurse}</span>}
+            {nurse !== null && <span className={`hw-tag ${styles.updateTag}`}>{nurse}</span>}
             {patch && row.signal_quality !== null && row.signal_quality <= 90 && (
-              <span className={styles.signalLow}>Signal {row.signal_quality}%</span>
+              <span className="hw-tag hw-tag--warning">Signal {row.signal_quality}%</span>
             )}
             {patch && age !== null ? (
-              <span className={styles.updateTag} data-stale={age > STALE_AFTER_S || undefined}>
+              <span className={`hw-tag ${styles.updateTag}`} data-stale={age > STALE_AFTER_S || undefined}>
                 {age > STALE_AFTER_S ? "Stale · " : ""}{formatAge(Math.floor(age))}
               </span>
             ) : (
-              (!patch || row.signal_quality === null) && <span className={styles.updateTag}>No patch signal</span>
+              (!patch || row.signal_quality === null) && <span className={`hw-tag ${styles.updateTag}`}>No patch signal</span>
             )}
           </div>
           <div className={styles.context}>{row.admitting_context}</div>

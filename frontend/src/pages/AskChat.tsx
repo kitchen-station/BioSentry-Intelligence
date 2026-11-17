@@ -3,15 +3,17 @@ import { NavLink, useParams } from "react-router-dom";
 import type { Session } from "../types";
 import { ApiError, getWard, hasLabQuestions, hasPatientQuestions } from "../api";
 import { SimulatedNote } from "../components/LabFrame";
-import { SessionMenu } from "../components/SessionMenu";
+import { AppShell } from "../components/AppShell";
 import { Thread } from "../components/Thread";
-import ward from "./Ward.module.css";
 import styles from "./AskChat.module.css";
 
 interface Props {
   session: Session;
   onSignOut: () => void;
 }
+
+// A thread is a pill link; the current one (aria-current) gets its heavier edge in the module.
+const PICK = `hw-button hw-button--sm ${styles.pick}`;
 
 function Chat({ session, onSignOut, patientId }: Props & { patientId?: string }) {
   // The reader's patients, ranked and not ranked, for the picker. Without them the ward's thread still works.
@@ -29,22 +31,24 @@ function Chat({ session, onSignOut, patientId }: Props & { patientId?: string })
 
   return (
     <>
-      <nav aria-label="Threads">
+      <nav aria-label="Threads" className={styles.threads}>
         <ul className={styles.picker}>
-          <li><NavLink to="/ask" end className={styles.pick}>The ward</NavLink></li>
+          <li><NavLink to="/ask" end className={PICK}>The ward</NavLink></li>
           {patients?.map((p) => (
-            <li key={p.id}><NavLink to={`/ask/patient/${p.id}`} className={styles.pick}>{p.name}</NavLink></li>
+            <li key={p.id}><NavLink to={`/ask/patient/${p.id}`} className={PICK}>{p.name}</NavLink></li>
           ))}
         </ul>
-        {failed && <p className={styles.quiet}>The patient list could not be loaded.</p>}
+        {failed && <p className="hw-caption">The patient list could not be loaded.</p>}
       </nav>
-      {/* key: a new thread starts with its own state. */}
-      <Thread
-        key={patientId ?? "ward"}
-        scope={patientId ? { kind: "patient", id: patientId } : { kind: "ward" }}
-        clinicianId={session.clinician_id}
-        onSignOut={onSignOut}
-      />
+      <div className={`hw-card hw-card--outlined ${styles.chat}`}>
+        {/* key: a new thread starts with its own state. */}
+        <Thread
+          key={patientId ?? "ward"}
+          scope={patientId ? { kind: "patient", id: patientId } : { kind: "ward" }}
+          clinicianId={session.clinician_id}
+          onSignOut={onSignOut}
+        />
+      </div>
     </>
   );
 }
@@ -54,29 +58,16 @@ export function AskChat({ session, onSignOut }: Props) {
   const { id } = useParams();
   const connected = id ? hasPatientQuestions : hasLabQuestions;
   return (
-    <div className={ward.page}>
-      <div className={ward.statusBar}>
-        <div className={ward.statusInner}>
-          <div className={ward.statusLeft}>
-            <span className={ward.statusItem}>
-              <span className={ward.statusLabel}>BioSentry</span>
-              <span className={ward.statusValue}>Ward {session.ward}</span>
-            </span>
-          </div>
-          <div className={ward.statusRight}>
-            <SessionMenu session={session} onSignOut={onSignOut} />
-          </div>
-        </div>
-      </div>
+    <AppShell session={session} onSignOut={onSignOut} title="Ask" status={`Ward ${session.ward}`}>
       <SimulatedNote />
-      <main className={ward.container}>
-        <h1 className={styles.title}>Ask</h1>
+      <div className={styles.container}>
+        <h1 className="hw-heading hw-heading--3">Ask</h1>
         {connected ? (
           <Chat session={session} onSignOut={onSignOut} patientId={id} />
         ) : (
-          <p className={styles.quiet}>Getting ready: the chat is not connected in this demo.</p>
+          <p className="hw-text-muted">Getting ready: the chat is not connected in this demo.</p>
         )}
-      </main>
-    </div>
+      </div>
+    </AppShell>
   );
 }

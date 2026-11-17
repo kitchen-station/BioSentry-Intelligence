@@ -1,0 +1,46 @@
+@layer hw.base {
+  .hw-heading {
+    margin: 0;
+    font-weight: var(--hw-weight-semibold);
+    line-height: 1.5;
+    color: var(--hw-color-text);
+  }
+  .hw-heading--1 { font-size: var(--hw-font-size-40); line-height: 1.25; }
+  .hw-heading--2 { font-size: var(--hw-font-size-32); }
+  .hw-heading--3 { font-size: var(--hw-font-size-24); }
+  .hw-heading--4 { font-size: var(--hw-font-size-18); }
+
+  /* Section title with the 60×2 brand bar (huawei.com signature) */
+  .hw-section-title {
+    position: relative;
+    display: inline-block;
+    margin: 0 0 var(--hw-space-6);
+    padding-bottom: var(--hw-space-3);
+    font-size: var(--hw-font-size-32);
+    font-weight: var(--hw-weight-semibold);
+    line-height: 1.5;
+  }
+  .hw-section-title::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 60px;
+    height: 2px;
+    background: var(--hw-color-brand);
+  }
+  .hw-section-title--center { display: block; text-align: center; }
+  .hw-section-title--center::after { left: 50%; transform: translateX(-50%); }
+
+  .hw-eyebrow { font-size: var(--hw-font-size-16); color: var(--hw-color-brand-text); }
+  .hw-text-muted { color: var(--hw-color-text-muted); }
+  .hw-caption { font-size: var(--hw-text-caption); color: var(--hw-color-text-muted); }
+  .hw-num { font-variant-numeric: tabular-nums; }
+}
+
+@layer hw.base {
+  @media (width < 768px) {
+    .hw-heading--1 { font-size: var(--hw-font-size-32); }
+    .hw-heading--2, .hw-section-title { font-size: var(--hw-font-size-24); }
+  }
+}

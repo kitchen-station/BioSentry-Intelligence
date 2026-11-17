@@ -1,23 +1,8 @@
 /* The patient page's Ask panel: its heading and the button that opens the chat. */
 
 .heading {
-  font-family: var(--font-mono);
-  font-weight: 500;
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--label);
-  margin-bottom: var(--sp-3);
-}
-
-.open {
-  min-height: 44px;
-  padding: 0 var(--sp-3);
-  font-family: var(--font-sans);
-  font-size: 13px;
-  color: var(--ink);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  cursor: pointer;
+  margin-bottom: var(--hw-space-4);
+  font-size: var(--hw-font-size-16);
+  font-weight: var(--hw-weight-semibold);
+  color: var(--hw-color-text);
 }

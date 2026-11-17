@@ -1,0 +1,52 @@
+@layer hw.components {
+  .hw-card {
+    --hw-card-pad: var(--hw-space-6);
+
+    padding: var(--hw-card-pad);
+    background: var(--hw-color-surface);
+    border-radius: var(--hw-card-radius);
+    transition: box-shadow var(--hw-duration-3), transform var(--hw-motion-micro) var(--hw-ease-move);
+  }
+  .hw-card--interactive { cursor: pointer; }
+  .hw-card--interactive:hover { box-shadow: var(--hw-elevation-raised); }
+  .hw-card--outlined { border: 1px solid var(--hw-color-border-subtle); }
+  .hw-card__media { margin: calc(var(--hw-card-pad) * -1) calc(var(--hw-card-pad) * -1) var(--hw-card-pad); overflow: hidden; border-radius: var(--hw-card-radius) var(--hw-card-radius) 0 0; }
+  .hw-card__media > img { display: block; width: 100%; transition: transform 500ms var(--hw-ease-standard); }
+  .hw-card--interactive:hover .hw-card__media > img { transform: scale(1.05); }
+  .hw-card__title { margin: 0 0 var(--hw-space-2); font-size: var(--hw-font-size-18); font-weight: var(--hw-weight-semibold); }
+
+  /* Tile: icon + name + chevron (huawei.com "What we do") */
+  .hw-tile {
+    display: flex;
+    gap: var(--hw-space-4);
+    align-items: center;
+    padding: 20px;
+    font-size: var(--hw-font-size-18);
+    font-weight: var(--hw-weight-semibold);
+    color: var(--hw-color-text);
+    text-decoration: none;
+    background: var(--hw-color-surface);
+    border-radius: var(--hw-card-radius);
+    transition: box-shadow var(--hw-duration-3), color var(--hw-duration-2), transform var(--hw-motion-micro) var(--hw-ease-move);
+  }
+  .hw-tile:active, .hw-card--interactive:active { transform: scale(var(--hw-press-scale)); }
+
+  /* The chevron is drawn with borders, not a "›" character: text in generated content becomes part
+     of the link's accessible name ("Ward ›"). */
+  .hw-tile::after {
+    content: "";
+    flex-shrink: 0;
+    width: 0.44em;
+    height: 0.44em;
+    margin-right: 0.12em;
+    margin-left: auto;
+    border-top: 2px solid var(--hw-color-brand-text);
+    border-right: 2px solid var(--hw-color-brand-text);
+    transform: rotate(45deg);
+    transition: transform var(--hw-duration-2);
+  }
+  .hw-tile:hover { color: var(--hw-color-brand-text); box-shadow: var(--hw-elevation-raised); }
+  .hw-tile:hover::after { transform: translateX(4px) rotate(45deg); }
+
+  @media (width < 576px) { .hw-card { --hw-card-pad: var(--hw-space-5); } }
+}

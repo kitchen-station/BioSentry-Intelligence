@@ -1,0 +1,39 @@
+@layer hw.components {
+  /* Behaviour: js/menu.js. Markup: button[aria-haspopup=menu] + .hw-menu[role=menu] */
+  .hw-menu-anchor { position: relative; display: inline-block; }
+  .hw-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: var(--hw-z-popup);
+    min-width: 180px;
+    margin: 0;
+    padding: var(--hw-space-2) 0;
+    list-style: none;
+    background: var(--hw-color-surface);
+    border: 1px solid var(--hw-color-border-subtle);
+    border-radius: var(--hw-popup-radius);
+    box-shadow: var(--hw-elevation-raised);
+    transform-origin: top;
+    animation: hw-pop-in var(--hw-motion-micro) var(--hw-ease-enter);
+  }
+  .hw-menu[data-hw-leaving] { animation: hw-pop-out var(--hw-motion-micro) var(--hw-ease-exit) forwards; }
+  .hw-menu[data-align="end"] { right: 0; left: auto; }
+  .hw-menu__item {
+    display: flex;
+    gap: var(--hw-space-3);
+    align-items: center;
+    width: 100%;
+    padding: var(--hw-space-3) var(--hw-space-5);
+    font-size: var(--hw-font-size-14);
+    text-align: left;
+    cursor: pointer;
+    background: none;
+    border: 0;
+    transition: background-color var(--hw-duration-1), color var(--hw-duration-1);
+  }
+  .hw-menu__item:hover, .hw-menu__item:focus-visible { color: var(--hw-color-brand-text); background: var(--hw-color-fill-hover); box-shadow: none; }
+  .hw-menu__item--danger { color: var(--hw-color-danger-fg); }
+  .hw-menu__item[aria-disabled="true"] { cursor: not-allowed; color: var(--hw-color-text-subtle); background: none; }
+  .hw-menu__separator { height: 1px; margin: var(--hw-space-2) 0; background: var(--hw-color-border-subtle); }
+}

@@ -1,23 +1,25 @@
-/* ============================================================
-   Change from the patient's own baseline (Tier B, research).
-   Ember marks a finding, Scorch only a stale reading. Words carry
-   every meaning; no dots, gradients or shadows.
-   ============================================================ */
+/* Change from the patient's own baseline (Tier B, research). Grey only: a baseline flag is not a
+   NEWS2 trigger. A stale reading is the one thing in red, and it is also worded. */
+
+.range {
+  margin-bottom: var(--hw-space-6);
+}
 
 .panel {
-  margin-top: var(--sp-3);
-  padding-top: var(--sp-3);
-  border-top: 1px solid var(--border);
+  margin-top: var(--hw-space-5);
+  padding-top: var(--hw-space-5);
+  border-top: 1px solid var(--hw-color-border-subtle);
+}
+
+.range + .panel {
+  margin-top: 0;
 }
 
 .heading {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--label);
-  margin-bottom: var(--sp-2);
+  margin-bottom: var(--hw-space-2);
+  font-size: var(--hw-font-size-16);
+  font-weight: var(--hw-weight-semibold);
+  color: var(--hw-color-text);
 }
 
 .list {
@@ -25,46 +27,40 @@
 }
 
 .item {
-  font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 1.5;
-  padding: var(--sp-2) 0 var(--sp-2) var(--sp-2);
-  border-left: 3px solid transparent;
-  border-bottom: 1px solid var(--border);
+  padding: var(--hw-space-3) 0 var(--hw-space-3) var(--hw-space-4);
+  font-size: var(--hw-font-size-14);
+  line-height: 1.6;
   overflow-wrap: anywhere;
+  border-bottom: 1px solid var(--hw-color-border-subtle);
+  border-left: 2px solid transparent;
 }
 
 .item:last-child {
-  border-bottom: none;
+  border-bottom: 0;
 }
 
 .item[data-significant] {
-  border-left-color: var(--accent);
-  font-weight: 500;
+  font-weight: var(--hw-weight-medium);
+  border-left-color: var(--hw-color-text);
 }
 
 .name {
-  color: var(--ink);
+  color: var(--hw-color-text);
 }
 
 .num {
-  font-family: var(--font-mono);
-  font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
 
 .flag {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--accent);
+  font-weight: var(--hw-weight-semibold);
 }
 
 .secondary,
 .sub {
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--label);
+  font-size: var(--hw-text-caption);
+  font-weight: var(--hw-weight-regular);
+  color: var(--hw-color-text-muted);
 }
 
 .sub {
@@ -72,20 +68,18 @@
 }
 
 .sub[data-stale] {
-  color: var(--alert);
-  font-weight: 500;
+  font-weight: var(--hw-weight-medium);
+  color: var(--hw-color-danger-fg);
 }
 
 .label,
 .quiet {
-  font-family: var(--font-sans);
-  font-size: 12px;
+  font-size: var(--hw-text-caption);
   line-height: 1.5;
-  color: var(--label);
+  color: var(--hw-color-text-muted);
 }
 
 .label {
-  margin-bottom: var(--sp-2);
-  color: var(--ink);
-  font-weight: 500;
+  margin-bottom: var(--hw-space-2);
+  color: var(--hw-color-text);
 }

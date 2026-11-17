@@ -1,0 +1,72 @@
+@layer hw.components {
+  /* Behaviour: js/tabs.js. Markup: .hw-tabs > [role=tablist].hw-tabs__list > button[role=tab].hw-tabs__tab, + [role=tabpanel].hw-tabs__panel */
+  .hw-tabs__list {
+    position: relative;
+    display: flex;
+    gap: var(--hw-space-7);
+    overflow-x: auto;
+    scrollbar-width: none;
+    border-bottom: 1px solid var(--hw-color-border-subtle);
+    scroll-snap-type: x proximity;
+  }
+  .hw-tabs__tab {
+    position: relative;
+    flex-shrink: 0;
+    height: 40px;
+    scroll-snap-align: start;
+    padding: 0 var(--hw-space-2);
+    font-size: var(--hw-font-size-14);
+    color: var(--hw-color-text-muted);
+    cursor: pointer;
+    background: none;
+    border: 0;
+    transition: color var(--hw-duration-2);
+  }
+  .hw-tabs__tab::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: -1px;
+    left: 0;
+    height: 2px;
+    background: transparent;
+    transition: background-color var(--hw-duration-2);
+  }
+  .hw-tabs__tab:hover { color: var(--hw-color-text); }
+  .hw-tabs__tab[aria-selected="true"] { font-weight: var(--hw-weight-semibold); color: var(--hw-color-text); }
+  .hw-tabs__tab[aria-selected="true"]::after { background: var(--hw-color-brand); }
+  .hw-tabs__panel { padding: var(--hw-space-6) 0; }
+
+  /* Sliding indicator. Without JS the per-tab underline above still shows. */
+  .hw-tabs__list[data-hw-indicator]::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: var(--hw-tab-indicator-w, 0);
+    height: 2px;
+    pointer-events: none;
+    background: var(--hw-color-brand);
+    transform: translateX(var(--hw-tab-indicator-x, 0));
+    transition: transform var(--hw-motion-enter) var(--hw-ease-move), width var(--hw-motion-enter) var(--hw-ease-move);
+  }
+  .hw-tabs__list[data-hw-indicator] [aria-selected="true"]::after { background: transparent; }
+
+  .hw-tabs--pill .hw-tabs__list { display: inline-flex; gap: var(--hw-space-2); padding: var(--hw-space-2); background: var(--hw-color-surface-subtle); border: 0; border-radius: var(--hw-radius-full); }
+  .hw-tabs--pill .hw-tabs__tab { height: 32px; padding: 0 var(--hw-space-5); border-radius: var(--hw-radius-full); }
+  .hw-tabs--pill .hw-tabs__tab::after { display: none; }
+  .hw-tabs--pill .hw-tabs__tab[aria-selected="true"] { background: var(--hw-color-surface); box-shadow: var(--hw-elevation-knob); }
+  .hw-tabs--pill .hw-tabs__list[data-hw-indicator] .hw-tabs__tab { z-index: 1; }
+  .hw-tabs--pill [data-hw-indicator] [aria-selected="true"] { background: transparent; box-shadow: none; }
+  .hw-tabs--pill .hw-tabs__list[data-hw-indicator]::after {
+    top: var(--hw-space-2);
+    bottom: var(--hw-space-2);
+    height: auto;
+    background: var(--hw-color-surface);
+    border-radius: var(--hw-radius-full);
+    box-shadow: var(--hw-elevation-knob);
+  }
+
+  .hw-tabs__list::-webkit-scrollbar { display: none; }
+  @media (width < 768px) { .hw-tabs__list { gap: var(--hw-space-5); } }
+}

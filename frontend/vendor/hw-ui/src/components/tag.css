@@ -1,0 +1,23 @@
+@layer hw.components {
+  .hw-tag {
+    --hw-tag-fg: var(--hw-color-text);
+    --hw-tag-bg: var(--hw-color-fill-hover);
+
+    display: inline-flex;
+    gap: var(--hw-space-2);
+    align-items: center;
+    height: 22px;
+    padding: 0 var(--hw-space-3);
+    font-size: var(--hw-text-caption);
+    color: var(--hw-tag-fg);
+    white-space: nowrap;
+    background: var(--hw-tag-bg);
+    border-radius: var(--hw-radius-xs);
+  }
+  .hw-tag--info { --hw-tag-fg: var(--hw-color-info-fg); --hw-tag-bg: var(--hw-color-info-bg); }
+  .hw-tag--success { --hw-tag-fg: var(--hw-color-success-fg); --hw-tag-bg: var(--hw-color-success-bg); }
+  .hw-tag--warning { --hw-tag-fg: var(--hw-color-warning-fg); --hw-tag-bg: var(--hw-color-warning-bg); }
+  .hw-tag--danger { --hw-tag-fg: var(--hw-color-danger-fg); --hw-tag-bg: var(--hw-color-danger-bg); }
+  .hw-tag--round { border-radius: var(--hw-radius-full); }
+  .hw-tag--lg { height: 28px; padding: 0 10px; font-size: var(--hw-font-size-14); }
+}

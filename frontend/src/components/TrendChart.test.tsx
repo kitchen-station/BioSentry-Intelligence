@@ -1,104 +1,113 @@
 // @vitest-environment jsdom
-/** The trend chart's warning thresholds and its latest reading. */
+/** The trend chart on the kit graph: the finding in the title, what the kit cannot draw in words, the readout and the table. */
 
-import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { formatClock } from "./format";
 import { TrendChart } from "./TrendChart";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 afterEach(cleanup);
 
+// jsdom lays nothing out: give the plot a width so the kit draws its line and says the readout.
+beforeAll(() => Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get: () => 600 }));
+afterAll(() => Reflect.deleteProperty(HTMLElement.prototype, "clientWidth")); // back to jsdom's own (on Element)
+
 const t = (m: number) => new Date(Date.UTC(2026, 0, 1, 0, m)).toISOString();
+const two = [{ time: t(0), value: 70 }, { time: t(15), value: 90 }];
+const figure = () => screen.getByRole("figure");
+const subtitle = () => figure().querySelector(".hw-graph__subtitle")?.textContent;
 
 describe("TrendChart", () => {
-  it("draws a dashed line and a label at each warning threshold", () => {
-    const { container } = render(
-      <TrendChart
-        label="HR"
-        unit="bpm"
-        warningHigh={130}
-        warningLow={40}
-        data={[{ time: t(0), value: 70 }, { time: t(15), value: 90 }]}
-      />,
-    );
-    const dashed = container.querySelectorAll('line[stroke-dasharray="6,4"]');
-    expect(dashed).toHaveLength(2);
-    const labels = [...container.querySelectorAll("text")].map((n) => n.textContent);
-    expect(labels).toContain("130");
-    expect(labels).toContain("40");
-    expect(container.textContent).toContain("90 bpm");
+  it("is a figure titled with the latest value, with the warning lines in words", () => {
+    render(<TrendChart label="HR" unit="bpm" warningHigh={130} warningLow={40} data={two} />);
+    expect(screen.getByRole("heading", { level: 3 }).textContent).toBe("HR 90 bpm");
+    expect(figure().getAttribute("aria-labelledby")).toBe(screen.getByRole("heading").id);
+    expect(subtitle()).toBe("Warning above 130 or below 40 bpm");
+    expect(screen.getByRole("group", { name: "HR 90 bpm. Use the left and right arrow keys to read each point." })).toBeTruthy();
   });
 
-  it("shows the latest value to one decimal, with the served value as its title", () => {
-    const { container } = render(
-      <TrendChart label="HR" unit="bpm" data={[{ time: t(0), value: 70 }, { time: t(15), value: 108.51226339288638 }]} />,
-    );
-    expect(container.textContent).toContain("108.5 bpm");
-    expect(container.textContent).not.toContain("108.51");
-    expect(container.querySelector('[title="108.51226339288638"]')!.textContent).toBe("108.5 bpm");
+  it("words one warning line alone, and none without one", () => {
+    const { rerender } = render(<TrendChart label="SpO2" unit="%" warningLow={94} data={two} />);
+    expect(subtitle()).toBe("Warning below 94 %");
+    rerender(<TrendChart label="SpO2" unit="%" warningHigh={99} data={two} />);
+    expect(subtitle()).toBe("Warning above 99 %");
+    rerender(<TrendChart label="SpO2" unit="%" data={two} />);
+    expect(subtitle()).toBeUndefined();
   });
 
-  it("draws no threshold without one, and shows -- when the latest bin is a gap", () => {
-    const { container } = render(
-      <TrendChart label="HR" unit="bpm" data={[{ time: t(0), value: 70 }, { time: t(15), value: null }]} />,
-    );
-    expect(container.querySelectorAll('line[stroke-dasharray="6,4"]')).toHaveLength(0);
-    expect(container.textContent).toContain("--");
+  it("reads the latest value to one decimal, and every value in the table", async () => {
+    render(<TrendChart label="HR" unit="bpm" data={[{ time: t(0), value: 70 }, { time: t(15), value: 108.51226339288638 }]} />);
+    const readout = figure().querySelector(".hw-graph__readout")!;
+    expect(readout.textContent).toBe(`108.5 bpmHR, ${formatClock(Date.parse(t(15)))}`);
+    expect(figure().textContent).not.toContain("108.51");
+    await userEvent.click(screen.getByRole("button", { name: "Show as a table" }));
+    const rows = within(screen.getByRole("table")).getAllByRole("row").map((r) => r.textContent);
+    expect(rows).toEqual(["TimeHR", `${formatClock(Date.parse(t(0)))}70 bpm`, `${formatClock(Date.parse(t(15)))}108.5 bpm`]);
   });
 
-  // Without warning lines the range is 5% under the lowest and over the highest reading; the plot
-  // is 108 px high from y 8 (height 140, padT 8, padB 24).
-  const two = [{ time: t(0), value: 70 }, { time: t(15), value: 90 }];
-  const yOf = (v: number) => 8 + 108 - ((v - 66.5) / 28) * 108;
-  const rect = (c: HTMLElement) => c.querySelector('rect[data-testid="own-baseline-band"]');
-
-  it("draws the server's band behind the line at the rows its numbers map to", () => {
-    const { container } = render(
-      <TrendChart label="HR" unit="bpm" data={two} band={{ low: 75, high: 85, flagged: false }} />,
-    );
-    const r = rect(container)!;
-    expect(Number(r.getAttribute("y"))).toBeCloseTo(yOf(85));
-    expect(Number(r.getAttribute("y")) + Number(r.getAttribute("height"))).toBeCloseTo(yOf(75));
-    const line = container.querySelector("path[stroke]")!;
-    expect(r.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  it("says the latest 15-minute set is missing when it is a gap, and shows the gap as a dash", async () => {
+    render(<TrendChart label="HR" unit="bpm" data={[{ time: t(0), value: 70 }, { time: t(15), value: null }]} />);
+    expect(screen.getByRole("heading").textContent).toBe("HR: latest 15-minute set missing");
+    await userEvent.click(screen.getByRole("button", { name: "Show as a table" }));
+    expect(within(screen.getByRole("table")).getAllByRole("row")[2].textContent).toBe(`${formatClock(Date.parse(t(15)))}–`);
   });
 
-  it("says the band in words in the header and the accessible text, and Flagged when it is", () => {
-    const { container, rerender } = render(
-      <TrendChart label="HR" unit="bpm" data={two} band={{ low: 62, high: 78, flagged: false }} />,
-    );
-    expect(container.textContent).toContain("Own baseline 62 to 78 bpm");
-    expect(container.textContent).not.toContain("Flagged");
-    expect(container.querySelector("svg")!.getAttribute("aria-label")).toBe("HR trend. Own baseline 62 to 78 bpm");
-    rerender(<TrendChart label="HR" unit="bpm" data={two} band={{ low: 62, high: 78, flagged: true }} />);
-    expect(container.textContent).toContain("Own baseline 62 to 78 bpm \u00b7 Flagged");
-    expect(container.querySelector("svg")!.getAttribute("aria-label")).toContain("Flagged");
+  it("labels a time it cannot read as sent, and a set on an earlier day with its date", async () => {
+    const day = Date.UTC(2026, 0, 2, 0, 0);
+    render(<TrendChart label="HR" unit="bpm" data={[{ time: "soon", value: 70 }, { time: t(0), value: 72 }, { time: new Date(day).toISOString(), value: 75 }]} />);
+    await userEvent.click(screen.getByRole("button", { name: "Show as a table" }));
+    const heads = within(screen.getByRole("table")).getAllByRole("rowheader").map((h) => h.textContent);
+    expect(heads[0]).toBe("soon");
+    expect(heads[1]).not.toBe(formatClock(Date.parse(t(0)))); // another day: the date comes with it
+    expect(heads[1]).toContain(formatClock(Date.parse(t(0))));
+    expect(heads[2]).toBe(formatClock(day));
   });
 
-  it("clips a band that reaches past the drawn range", () => {
-    const { container } = render(
-      <TrendChart label="HR" unit="bpm" data={two} band={{ low: 40, high: 80, flagged: false }} />,
-    );
-    const r = rect(container)!;
-    expect(Number(r.getAttribute("y"))).toBeCloseTo(yOf(80));
-    expect(Number(r.getAttribute("y")) + Number(r.getAttribute("height"))).toBeCloseTo(yOf(66.5));
+  it.each([
+    [62, 78, "above"],
+    [92, 110, "below"],
+    [80, 95, "within"],
+  ])("says the latest value against an own baseline of %i to %i: %s", (low, high, where) => {
+    render(<TrendChart label="HR" unit="bpm" warningHigh={90} data={two} band={{ low, high, flagged: false }} />);
+    expect(screen.getByRole("heading").textContent).toBe(`HR 90 bpm, ${where} own baseline`);
+    expect(subtitle()).toBe(`Warning above 90 bpm · Own baseline ${low} to ${high} bpm`);
   });
 
-  it("draws no rectangle for a band wholly outside the range, and keeps the words", () => {
-    for (const [low, high] of [[100, 120], [10, 20]]) {
-      const { container, unmount } = render(
-        <TrendChart label="HR" unit="bpm" data={two} band={{ low, high, flagged: false }} />,
-      );
-      expect(rect(container)).toBeNull();
-      expect(container.textContent).toContain(`Own baseline ${low} to ${high} bpm`);
+  it("says when the latest value is past a warning line, with the baseline after it", () => {
+    const { rerender } = render(<TrendChart label="HR" unit="bpm" warningHigh={80} data={two} />);
+    expect(screen.getByRole("heading").textContent).toBe("HR 90 bpm, above the warning line");
+    rerender(<TrendChart label="HR" unit="bpm" warningLow={95} data={two} />);
+    expect(screen.getByRole("heading").textContent).toBe("HR 90 bpm, below the warning line");
+    rerender(<TrendChart label="HR" unit="bpm" warningHigh={80} data={two} band={{ low: 62, high: 78, flagged: false }} />);
+    expect(screen.getByRole("heading").textContent).toBe("HR 90 bpm, above the warning line and above own baseline");
+  });
+
+  it("says Flagged when the server flagged the band, and no band without one", () => {
+    const { rerender } = render(<TrendChart label="HR" unit="bpm" data={two} band={{ low: 62, high: 78, flagged: true }} />);
+    expect(subtitle()).toBe("Own baseline 62 to 78 bpm · Flagged");
+    rerender(<TrendChart label="HR" unit="bpm" data={two} />);
+    expect(figure().textContent).not.toContain("Own baseline");
+    expect(figure().textContent).not.toContain("own baseline");
+  });
+
+  it("draws nothing for fewer than two sets or no reading at all", () => {
+    for (const data of [[{ time: t(0), value: 70 }], [{ time: t(0), value: null }, { time: t(15), value: null }]]) {
+      const { container, unmount } = render(<TrendChart label="HR" unit="bpm" data={data} />);
+      expect(container.innerHTML).toBe("");
       unmount();
     }
   });
 
-  it("has no band and no words without one", () => {
-    const { container } = render(<TrendChart label="HR" unit="bpm" data={two} />);
-    expect(rect(container)).toBeNull();
-    expect(container.textContent).not.toContain("Own baseline");
-    expect(container.querySelector("svg")!.getAttribute("aria-label")).toBe("HR trend");
+  it("is not rebuilt for the same figures, is for new ones, and goes when the data does", () => {
+    const { container, rerender } = render(<TrendChart label="HR" unit="bpm" data={two} />);
+    const heading = screen.getByRole("heading");
+    rerender(<TrendChart label="HR" unit="bpm" data={two.map((p) => ({ ...p }))} />);
+    expect(screen.getByRole("heading")).toBe(heading);
+    rerender(<TrendChart label="HR" unit="bpm" data={[...two, { time: t(30), value: 95 }]} />);
+    expect(screen.getByRole("heading").textContent).toBe("HR 95 bpm");
+    rerender(<TrendChart label="HR" unit="bpm" data={[]} />);
+    expect(container.innerHTML).toBe("");
   });
 });

@@ -1,0 +1,7 @@
+/* HarmonyOS Sans, bundled unmodified in ../fonts/harmonyos-sans (see LICENSE.txt there).
+   The licence asks any product that uses the fonts to say so prominently, for example "Set in HarmonyOS Sans"
+   on an About screen or in the page footer. Drop this import if the app ships its own type. */
+@font-face { font-family: "HarmonyOS Sans"; src: url("../fonts/harmonyos-sans/HarmonyOS_Sans_Light.ttf") format("truetype"); font-weight: 300; font-display: swap; }
+@font-face { font-family: "HarmonyOS Sans"; src: url("../fonts/harmonyos-sans/HarmonyOS_Sans_Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "HarmonyOS Sans"; src: url("../fonts/harmonyos-sans/HarmonyOS_Sans_Medium.ttf") format("truetype"); font-weight: 500 600; font-display: swap; }
+@font-face { font-family: "HarmonyOS Sans"; src: url("../fonts/harmonyos-sans/HarmonyOS_Sans_Bold.ttf") format("truetype"); font-weight: 700; font-display: swap; }

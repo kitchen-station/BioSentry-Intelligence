@@ -267,7 +267,7 @@ export function StayPanel({ patientId, onSignOut, now }: { patientId: string; on
 
   return (
     <details
-      className={styles.panel}
+      className={`hw-accordion__item ${styles.panel}`}
       onToggle={(e) => {
         if (e.currentTarget.open && !asked) {
           setAsked(true);
@@ -275,8 +275,8 @@ export function StayPanel({ patientId, onSignOut, now }: { patientId: string; on
         }
       }}
     >
-      <summary className={styles.summary}>Stay</summary>
-      <div className={styles.body}>
+      <summary className={`hw-accordion__summary ${styles.summary}`}>Stay</summary>
+      <div className={`hw-accordion__body ${styles.body}`}>
         <p role="status" className={error ? styles.error : styles.quiet}>{loading ? "Loading the stay\u2026" : (error ?? "")}</p>
         {stay && stay.unavailable !== null && <p className={styles.quiet}>{UNAVAILABLE[stay.unavailable] ?? "The stay could not be shown."}</p>}
         {stay && body && (
@@ -303,7 +303,10 @@ export function StayPanel({ patientId, onSignOut, now }: { patientId: string; on
         {stay && !loading && <p className={`${styles.quiet} ${styles.foot}`}>{FIXED} Synthetic, not validated.</p>}
         {asked && (
           <p className={styles.quiet}>
-            <button type="button" className={styles.button} aria-disabled={loading} onClick={read}>Refresh</button>
+            <button type="button" className="hw-button hw-button--sm" aria-disabled={loading} onClick={read}>
+              <span className="hw-icon fa-solid fa-rotate" aria-hidden="true" />
+              Refresh
+            </button>
             {readAt && ` Read at ${readAt}.`}
           </p>
         )}

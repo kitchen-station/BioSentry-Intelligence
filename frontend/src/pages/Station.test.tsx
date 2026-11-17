@@ -5,7 +5,7 @@
  * entered (trimmed, optional fields left out) and says what it saved.
  */
 
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -51,9 +51,7 @@ const page = () =>
     </MemoryRouter>,
   );
 
-// The form labels are not tied to their controls, so a control is the label's next sibling.
-const field = (label: string) =>
-  screen.getByText(label, { selector: "label" }).nextElementSibling as HTMLInputElement;
+const field = (label: string) => screen.getByLabelText(label) as HTMLInputElement;
 const submit = () => document.querySelector('button[type="submit"]') as HTMLButtonElement;
 
 beforeEach(() => {
@@ -78,7 +76,7 @@ describe("Station tabs", () => {
     api.getStays.mockResolvedValue([]);
     api.getWard.mockResolvedValue({ now: "2026-09-03T07:00:00Z" });
     page();
-    fireEvent.click(screen.getByRole("button", { name: "Patient flow" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Patient flow" }));
     expect(await screen.findByText("No arrivals or departures yet.")).toBeTruthy();
   });
 
@@ -88,14 +86,43 @@ describe("Station tabs", () => {
     expect(screen.getByText(/Station · Ward W4/)).toBeTruthy();
     expect(screen.getByText(/New patients start NOT RANKED/)).toBeTruthy();
 
-    await user.click(screen.getByRole("button", { name: "Enter lab results" }));
+    await user.click(screen.getByRole("tab", { name: "Enter lab results" }));
     expect(screen.getByText(/Select a ranked patient/)).toBeTruthy();
 
-    await user.click(screen.getByRole("button", { name: "Upload" }));
+    await user.click(screen.getByRole("tab", { name: "Upload" }));
     expect(screen.getByText("Upload document")).toBeTruthy();
 
-    await user.click(screen.getAllByRole("button", { name: "Admit patient" })[0]);
+    await user.click(screen.getByRole("tab", { name: "Admit patient" }));
     expect(screen.getByText(/New patients start NOT RANKED/)).toBeTruthy();
+  });
+
+  it("moves with the arrow keys, Home and End, keeping only the selected tab in the tab order", async () => {
+    api.getStays.mockResolvedValue([]);
+    api.getWard.mockResolvedValue({ now: "2026-09-03T07:00:00Z" });
+    const user = userEvent.setup();
+    page();
+    const tab = (name: string) => screen.getByRole("tab", { name });
+    const order = () => screen.getAllByRole("tab").map((t) => t.tabIndex);
+    expect(order()).toEqual([0, -1, -1, -1]);
+    expect(screen.getByRole("tabpanel", { name: "Admit patient" })).toBeTruthy();
+    await user.type(field("Last name"), "Garcia");
+
+    tab("Admit patient").focus();
+    await user.keyboard("{ArrowLeft}"); // wraps to the last
+    expect(document.activeElement).toBe(tab("Patient flow"));
+    expect(tab("Patient flow").getAttribute("aria-selected")).toBe("true");
+    await user.keyboard("{ArrowRight}"); // and back round to the first
+    expect(document.activeElement).toBe(tab("Admit patient"));
+    expect(field("Last name").value).toBe(""); // only the open panel is kept: switching drops what was typed
+    await user.keyboard("{End}");
+    expect(document.activeElement).toBe(tab("Patient flow"));
+    await user.keyboard("{Home}{ArrowRight}");
+    expect(document.activeElement).toBe(tab("Enter lab results"));
+    expect(order()).toEqual([-1, 0, -1, -1]);
+    expect(screen.getAllByRole("tabpanel")).toHaveLength(1);
+    expect(screen.getByRole("tabpanel", { name: "Enter lab results" })).toBeTruthy();
+    await user.keyboard("{ArrowDown}"); // not a tab key
+    expect(document.activeElement).toBe(tab("Enter lab results"));
   });
 });
 
@@ -201,7 +228,7 @@ describe("Admit patient", () => {
 describe("Enter lab results", () => {
   async function open(user: ReturnType<typeof userEvent.setup>) {
     page();
-    await user.click(screen.getByRole("button", { name: "Enter lab results" }));
+    await user.click(screen.getByRole("tab", { name: "Enter lab results" }));
     await screen.findByRole("option", { name: "Dela Cruz, Juan -- Bed MW-4A (p-001)" });
   }
 
@@ -262,7 +289,7 @@ describe("Upload", () => {
 
   async function open(user: ReturnType<typeof userEvent.setup>) {
     page();
-    await user.click(screen.getByRole("button", { name: "Upload" }));
+    await user.click(screen.getByRole("tab", { name: "Upload" }));
     expect(screen.getByText(/Document reading is simulated/)).toBeTruthy();
     await screen.findByRole("option", { name: "Dela Cruz, Juan -- Bed MW-4A (p-001)" });
   }
@@ -288,19 +315,20 @@ describe("Upload", () => {
     finish(labRead);
 
     await screen.findByText("Values read from document -- review and correct");
-    const rows = screen.getAllByRole("spinbutton").map((i) => i.parentElement!);
-    expect(rows.map((r) => within(r).getAllByText(/./)[0].textContent)).toEqual([
+    const values = screen.getAllByRole("spinbutton") as HTMLInputElement[];
+    expect(values.map((i) => i.labels?.[0].textContent)).toEqual([
       "Troponin (ng/mL)",
       "Hemoglobin (g/L)",
       "lactate", // a key the form does not know is shown as is; an absent value has no row
     ]);
-    expect(within(rows[0]).getByText("92%")).toBeTruthy();
-    expect(within(rows[1]).queryByText(/%/)).toBeNull(); // no confidence given
+    // The reading's confidence describes its value.
+    expect(screen.getByRole("spinbutton", { name: "Troponin (ng/mL)", description: "92%" })).toBeTruthy();
+    expect(screen.queryByRole("spinbutton", { name: "Hemoglobin (g/L)", description: /%/ })).toBeNull(); // none given
 
-    const hb = within(rows[1]).getByRole("spinbutton");
+    const hb = field("Hemoglobin (g/L)");
     await user.clear(hb);
     await user.type(hb, "131");
-    await user.clear(within(rows[2]).getByRole("spinbutton")); // emptied: not saved
+    await user.clear(field("lactate")); // emptied: not saved
     await user.click(screen.getByRole("button", { name: "Confirm and save" }));
 
     expect(api.enterLabResults).toHaveBeenCalledWith("p-001", { troponin: 0.04, hemoglobin: 131 });
@@ -363,7 +391,7 @@ describe("Upload", () => {
     expect(screen.getByText("87%")).toBeTruthy();
     expect(screen.getByText("civilStatus")).toBeTruthy(); // unknown key shown as is
     expect(screen.queryByText("weightKg")).toBeNull();
-    const bed = screen.getByText("Bed").parentElement!.querySelector("input")!;
+    const bed = field("Bed");
     await user.clear(bed);
     await user.type(bed, "MW-4D");
     await user.click(screen.getByRole("button", { name: "Confirm and admit" }));
@@ -437,7 +465,7 @@ describe("Upload", () => {
     api.listAllPatients.mockResolvedValue([{ ...PATIENTS[0], ranked: false }]);
     const user = userEvent.setup();
     page();
-    await user.click(screen.getByRole("button", { name: "Upload" }));
+    await user.click(screen.getByRole("tab", { name: "Upload" }));
     await user.upload(field("File"), pdf());
     expect((screen.getByRole("button", { name: "Read document" }) as HTMLButtonElement).disabled).toBe(
       true,

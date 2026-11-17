@@ -1,0 +1,27 @@
+@layer hw.components {
+  /* Markup: nav[aria-label=Pagination] > ul.hw-pagination > li > a|button.hw-pagination__item[aria-current=page] */
+  .hw-pagination { display: flex; gap: var(--hw-space-2); align-items: center; margin: 0; padding: 0; list-style: none; }
+  .hw-pagination__item {
+    display: grid;
+    place-items: center;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 6px;
+    font-size: var(--hw-font-size-14);
+    color: var(--hw-color-text);
+    text-decoration: none;
+    cursor: pointer;
+    background: none;
+    border: 0;
+    border-radius: var(--hw-control-radius);
+    transition: background-color var(--hw-duration-1);
+  }
+  .hw-pagination__item:hover, .hw-pagination__item[aria-current="page"] { color: var(--hw-color-text); background: var(--hw-color-surface-subtle); }
+  .hw-pagination__item[aria-current="page"] { font-weight: var(--hw-weight-semibold); }
+  .hw-pagination__item:disabled { cursor: not-allowed; color: var(--hw-color-text-subtle); background: none; }
+  .hw-pagination__ellipsis { min-width: 32px; text-align: center; color: var(--hw-color-text-muted); }
+
+  @media (width < 576px) {
+    .hw-pagination > li:not(:first-child, :last-child):not(:has([aria-current="page"])) { display: none; }
+  }
+}

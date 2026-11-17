@@ -1,0 +1,29 @@
+@layer hw.components {
+  .hw-chip {
+    display: inline-flex;
+    gap: var(--hw-space-2);
+    align-items: center;
+    max-width: 160px;
+    height: 24px;
+    padding: 0 6px;
+    font-size: var(--hw-text-caption);
+    white-space: nowrap;
+    background: var(--hw-color-surface-subtle);
+    border: 1px solid var(--hw-color-border-subtle);
+    border-radius: var(--hw-radius-xs);
+  }
+  .hw-chip__label { overflow: hidden; text-overflow: ellipsis; }
+  .hw-chip__remove {
+    display: grid;
+    place-items: center;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    color: var(--hw-color-text-muted);
+    cursor: pointer;
+    background: none;
+    border: 0;
+    border-radius: var(--hw-radius-xs);
+  }
+  .hw-chip__remove:hover { color: var(--hw-color-text); background: var(--hw-color-fill-hover); }
+}

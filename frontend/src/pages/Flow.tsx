@@ -13,6 +13,7 @@ const OUTCOME = { discharged: "Discharged", higher_care: "Higher care", transfer
 const when = (iso: string) => `${formatDay(Date.parse(iso))}, ${formatClock(Date.parse(iso))}`;
 const day = formatDay;
 const status = (stay: PatientStay) => (stay.outcome ? OUTCOME[stay.outcome] : "On the ward");
+const LEGEND = { open: "On the ward", ...OUTCOME }; // the timeline's key: every outcome a bar can show
 
 /** The Station's admin view of who came and went. Scoped by the server, like the ward. */
 export function FlowSection() {
@@ -45,56 +46,67 @@ export function FlowSection() {
   const recent = stays ? recentMoves(stays, RECENT) : [];
   return (
     <div className={styles.flow}>
-      <header>
-        <h1 className={styles.title}>Patient flow</h1>
-      </header>
-      {failed && <p role="alert" className={styles.alert}>Could not refresh. Showing the last stays received.</p>}
+      <h1 className="hw-heading hw-heading--4">Patient flow</h1>
+      {failed && (
+        <p role="alert" className={`hw-alert hw-alert--warning ${styles.alert}`}>
+          <span className="hw-alert__icon hw-icon fa-solid fa-triangle-exclamation" aria-hidden="true" />
+          <span className="hw-alert__body">Could not refresh. Showing the last stays received.</span>
+        </p>
+      )}
       {stays === null || stats === null ? (
-        !failed && <p className={styles.sub}>Loading...</p>
+        !failed && <p className="hw-text-muted">Loading...</p>
       ) : (
         <>
+          {/* Each <dt> is followed directly by its <dd>: a reader moves from the name to the number. */}
           <dl className={styles.stats}>
-            <div><dt>On the ward</dt><dd>{stats.onWard}</dd></div>
-            <div><dt>In, last 24 h</dt><dd>{stats.in24h}</dd></div>
-            <div><dt>Out, last 24 h</dt><dd>{stats.out24h}</dd></div>
-            <div><dt>Average stay</dt><dd>{stats.averageMs === null ? "--" : formatStay(stats.averageMs)}</dd></div>
+            <div className={`hw-stat ${styles.stat}`}><dt className="hw-stat__label">On the ward</dt><dd className="hw-stat__value">{stats.onWard}</dd></div>
+            <div className={`hw-stat ${styles.stat}`}><dt className="hw-stat__label">In, last 24 h</dt><dd className="hw-stat__value">{stats.in24h}</dd></div>
+            <div className={`hw-stat ${styles.stat}`}><dt className="hw-stat__label">Out, last 24 h</dt><dd className="hw-stat__value">{stats.out24h}</dd></div>
+            <div className={`hw-stat ${styles.stat}`}><dt className="hw-stat__label">Average stay</dt><dd className="hw-stat__value">{stats.averageMs === null ? "--" : formatStay(stats.averageMs)}</dd></div>
           </dl>
 
-          <section aria-label="Recent moves" className={styles.card}>
-            <h2 className={styles.heading}>Recent movement</h2>
+          <section aria-label="Recent moves" className="hw-card hw-card--outlined">
+            <h2 className={`hw-card__title ${styles.heading}`}>Recent movement</h2>
             {recent.length === 0 ? (
-              <p className={styles.sub}>No arrivals or departures yet.</p>
+              <p className="hw-text-muted">No arrivals or departures yet.</p>
             ) : (
-              <table className={styles.table}>
-                <thead>
-                  <tr><th>Patient</th><th>Bed</th><th>Status</th><th>When</th><th>Stay</th></tr>
-                </thead>
-                <tbody>
-                  {recent.map((s) => (
-                    <tr key={s.id}>
-                      <td>{s.left_at === null ? <Link to={`/patient/${s.id}`}>{s.name}</Link> : s.name}</td>
-                      <td className={styles.mono}>{s.bed}</td>
-                      <td><span className={`${styles.chip} ${styles[s.outcome ?? "open"]}`}>{status(s)}</span></td>
-                      <td>{when((s.left_at ?? s.admitted_at)!)}</td>
-                      <td className={styles.mono}>
-                        {s.admitted_at
-                          ? formatStay((s.left_at ? Date.parse(s.left_at) : now) - Date.parse(s.admitted_at))
-                          : "--"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="hw-table-wrap">
+                <table className={`hw-table ${styles.table}`}>
+                  <thead>
+                    <tr><th>Patient</th><th>Bed</th><th>Status</th><th>When</th><th className="hw-table__num">Stay</th></tr>
+                  </thead>
+                  <tbody>
+                    {recent.map((s) => (
+                      <tr key={s.id}>
+                        <td>{s.left_at === null ? <Link to={`/patient/${s.id}`}>{s.name}</Link> : s.name}</td>
+                        <td className={styles.mono}>{s.bed}</td>
+                        <td>
+                          <span className="hw-tag hw-tag--round">
+                            <span className={styles.swatch} data-outcome={s.outcome ?? "open"} />
+                            {status(s)}
+                          </span>
+                        </td>
+                        <td>{when((s.left_at ?? s.admitted_at)!)}</td>
+                        <td className="hw-table__num">
+                          {s.admitted_at
+                            ? formatStay((s.left_at ? Date.parse(s.left_at) : now) - Date.parse(s.admitted_at))
+                            : "--"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </section>
 
-          <section aria-label="Bed timeline" className={styles.card}>
+          <section aria-label="Bed timeline" className="hw-card hw-card--outlined">
             <div className={styles.cardHead}>
-              <h2 className={styles.heading}>Bed use, last {FLOW_DAYS} days</h2>
+              <h2 className={`hw-card__title ${styles.heading}`}>Bed use, last {FLOW_DAYS} days</h2>
               <ul className={styles.key}>
-                <li><i className={styles.open} /> On the ward</li>
-                <li><i className={styles.discharged} /> Discharged</li>
-                <li><i className={styles.higher_care} /> Higher care</li>
+                {(Object.keys(LEGEND) as Array<keyof typeof LEGEND>).map((k) => (
+                  <li key={k}><span className={styles.swatch} data-outcome={k} />{LEGEND[k]}</li>
+                ))}
               </ul>
             </div>
             <div className={styles.row}>
@@ -114,7 +126,8 @@ export function FlowSection() {
                     return (
                       <span
                         key={stay.id}
-                        className={`${styles.stay} ${styles[stay.outcome ?? "open"]}`}
+                        className={styles.stay}
+                        data-outcome={stay.outcome ?? "open"}
                         style={{ left: `${left}%`, width: `${width}%` }}
                         title={text}
                         role="img"

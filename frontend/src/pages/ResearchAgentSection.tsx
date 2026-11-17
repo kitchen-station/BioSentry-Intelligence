@@ -11,8 +11,8 @@ const signOff = ({ state, approvedBy, approvedAt }: AgentProposal) => {
 export function ResearchAgentSection({ data = RESEARCH_AGENT }: { data?: AgentExport }) {
   const { provenance: P, questions, proposals } = data;
   return (
-    <section className={styles.card} aria-labelledby="agent">
-      <h2 id="agent" className={styles.heading}>Research agent: questions asked on the simulated ward</h2>
+    <section className={`hw-card hw-card--outlined ${styles.card}`} aria-labelledby="agent">
+      <h2 id="agent" className="hw-heading hw-heading--4">Research agent: questions asked on the simulated ward</h2>
       <p>
         Answers recorded from a program run by hand. This page cannot ask it anything yet.
       </p>
@@ -21,18 +21,18 @@ export function ResearchAgentSection({ data = RESEARCH_AGENT }: { data?: AgentEx
         the tables above, so the counts differ. The baseline&apos;s k and p were chosen on these same seeds, so
         its numbers here flatter it.
       </p>
-      <p className={styles.small}>
+      <p className="hw-caption">
         Source: {P.source} {P.records} ledger records, {P.exportedBy}, {P.date}.
       </p>
       {questions.length === 0 ? (
         <p>No questions are recorded in this export.</p>
       ) : (
-        <ol>
+        <ol className={styles.entries}>
           {questions.map((q) => (
             <li key={q.id}>
-              <p>&ldquo;{q.question}&rdquo;</p>
-              <p>{q.askedAt ? `Asked ${q.askedAt}` : "Time not recorded"}</p>
-              <p>{q.status === "answered" ? "Answered" : "Refused, nothing was run"}</p>
+              <p className={styles.question}>&ldquo;{q.question}&rdquo;</p>
+              <p className="hw-caption">{q.askedAt ? `Asked ${q.askedAt}` : "Time not recorded"}</p>
+              <p><span className={q.status === "answered" ? "hw-tag hw-tag--success" : "hw-tag"}>{q.status === "answered" ? "Answered" : "Refused, nothing was run"}</span></p>
               {q.answer.map((line) => (
                 <p key={line}>{line}</p>
               ))}
@@ -40,14 +40,14 @@ export function ResearchAgentSection({ data = RESEARCH_AGENT }: { data?: AgentEx
           ))}
         </ol>
       )}
-      <h3 className={styles.heading}>Proposals</h3>
+      <h3 className="hw-heading hw-heading--4">Proposals</h3>
       {proposals.length === 0 ? (
         <p>No proposals are recorded in this export.</p>
       ) : (
-        <ul>
+        <ul className={styles.entries}>
           {proposals.map((p) => (
             <li key={p.id}>
-              <p>Proposal {p.id}</p>
+              <p className={styles.question}>Proposal {p.id}</p>
               <p>{signOff(p)}</p>
               <p>{p.conclusion}</p>
             </li>

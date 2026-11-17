@@ -1,0 +1,45 @@
+@layer hw.components {
+  /* Markup: ol.hw-steps > li.hw-steps__step[data-status=done|current|error] (current also aria-current=step) */
+  .hw-steps { display: flex; gap: var(--hw-space-3); margin: 0; padding: 0; list-style: none; counter-reset: hw-step; }
+  .hw-steps__step {
+    --hw-step-bg: var(--hw-color-surface);
+    --hw-step-fg: var(--hw-color-text-muted);
+    --hw-step-border: var(--hw-color-border);
+    --hw-step-line: var(--hw-color-border-subtle);
+
+    display: flex;
+    flex: 1;
+    gap: var(--hw-space-3);
+    align-items: flex-start;
+    font-size: var(--hw-font-size-14);
+    color: var(--hw-color-text-muted);
+    counter-increment: hw-step;
+  }
+  .hw-steps__step::before {
+    content: counter(hw-step);
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    font-size: var(--hw-text-caption);
+    color: var(--hw-step-fg);
+    background: var(--hw-step-bg);
+    border: 1px solid var(--hw-step-border);
+    border-radius: 50%;
+  }
+  .hw-steps__step::after { content: ""; flex: 1; height: 1px; margin-top: 12px; background: var(--hw-step-line); }
+  .hw-steps__step:last-child { flex: 0 0 auto; }
+  .hw-steps__step:last-child::after { display: none; }
+  .hw-steps__step[data-status="done"] { --hw-step-bg: var(--hw-color-accent); --hw-step-fg: var(--hw-color-on-accent); --hw-step-border: var(--hw-color-accent); --hw-step-line: var(--hw-color-accent); }
+  .hw-steps__step[data-status="done"]::before { content: "✓"; }
+  .hw-steps__step[data-status="current"] { --hw-step-bg: var(--hw-color-brand); --hw-step-fg: var(--hw-color-text-on-brand); --hw-step-border: var(--hw-color-brand); font-weight: var(--hw-weight-semibold); color: var(--hw-color-text); }
+  .hw-steps__step[data-status="error"] { --hw-step-bg: var(--hw-color-danger-bg); --hw-step-fg: var(--hw-color-danger-fg); --hw-step-border: var(--hw-color-danger); }
+  .hw-steps__step[data-status="error"]::before { content: "!"; }
+
+  @media (width < 576px) {
+    .hw-steps { flex-direction: column; gap: 0; }
+    .hw-steps__step { position: relative; padding-bottom: var(--hw-space-5); }
+    .hw-steps__step::after { position: absolute; top: 28px; bottom: 4px; left: 11.5px; width: 1px; height: auto; margin: 0; }
+  }
+}

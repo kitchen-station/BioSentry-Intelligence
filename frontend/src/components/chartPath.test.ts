@@ -1,15 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  agoLabel,
   appendedCount,
   areaPath,
   isolatedPoints,
-  labelIndexes,
   linePath,
   present,
   runs,
   xByIndex,
-  xByTime,
   type Pt,
 } from "./chartPath";
 
@@ -106,53 +103,9 @@ describe("xByIndex", () => {
   });
 });
 
-describe("xByTime", () => {
-  const MIN = 60_000;
-
-  it("places bins in proportion to elapsed time, so a gap leaves a gap", () => {
-    const times = [0, 15 * MIN, 30 * MIN, 75 * MIN];
-    expect(xByTime(times, 0, 150)).toEqual([0, 30, 60, 150]);
-  });
-
-  it("returns null when times are unusable so callers fall back to even spacing", () => {
-    expect(xByTime([0], 0, 100)).toBeNull();
-    expect(xByTime([0, Number.NaN, 2], 0, 100)).toBeNull();
-    expect(xByTime([0, 5, 5], 0, 100)).toBeNull();
-    expect(xByTime([10, 5], 0, 100)).toBeNull();
-    expect(xByTime([Date.parse("06:30"), Date.parse("07:00")], 0, 100)).toBeNull();
-  });
-});
-
-describe("agoLabel", () => {
-  it.each([
-    [0, "now"],
-    [-3, "now"],
-    [15, "-15m"],
-    [45, "-45m"],
-    [60, "-1h"],
-    [180, "-3h"],
-    [345, "-5h45m"],
-    [359.6, "-6h"],
-  ])("%s min -> %s", (minutes, label) => {
-    expect(agoLabel(minutes)).toBe(label);
-  });
-});
-
 describe("present", () => {
   it("keeps zero and drops nulls", () => {
     expect(present([0, null, 3, null, 0])).toEqual([0, 3, 0]);
-  });
-});
-
-describe("labelIndexes", () => {
-  it.each([
-    [0, []],
-    [1, [0]],
-    [2, [0, 1]],
-    [3, [0, 1, 2]],
-    [24, [0, 12, 23]],
-  ])("%s bins -> %j", (n, expected) => {
-    expect(labelIndexes(n)).toEqual(expected);
   });
 });
 

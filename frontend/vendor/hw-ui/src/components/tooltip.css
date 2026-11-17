@@ -1,0 +1,29 @@
+@layer hw.components {
+  /* Tooltip is created/positioned by js/tooltip.js from [data-hw-tooltip]. */
+  .hw-tooltip {
+    position: fixed;
+    z-index: var(--hw-z-popup);
+    width: max-content;
+    max-width: 280px;
+    padding: 6px var(--hw-space-3);
+    font-size: var(--hw-text-caption);
+    line-height: 1.5;
+    color: var(--hw-color-text-inverse);
+    pointer-events: none;
+    background: var(--hw-color-surface-inverse);
+    border-radius: var(--hw-control-radius);
+    animation: hw-fade-in var(--hw-motion-exit);
+  }
+
+  .hw-popover {
+    min-width: 120px;
+    max-width: 320px;
+    padding: var(--hw-space-5);
+    font-size: var(--hw-font-size-14);
+    background: var(--hw-color-surface);
+    border: 1px solid var(--hw-color-border-subtle);
+    border-radius: var(--hw-radius-lg);
+    box-shadow: var(--hw-elevation-overlay);
+  }
+  .hw-popover__title { margin: 0 0 var(--hw-space-3); padding-bottom: var(--hw-space-3); font-weight: var(--hw-weight-semibold); border-bottom: 1px solid var(--hw-color-border-subtle); }
+}

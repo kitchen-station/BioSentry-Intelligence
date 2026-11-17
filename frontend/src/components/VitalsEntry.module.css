@@ -1,171 +1,81 @@
-/* ============================================================
-   Vitals entry -- the nurse's way out of NOT RANKED
-   Bounded fields, an echo of what will be stored, the server's
-   reasons shown as written. No border radius (design language).
-   ============================================================ */
+/* Manual vitals entry: a kit card with kit fields and radios. Layout only here. */
 
 .form {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
-  padding: var(--sp-3);
-  background: var(--ground);
-  border: 1px solid var(--border);
-  max-width: 560px;
+  gap: var(--hw-space-5);
 }
 
 .title {
-  font-size: 16px;
-  font-weight: 500;
+  font-size: var(--hw-font-size-18);
+  font-weight: var(--hw-weight-semibold);
 }
 
 .sub,
-.hint {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  color: var(--label);
-  line-height: 1.5;
+.hint,
+.echoTitle {
+  font-size: var(--hw-text-caption);
+  color: var(--hw-color-text-muted);
 }
+
+.sub { margin-top: calc(var(--hw-space-4) * -1); }
 
 .group {
-  border: none;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--hw-space-3);
+  min-width: 0;
+  border: 0;
 }
 
+.group:disabled { opacity: 0.6; }
+
 .legend {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--label);
-  padding: 0;
-  margin-bottom: var(--sp-1);
+  margin-bottom: var(--hw-space-3);
+  font-size: var(--hw-font-size-14);
+  font-weight: var(--hw-weight-semibold);
 }
 
 .pair {
   display: flex;
   align-items: flex-end;
-  gap: var(--sp-2);
+  gap: var(--hw-space-4);
 }
 
 .wrap {
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.fieldLabel {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  color: var(--label);
-}
-
-.input {
-  width: 96px;
-  font-family: var(--font-sans);
-  font-size: 15px;
-  padding: var(--sp-2);
-  border: 1px solid var(--border);
-  border-radius: 0;
-  background: var(--surface);
-  color: var(--ink);
-}
-
-.input[aria-invalid="true"] {
-  border-color: var(--ink);
-  outline: 2px solid var(--ink);
-}
+.field { min-width: 0; }
 
 .slash {
-  font-size: 20px;
-  padding-bottom: var(--sp-2);
-  color: var(--label);
+  padding-bottom: var(--hw-space-3);
+  color: var(--hw-color-text-muted);
 }
 
 .choices {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--sp-2) var(--sp-3);
-}
-
-.choice {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  font-family: var(--font-sans);
-  font-size: 13px;
-  cursor: pointer;
+  gap: var(--hw-space-3) var(--hw-space-6);
 }
 
 .echo {
-  border-left: 2px solid var(--border);
-  padding-left: var(--sp-3);
-}
-
-.echoTitle {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  color: var(--label);
+  padding: var(--hw-space-4) var(--hw-space-5);
+  background: var(--hw-color-surface-subtle);
+  border-radius: var(--hw-popup-radius);
 }
 
 .echoList {
-  list-style: none;
-  font-size: 14px;
-  margin-top: var(--sp-1);
+  margin-top: var(--hw-space-2);
+  padding-left: var(--hw-space-5);
+  font-size: var(--hw-font-size-14);
 }
 
-.problem,
-.failure {
-  font-family: var(--font-sans);
-  font-size: 13px;
-  color: var(--ink);
-  font-weight: 500;
-}
-
-.failure {
-  border: 1px solid var(--ink);
-  padding: var(--sp-2) var(--sp-3);
-}
-
-.standing {
-  font-size: 14px;
-  font-weight: 500;
-}
+.message { align-items: center; }
 
 .actions {
   display: flex;
-  gap: var(--sp-2);
-}
-
-.primary,
-.secondary {
-  font-family: var(--font-sans);
-  font-size: 14px;
-  font-weight: 500;
-  padding: var(--sp-2) var(--sp-4);
-  border: 1px solid var(--button);
-  border-radius: 0;
-  cursor: pointer;
-}
-
-.primary {
-  background: var(--button);
-  color: var(--button-ink);
-}
-
-.primary:disabled {
-  opacity: 0.6;
-  cursor: progress;
-}
-
-.secondary {
-  background: none;
-  color: var(--ink);
+  flex-wrap: wrap;
+  gap: var(--hw-space-3);
 }

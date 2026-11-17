@@ -51,7 +51,7 @@ export function VitalsEntryForm(props: VitalsEntryFormProps) {
 
   return (
     <form
-      className={styles.form}
+      className={`hw-card hw-card--outlined ${styles.form}`}
       aria-label={`Record vitals for ${patientName}`}
       noValidate
       onSubmit={(event) => {
@@ -68,10 +68,11 @@ export function VitalsEntryForm(props: VitalsEntryFormProps) {
         <legend className={styles.legend}>Patch values, if measured by hand</legend>
         <div className={`${styles.pair} ${styles.wrap}`}>
           {PATCH_INPUTS.map(({ key, label, bounds }) => (
-            <label key={key} className={styles.field}>
-              <span className={styles.fieldLabel}>{label}</span>
+            <label key={key} className={`hw-field ${styles.field}`}>
+              <span className="hw-field__label">{label}</span>
+              <span className="hw-input">
               <input
-                className={styles.input}
+                className="hw-input__control"
                 inputMode={key === "temperature" ? "decimal" : "numeric"}
                 autoComplete="off"
                 placeholder={`${bounds.min}-${bounds.max}`}
@@ -79,13 +80,14 @@ export function VitalsEntryForm(props: VitalsEntryFormProps) {
                 aria-invalid={problems[key] !== undefined}
                 onChange={(e) => onChange({ ...draft, [key]: e.target.value })}
               />
+              </span>
             </label>
           ))}
         </div>
         {PATCH_INPUTS.map(
           ({ key }) =>
             problems[key] !== undefined && (
-              <p key={key} className={styles.problem}>
+              <p key={key} className="hw-field__error">
                 {problems[key]}
               </p>
             ),
@@ -95,10 +97,11 @@ export function VitalsEntryForm(props: VitalsEntryFormProps) {
       <fieldset className={styles.group} disabled={busy}>
         <legend className={styles.legend}>Blood pressure (mmHg)</legend>
         <div className={styles.pair}>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Systolic</span>
+          <label className={`hw-field ${styles.field}`}>
+            <span className="hw-field__label">Systolic</span>
+            <span className="hw-input">
             <input
-              className={styles.input}
+              className="hw-input__control"
               inputMode="numeric"
               autoComplete="off"
               placeholder={`${SYSTOLIC_BOUNDS.min}-${SYSTOLIC_BOUNDS.max}`}
@@ -106,14 +109,16 @@ export function VitalsEntryForm(props: VitalsEntryFormProps) {
               aria-invalid={problems.systolic !== undefined || problems.pair !== undefined}
               onChange={(e) => onChange({ ...draft, systolic: e.target.value })}
             />
+            </span>
           </label>
           <span className={styles.slash} aria-hidden="true">
             /
           </span>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Diastolic</span>
+          <label className={`hw-field ${styles.field}`}>
+            <span className="hw-field__label">Diastolic</span>
+            <span className="hw-input">
             <input
-              className={styles.input}
+              className="hw-input__control"
               inputMode="numeric"
               autoComplete="off"
               placeholder={`${DIASTOLIC_BOUNDS.min}-${DIASTOLIC_BOUNDS.max}`}
@@ -121,12 +126,13 @@ export function VitalsEntryForm(props: VitalsEntryFormProps) {
               aria-invalid={problems.diastolic !== undefined || problems.pair !== undefined}
               onChange={(e) => onChange({ ...draft, diastolic: e.target.value })}
             />
+            </span>
           </label>
         </div>
         {[problems.systolic, problems.diastolic, problems.pair].map(
           (text) =>
             text !== undefined && (
-              <p key={text} className={styles.problem}>
+              <p key={text} className="hw-field__error">
                 {text}
               </p>
             ),
@@ -223,26 +229,26 @@ export function VitalsEntryForm(props: VitalsEntryFormProps) {
       </div>
 
       {problems.form !== undefined && (
-        <p className={styles.problem} role="alert">
+        <p className={`hw-alert hw-alert--danger ${styles.message}`} role="alert">
           {problems.form}
         </p>
       )}
       {failure !== null && (
-        <p className={styles.failure} role="alert">
+        <p className={`hw-alert hw-alert--danger ${styles.message}`} role="alert">
           {failure}
         </p>
       )}
       {standingText !== null && (
-        <p className={styles.standing} role="status">
+        <p className={`hw-alert hw-alert--success ${styles.message}`} role="status">
           {standingText}
         </p>
       )}
 
       <div className={styles.actions}>
-        <button type="submit" className={styles.primary} disabled={busy}>
+        <button type="submit" className="hw-button hw-button--primary" disabled={busy}>
           {busy ? "Recording…" : "Record"}
         </button>
-        <button type="button" className={styles.secondary} onClick={onClose}>
+        <button type="button" className="hw-button" onClick={onClose}>
           Close
         </button>
       </div>
@@ -257,8 +263,9 @@ function Choice(props: {
   readonly onPick: () => void;
 }) {
   return (
-    <label className={styles.choice}>
-      <input type="radio" name={props.name} checked={props.checked} onChange={props.onPick} />
+    <label className="hw-radio">
+      <input className="hw-radio__input" type="radio" name={props.name} checked={props.checked} onChange={props.onPick} />
+      <span className="hw-radio__dot" />
       <span>{props.label}</span>
     </label>
   );

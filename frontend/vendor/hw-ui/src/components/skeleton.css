@@ -1,0 +1,11 @@
+@layer hw.components {
+  .hw-skeleton {
+    display: block;
+    height: 12px;
+    background: linear-gradient(90deg, var(--hw-color-skeleton) 25%, var(--hw-color-skeleton-shine) 37%, var(--hw-color-skeleton) 63%);
+    background-size: 400% 100%;
+    border-radius: var(--hw-radius-xs);
+    animation: hw-shimmer 1.4s ease infinite;
+  }
+  .hw-skeleton--title { height: 16px; width: 60%; }
+}
