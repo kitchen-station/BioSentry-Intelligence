@@ -27,8 +27,8 @@ const search = () => {
   );
   return screen.getByRole("combobox", { name: "Find a patient by name or bed" }) as HTMLInputElement;
 };
-const options = () => within(screen.getByRole("listbox", { name: "Patients, in rank order" })).getAllByRole("option");
-const names = () => options().map((o) => o.querySelector("span:nth-child(2)")?.textContent);
+const options = () => within(screen.getByRole("listbox", { name: "Patients in rank order" })).getAllByRole("option");
+const names = () => options().map((o) => o.querySelector(".hw-search__name")?.textContent);
 
 describe("PatientSearch", () => {
   it("is focused by / from outside a field, and not from inside one", () => {
@@ -49,7 +49,8 @@ describe("PatientSearch", () => {
     await userEvent.type(box, "a");
     expect(box.getAttribute("aria-expanded")).toBe("true");
     expect(options()).toHaveLength(6);
-    expect(options()[0].textContent).toBe("#1Santos, MariaBed 4A9 High");
+    expect(options()[0].textContent).toBe("#1Santos, Maria67 F · Bed 4A9 High");
+    expect(options()[0].querySelector(".hw-tag")!.className).toBe("hw-tag hw-tag--emergency hw-tag--round");
     await userEvent.clear(box);
     await userEvent.type(box, "4");
     expect(names()).toEqual(["Santos, Maria", "Flores, Ramon"]); // bed 4A ranked, bed 4B NOT RANKED
@@ -80,8 +81,9 @@ describe("PatientSearch", () => {
   it("says when no patient matches, and Enter then does nothing", async () => {
     const box = search();
     await userEvent.type(box, "zz{Enter}");
-    expect(options()[0].textContent).toBe("No patient on Ward W4 matches. Try a surname or a bed.");
-    expect(options()[0].getAttribute("aria-disabled")).toBe("true");
+    expect(screen.getByRole("status").textContent).toBe("No patient on Ward W4 matches. Try a surname or a bed.");
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(box.getAttribute("aria-expanded")).toBe("false");
     expect(box.hasAttribute("aria-activedescendant")).toBe(false);
     expect(screen.getByText("at /ward")).toBeTruthy();
   });

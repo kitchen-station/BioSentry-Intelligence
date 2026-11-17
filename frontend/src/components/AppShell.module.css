@@ -67,6 +67,7 @@
 .item {
   display: flex;
   flex-direction: column;
+  color: var(--hw-color-text);
 }
 
 .itemTitle { font-weight: var(--hw-weight-medium); }
@@ -155,6 +156,15 @@
   .heading .status { display: block; }
   .tools { flex-wrap: nowrap; gap: var(--hw-space-2); }
   .menuAnchor { display: grid; }
+  /* The bottom bar's Research is a button among links: no button chrome, and it fills its cell. */
+  .bottomTrigger {
+    width: 100%;
+    padding: 0;
+    font-family: inherit;
+    cursor: pointer;
+    background: none;
+    border: 0;
+  }
   /* The bottom bar's menu opens upward. */
   .up {
     top: auto;

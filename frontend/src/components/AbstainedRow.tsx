@@ -5,6 +5,7 @@ import styles from "./AbstainedRow.module.css";
 import { formatAge, formatBloodPressure, formatClockDay } from "./format";
 import { useWardNow } from "./wardNow";
 import { VitalsEntry } from "./VitalsEntry";
+import { sentence } from "./vitalsDraft";
 
 const SEEN = [
   ["heart_rate", "HR"],
@@ -26,9 +27,9 @@ function LastSeen({ seen, now }: { seen: NonNullable<AbstainedRowType["last_seen
     return [`${label} ${value} (${m.provenance.source}, ${quality}${age}${formatClockDay(at, now)})`];
   });
   return (
-    <div className={styles.seen}>
+    <p className={styles.seen}>
       Last seen: {items.length > 0 ? items.join(" · ") : "no value stored"}
-    </div>
+    </p>
   );
 }
 
@@ -47,32 +48,26 @@ export function AbstainedRow({ row, canRecord = false, clinicianId = "", onRecor
   const [entering, setEntering] = useState(false);
   const now = useWardNow();
   return (
-    <div className={styles.row}>
-      <div className={styles.infoCol}>
-        <div className={styles.nameRow}>
-          <Link to={`/patient/${row.id}`} className={styles.name}>{row.name}</Link>
-          <span className={styles.detail}>
-            {row.age ?? "--"}{row.sex ? ` ${row.sex}` : ""} &middot; Bed {row.bed}
-          </span>
-        </div>
-        <div className={styles.context}>{row.admitting_context}</div>
-      </div>
-      <div className={styles.reasonCol}>
-        <div className={styles.reason}>{row.reason}</div>
-        <div className={styles.instruction}>{row.instruction}</div>
+    <div className="hw-notice__item">
+      <div className="hw-notice__main">
+        <Link to={`/patient/${row.id}`} className="hw-notice__name">{row.name}</Link>
+        <span className="hw-notice__meta">
+          {row.age ?? "--"}{row.sex ? ` ${row.sex}` : ""} &middot; Bed {row.bed}
+        </span>
+        <p className="hw-notice__reason"><strong>{sentence(row.reason)}</strong> {sentence(row.instruction)}</p>
         {row.last_seen && <LastSeen seen={row.last_seen} now={now} />}
-        {canRecord && (
-          <button
-            type="button"
-            className={`hw-button hw-button--sm ${styles.action}`}
-            aria-expanded={entering}
-            disabled={disabled && !entering}
-            onClick={() => setEntering((open) => !open)}
-          >
-            {entering ? "Close" : "Record vitals"}
-          </button>
-        )}
       </div>
+      {canRecord && (
+        <button
+          type="button"
+          className={entering ? "hw-button" : "hw-button hw-button--accent"}
+          aria-expanded={entering}
+          disabled={disabled && !entering}
+          onClick={() => setEntering((open) => !open)}
+        >
+          {entering ? "Close" : "Record vitals"}
+        </button>
+      )}
       {canRecord && entering && (
         <div className={styles.entry}>
           <VitalsEntry

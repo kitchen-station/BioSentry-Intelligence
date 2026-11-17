@@ -10,7 +10,8 @@ import { MeasurementDisplay } from "../components/MeasurementDisplay";
 import { band, obsDue } from "../components/risk";
 import { Score } from "../components/Score";
 import { VitalsEntry } from "../components/VitalsEntry";
-import { standing } from "../components/vitalsDraft";
+import { news2Points } from "../components/news2";
+import { sentence, standing } from "../components/vitalsDraft";
 import { DataAge, WardRow, responseLine } from "../components/WardRow";
 import { useWardFeed, type WardFeed } from "../components/wardFeed";
 import { WardFeedProvider } from "../components/WardFeedProvider";
@@ -67,9 +68,9 @@ function NotRankedTableRow({ row, now, canRecord, offline, clinicianId, onRecord
       <tr>
         <td>--</td>
         <td>{row.bed}</td>
-        <td><Link to={`/patient/${row.id}`}>{row.name}</Link> <span className={styles.sub}>{row.age ?? "--"}{row.sex ? ` ${row.sex}` : ""}</span></td>
+        <td className={styles.who}><Link to={`/patient/${row.id}`}>{row.name}</Link> <span className={styles.sub}>{row.age ?? "--"}{row.sex ? ` ${row.sex}` : ""}</span></td>
         <td><span className="hw-tag hw-tag--dashed">NOT RANKED</span></td>
-        <td><strong>{row.reason}</strong> {row.instruction}</td>
+        <td><strong>{sentence(row.reason)}</strong> {sentence(row.instruction)}</td>
         <td>{v ? <MeasurementDisplay now={now} measurement={v.heart_rate} /> : "--"}</td>
         <td>{v ? <MeasurementDisplay now={now} measurement={v.respiratory_rate} /> : "--"}</td>
         <td>{v ? <MeasurementDisplay now={now} measurement={v.spo2} format={(n) => `${n}%`} /> : "--"}</td>
@@ -80,7 +81,7 @@ function NotRankedTableRow({ row, now, canRecord, offline, clinicianId, onRecord
           {canRecord && (
             <button
               type="button"
-              className="hw-button hw-button--sm"
+              className={entering ? "hw-button hw-button--sm" : "hw-button hw-button--accent hw-button--sm"}
               aria-expanded={entering}
               aria-label={`${entering ? "Close" : "Record vitals"} for ${row.name}`}
               disabled={offline && !entering}
@@ -150,7 +151,7 @@ function WardPage({ session, onSignOut, feed }: Props & { feed: WardFeed }) {
               {readOnly && <button type="button" className="hw-button hw-button--sm" onClick={refresh}>Refresh</button>}
             </>
           ) : (
-            <div role="status" className={styles.panel}>
+            <div role="status" className={styles.box}>
               <span className="hw-visually-hidden">Loading ward…</span>
               {[38, 30, 42, 34, 28, 36].map((w) => (
                 <div key={w} className={styles.skeletonRow} aria-hidden="true">
@@ -218,7 +219,7 @@ function WardPage({ session, onSignOut, feed }: Props & { feed: WardFeed }) {
       {failedSince && (
         <div className={`hw-banner hw-banner--inverse ${styles.offline}`} role="alert">
           <span className="hw-icon fa-solid fa-ban" aria-hidden="true" />
-          <strong>Offline since {formatClock(since(failedSince))}</strong>
+          <strong className="hw-banner__title">Offline since {formatClock(since(failedSince))}</strong>
           <span>
             Cannot reach the ward server. Showing data from {fetchedAt ? formatClock(fetchedAt) : "--"}; ages below stand at that time. {retry}
             {!readOnly && " Acknowledging and recording wait until the connection is back."}
@@ -254,7 +255,7 @@ function WardPage({ session, onSignOut, feed }: Props & { feed: WardFeed }) {
             return (
               <button key={f} type="button" className="hw-filter__item" aria-pressed={filter === f} onClick={() => setFilter(f)}>
                 {label}{" "}
-                <span className="hw-filter__count" data-tone={tone}><Flip>{n}</Flip></span>
+                <span className="hw-filter__count" data-tone={tone} data-count={n}><Flip>{n}</Flip></span>
               </button>
             );
           })}
@@ -265,12 +266,12 @@ function WardPage({ session, onSignOut, feed }: Props & { feed: WardFeed }) {
         )}
 
         {view === "list" && ranked.length > 0 && (
-          <section aria-label="Ranked patients" className={styles.panel}>
+          <section aria-label="Ranked patients" className={`hw-ranklist-wrap ${styles.panel}`}>
+            <div className="hw-ranklist__head" aria-hidden="true">
+              <span>Rank</span><span>NEWS2</span><span>Patient and next step</span><span>Heart rate</span><span>Resp. rate</span>
+              <span>SpO2</span><span>BP</span><span>ACVPU</span><span>Data</span><span />
+            </div>
             <ol className="hw-ranklist" data-density={density}>
-              <li className={`hw-ranklist__row ${styles.head}`} data-head="" aria-hidden="true">
-                <span>Rank</span><span>NEWS2</span><span>Patient and next step</span><span>Heart rate</span><span>Resp. rate</span>
-                <span>SpO2</span><span>BP</span><span>AVPU</span><span>Data</span><span />
-              </li>
               {ranked.map((row) => (
                 <WardRow
                   key={row.id}
@@ -300,7 +301,7 @@ function WardPage({ session, onSignOut, feed }: Props & { feed: WardFeed }) {
                       <button type="button" className={styles.sort} onClick={() => setSort(k)}>{k === "rank" ? "Rank" : "Bed"}</button>
                     </th>
                   ))}
-                  <th>Patient</th><th>NEWS2</th><th>Next step</th><th>HR</th><th>RR</th><th>SpO2</th><th>BP</th><th>AVPU</th><th>Data age</th>
+                  <th>Patient</th><th>NEWS2</th><th>Next step</th><th>HR</th><th>RR</th><th>SpO2</th><th>BP</th><th>ACVPU</th><th>Data age</th>
                   <th><span className="hw-visually-hidden">Action</span></th>
                 </tr>
               </thead>
@@ -312,25 +313,28 @@ function WardPage({ session, onSignOut, feed }: Props & { feed: WardFeed }) {
                     );
                   }
                   const b = band(r);
+                  const p = news2Points(r.vitals);
                   const onAck = ack(r);
                   return (
                     <tr key={r.id} data-alert={alertIds.has(r.id) || undefined}>
                       <td>{r.rank}</td>
                       <td>{r.bed}</td>
-                      <td><Link to={`/patient/${r.id}`}>{r.name}</Link> <span className={styles.sub}>{r.age ?? "--"}{r.sex ? ` ${r.sex}` : ""}</span></td>
+                      <td className={styles.who}><Link to={`/patient/${r.id}`}>{r.name}</Link> <span className={styles.sub}>{r.age ?? "--"}{r.sex ? ` ${r.sex}` : ""}</span></td>
                       <td><Score score={r.score} band={b} rising={r.trend === "rising"} small /></td>
-                      <td>{responseLine(r, b, session.role) ?? "--"}</td>
-                      <td><MeasurementDisplay now={now} measurement={r.vitals.heart_rate} /></td>
-                      <td><MeasurementDisplay now={now} measurement={r.vitals.respiratory_rate} /></td>
-                      <td><MeasurementDisplay now={now} measurement={r.vitals.spo2} format={(n) => `${n}%`} /></td>
-                      <td><MeasurementDisplay now={now} measurement={r.vitals.blood_pressure} format={formatBloodPressure} /></td>
-                      <td><MeasurementDisplay now={now} measurement={r.vitals.consciousness} /></td>
+                      <td className={styles.next} data-band={b}>{responseLine(r, b, session.role) ?? "--"}</td>
+                      <td className={styles.vital} data-points={p.heart_rate}><MeasurementDisplay now={now} measurement={r.vitals.heart_rate} /></td>
+                      <td className={styles.vital} data-points={p.respiratory_rate}><MeasurementDisplay now={now} measurement={r.vitals.respiratory_rate} /></td>
+                      <td className={styles.vital} data-points={p.spo2}><MeasurementDisplay now={now} measurement={r.vitals.spo2} format={(n) => `${n}%`} /></td>
+                      <td className={styles.vital} data-points={p.blood_pressure}>
+                        <MeasurementDisplay now={now} measurement={r.vitals.blood_pressure} format={formatBloodPressure} />
+                      </td>
+                      <td className={styles.vital} data-points={p.consciousness}><MeasurementDisplay now={now} measurement={r.vitals.consciousness} /></td>
                       <td><DataAge row={r} ageOffsetS={ageOffsetS} offline={offline} /></td>
                       <td>
                         {onAck && (
                           <button
                             type="button"
-                            className="hw-button hw-button--primary hw-button--sm"
+                            className="hw-button hw-button--accent hw-button--sm"
                             disabled={offline}
                             aria-label={`Acknowledge the alert for ${r.name}`}
                             onClick={onAck}
@@ -348,7 +352,7 @@ function WardPage({ session, onSignOut, feed }: Props & { feed: WardFeed }) {
         )}
 
         {empty && (
-          <div className={`hw-empty ${styles.panel}`}>
+          <div className={`hw-empty ${styles.box}`}>
             <span className="hw-empty__art" aria-hidden="true"><span className="hw-icon fa-solid fa-bed" /></span>
             <p className="hw-empty__title">No patients on Ward {data.ward}</p>
             <p>A patient appears here once admitted, and stays NOT RANKED until the first complete set of observations is in.</p>
@@ -359,7 +363,7 @@ function WardPage({ session, onSignOut, feed }: Props & { feed: WardFeed }) {
         )}
 
         {!empty && filter !== "all" && ranked.length === 0 && unranked.length === 0 && (
-          <div className={`hw-empty ${styles.panel}`}>
+          <div className={`hw-empty ${styles.box}`}>
             <p className="hw-empty__title">{NO_MATCH[filter]}</p>
             <p>The ranked list is unchanged. This filter only hides rows.</p>
             <button type="button" className="hw-button" onClick={() => setFilter("all")}>Show all patients</button>

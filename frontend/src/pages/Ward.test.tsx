@@ -155,7 +155,7 @@ describe("the filter chips", () => {
     expect(screen.queryByRole("region", { name: "Ranked patients" })).toBeNull();
     expect(screen.queryByText(/This filter only hides rows/)).toBeNull();
     await user.click(chip(/^All/));
-    expect(within(screen.getByRole("region", { name: "Ranked patients" })).getAllByRole("listitem")).toHaveLength(6); // the head row is hidden
+    expect(screen.getByRole("region", { name: "Ranked patients" }).querySelectorAll(".hw-ranklist__row")).toHaveLength(6);
     expect(screen.getByRole("heading", { level: 2, name: "Not ranked (2)" })).toBeTruthy();
   });
 
@@ -198,7 +198,7 @@ describe("the NOT RANKED strip", () => {
     await user.click(within(strip).getByRole("button", { name: "Hide" }));
     expect(within(strip).queryByRole("link", { name: "Flores, Ramon" })).toBeNull();
     await user.click(within(strip).getByRole("button", { name: "Show" }));
-    expect(within(strip).getByText("Systolic BP missing")).toBeTruthy();
+    expect(within(strip).getByText("Systolic BP missing.")).toBeTruthy();
   });
 });
 
@@ -393,7 +393,7 @@ describe("the patient search", () => {
     expect(document.activeElement).toBe(box);
     await user.type(box, "es");
     const options = within(screen.getByRole("listbox")).getAllByRole("option").map((o) => o.textContent);
-    expect(options).toEqual(["#2Reyes, CarlosBed 2B7 High", "Flores, RamonBed 4BNOT RANKED"]);
+    expect(options).toEqual(["#2Reyes, Carlos54 M · Bed 2B7 High", "Flores, Ramon73 M · Bed 4BNOT RANKED"]);
     await user.keyboard("{Enter}");
     expect(screen.getByText("at /patient/p-002")).toBeTruthy();
   });
@@ -404,19 +404,32 @@ describe("density and the table", () => {
     api.getWard.mockResolvedValue(ward({ ranked: rows.slice(0, 3), abstained: unranked }));
   });
 
-  it("shows compact rows without sparklines or reason chips", async () => {
+  it("switches the list to compact rows: the kit drops sparklines and chips, the tile goes small", async () => {
     const user = userEvent.setup();
     page();
     await loaded();
     const list = () => screen.getByRole("region", { name: "Ranked patients" });
     expect(list().querySelector("ol")!.getAttribute("data-density")).toBe("comfortable");
-    expect(list().querySelectorAll("svg").length).toBeGreaterThan(0);
-    expect(within(list()).getByText("Total 9 (≥7): high")).toBeTruthy();
+    expect(within(list()).getByRole("img", { name: "NEWS2 9, High" }).className).toBe("hw-score");
     await user.click(screen.getByRole("radio", { name: "Compact" }));
     expect(list().querySelector("ol")!.getAttribute("data-density")).toBe("compact");
-    expect(list().querySelectorAll("svg")).toHaveLength(0);
-    expect(within(list()).queryByText("Total 9 (≥7): high")).toBeNull();
-    expect(within(list()).getByRole("img", { name: "NEWS2 9, High" }).className).toContain("hw-score--sm");
+    expect(within(list()).getByRole("img", { name: "NEWS2 9, High" }).className).toBe("hw-score hw-score--sm");
+    expect(screen.getByRole("radio", { name: "Compact" })).toHaveProperty("checked", true);
+  });
+
+  it("names each vital for a screen reader, with the points it adds", async () => {
+    page();
+    await loaded();
+    const row = rowOf("Santos, Maria");
+    const vitals = within(row).getAllByRole("img").filter((e) => e.classList.contains("hw-ranklist__vital"));
+    expect(vitals.map((v) => v.getAttribute("aria-label")?.replace(/ \d+(\/\d+)?/, " N"))).toEqual([
+      expect.stringMatching(/^Heart rate N per minute/),
+      expect.stringMatching(/^Respiratory rate N per minute/),
+      expect.stringMatching(/^SpO2 N percent/),
+      expect.stringMatching(/^Blood pressure N mmHg, adds 3 NEWS2 points$/),
+      expect.stringMatching(/^ACVPU /),
+    ]);
+    expect(vitals[3].getAttribute("data-points")).toBe("3");
   });
 
   it("shows every patient as a table, NOT RANKED first, sortable by rank or bed", async () => {
@@ -906,7 +919,8 @@ describe("flip on change", () => {
     act(async () => {
       await vi.advanceTimersByTimeAsync(ms);
     });
-  const flips = () => [...document.querySelectorAll('[class*="_flip_"]')].map((e) => e.textContent);
+  // The page's own flips; the bar's (the closed tray's tiles, the clock) are counted where a test asks for them.
+  const flips = () => [...document.querySelectorAll('main [class*="_flip_"], [role="group"][aria-label="Ward clock"] [class*="_flip_"]')].map((e) => e.textContent);
   const withScore = (score: number): WardResponse => ({ ...ward(), ranked: [{ ...rows[0], score }] });
   beforeEach(() => {
     api.build.usesServer = true;

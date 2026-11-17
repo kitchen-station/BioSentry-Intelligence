@@ -86,7 +86,7 @@ function ResearchMenu({ label, items, bottom = false }: { label: string; items: 
       <button
         ref={trigger}
         type="button"
-        className={bottom ? "hw-bottomnav__item" : `hw-header__link ${styles.menuTrigger}`}
+        className={bottom ? `hw-bottomnav__item ${styles.bottomTrigger}` : `hw-header__link ${styles.menuTrigger}`}
         aria-expanded={open}
         aria-controls={id}
         onClick={() => setOpen((v) => !v)}

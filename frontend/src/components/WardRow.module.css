@@ -1,80 +1,8 @@
-/* Inside one hw-ranklist__row. The row's grid, the alert bar and tint, and the score tile are the kit's;
-   this file lays out each cell and keeps the clinical colour on text: a value adding NEWS2 points is red
-   (bold at 2+), the response line takes its band's colour, a stale age and overdue obs are red. */
+/* The row is the kit's hw-ranklist__row. This file adds what the kit leaves to the app:
+   overdue observations in red, and the table's data age (Ward.tsx), red once stale or offline. */
 
-.rank {
-  font-size: var(--hw-font-size-18);
-  color: var(--hw-color-text-muted);
-  text-align: center;
-}
-
-.main { min-width: 0; }
-
-.nameRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0 var(--hw-space-3);
-}
-
-.name {
-  font-size: var(--hw-font-size-16);
-  font-weight: var(--hw-weight-medium);
-  color: var(--hw-color-text);
-}
-
-.detail {
-  font-size: var(--hw-text-caption);
-  color: var(--hw-color-text-muted);
-}
-
-.response { font-weight: var(--hw-weight-medium); }
-:global(.hw-ranklist__row)[data-band="high"] .response { color: var(--hw-graph-emergency-text); }
-:global(.hw-ranklist__row)[data-band="medium"] .response,
-:global(.hw-ranklist__row)[data-band="low-medium"] .response { color: var(--hw-graph-urgent-text); }
-
-.context { color: var(--hw-color-text-muted); }
-
-.reasons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--hw-space-2);
-  margin-top: var(--hw-space-1);
-}
-
-.vital {
-  display: flex;
-  align-items: center;
-  gap: var(--hw-space-3);
-}
-
-.value {
-  font-size: var(--hw-font-size-16);
-  font-weight: var(--hw-weight-medium);
-}
-
-.vital[data-points="1"] .value { color: var(--hw-color-danger-fg); }
-.vital[data-points="2"] .value,
-.vital[data-points="3"] .value { color: var(--hw-color-danger-fg); font-weight: var(--hw-weight-bold); }
-
-.data {
-  font-size: var(--hw-text-caption);
-  line-height: 1.4;
-  color: var(--hw-color-text-muted);
-}
-
-.age[data-stale],
-.obsDue[data-overdue] {
+.obs[data-overdue],
+.age[data-stale] {
   font-weight: var(--hw-weight-bold);
-  color: var(--hw-color-danger-fg);
-}
-
-.data [data-weak] {
-  font-weight: var(--hw-weight-bold);
-  color: var(--hw-color-text);
-}
-
-.action {
-  display: flex;
-  justify-content: flex-end;
+  color: var(--hw-graph-emergency-text);
 }

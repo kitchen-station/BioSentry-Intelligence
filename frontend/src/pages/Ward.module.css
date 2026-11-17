@@ -58,65 +58,20 @@
   margin-left: auto;
 }
 
-.filters { margin-top: var(--hw-space-5); }
+/* The kit's filter row pads its chips' focus rings; this lines the chips up with the title. */
+.filters { margin: var(--hw-space-4) calc(-1 * var(--hw-space-2)) 0; }
 
 .block {
   align-items: center;
   margin-top: var(--hw-space-4);
 }
 
-.offline {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--hw-space-2) var(--hw-space-5);
-  padding: var(--hw-space-4) var(--hw-space-7);
-}
+.offline { padding-inline: var(--hw-space-7); }
 
-/* ---- The NOT RANKED strip (NotRankedSection) ---- */
+.strip,
+.panel { margin-top: var(--hw-space-6); }
 
-.strip {
-  margin-top: var(--hw-space-6);
-  padding: var(--hw-space-4) var(--hw-space-6) var(--hw-space-5);
-}
-
-.stripHead {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--hw-space-2) var(--hw-space-5);
-}
-
-.stripTitle {
-  font-size: var(--hw-font-size-14);
-  font-weight: var(--hw-weight-bold);
-}
-
-.stripNote {
-  flex: 1 1 320px;
-  color: var(--hw-color-text-muted);
-}
-
-.stripList {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
-  gap: var(--hw-space-4);
-  margin-top: var(--hw-space-4);
-  padding: 0;
-  list-style: none;
-}
-
-/* ---- The ranked list and the table ---- */
-
-.panel {
-  margin-top: var(--hw-space-6);
-  overflow-x: auto;
-}
-
-.head {
-  font-size: var(--hw-font-size-12);
-  color: var(--hw-color-text-muted);
-}
+/* ---- The table ---- */
 
 .sort {
   padding: 0;
@@ -128,12 +83,28 @@
   border: 0;
 }
 
+.who { white-space: nowrap; }
+.who a { font-weight: var(--hw-weight-medium); color: var(--hw-color-text); }
+
 .sub {
+  display: block;
   font-size: var(--hw-text-caption);
   color: var(--hw-color-text-muted);
 }
 
+/* The clinical colour the list carries, kept in the table: the next step in its band's colour, a value adding points red (bold at 2+). */
+.next[data-band="high"] { font-weight: var(--hw-weight-medium); color: var(--hw-graph-emergency-text); }
+.next:is([data-band="medium"], [data-band="low-medium"]) { font-weight: var(--hw-weight-medium); color: var(--hw-graph-urgent-text); }
+.vital:is([data-points="1"], [data-points="2"], [data-points="3"]) { color: var(--hw-graph-emergency-text); }
+.vital:is([data-points="2"], [data-points="3"]) { font-weight: var(--hw-weight-bold); }
+
 /* ---- Loading ---- */
+
+.box {
+  margin-top: var(--hw-space-6);
+  background: var(--hw-color-surface);
+  border-radius: var(--hw-card-radius);
+}
 
 .skeletonRow {
   display: flex;
@@ -164,14 +135,7 @@
 @media (width < 768px) {
   .container { padding: var(--hw-space-4) var(--hw-space-4) var(--hw-space-6); }
   .title { font-size: var(--hw-font-size-24); }
-  .switches { margin-left: 0; }
+  /* Phone rows are cards: density and the table are desk choices. */
+  .switches { display: none; }
   .offline { padding-inline: var(--hw-space-4); }
-  .strip { padding-inline: var(--hw-space-4); }
-  /* One sideways-scrolling row of chips. */
-  .filters {
-    flex-wrap: nowrap;
-    margin-inline: calc(-1 * var(--hw-space-4));
-    padding-inline: var(--hw-space-4);
-    overflow-x: auto;
-  }
 }

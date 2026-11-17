@@ -25,12 +25,12 @@ export function NotRankedSection({ rows, clinicianId, readOnly = false, offline 
   if (rows.length === 0) return null;
   return (
     <section className={`hw-notice hw-notice--dashed ${styles.strip}`} aria-labelledby={heading}>
-      <div className={styles.stripHead}>
-        <h2 id={heading} className={styles.stripTitle}>Not ranked ({rows.length})</h2>
-        <p className={styles.stripNote}>Action required to enable scoring. Not ranked does not mean low risk.</p>
+      <div className="hw-notice__head">
+        <h2 id={heading} className="hw-notice__title">Not ranked ({rows.length})</h2>
+        <p className="hw-notice__text">Action required to enable scoring. Not ranked does not mean low risk.</p>
         <button
           type="button"
-          className="hw-button hw-button--ghost hw-button--sm"
+          className="hw-notice__toggle"
           aria-expanded={open}
           aria-controls={list}
           onClick={() => setOpen((v) => !v)}
@@ -38,21 +38,18 @@ export function NotRankedSection({ rows, clinicianId, readOnly = false, offline 
           {open ? "Hide" : "Show"}
         </button>
       </div>
-      {open && (
-        <ul id={list} className={styles.stripList}>
-          {rows.map((row) => (
-            <li key={row.id}>
-              <AbstainedRow
-                row={row}
-                canRecord={canRecordVitals && !readOnly}
-                clinicianId={clinicianId}
-                onRecorded={onRecorded}
-                disabled={offline}
-              />
-            </li>
-          ))}
-        </ul>
-      )}
+      <div id={list} className="hw-notice__body" hidden={!open}>
+        {rows.map((row) => (
+          <AbstainedRow
+            key={row.id}
+            row={row}
+            canRecord={canRecordVitals && !readOnly}
+            clinicianId={clinicianId}
+            onRecorded={onRecorded}
+            disabled={offline}
+          />
+        ))}
+      </div>
     </section>
   );
 }

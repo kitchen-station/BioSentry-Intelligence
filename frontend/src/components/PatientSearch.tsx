@@ -2,10 +2,11 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import type { WardResponse } from "../types";
 import { band } from "./risk";
-import { BAND_WORD } from "./Score";
-import styles from "./PatientSearch.module.css";
+import { BAND_TAG, BAND_WORD } from "./Score";
 
 const MAX = 6;
+
+const meta = (r: { age: number | null; sex: string | null; bed: string }) => `${r.age ?? "--"}${r.sex ? ` ${r.sex}` : ""} · Bed ${r.bed}`;
 
 /**
  * Find a patient by name or bed (kit hw-search). Results in rank order, NOT RANKED last, at most
@@ -37,8 +38,12 @@ export function PatientSearch({ ward }: { ward: WardResponse }) {
   const results = q === ""
     ? []
     : [
-        ...ward.ranked.filter(hit).map((r) => ({ id: r.id, name: r.name, bed: r.bed, rank: `#${r.rank}`, tag: `${r.score} ${BAND_WORD[band(r)]}` })),
-        ...ward.abstained.filter(hit).map((r) => ({ id: r.id, name: r.name, bed: r.bed, rank: "", tag: null })),
+        ...ward.ranked.filter(hit).map((r) => ({
+          id: r.id, name: r.name, meta: meta(r), rank: `#${r.rank}`, tag: `${r.score} ${BAND_WORD[band(r)]}`, tagClass: `${BAND_TAG[band(r)]} hw-tag--round`,
+        })),
+        ...ward.abstained.filter(hit).map((r) => ({
+          id: r.id, name: r.name, meta: meta(r), rank: "", tag: "NOT RANKED", tagClass: "hw-tag hw-tag--round hw-tag--dashed",
+        })),
       ].slice(0, MAX);
   const expanded = focused && q !== "";
   const optionId = (i: number) => `${listId}-${i}`;
@@ -64,9 +69,9 @@ export function PatientSearch({ ward }: { ward: WardResponse }) {
   };
 
   return (
-    <div className={`hw-search ${styles.search}`}>
+    <div className="hw-search">
       <label className="hw-input">
-        <span className="hw-icon fa-solid fa-magnifying-glass" aria-hidden="true" />
+        <span className="hw-icon hw-input__icon fa-solid fa-magnifying-glass" aria-hidden="true" />
         <input
           ref={input}
           type="search"
@@ -74,7 +79,7 @@ export function PatientSearch({ ward }: { ward: WardResponse }) {
           role="combobox"
           aria-label="Find a patient by name or bed"
           aria-autocomplete="list"
-          aria-expanded={expanded}
+          aria-expanded={expanded && results.length > 0}
           aria-controls={listId}
           aria-activedescendant={expanded && results[active] ? optionId(active) : undefined}
           placeholder="Find a patient"
@@ -87,25 +92,24 @@ export function PatientSearch({ ward }: { ward: WardResponse }) {
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
         />
-        <kbd aria-hidden="true">/</kbd>
+        <kbd className="hw-search__key" aria-hidden="true">/</kbd>
       </label>
-      {expanded && (
+      {expanded && results.length > 0 && (
         // A press on a result must not blur the field first, or the result is gone before the click lands.
-        <ul id={listId} className="hw-search__results" role="listbox" aria-label="Patients, in rank order" onMouseDown={(e) => e.preventDefault()}>
+        <ul id={listId} className="hw-search__results" role="listbox" aria-label="Patients in rank order" onMouseDown={(e) => e.preventDefault()}>
+          <li className="hw-search__caption" aria-hidden="true">In rank order</li>
           {results.map((r, i) => (
             <li key={r.id} id={optionId(i)} role="option" aria-selected={i === active} onClick={() => open(r.id)}>
-              <span className={styles.rank}>{r.rank}</span>
-              <span className={styles.name}>{r.name}</span>
-              <span className={styles.bed}>Bed {r.bed}</span>
-              {r.tag !== null ? <span className="hw-tag">{r.tag}</span> : <span className="hw-tag hw-tag--dashed">NOT RANKED</span>}
+              <span className="hw-search__rank">{r.rank}</span>
+              <span className="hw-search__name">{r.name}</span>
+              <span className="hw-search__bed">{r.meta}</span>
+              <span className={r.tagClass}>{r.tag}</span>
             </li>
           ))}
-          {results.length === 0 && (
-            <li role="option" aria-selected={false} aria-disabled="true" className={styles.none}>
-              No patient on Ward {ward.ward} matches. Try a surname or a bed.
-            </li>
-          )}
         </ul>
+      )}
+      {expanded && results.length === 0 && (
+        <p className="hw-search__empty" role="status">No patient on Ward {ward.ward} matches. Try a surname or a bed.</p>
       )}
     </div>
   );

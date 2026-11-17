@@ -1,6 +1,6 @@
 import type { ReactNode, Ref } from "react";
 import { Link } from "react-router-dom";
-import type { ScoreRow, SessionRole } from "../types";
+import type { Measurement, ScoreRow, SessionRole } from "../types";
 import { formatAge, formatBloodPressure, formatClock, nurseEntryText, patchInUse, STALE_AFTER_S } from "./format";
 import { Flip } from "./Flip";
 import { MeasurementDisplay } from "./MeasurementDisplay";
@@ -18,7 +18,7 @@ interface Props {
   /** Seconds since the ward was fetched, added to the server's data age. */
   ageOffsetS: number;
   compact?: boolean;
-  /** An unacknowledged alert is a state of the row: the emergency bar, the tint, and Acknowledge in place of Open. */
+  /** An unacknowledged alert is a state of the row: the emergency edge, the tint, and Acknowledge in place of Open. */
   alert?: boolean;
   /** Offline: the last data stays, its age turns red, Acknowledge waits. */
   offline?: boolean;
@@ -32,113 +32,132 @@ export function responseLine(row: ScoreRow, b: Band, role: SessionRole): string 
   return row.escalation_reasons.some((r) => r.rule === "tier_b_finding") ? driftResponse(role, row.score) : null;
 }
 
-function ObsDue({ due, now, noPatch }: { due: number | "continuous"; now: number; noPatch: boolean }) {
-  if (due === "continuous") {
-    return <div className={styles.obsDue}>{noPatch ? "Continuous monitoring needed: no patch" : "Obs continuous"}</div>;
-  }
-  if (due > now) return <div className={styles.obsDue}>Obs due {formatClock(due)}</div>;
-  return (
-    <div className={styles.obsDue} data-overdue>
-      {due === -Infinity ? "Obs due now" : `Obs overdue ${formatAge(Math.floor((now - due) / 1000)).replace(" ago", "")}`}
-    </div>
-  );
-}
-
-/** How old the patch data is (red once stale, and while offline), or that there is no patch signal. */
-export function DataAge({ row, ageOffsetS, offline = false }: { row: ScoreRow; ageOffsetS: number; offline?: boolean }) {
+/**
+ * How old the patch data is ("Stale · " once stale; `red` too while offline), or that there is no patch
+ * signal; null when neither applies.
+ */
+export function dataAge(row: ScoreRow, ageOffsetS: number, offline = false): { text: string; red: boolean } | null {
   // Either figure can be null on a row ranked from nurse entries: never compute with a null.
   const age = row.last_update_s === null ? null : row.last_update_s + ageOffsetS;
   const patch = patchInUse(row.vitals);
   if (patch && age !== null) {
     const stale = age > STALE_AFTER_S;
-    return (
-      <div className={styles.age} data-stale={stale || offline || undefined}>
-        {stale ? "Stale · " : ""}{formatAge(Math.floor(age))}
-      </div>
-    );
+    return { text: `${stale ? "Stale · " : ""}${formatAge(Math.floor(age))}`, red: stale || offline };
   }
-  return !patch || row.signal_quality === null ? <div className={styles.age}>No patch signal</div> : null;
+  return !patch || row.signal_quality === null ? { text: "No patch signal", red: false } : null;
 }
 
-/** One vital: its name for a screen reader (the column heads are hidden), a sparkline when comfortable, the value red when it adds points. */
-function Vital({ label, points, trend, compact, children }: { label: string; points: number | undefined; trend: readonly (number | null)[]; compact: boolean; children: ReactNode }) {
+/** The data age alone, for the Ward's table. */
+export function DataAge({ row, ageOffsetS, offline }: { row: ScoreRow; ageOffsetS: number; offline: boolean }) {
+  const a = dataAge(row, ageOffsetS, offline);
+  return a && <span className={styles.age} data-stale={a.red || undefined}>{a.text}</span>;
+}
+
+function obsText(due: number | "continuous", now: number, noPatch: boolean): string {
+  if (due === "continuous") return noPatch ? "Continuous monitoring needed: no patch" : "Obs continuous";
+  if (due > now) return `Obs due ${formatClock(due)}`;
+  return due === -Infinity ? "Obs due now" : `Obs overdue ${formatAge(Math.floor((now - due) / 1000)).replace(" ago", "")}`;
+}
+
+/** One of the five vitals (kit hw-ranklist__vital): named for a screen reader, which hears the value and its points. */
+function Vital({ name, label, unit, said, points, trend, children }: {
+  name: string; label: string; unit: string; said: string | null; points: number | undefined;
+  trend?: readonly (number | null)[]; children: ReactNode;
+}) {
+  const p = points ?? 0;
+  const adds = p > 0 ? `, adds ${p} NEWS2 point${p === 1 ? "" : "s"}` : "";
   return (
-    <div className={styles.vital} data-points={points}>
-      <span className="hw-visually-hidden">{label} </span>
-      {!compact && <Sparkline data={trend} width={64} height={24} color="var(--trace-hr)" />}
-      <span className={styles.value}>{children}</span>
+    <div className="hw-ranklist__vital" role="img" aria-label={said === null ? `${name} not recorded` : `${name} ${said}${unit}${adds}`} data-points={p}>
+      {trend && (
+        <span className="hw-ranklist__spark" aria-hidden="true">
+          <Sparkline data={trend} width={64} height={24} color="var(--trace-hr)" />
+        </span>
+      )}
+      <span className="hw-ranklist__label">{label}</span>
+      {children}
     </div>
   );
 }
 
-/** One ranked patient in the Ward list (kit hw-ranklist__row). The name and the chevron open the patient; nothing else on the row does. */
+const value = <T,>(m: Measurement<T> | null | undefined, write: (v: T) => string): string | null =>
+  m?.data.present ? write(m.data.value) : null;
+
+/**
+ * One ranked patient (kit hw-ranklist__row). Every element is rendered; the kit drops what compact
+ * rows and phone cards leave out. The name and the chevron open the patient; nothing else on the row does.
+ */
 export function WardRow({ row, role, now, ageOffsetS, compact = false, alert = false, offline = false, onAcknowledge, ref }: Props) {
   const b = band(row);
   const p = news2Points(row.vitals);
-  const nurse = nurseEntryText(row.vitals, now);
-  const patch = patchInUse(row.vitals);
+  const v = row.vitals;
+  const nurse = nurseEntryText(v, now);
+  const patch = patchInUse(v);
   const line = responseLine(row, b, role);
+  const age = dataAge(row, ageOffsetS, offline);
+  const due = obsDue(row);
   const to = `/patient/${row.id}`;
 
   return (
     <li ref={ref} className="hw-ranklist__row" data-alert={alert || undefined} data-band={b}>
-      <span className={styles.rank}><Flip>{row.rank}</Flip></span>
+      <span className="hw-ranklist__rank"><Flip>{row.rank}</Flip></span>
       <Score score={row.score} band={b} rising={row.trend === "rising"} small={compact} />
 
-      <div className={styles.main}>
-        <div className={styles.nameRow}>
-          <Link to={to} className={styles.name}>{row.name}</Link>
-          <span className={styles.detail}>
+      <div className="hw-ranklist__who">
+        <div className="hw-ranklist__id">
+          <Link to={to} className="hw-ranklist__name">{row.name}</Link>
+          <span className="hw-ranklist__meta">
             {row.age ?? "--"}{row.sex ? ` ${row.sex}` : ""} &middot; Bed {row.bed}
           </span>
         </div>
-        {line !== null && <div className={styles.response}>{line}</div>}
-        {line === null && !compact && row.admitting_context && <div className={styles.context}>{row.admitting_context}</div>}
-        {!compact && row.escalation_reasons.length > 0 && (
-          <div className={styles.reasons}>
-            {row.escalation_reasons.map((r) => <span key={r.text} className="hw-tag">{r.text}</span>)}
-          </div>
+        {line !== null
+          ? <p className="hw-ranklist__response">{line}</p>
+          : row.admitting_context && <p className="hw-ranklist__context">{row.admitting_context}</p>}
+        {row.escalation_reasons.length > 0 && (
+          <ul className="hw-ranklist__reasons">
+            {row.escalation_reasons.map((r) => <li key={r.text} className="hw-tag">{r.text}</li>)}
+          </ul>
         )}
       </div>
 
-      <Vital label="Heart rate" points={p.heart_rate} trend={row.vital_trends.heart_rate} compact={compact}>
-        <MeasurementDisplay now={now} measurement={row.vitals.heart_rate} />
-      </Vital>
-      <Vital label="Respiratory rate" points={p.respiratory_rate} trend={row.vital_trends.respiratory_rate} compact={compact}>
-        <MeasurementDisplay now={now} measurement={row.vitals.respiratory_rate} />
-      </Vital>
-      <Vital label="SpO2" points={p.spo2} trend={row.vital_trends.spo2} compact={compact}>
-        <MeasurementDisplay now={now} measurement={row.vitals.spo2} format={(v) => `${v}%`} />
-      </Vital>
-      <div className={styles.vital} data-points={p.blood_pressure}>
-        <span className="hw-visually-hidden">Blood pressure </span>
-        <span className={styles.value}>
-          <MeasurementDisplay now={now} measurement={row.vitals.blood_pressure} format={formatBloodPressure} />
+      <div className="hw-ranklist__vitals">
+        <Vital name="Heart rate" label="HR" unit=" per minute" said={value(v.heart_rate, String)} points={p.heart_rate} trend={row.vital_trends.heart_rate}>
+          <span className="hw-ranklist__value"><MeasurementDisplay now={now} measurement={v.heart_rate} /></span>
+        </Vital>
+        <Vital name="Respiratory rate" label="RR" unit=" per minute" said={value(v.respiratory_rate, String)} points={p.respiratory_rate} trend={row.vital_trends.respiratory_rate}>
+          <span className="hw-ranklist__value"><MeasurementDisplay now={now} measurement={v.respiratory_rate} /></span>
+        </Vital>
+        <Vital name="SpO2" label="SpO2" unit=" percent" said={value(v.spo2, String)} points={p.spo2} trend={row.vital_trends.spo2}>
+          <span className="hw-ranklist__value"><MeasurementDisplay now={now} measurement={v.spo2} format={(n) => `${n}%`} /></span>
+        </Vital>
+        <Vital name="Blood pressure" label="BP" unit=" mmHg" said={value(v.blood_pressure, formatBloodPressure)} points={p.blood_pressure}>
+          <span className="hw-ranklist__value">
+            <MeasurementDisplay now={now} measurement={v.blood_pressure} format={formatBloodPressure} />
+          </span>
+          {v.blood_pressure.data.present && v.blood_pressure.provenance.source === "nurse" && <span className="hw-ranklist__by">by nurse</span>}
+        </Vital>
+        <Vital name="ACVPU" label="ACVPU" unit="" said={value(v.consciousness, String)} points={p.consciousness}>
+          <span className="hw-ranklist__value"><MeasurementDisplay now={now} measurement={v.consciousness} /></span>
+        </Vital>
+      </div>
+
+      <div className="hw-ranklist__data">
+        <span className="hw-ranklist__age" data-stale={age?.red || undefined}>
+          {age?.text}
+        </span>
+        {patch && row.signal_quality !== null && (
+          <span className="hw-ranklist__signal" data-weak={row.signal_quality <= 90 || undefined}>Signal {row.signal_quality}%</span>
+        )}
+        {nurse !== null && <span className="hw-ranklist__signal">{nurse}</span>}
+        <span className={`hw-ranklist__obs ${styles.obs}`} data-overdue={(due !== "continuous" && due <= now) || undefined}>
+          {obsText(due, now, row.last_update_s === null || !patch)}
         </span>
       </div>
-      <div className={styles.vital} data-points={p.consciousness}>
-        <span className="hw-visually-hidden">AVPU </span>
-        <span className={styles.value}><MeasurementDisplay now={now} measurement={row.vitals.consciousness} /></span>
-      </div>
 
-      <div className={styles.data}>
-        <DataAge row={row} ageOffsetS={ageOffsetS} offline={offline} />
-        {!compact && (
-          <>
-            {nurse !== null && <div>{nurse}</div>}
-            {patch && row.signal_quality !== null && (
-              <div data-weak={row.signal_quality <= 90 || undefined}>Signal {row.signal_quality}%</div>
-            )}
-            <ObsDue due={obsDue(row)} now={now} noPatch={row.last_update_s === null || !patch} />
-          </>
-        )}
-      </div>
-
-      <div className={styles.action}>
+      <div className="hw-ranklist__action">
         {alert && onAcknowledge ? (
           <button
             type="button"
-            className="hw-button hw-button--primary hw-button--sm"
+            className="hw-button hw-button--accent"
             disabled={offline}
             aria-label={`Acknowledge the alert for ${row.name}`}
             onClick={onAcknowledge}
@@ -147,7 +166,7 @@ export function WardRow({ row, role, now, ageOffsetS, compact = false, alert = f
             Acknowledge
           </button>
         ) : (
-          <Link to={to} className="hw-button hw-button--ghost hw-button--icon hw-button--sm" aria-label={`Open ${row.name}`}>
+          <Link to={to} className="hw-button hw-button--ghost hw-button--icon hw-ranklist__open" aria-label={`Open ${row.name}`}>
             <span className="hw-icon fa-solid fa-chevron-right" aria-hidden="true" />
           </Link>
         )}

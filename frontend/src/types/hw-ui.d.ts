@@ -16,4 +16,7 @@ declare module "hw-ui" {
     message: string; tone?: "success" | "danger" | "warning" | "info"; icon?: string; timeout?: number;
     action?: { label: string; onClick?: () => void };
   }): () => void;
+  /** Plays the element's exit; resolves true when it finished, false when cancelLeave() interrupted it. */
+  export function leave(el: Element | null): Promise<boolean>;
+  export function cancelLeave(el: Element | null): void;
 }

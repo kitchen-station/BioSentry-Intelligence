@@ -1,57 +1,14 @@
-/* One NOT RANKED patient inside the Ward's NOT RANKED strip (the strip is the dashed container). */
+/* One NOT RANKED patient: the kit's hw-notice__item. This file adds the last stored values and room for the entry form. */
 
-.row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
-  align-items: start;
-  gap: var(--hw-space-3) var(--hw-space-5);
-  padding: var(--hw-space-4) var(--hw-space-5);
-  background: var(--hw-color-surface-subtle);
-  border-radius: var(--hw-control-radius);
-}
-
-.infoCol,
-.reasonCol { min-width: 0; }
-
-.nameRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--hw-space-2) var(--hw-space-3);
-}
-
-.name {
-  font-size: var(--hw-font-size-16);
-  font-weight: var(--hw-weight-semibold);
-  color: var(--hw-color-text);
-}
-
-.detail,
-.instruction,
 .seen {
+  margin-top: var(--hw-space-2);
   font-size: var(--hw-text-caption);
   color: var(--hw-color-text-muted);
 }
 
-.context,
-.reason { font-size: var(--hw-font-size-14); }
-
-.context,
-.instruction { margin-top: 2px; }
-
-.reason { font-weight: var(--hw-weight-bold); }
-
-.seen { margin-top: var(--hw-space-2); }
-
-.action { margin-top: var(--hw-space-3); }
-
-/* The entry form opens under the row, across both columns. */
+/* The entry form opens under the patient, across the whole item. */
 .entry {
-  grid-column: 1 / -1;
+  flex: 1 1 100%;
   padding-top: var(--hw-space-4);
   border-top: 1px solid var(--hw-color-border-subtle);
-}
-
-@media (width < 576px) {
-  .row { grid-template-columns: 1fr; }
 }
