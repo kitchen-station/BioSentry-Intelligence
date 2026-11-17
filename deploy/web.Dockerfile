@@ -17,6 +17,7 @@ COPY --from=frontend package.json package-lock.json ./
 RUN npm ci
 COPY --from=frontend index.html tsconfig.json tsconfig.app.json tsconfig.node.json vite.config.ts ./
 COPY --from=frontend public ./public
+COPY --from=frontend vendor ./vendor
 COPY --from=frontend src ./src
 RUN VITE_API_URL=/api npx vite build
 
