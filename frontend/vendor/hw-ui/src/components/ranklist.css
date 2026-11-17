@@ -3,21 +3,22 @@
      or density leaves out, so render every element and let the kit drop it.
 
      section.hw-ranklist-wrap[aria-label="Ranked patients"]             surface, rounded, scrolls sideways if narrow
-       > div.hw-ranklist__head[aria-hidden=true] > span * 10             column names: Rank, NEWS2, Patient and next step,
-                                                                         Heart rate, Resp. rate, SpO2, BP, ACVPU, Data, (empty)
+       > div.hw-ranklist__head[aria-hidden=true] > span * 11             column names: Rank, NEWS2, Patient and next step,
+                                                                         Heart rate, Resp. rate, SpO2, temperature, BP, ACVPU, Data, (empty)
        + ol.hw-ranklist[data-density=comfortable|compact]
            > li.hw-ranklist__row[data-alert]                             data-alert only on unacknowledged alert rows
                > span.hw-ranklist__rank                                  "1" (hidden on cards: the list order says it)
-               + div.hw-score[data-band][role=img][aria-label]           default size when comfortable, .hw-score--sm when compact
+               + div.hw-ranklist__score > div.hw-score + span.hw-ranklist__status           default size when comfortable, .hw-score--sm when compact
                + div.hw-ranklist__who
                    > div.hw-ranklist__id > button.hw-ranklist__name[type=button] + span.hw-ranklist__meta ("67 F · Bed 4A")
                    + p.hw-ranklist__response                             role response line; takes the band colour of the row's score
                    + p.hw-ranklist__context                              only when there is no response line (comfortable rows only)
+                   + p.hw-ranklist__reason                               first reason or NEWS2 fallback, always visible
                    + ul.hw-ranklist__reasons > li.hw-tag *               reason chips (comfortable rows only)
-               + div.hw-ranklist__vitals                                 exactly five, in this order: HR, RR, SpO2, BP, ACVPU
+               + div.hw-ranklist__vitals                                 five vitals plus ACVPU, in this order: HR, RR, SpO2, temperature, BP, ACVPU
                    > div.hw-ranklist__vital[role=img][aria-label="Heart rate 118 per minute, adds 2 NEWS2 points"][data-points=0|1|2|3]
-                       > svg.hw-ranklist__spark[viewBox="0 0 64 24"][aria-hidden=true] > polyline + circle[r=2.5]   (HR, RR, SpO2; comfortable rows)
-                       + span.hw-ranklist__label ("HR", "RR", "SpO2", "BP", "ACVPU": shown on cards only)
+                       > svg.hw-ranklist__spark[viewBox="0 0 64 24"][aria-hidden=true] > polyline + circle[r=2.5]   (HR, RR, SpO2, temperature; comfortable rows)
+                       + span.hw-ranklist__label ("HR", "RR", "SpO2", "Temp", "BP", "ACVPU": shown on cards only)
                        + span.hw-ranklist__value ("118"; red when it adds points, bold at 2+)
                        + span.hw-ranklist__by ("by nurse", BP only; comfortable rows)
                + div.hw-ranklist__data
@@ -29,19 +30,18 @@
                    p.hw-ranklist__note ("Alert not acknowledged since 11:02 AM", read-only roles)
                    button.hw-button.hw-button--ghost.hw-button--icon.hw-ranklist__open[aria-label="Open Santos, Maria"] > i.fa-chevron-right
      Boolean attributes (data-alert, data-stale, data-weak) count when present; ="false" counts as absent.
-     Compact: 56px rows, no sparklines, chips, context, "by nurse", signal or obs.
-     Cards: score, name and age on top, response line, vitals in one line with labels, Acknowledge full width.
-     Rows from 1200px; from 1200 to 1365px the same columns run tighter (narrower vitals, shorter sparklines,
-     smaller gaps) so the action column stays in view without a sideways scroll. */
+     Compact: minimum 56px rows, no sparklines, chips, context, "by nurse", signal or obs.
+     Cards: score and statuses, name and age, response and reason, wrapping vitals, Acknowledge full width.
+     Rows from 1200px; narrower screens scroll horizontally to preserve all readings and statuses. */
   .hw-ranklist-wrap, .hw-ranklist {
-    --hw-ranklist-cols: 32px 64px minmax(250px, 1fr) 112px 112px 112px 84px 52px 132px 150px;
+    --hw-ranklist-cols: 32px 190px minmax(250px, 1fr) 112px 112px 112px 100px 112px 52px 132px 150px;
     --hw-ranklist-gap: var(--hw-space-5);
     --hw-ranklist-pad: 20px;
     --hw-ranklist-spark-width: 64px;
     --hw-ranklist-action-pad: 20px;
   }
   .hw-ranklist[data-density="compact"], .hw-ranklist-wrap:has(> .hw-ranklist[data-density="compact"]) {
-    --hw-ranklist-cols: 32px 100px minmax(250px, 1fr) 56px 56px 56px 84px 52px 132px 150px;
+    --hw-ranklist-cols: 32px 230px minmax(250px, 1fr) 76px 76px 64px 76px 112px 52px 132px 150px;
   }
   .hw-ranklist {
     --hw-ranklist-row-height: 88px;
@@ -63,7 +63,7 @@
     --hw-ranklist-response: var(--hw-color-text);
 
     display: grid;
-    grid-template-areas: "score id data" "resp resp resp" "vitals vitals vitals" "action action action";
+    grid-template-areas: "score score score" "id id data" "resp resp resp" "reason reason reason" "vitals vitals vitals" "action action action";
     grid-template-columns: auto minmax(0, 1fr) auto;
     column-gap: var(--hw-space-4);
     align-items: start;
@@ -76,11 +76,14 @@
     --hw-ranklist-row-bg: var(--hw-color-danger-bg);
     --hw-ranklist-edge: var(--hw-graph-emergency);
   }
-  .hw-ranklist__row:has(> .hw-score[data-band="high"]) { --hw-ranklist-response: var(--hw-graph-emergency-text); }
-  .hw-ranklist__row:has(> .hw-score[data-band="medium"]) { --hw-ranklist-response: var(--hw-graph-urgent-text); }
+  .hw-ranklist__row:has(.hw-score[data-band="high"]) { --hw-ranklist-response: var(--hw-graph-emergency-text); }
+  .hw-ranklist__row:has(.hw-score[data-band="medium"]) { --hw-ranklist-response: var(--hw-graph-urgent-text); }
 
   .hw-ranklist__rank { display: none; grid-area: rank; font-size: var(--hw-font-size-18); color: var(--hw-color-text-muted); text-align: center; }
-  .hw-ranklist__row > .hw-score { grid-area: score; }
+  .hw-ranklist__score { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+  .hw-ranklist__row > .hw-ranklist__score { grid-area: score; margin-bottom: 8px; }
+  .hw-ranklist__status { display: flex; flex-direction: column; font-size: var(--hw-font-size-11); line-height: 1.4; color: var(--hw-color-text-muted); }
+  .hw-ranklist__reason { display: block; grid-area: reason; margin: 3px 0 0; font-size: 13px; overflow-wrap: anywhere; }
   .hw-ranklist__who { display: contents; }
   .hw-ranklist__id { display: flex; flex-wrap: wrap; grid-area: id; gap: 0 10px; align-items: baseline; min-width: 0; }
   .hw-ranklist__name {
@@ -167,7 +170,7 @@
     .hw-ranklist__head { padding-block: 10px; font-size: var(--hw-text-caption); color: var(--hw-color-text-muted); }
     .hw-ranklist__head > :first-child { text-align: center; }
     .hw-ranklist__row {
-      grid-template-areas: "rank score who . . . . . data action";
+      grid-template-areas: "rank score who . . . . . . data action";
       min-height: var(--hw-ranklist-row-height);
       padding-block: var(--hw-ranklist-row-pad);
       border: 0;
@@ -176,6 +179,7 @@
       box-shadow: inset 4px 0 0 var(--hw-ranklist-edge);
     }
     .hw-ranklist__rank { display: block; }
+    .hw-ranklist__row > .hw-ranklist__score { margin-bottom: 0; }
     .hw-ranklist__who { display: block; grid-area: who; min-width: 0; }
     .hw-ranklist__response { margin: 0; }
     .hw-ranklist__context { display: block; }
@@ -201,17 +205,17 @@
     .hw-ranklist[data-density="compact"] :is(.hw-ranklist__spark, .hw-ranklist__context, .hw-ranklist__reasons, .hw-ranklist__by, .hw-ranklist__signal, .hw-ranklist__obs) { display: none; }
   }
 
-  /* Laptops (1200 to 1365px): about 1110px of rows instead of 1284, so a 1280px screen shows Acknowledge. */
+  /* Laptops (1200 to 1365px): tighter spacing; the wrapper scrolls when needed. */
   @media (1200px <= width < 1366px) {
     .hw-ranklist-wrap, .hw-ranklist {
-      --hw-ranklist-cols: 28px 64px minmax(220px, 1fr) 92px 92px 92px 76px 48px 116px 144px;
+      --hw-ranklist-cols: 28px 190px minmax(220px, 1fr) 80px 80px 64px 76px 112px 48px 116px 144px;
       --hw-ranklist-gap: var(--hw-space-4);
       --hw-ranklist-pad: var(--hw-space-5);
       --hw-ranklist-spark-width: 48px;
       --hw-ranklist-action-pad: 14px;
     }
     .hw-ranklist[data-density="compact"], .hw-ranklist-wrap:has(> .hw-ranklist[data-density="compact"]) {
-      --hw-ranklist-cols: 28px 100px minmax(220px, 1fr) 52px 52px 56px 76px 48px 116px 144px;
+      --hw-ranklist-cols: 28px 230px minmax(220px, 1fr) 76px 76px 64px 76px 112px 48px 116px 144px;
     }
   }
 }

@@ -32,6 +32,32 @@ export function responseLine(row: ScoreRow, b: Band, role: SessionRole): string 
   return row.escalation_reasons.some((r) => r.rule === "tier_b_finding") ? driftResponse(role, row.score) : null;
 }
 
+/** Use the served reason first; a quiet row still explains its NEWS2 position. */
+export function rankingReason(row: ScoreRow): string {
+  if (row.escalation_reasons.length > 0) return row.escalation_reasons[0].text;
+  if (row.models?.prediction?.state === "flag") return "Prediction model flag (synthetic, not validated)";
+  const trigger = { low: "no trigger", "low-medium": "single-parameter trigger", medium: "medium trigger", high: "high trigger" }[band(row)];
+  return `NEWS2 ${row.score}, ${trigger}`;
+}
+
+/** ScoreRow has positive baseline reasons, but no complete baseline assessment state. */
+export function RankedStatus({ row }: { row: ScoreRow }) {
+  // The row carries the baseline only when it flags; its other states are on the patient page.
+  const baseline = row.escalation_reasons.some((r) => r.rule === "tier_b_finding") ? "flagged" : "see patient page";
+  const prediction = row.models?.prediction;
+  const confidence = prediction?.state === "flag" ? "flagged"
+    : prediction?.state === "no_flag" ? "no flag"
+    : prediction?.state === "not_sure" ? "unsure"
+    : prediction?.state === "not_computed" && prediction.reason === "baseline forming" ? "forming"
+    : "unavailable";
+  return (
+    <span className="hw-ranklist__status" title="Synthetic, not validated. No flag is not an all-clear; NEWS2 sets the next step.">
+      <span title={baseline === "flagged" ? undefined : "The list shows the own-baseline result only when it flags. Open the patient for its full state."}>Own baseline: {baseline}</span>
+      <span title={prediction?.reason ?? undefined}>Confidence: {confidence}</span>
+    </span>
+  );
+}
+
 /**
  * How old the patch data is ("Stale · " once stale; `red` too while offline), or that there is no patch
  * signal; null when neither applies.
@@ -60,7 +86,7 @@ export function obsText(due: number | "continuous", now: number, noPatch: boolea
   return due === -Infinity ? "Obs due now" : `Obs overdue ${formatAge(Math.floor((now - due) / 1000)).replace(" ago", "")}`;
 }
 
-/** One of the five vitals (kit hw-ranklist__vital): named for a screen reader, which hears the value and its points. */
+/** A vital or the separate ACVPU input: named for a screen reader, including its NEWS2 points. */
 function Vital({ name, label, unit, said, points, trend, children }: {
   name: string; label: string; unit: string; said: string | null; points: number | undefined;
   trend?: readonly (number | null)[]; children: ReactNode;
@@ -101,7 +127,10 @@ export function WardRow({ row, role, now, ageOffsetS, compact = false, alert = f
   return (
     <li ref={ref} className="hw-ranklist__row" data-alert={alert || undefined} data-band={b}>
       <span className="hw-ranklist__rank"><Flip>{row.rank}</Flip></span>
-      <Score score={row.score} band={b} rising={row.trend === "rising"} small={compact} />
+      <div className="hw-ranklist__score">
+        <Score score={row.score} band={b} rising={row.trend === "rising"} small={compact} />
+        <RankedStatus row={row} />
+      </div>
 
       <div className="hw-ranklist__who">
         <div className="hw-ranklist__id">
@@ -113,24 +142,28 @@ export function WardRow({ row, role, now, ageOffsetS, compact = false, alert = f
         {line !== null
           ? <p className="hw-ranklist__response">{line}</p>
           : row.admitting_context && <p className="hw-ranklist__context">{row.admitting_context}</p>}
-        {row.escalation_reasons.length > 0 && (
+        <p className="hw-ranklist__reason">{rankingReason(row)}</p>
+        {row.escalation_reasons.length > 1 && (
           <ul className="hw-ranklist__reasons">
-            {row.escalation_reasons.map((r) => <li key={r.text} className="hw-tag">{r.text}</li>)}
+            {row.escalation_reasons.slice(1).map((r) => <li key={r.text} className="hw-tag">{r.text}</li>)}
           </ul>
         )}
       </div>
 
       <div className="hw-ranklist__vitals">
-        <Vital name="Heart rate" label="HR" unit=" per minute" said={value(v.heart_rate, String)} points={p.heart_rate} trend={row.vital_trends.heart_rate}>
-          <span className="hw-ranklist__value"><MeasurementDisplay now={now} measurement={v.heart_rate} /></span>
+        <Vital name="Heart rate" label="HR (bpm)" unit=" per minute" said={value(v.heart_rate, String)} points={p.heart_rate} trend={row.vital_trends.heart_rate}>
+          <span className="hw-ranklist__value"><MeasurementDisplay now={now} measurement={v.heart_rate} unit="bpm" /></span>
         </Vital>
-        <Vital name="Respiratory rate" label="RR" unit=" per minute" said={value(v.respiratory_rate, String)} points={p.respiratory_rate} trend={row.vital_trends.respiratory_rate}>
-          <span className="hw-ranklist__value"><MeasurementDisplay now={now} measurement={v.respiratory_rate} /></span>
+        <Vital name="Respiratory rate" label="RR (/min)" unit=" per minute" said={value(v.respiratory_rate, String)} points={p.respiratory_rate} trend={row.vital_trends.respiratory_rate}>
+          <span className="hw-ranklist__value"><MeasurementDisplay now={now} measurement={v.respiratory_rate} unit="/min" /></span>
         </Vital>
-        <Vital name="SpO2" label="SpO2" unit=" percent" said={value(v.spo2, String)} points={p.spo2} trend={row.vital_trends.spo2}>
+        <Vital name="SpO2" label="SpO2 (%)" unit=" percent" said={value(v.spo2, String)} points={p.spo2} trend={row.vital_trends.spo2}>
           <span className="hw-ranklist__value"><MeasurementDisplay now={now} measurement={v.spo2} format={(n) => `${n}%`} /></span>
         </Vital>
-        <Vital name="Blood pressure" label="BP" unit=" mmHg" said={value(v.blood_pressure, formatBloodPressure)} points={p.blood_pressure}>
+        <Vital name="Temperature" label="Temp (°C)" unit=" °C" said={value(v.temperature, String)} points={p.temperature} trend={row.vital_trends.temperature}>
+          <span className="hw-ranklist__value"><MeasurementDisplay now={now} measurement={v.temperature} unit="°C" /></span>
+        </Vital>
+        <Vital name="Blood pressure" label="BP (mmHg)" unit="" said={value(v.blood_pressure, formatBloodPressure)} points={p.blood_pressure}>
           <span className="hw-ranklist__value">
             <MeasurementDisplay now={now} measurement={v.blood_pressure} format={formatBloodPressure} />
           </span>

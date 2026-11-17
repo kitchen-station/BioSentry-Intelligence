@@ -15,9 +15,9 @@ describe("formatAge", () => {
 });
 
 describe("formatBloodPressure", () => {
-  it("writes systolic over diastolic", () => {
-    expect(formatBloodPressure({ systolic: 88, diastolic: 52 })).toBe("88/52");
-    expect(formatBloodPressure({ systolic: 224, diastolic: 118 })).toBe("224/118");
+  it("writes systolic over diastolic with mmHg", () => {
+    expect(formatBloodPressure({ systolic: 88, diastolic: 52 })).toBe("88/52 mmHg");
+    expect(formatBloodPressure({ systolic: 224, diastolic: 118 })).toBe("224/118 mmHg");
   });
 
   it("is never the default object stringification", () => {

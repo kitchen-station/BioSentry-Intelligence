@@ -69,7 +69,7 @@ describe("the last stored values of a NOT RANKED row", () => {
     syncWardNow("2026-09-03T07:00:00Z");
     const out = html(<AbstainedRow row={{ ...row, last_seen }} />);
     expect(out).toContain("HR 88 (device, 2 h ago,");
-    expect(out).toContain("BP 120/80 (nurse, 2 h ago,");
+    expect(out).toContain("BP 120/80 mmHg (nurse, 2 h ago,");
     expect(out).not.toContain("RR");
     forgetWardNow();
   });
@@ -79,7 +79,7 @@ describe("the last stored values of a NOT RANKED row", () => {
     const weak = { ...last_seen!, heart_rate: { ...last_seen!.heart_rate, provenance: { ...last_seen!.heart_rate.provenance, quality: "degraded" } } };
     const out = html(<AbstainedRow row={{ ...row, last_seen: weak as AbstainedRowType["last_seen"] }} />);
     expect(out).toContain("HR 88 (device, degraded, 2 h ago,");
-    expect(out).toContain("BP 120/80 (nurse, 2 h ago,");
+    expect(out).toContain("BP 120/80 mmHg (nurse, 2 h ago,");
     forgetWardNow();
   });
 

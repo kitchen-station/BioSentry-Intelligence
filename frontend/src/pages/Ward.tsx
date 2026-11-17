@@ -13,7 +13,7 @@ import { Segmented } from "../components/Segmented";
 import { VitalsEntry } from "../components/VitalsEntry";
 import { news2Points } from "../components/news2";
 import { sentence, standing } from "../components/vitalsDraft";
-import { DataAge, WardRow, responseLine } from "../components/WardRow";
+import { DataAge, RankedStatus, WardRow, rankingReason, responseLine } from "../components/WardRow";
 import { useWardFeed, type WardFeed } from "../components/wardFeed";
 import { WardFeedProvider } from "../components/WardFeedProvider";
 import { since, useWardNow } from "../components/wardNow";
@@ -51,9 +51,10 @@ function NotRankedTableRow({ row, now, canRecord, offline, onRecord }: {
       <td className={styles.who}><Link to={`/patient/${row.id}`}>{row.name}</Link> <span className={styles.sub}>{row.age ?? "--"}{row.sex ? ` ${row.sex}` : ""}</span></td>
       <td><span className="hw-tag hw-tag--dashed">NOT RANKED</span></td>
       <td><strong>{sentence(row.reason)}</strong> {sentence(row.instruction)}</td>
-      <td>{v ? <MeasurementDisplay now={now} measurement={v.heart_rate} /> : "--"}</td>
-      <td>{v ? <MeasurementDisplay now={now} measurement={v.respiratory_rate} /> : "--"}</td>
+      <td>{v ? <MeasurementDisplay now={now} measurement={v.heart_rate} unit="bpm" /> : "--"}</td>
+      <td>{v ? <MeasurementDisplay now={now} measurement={v.respiratory_rate} unit="/min" /> : "--"}</td>
       <td>{v ? <MeasurementDisplay now={now} measurement={v.spo2} format={(n) => `${n}%`} /> : "--"}</td>
+      <td>{v ? <MeasurementDisplay now={now} measurement={v.temperature} unit="°C" /> : "--"}</td>
       <td>{v ? <MeasurementDisplay now={now} measurement={v.blood_pressure} format={formatBloodPressure} /> : "--"}</td>
       <td>{v ? <MeasurementDisplay now={now} measurement={v.consciousness} /> : "--"}</td>
       <td>--</td>
@@ -227,8 +228,8 @@ function WardPage({ session, onSignOut, feed }: Props & { feed: WardFeed }) {
         {view === "list" && ranked.length > 0 && (
           <section aria-label="Ranked patients" className={`hw-ranklist-wrap ${styles.panel}`}>
             <div className="hw-ranklist__head" aria-hidden="true">
-              <span>Rank</span><span>NEWS2</span><span>Patient and next step</span><span>Heart rate</span><span>Resp. rate</span>
-              <span>SpO2</span><span>BP</span><span>ACVPU</span><span>Data</span><span />
+              <span>Rank</span><span>NEWS2</span><span>Patient and next step</span><span>Heart rate (bpm)</span><span>Resp. rate (/min)</span>
+              <span>SpO2 (%)</span><span>Temp (°C)</span><span>BP (mmHg)</span><span>ACVPU</span><span>Data</span><span />
             </div>
             <ol className="hw-ranklist" data-density={density}>
               {ranked.map((row) => (
@@ -260,7 +261,7 @@ function WardPage({ session, onSignOut, feed }: Props & { feed: WardFeed }) {
                       <button type="button" className={styles.sort} onClick={() => setSort(k)}>{k === "rank" ? "Rank" : "Bed"}</button>
                     </th>
                   ))}
-                  <th>Patient</th><th>NEWS2</th><th>Next step</th><th>HR</th><th>RR</th><th>SpO2</th><th>BP</th><th>ACVPU</th><th>Data age</th>
+                  <th>Patient</th><th>NEWS2</th><th>Reason and next step</th><th>HR (bpm)</th><th>RR (/min)</th><th>SpO2 (%)</th><th>Temp (°C)</th><th>BP (mmHg)</th><th>ACVPU</th><th>Data age</th>
                   <th><span className="hw-visually-hidden">Action</span></th>
                 </tr>
               </thead>
@@ -279,11 +280,12 @@ function WardPage({ session, onSignOut, feed }: Props & { feed: WardFeed }) {
                       <td>{r.rank}</td>
                       <td>{r.bed}</td>
                       <td className={styles.who}><Link to={`/patient/${r.id}`}>{r.name}</Link> <span className={styles.sub}>{r.age ?? "--"}{r.sex ? ` ${r.sex}` : ""}</span></td>
-                      <td><Score score={r.score} band={b} rising={r.trend === "rising"} small /></td>
-                      <td className={styles.next} data-band={b}>{responseLine(r, b, session.role) ?? "--"}</td>
-                      <td className={styles.vital} data-points={p.heart_rate}><MeasurementDisplay now={now} measurement={r.vitals.heart_rate} /></td>
-                      <td className={styles.vital} data-points={p.respiratory_rate}><MeasurementDisplay now={now} measurement={r.vitals.respiratory_rate} /></td>
+                      <td><div className="hw-ranklist__score"><Score score={r.score} band={b} rising={r.trend === "rising"} small /><RankedStatus row={r} /></div></td>
+                      <td className={styles.next} data-band={b}><p className="hw-ranklist__reason">{rankingReason(r)}</p>{responseLine(r, b, session.role)}</td>
+                      <td className={styles.vital} data-points={p.heart_rate}><MeasurementDisplay now={now} measurement={r.vitals.heart_rate} unit="bpm" /></td>
+                      <td className={styles.vital} data-points={p.respiratory_rate}><MeasurementDisplay now={now} measurement={r.vitals.respiratory_rate} unit="/min" /></td>
                       <td className={styles.vital} data-points={p.spo2}><MeasurementDisplay now={now} measurement={r.vitals.spo2} format={(n) => `${n}%`} /></td>
+                      <td className={styles.vital} data-points={p.temperature}><MeasurementDisplay now={now} measurement={r.vitals.temperature} unit="°C" /></td>
                       <td className={styles.vital} data-points={p.blood_pressure}>
                         <MeasurementDisplay now={now} measurement={r.vitals.blood_pressure} format={formatBloodPressure} />
                       </td>
