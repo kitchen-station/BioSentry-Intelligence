@@ -292,7 +292,7 @@ describe("Overview", () => {
   });
 
   it("shows no picker when the units cannot be read", async () => {
-    api.getUnits.mockRejectedValue(new ApiError(403, "Forbidden"));
+    api.getUnits.mockRejectedValue(new ApiError(403, "Forbidden", null));
     show();
     await screen.findByText(AS_OF);
     expect(screen.queryByRole("combobox")).toBeNull();
