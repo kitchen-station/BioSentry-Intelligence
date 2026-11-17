@@ -170,25 +170,28 @@ export interface components {
         readonly AnalyticsHour: {
             readonly admitted: number;
             readonly beds_in_use: number;
-            readonly discharged: number;
             readonly from_minute: number;
+            readonly left: number;
             readonly news2: components["schemas"]["News2Counts"];
             readonly to_minute: number;
             readonly transferred_in: number;
-            readonly transferred_out: number;
         };
         /**
          * AnalyticsShift
          * @description Run-relative 12-hour shifts, clipped to the requested window. Alerts count scored
          *     patient bins ending in (from, to] with NEWS2 >=5 or a single parameter at 3, not runs of them.
          *     Patient-minutes sum stay overlap, including unranked patients. Unknown arrival times
-         *     contribute from the window start; they are not counted as admissions.
+         *     contribute from the window start; they are not counted as admissions. Discharged, transferred_out
+         *     and died count the stays that ended in (from, to]; null when 1 to 4 (k = 5).
          */
         readonly AnalyticsShift: {
             readonly alerts: number;
+            readonly died: number | null;
+            readonly discharged: number | null;
             readonly from_minute: number;
             readonly patient_minutes: number;
             readonly to_minute: number;
+            readonly transferred_out: number | null;
         };
         /** BaselineComputed */
         readonly BaselineComputed: {
@@ -317,16 +320,6 @@ export interface components {
          * @enum {string}
          */
         readonly FindingDirection: "rising" | "falling" | "stable" | "new";
-        /**
-         * FinishedStayCount
-         * @description Finished stays grouped by arrival/departure minute, never individual identifiers.
-         *     Includes every exit outcome in the window; an unknown arrival remains null.
-         */
-        readonly FinishedStayCount: {
-            readonly count: number;
-            readonly in_minute: number | null;
-            readonly out_minute: number;
-        };
         /** FlagMeasurement */
         readonly FlagMeasurement: {
             readonly data: components["schemas"]["FlagPresent"] | components["schemas"]["MeasurementAbsent"];
@@ -768,11 +761,11 @@ export interface components {
          * OpenWardAnalytics
          * @description Last hours of ward time, oldest first, with zero-filled buckets. Transfers in are
          *     arrivals linked by person, time and destination to a transferred stay in this run;
-         *     other known arrivals are admissions. Discharged counts only the discharged outcome.
+         *     other known arrivals are admissions.
          */
         readonly OpenWardAnalytics: {
-            readonly finished_stays: readonly components["schemas"]["FinishedStayCount"][];
             readonly hourly: readonly components["schemas"]["AnalyticsHour"][];
+            readonly length_of_stay: readonly components["schemas"]["StayLength"][];
             /** Format: date-time */
             readonly origin: string;
             readonly shifts: readonly components["schemas"]["AnalyticsShift"][];
@@ -1238,6 +1231,16 @@ export interface components {
             readonly value: components["schemas"]["Spo2Scale"];
         };
         /**
+         * StayLength
+         * @description Finished stays in the window whose length is from_hours to from_hours + 1 whole hours; the last
+         *     bucket also holds longer stays. A stay with an unknown arrival has no length and is in none. No
+         *     arrival or departure time. Null when 1 to 4 stays (k = 5).
+         */
+        readonly StayLength: {
+            readonly count: number | null;
+            readonly from_hours: number;
+        };
+        /**
          * Tier
          * @enum {string}
          */
@@ -1458,7 +1461,6 @@ export type ClinicalNote = components['schemas']['ClinicalNote'];
 export type EscalationReason = components['schemas']['EscalationReason'];
 export type EscalationRule = components['schemas']['EscalationRule'];
 export type FindingDirection = components['schemas']['FindingDirection'];
-export type FinishedStayCount = components['schemas']['FinishedStayCount'];
 export type FlagMeasurement = components['schemas']['FlagMeasurement'];
 export type FlagPresent = components['schemas']['FlagPresent'];
 export type HistoryEvent = components['schemas']['HistoryEvent'];
@@ -1526,6 +1528,7 @@ export type SimulatedEpisode = components['schemas']['SimulatedEpisode'];
 export type Spo2Scale = components['schemas']['Spo2Scale'];
 export type Spo2ScaleMeasurement = components['schemas']['Spo2ScaleMeasurement'];
 export type Spo2ScalePresent = components['schemas']['Spo2ScalePresent'];
+export type StayLength = components['schemas']['StayLength'];
 export type Tier = components['schemas']['Tier'];
 export type TierAScore = components['schemas']['TierAScore'];
 export type TierBreakdown = components['schemas']['TierBreakdown'];
