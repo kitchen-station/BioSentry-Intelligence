@@ -1,0 +1,93 @@
+@layer hw.components {
+  /* NEWS2 score tile. The band is always written, inside the tile or beside it.
+     div.hw-score[data-band=high|medium|low][role=img][aria-label="NEWS2 9, High, rising"]
+       > span.hw-score__value + span.hw-score__band (+ i.hw-icon.fa-solid.fa-arrow-up when rising)
+     Sizes: default 60px (54px below 576px), --sm 40px with the band beside the tile.
+     In --sm, leave out .hw-score__band where the band is already written next to it (the alert tray line).
+     "Low-medium" (a single parameter at 3) is data-band="medium" with that word in the band. */
+  .hw-score {
+    --hw-score-bg: var(--hw-color-fill-disabled);
+    --hw-score-fg: var(--hw-color-text);
+    --hw-score-border: var(--hw-score-bg);
+    --hw-score-word: var(--hw-color-text);        /* the band word when it sits beside the tile */
+    --hw-score-size: 54px;                         /* phones; 60px from 576px up */
+    --hw-score-font: 26px;
+    --hw-score-radius: var(--hw-radius-lg);
+    --hw-score-lift: 14px;                         /* room under the number for the band inside the tile */
+    --hw-score-band-area: 1 / 1;                   /* 1 / 1 inside the tile, 1 / 2 beside it */
+    --hw-score-band-align: end;
+    --hw-score-band-justify: center;
+    --hw-score-band-inset: 7px;
+    --hw-score-band-font: var(--hw-font-size-11);
+    --hw-score-band-fg: var(--hw-score-fg);
+
+    display: inline-grid;
+    flex-shrink: 0;
+    grid-template-columns: minmax(var(--hw-score-size), max-content);   /* widens for "Low-medium" rather than spill */
+    grid-auto-columns: auto;
+    column-gap: var(--hw-space-3);
+    align-items: center;
+    vertical-align: middle;
+    line-height: 1;
+  }
+  .hw-score[data-band="high"] {
+    --hw-score-bg: var(--hw-color-emergency);
+    --hw-score-fg: var(--hw-color-on-emergency);
+    --hw-score-word: var(--hw-graph-emergency-text);
+  }
+  .hw-score[data-band="medium"] {
+    --hw-score-bg: var(--hw-color-surface);
+    --hw-score-fg: var(--hw-graph-urgent-text);
+    --hw-score-border: var(--hw-graph-urgent);
+    --hw-score-word: var(--hw-graph-urgent-text);
+  }
+
+  .hw-score__value {
+    display: grid;
+    grid-area: 1 / 1;
+    place-items: center;
+    height: var(--hw-score-size);
+    padding-bottom: var(--hw-score-lift);
+    font-size: var(--hw-score-font);
+    font-weight: var(--hw-weight-medium);
+    font-variant-numeric: tabular-nums;
+    color: var(--hw-score-fg);
+    background: var(--hw-score-bg);
+    border: 2px solid var(--hw-score-border);
+    border-radius: var(--hw-score-radius);
+  }
+  .hw-score__band {
+    display: inline-flex;
+    grid-area: var(--hw-score-band-area);
+    gap: 3px;
+    align-items: center;
+    align-self: var(--hw-score-band-align);
+    justify-self: var(--hw-score-band-justify);
+    margin-bottom: var(--hw-score-band-inset);
+    padding-inline: 2px;
+    font-size: var(--hw-score-band-font);
+    font-weight: var(--hw-weight-bold);
+    line-height: 1.1;
+    color: var(--hw-score-band-fg);
+    white-space: nowrap;
+  }
+  .hw-score__band > .hw-icon { --hw-icon-size: 1em; width: 1em; }
+
+  /* 40px: compact list rows and the alert tray. The band moves beside the tile. */
+  .hw-score--sm {
+    --hw-score-size: 40px;
+    --hw-score-font: var(--hw-font-size-20);
+    --hw-score-radius: var(--hw-radius-md);
+    --hw-score-lift: 0;
+    --hw-score-band-area: 1 / 2;
+    --hw-score-band-align: center;
+    --hw-score-band-justify: start;
+    --hw-score-band-inset: 0;
+    --hw-score-band-font: var(--hw-text-caption);
+    --hw-score-band-fg: var(--hw-score-word);
+  }
+
+  @media (width >= 576px) {
+    .hw-score:not(.hw-score--sm) { --hw-score-size: 60px; --hw-score-font: 28px; --hw-score-band-inset: 9px; }
+  }
+}

@@ -21,14 +21,30 @@
   .hw-alert__title { margin: 0 0 2px; font-weight: var(--hw-weight-semibold); }
 
   .hw-banner {
+    --hw-banner-fg: var(--hw-color-text);
+    --hw-banner-bg: var(--hw-color-surface-subtle);
+    --hw-banner-border: var(--hw-color-border-subtle);
+    --hw-banner-font: var(--hw-text-caption);
+
     display: flex;
-    gap: var(--hw-space-4);
+    flex-wrap: wrap;
+    gap: var(--hw-space-2) var(--hw-space-4);
     align-items: center;
     min-height: 40px;
     padding: var(--hw-space-3) var(--hw-space-5);
-    font-size: var(--hw-text-caption);
-    background: var(--hw-color-surface-subtle);
-    border-bottom: 1px solid var(--hw-color-border-subtle);
+    font-size: var(--hw-banner-font);
+    color: var(--hw-banner-fg);
+    background: var(--hw-banner-bg);
+    border-bottom: 1px solid var(--hw-banner-border);
   }
+  .hw-banner__title { font-size: var(--hw-font-size-16); font-weight: var(--hw-weight-medium); }
   .hw-banner__close { margin-left: auto; }
+  /* Offline: black, never a clinical colour. Use with role="alert".
+     div.hw-banner.hw-banner--inverse[role=alert] > i.hw-icon + strong.hw-banner__title + span */
+  .hw-banner--inverse {
+    --hw-banner-fg: var(--hw-color-text-inverse);
+    --hw-banner-bg: var(--hw-color-surface-inverse);
+    --hw-banner-border: var(--hw-color-surface-inverse);
+    --hw-banner-font: var(--hw-font-size-14);
+  }
 }

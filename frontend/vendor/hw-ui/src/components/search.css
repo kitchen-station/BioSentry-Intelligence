@@ -1,0 +1,78 @@
+@layer hw.components {
+  /* Patient search (combobox). Behaviour lives in the app: "/" focuses the field, Down/Up move the active
+     option (aria-activedescendant + aria-selected="true" on it), Enter opens, Esc clears then closes.
+     div.hw-search
+       > label.hw-input > i.hw-icon.hw-input__icon.fa-solid.fa-magnifying-glass[aria-hidden=true]
+           + input.hw-input__control[type=search][role=combobox][aria-label][aria-expanded][aria-controls][aria-autocomplete=list][aria-activedescendant]
+           + kbd.hw-search__key[aria-hidden=true] ("/")
+       + ul.hw-search__results[role=listbox][id][aria-label="Patients in rank order"]
+           > li.hw-search__caption[aria-hidden=true] ("In rank order", optional)
+           + li[role=option][id][aria-selected=true|false]
+               > span.hw-search__rank ("#1", empty when not ranked) + span.hw-search__name + span.hw-search__bed ("67 F · Bed 4A")
+               + span.hw-tag.hw-tag--round (.hw-tag--emergency | .hw-tag--urgent | plain for low | .hw-tag--dashed for NOT RANKED)
+       + p.hw-search__empty[role=status] (no match; shown instead of the list) */
+  .hw-search {
+    --hw-search-width: 100%;
+    --hw-search-results-width: 360px;
+
+    position: relative;
+    width: var(--hw-search-width);
+  }
+  .hw-search__key {
+    display: none;
+    flex-shrink: 0;
+    padding: 0 6px;
+    font: inherit;
+    font-size: var(--hw-text-caption);
+    line-height: 18px;
+    color: var(--hw-color-text-muted);
+    border: 1px solid var(--hw-color-border);
+    border-radius: var(--hw-radius-xs);
+  }
+
+  .hw-search__results, .hw-search__empty {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    left: 0;
+    z-index: var(--hw-z-popup);
+    margin: 0;
+    background: var(--hw-color-surface);
+    border: 1px solid var(--hw-color-border-subtle);
+    border-radius: var(--hw-popup-radius);
+    box-shadow: var(--hw-elevation-popup);
+    transform-origin: top;
+    animation: hw-pop-in var(--hw-motion-micro) var(--hw-ease-enter);
+  }
+  .hw-search__results[data-hw-leaving], .hw-search__empty[data-hw-leaving] { animation: hw-pop-out var(--hw-motion-micro) var(--hw-ease-exit) forwards; }
+  .hw-search__results { max-height: min(420px, 70dvh); padding: var(--hw-space-3) 0; overflow-y: auto; list-style: none; }
+  .hw-search__empty { padding: var(--hw-space-4) var(--hw-space-5); color: var(--hw-color-text-muted); }
+  .hw-search__caption { padding: var(--hw-space-2) var(--hw-space-5) var(--hw-space-3); font-size: var(--hw-text-caption); color: var(--hw-color-text-muted); }
+
+  .hw-search__results > [role="option"] {
+    display: grid;
+    grid-template-areas: "rank name tag" "rank bed tag";
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    column-gap: var(--hw-space-4);
+    align-items: center;
+    min-height: 48px;
+    padding: 6px var(--hw-space-5);
+    cursor: pointer;
+    transition: background-color var(--hw-duration-1);
+  }
+  .hw-search__results > [role="option"]:hover { background: var(--hw-color-fill-hover); }
+  /* The field keeps focus, so the active option carries its own visible mark. */
+  .hw-search__results > [role="option"][aria-selected="true"] { background: var(--hw-color-fill-hover); box-shadow: inset 3px 0 0 var(--hw-color-focus); }
+  .hw-search__rank { grid-area: rank; color: var(--hw-color-text-muted); font-variant-numeric: tabular-nums; }
+  .hw-search__name { grid-area: name; overflow: hidden; font-weight: var(--hw-weight-medium); text-overflow: ellipsis; white-space: nowrap; }
+  .hw-search__bed { grid-area: bed; font-size: var(--hw-text-caption); color: var(--hw-color-text-muted); }
+  .hw-search__results > [role="option"] > .hw-tag { grid-area: tag; }
+
+  @media (width >= 576px) {
+    .hw-search { --hw-search-width: 232px; }
+    .hw-search__results, .hw-search__empty { left: auto; width: var(--hw-search-results-width); max-width: calc(100vw - 32px); }
+  }
+  @media (width >= 768px) {
+    .hw-search__key { display: inline-block; }
+  }
+}
