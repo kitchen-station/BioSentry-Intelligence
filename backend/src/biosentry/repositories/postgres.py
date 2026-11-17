@@ -33,6 +33,9 @@ from biosentry.schemas import ClinicalNote, LabPanel, TierStatus, UnscoredPatien
 
 LIVE_WITHIN = timedelta(seconds=30)  # a sim run whose last batch is older is not "receiving data"
 CONTROL_ROLES = ("md", "charge_rn")  # the roles that may send commands to the ward simulation
+# Owner decision orch-s2: only these two may set the speed of, skip or reset the whole shared run. Any other physician
+# or charge nurse may still send the patient commands of their own unit's patients.
+RUN_STEERERS = ("rn-manalo", "md-santos")
 ADMIN_ROLE = "admin"  # reads the ward and its patients, writes nothing, is never assigned
 SESSION_TTL = timedelta(hours=12)
 # judgement: RCP NEWS2 (2017) chart, "minimum 12 hourly" at aggregate 0, used for every score.
@@ -317,6 +320,7 @@ class PostgresStore:
         self.synthetic = bool(run["synthetic"])
         self.ended = bool(run["ended"])
         self.as_of: datetime = run["as_of"]
+        self.origin: datetime = run["origin"]
         self.last_batch_at: datetime | None = run["last_batch_at"]
         self.tier_status = [TierStatus.model_validate(t) for t in run["tier_status"]]
 
@@ -345,6 +349,11 @@ class PostgresStore:
     def can_control(self, clinician_id: str) -> bool:
         """Whether this clinician may send the sim commands: the one place that rule is written."""
         return self.role_of(clinician_id) in CONTROL_ROLES
+
+    def can_steer_run(self, clinician_id: str) -> bool:
+        """Whether this clinician may send the commands that act on the whole shared run (speed, skip,
+        reset): the one place that rule is written. Needs `can_control` too, as the route checks."""
+        return clinician_id in RUN_STEERERS
 
     def is_admin(self, clinician_id: str) -> bool:
         """Whether this clinician is an admin: the one place that rule is written."""
@@ -763,6 +772,37 @@ class PostgresStore:
             }
             for r in rows
         ]
+
+    def analytics_inputs(
+        self, unit: str, since: datetime, until: datetime
+    ) -> tuple[list[dict[str, Any]], dict[str, dict[datetime, dict[str, float | None]]], dict[str, list[StoredObservation]]]:
+        """For the unit's stays that were not over before `since`, in three statements: the stays
+        (times, outcome, and whether it began with a transfer in), the stored device bins ending in (since, until] by patient and
+        bin, and the rows the as-of rebuild reads (charted codes, and every nurse-typed device value)."""
+        stays = self.conn.execute(
+            "SELECT p.id, p.admitted_at, p.left_at, p.outcome, EXISTS (SELECT 1 FROM patient o"
+            " WHERE o.run_id = p.run_id AND o.person = p.person AND o.outcome = 'transferred'"
+            " AND o.to_unit = p.unit AND o.left_at = p.admitted_at) AS transfer_in FROM patient p"
+            " WHERE p.run_id = %s AND p.unit = %s AND (p.left_at IS NULL OR p.left_at > %s) ORDER BY p.id",
+            (self.run_id, unit, since),
+        ).fetchall()
+        ids = [s["id"] for s in stays]
+        bins: dict[str, dict[datetime, dict[str, float | None]]] = defaultdict(lambda: defaultdict(dict))
+        for b in self.conn.execute(
+            "SELECT patient_id, vital, bin_at, value FROM vital_bin WHERE run_id = %s AND patient_id = ANY(%s)"
+            " AND vital = ANY(%s) AND bin_at > %s AND bin_at <= %s",
+            (self.run_id, ids, list(DEVICE_VITALS), since, until),
+        ):
+            bins[b["patient_id"]][b["bin_at"]][b["vital"]] = b["value"]
+        rows: dict[str, list[StoredObservation]] = defaultdict(list)
+        for r in self.conn.execute(
+            "SELECT patient_id, code, source, observed_at, id, quality, num, num2, txt, absent_reason"
+            " FROM observation WHERE run_id = %s AND patient_id = ANY(%s) AND observed_at <= %s"
+            " AND (code = ANY(%s) OR source = 'nurse') AND code = ANY(%s)",
+            (self.run_id, ids, until, list(CHARTED_VITALS), [*CHARTED_VITALS, *DEVICE_VITALS]),
+        ):
+            rows[r["patient_id"]].append(StoredObservation(**r))
+        return stays, bins, rows
 
     def live_view(self, unit: str) -> dict[str, Any] | None:
         """The view the sim last published for this unit, unscoped. None: nothing published."""
