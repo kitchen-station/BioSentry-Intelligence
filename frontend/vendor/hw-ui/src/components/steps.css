@@ -1,5 +1,6 @@
 @layer hw.components {
-  /* Markup: ol.hw-steps > li.hw-steps__step[data-status=done|current|error] (current also aria-current=step) */
+  /* Markup: ol.hw-steps > li.hw-steps__step[data-status=done|current|error] (current also aria-current=step)
+     Current: brand red by default; --accent makes it ink, for products where red is clinical (as hw-segmented--accent). */
   .hw-steps { display: flex; gap: var(--hw-space-3); margin: 0; padding: 0; list-style: none; counter-reset: hw-step; }
   .hw-steps__step {
     --hw-step-bg: var(--hw-color-surface);
@@ -36,6 +37,7 @@
   .hw-steps__step[data-status="current"] { --hw-step-bg: var(--hw-color-brand); --hw-step-fg: var(--hw-color-text-on-brand); --hw-step-border: var(--hw-color-brand); font-weight: var(--hw-weight-semibold); color: var(--hw-color-text); }
   .hw-steps__step[data-status="error"] { --hw-step-bg: var(--hw-color-danger-bg); --hw-step-fg: var(--hw-color-danger-fg); --hw-step-border: var(--hw-color-danger); }
   .hw-steps__step[data-status="error"]::before { content: "!"; }
+  .hw-steps--accent > .hw-steps__step[data-status="current"] { --hw-step-bg: var(--hw-color-accent); --hw-step-fg: var(--hw-color-on-accent); --hw-step-border: var(--hw-color-accent); }
 
   @media (width < 576px) {
     .hw-steps { flex-direction: column; gap: 0; }
