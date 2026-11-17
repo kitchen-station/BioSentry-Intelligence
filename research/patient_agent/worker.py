@@ -21,6 +21,7 @@ R_KIND, R_QUESTION = base.R_KIND, base.R_QUESTION
 R_PATIENT = "the worker does not accept this job: patient"
 R_REFUSED = "Refused: this agent answers only fixed kinds of question about this patient's own data."
 R_HISTORY = "Refused: the alert history of the stay is not available to this agent yet."
+R_SHIFT = "Refused: this patient's data has no shift boundary; ask about a number of hours instead."
 R_UNGROUNDED = "Refused: a number in the answer is not in this patient's data."
 R_SIZE, R_ERROR = base.R_SIZE, base.R_ERROR
 
@@ -56,6 +57,8 @@ def report_for(job: dict, commit: str | None) -> dict:
     if out["status"] == "refused":
         if out["reason"] == "history":
             return {"state": "refused", "reason": R_HISTORY}
+        if out["reason"] == "shift":
+            return {"state": "refused", "reason": R_SHIFT}
         return {"state": "refused", "reason": R_REFUSED}
     if out["status"] == "ungrounded":
         return {"state": "refused", "reason": R_UNGROUNDED}
