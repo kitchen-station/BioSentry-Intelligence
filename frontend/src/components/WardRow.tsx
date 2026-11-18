@@ -127,7 +127,7 @@ export function WardRow({ row, role, now, ageOffsetS, compact = false, alert = f
   const to = `/patient/${row.id}`;
 
   return (
-    <li ref={ref} className="hw-ranklist__row" data-alert={alert || undefined} data-band={b}>
+    <li ref={ref} className={`hw-ranklist__row ${styles.tap}`} data-alert={alert || undefined} data-band={b}>
       <span className="hw-ranklist__rank"><Flip>{row.rank}</Flip></span>
       <div className="hw-ranklist__score">
         <Score score={row.score} band={b} rising={row.trend === "rising"} small={compact} />
@@ -136,7 +136,7 @@ export function WardRow({ row, role, now, ageOffsetS, compact = false, alert = f
 
       <div className="hw-ranklist__who">
         <div className="hw-ranklist__id">
-          <Link to={to} className="hw-ranklist__name">{row.name}</Link>
+          <Link to={to} className={`hw-ranklist__name ${styles.link}`}>{row.name}</Link>
           <span className="hw-ranklist__meta">
             {row.age ?? "--"}{row.sex ? ` ${row.sex}` : ""} &middot; {row.unit ?? fallbackUnit ?? "Unit unavailable"} &middot; {row.floor == null ? "Floor unavailable" : `Floor ${row.floor}`} &middot; Bed {row.bed}
           </span>
