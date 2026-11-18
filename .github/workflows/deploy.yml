@@ -56,4 +56,12 @@ jobs:
         env:
           VITE_API_URL: ${{ vars.VITE_API_URL }}
       - if: steps.gate.outputs.go == 'true'
-        run: npx --yes wrangler@4.155.0 pages deploy dist --project-name=biosentry-dashboard --branch=main --commit-hash=${{ github.sha }}
+        # Pages serves the main address only from the project's production branch; any other
+        # branch name lands on a preview URL. Ask the project which one it is instead of assuming.
+        run: |
+          prod=$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/biosentry-dashboard" \
+            | jq -r '.result.production_branch')
+          echo "production branch: $prod"
+          test -n "$prod" && test "$prod" != null
+          npx --yes wrangler@4.155.0 pages deploy dist --project-name=biosentry-dashboard --branch="$prod" --commit-hash=${{ github.sha }}
