@@ -12,3 +12,9 @@
   width: 100%;
   height: 100%;
 }
+
+/* Tap anywhere on the row to open the patient: the name link stretches over the row,
+   and the acknowledge button stays above it. */
+.tap { position: relative; cursor: pointer; }
+.link::after { content: ""; position: absolute; inset: 0; }
+.tap button { position: relative; z-index: 1; }
